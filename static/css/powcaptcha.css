@@ -1,0 +1,102 @@
+
+.pow-captcha .loading-spinner {
+  padding: 16px 0;
+}
+
+.pow-captcha .loading-spinner .spinner {
+  height: 30px;
+  margin: 0 16px;
+}
+
+.pow-captcha .faucet-image {
+  margin: 8px 8px 8px 8px;
+}
+ 
+@media screen and (max-height:700px) {
+  .pow-captcha .faucet-image {
+    display:none;
+  }
+}
+
+.pow-captcha .faucet-actions {
+  margin: 8px 0;
+}
+
+.pow-captcha .faucet-actions button {
+  width: 100%;
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+}
+
+.pow-captcha .faucet-actions button.start-action {
+  background-color: #4CAF50;
+}
+
+.pow-captcha .faucet-actions button.stop-action {
+  background-color: #af4c4c;
+}
+
+.pow-captcha .faucet-actions button:disabled {
+  background-color: gray;
+  color: #ccc;
+  cursor: wait;
+}
+
+.pow-captcha .faucet-inputs {
+  margin-top: 24px;
+}
+
+.pow-captcha .faucet-captcha {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.pow-captcha .pow-header {
+  position: relative;
+}
+
+.pow-captcha .pow-status {
+  height: 100%;
+  background-color: white;
+  border: 1px solid darkgray;
+  padding: 8px;
+}
+
+.pow-captcha .pow-status .pow-status-top .status-title {
+  text-align: center;
+}
+
+.pow-captcha .pow-status .pow-status-top .status-value {
+  text-align: center;
+  font-size: 28px;
+}
+
+.pow-captcha .pow-status .pow-status-spacer {
+  height: 16px;
+}
+
+.pow-captcha .pow-status .pow-status-other {
+  margin-top: 4px;
+}
+
+.pow-captcha .pow-status .pow-worker-controls button {
+  width: 27px;
+  margin-right: 6px;
+  border-radius: 15px;
+  height: 20px;
+  padding: 0;
+}
+
+.spinner-alert .spinner-text {
+  vertical-align: top;
+  margin-left: 12px;
+}
+
+

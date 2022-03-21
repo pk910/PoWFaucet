@@ -1,0 +1,47 @@
+{
+  "faucetTitle": "Kiln Dev PoW Faucet",
+  "faucetImage": "https://ligi.de/assets/img/fauceth_420.jpg",
+
+  "serverPorts": [
+    { "port": 8080 }
+  ],
+
+  "powShareReward":     25000000000000000,
+  "claimMinAmount":    100000000000000000,
+  "claimMaxAmount":   1000000000000000000,
+  "powSessionTimeout": 3600,
+  "claimSessionTimeout": 7200,
+  "claimAddrCooldown": 7200,
+  "powSessionSecret": "***censored***",
+  "powScryptParams": {
+    "cpuAndMemory": 4096,
+    "blockSize": 8,
+    "paralellization": 1,
+    "keyLength": 16,
+    "difficulty": 10
+  },
+  "powNonceCount": 2,
+
+  "verifyLocalPercent": 10,
+  "verifyLocalMaxQueue": 100,
+  "verifyMinerPeerCount": 2,
+  "verifyLocalLowPeerPercent": 100,
+  "verifyMinerPercent": 100,
+  "verifyMinerIndividuals": 2,
+  "verifyMinerMissPenalty": 10000000000000000,
+
+  "hcaptcha": {
+    "siteKey": "3f8f7b03-6698-4b4e-b0be-e3a7f2a4a764",
+    "secret": "***censored***",
+    "checkSessionStart": true,
+    "checkBalanceClaim": true
+  },
+
+  "ethRpcHost": "http://127.0.0.1:8545/",
+  "ethWalletKey": "***censored***",
+  "ethChainId": 1337802,
+  "ethTxGasLimit": 500000,
+  "ethTxMaxFee": 1800000000,
+  "ethTxPrioFee": 800000000,
+  "ethMaxPending": 12
+}

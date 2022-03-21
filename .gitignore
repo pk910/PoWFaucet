@@ -1,0 +1,6 @@
+
+build/
+dist/
+node_modules/
+faucet-config.json
+faucet-store.json
