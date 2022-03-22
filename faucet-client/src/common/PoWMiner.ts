@@ -19,6 +19,7 @@ interface IPoWMinerWorker {
   worker: Worker;
   ready: boolean;
   stats: IPoWMinerWorkerStats[];
+  lastNonce: number;
 }
 
 interface IPoWMinerWorkerStats {
@@ -54,8 +55,10 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   private workers: IPoWMinerWorker[];
   private powParamsStr: string;
   private nonceQueue: number[];
+  private lastSaveNonce: number;
   private updateStatsTimer: NodeJS.Timeout;
   private totalShares: number;
+  private targetNoncePrefill: number;
 
   public constructor(options: IPoWMinerOptions) {
     super();
@@ -64,6 +67,9 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     this.powParamsStr = this.getPoWParamsStr(options.powParams);
     this.totalShares = 0;
     this.nonceQueue = [];
+    this.lastSaveNonce = null;
+    this.targetNoncePrefill = 200;
+
     this.loadSettings();
     this.startStopWorkers();
 
@@ -146,6 +152,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       worker: new Worker(this.options.workerSrc),
       ready: false,
       stats: [],
+      lastNonce: 0,
     };
     worker.worker.addEventListener("message", (evt) => this.onWorkerMessage(worker, evt));
     this.workers.push(worker);
@@ -181,14 +188,20 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   }
 
   private onWorkerInit(worker: IPoWMinerWorker) {
-    worker.ready = true;
     let sessionInfo = this.options.session.getSessionInfo();
+    let nonceRange = this.options.session.getNonceRange(this.targetNoncePrefill);
+
+    worker.ready = true;
+    worker.lastNonce = nonceRange;
+    
     worker.worker.postMessage({
       action: "setWork",
       data: {
         workerid: worker.id,
         preimage: sessionInfo.preimage,
-        params: this.options.powParams
+        params: this.options.powParams,
+        nonceStart: nonceRange,
+        nonceCount: this.targetNoncePrefill,
       }
     });
   }
@@ -197,23 +210,75 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     if(nonce.params !== this.powParamsStr)
       return; // old params - ignore
     
-    this.nonceQueue.push(nonce.nonce);
+    worker.lastNonce = nonce.nonce;
 
-    if(this.nonceQueue.length >= this.options.nonceCount) {
+    let insertIdx = 0;
+    let queueLen = this.nonceQueue.length;
+    while(insertIdx < queueLen && nonce.nonce > this.nonceQueue[insertIdx])
+      insertIdx++;
+    this.nonceQueue.splice(insertIdx, 0, nonce.nonce);
+
+    this.processNonceQueue();
+  }
+
+  private processNonceQueue() {
+    // get lowest nonce
+    let saveNonce: number = null;
+    this.workers.forEach((worker) => {
+      if(!worker.ready)
+        return;
+      if(saveNonce === null || worker.lastNonce < saveNonce)
+        saveNonce = worker.lastNonce;
+    });
+    if(saveNonce === null || this.lastSaveNonce === saveNonce)
+      return;
+
+    this.lastSaveNonce = saveNonce;
+
+    let saveNonces = 0;
+    let queueLen = this.nonceQueue.length;
+    if(queueLen < this.options.nonceCount)
+      return;
+
+    for(let i = 0; i < queueLen; i++) {
+      if(this.nonceQueue[i] > saveNonce)
+        break;
+      saveNonces++;
+    }
+
+    while(saveNonces >= this.options.nonceCount) {
       let share: IPoWMinerShare = {
         nonces: this.nonceQueue.splice(0, this.options.nonceCount),
         params: this.powParamsStr,
       };
-
+      
       this.totalShares++;
+      saveNonces -= this.options.nonceCount;
       this.options.session.submitShare(share);
     }
   }
 
-  private onWorkerStats(worker: IPoWMinerWorker, stats: IPoWMinerWorkerStats) {
-    worker.stats.push(stats);
+  private onWorkerStats(worker: IPoWMinerWorker, stats: any) {
+    worker.stats.push({
+      shares: stats.shares,
+      time: stats.time,
+    });
     if(worker.stats.length > 30) 
       worker.stats.splice(0, 1);
+
+    worker.lastNonce = stats.last;
+    if(stats.nonces < this.targetNoncePrefill) {
+      let refill = this.targetNoncePrefill - stats.nonces;
+      worker.worker.postMessage({
+        action: "addRange",
+        data: {
+          start: this.options.session.getNonceRange(refill),
+          count: refill,
+        }
+      });
+    }
+
+    this.processNonceQueue();
     
     if(!this.updateStatsTimer) {
       this.updateStatsTimer = setTimeout(() => {
@@ -239,6 +304,15 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       if(workerTime > 0)
         hashRate += (workerShares / (workerTime / 1000));
     });
+
+    // predict targetNoncePrefill based on hashrate
+    if(hashRate > 0) {
+      // workers should have enough nounces to work for 4 seconds
+      // workers report their nonce count every 2 seconds so there is enough time to add more nonce ranges
+      this.targetNoncePrefill = Math.ceil(hashRate * 4 / this.workers.length);
+      if(this.targetNoncePrefill < 100)
+        this.targetNoncePrefill = 100;
+    }
 
     let minerStats: IPoWMinerStats = {
       workerCount: workerCount,

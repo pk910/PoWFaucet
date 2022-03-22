@@ -14,6 +14,7 @@ export interface IPoWSessionInfo {
   preimage: string;
   balance: number;
   recovery: string;
+  noncePos: number;
 }
 
 export interface IPoWSessionBalanceUpdate {
@@ -56,6 +57,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       this.options.client.setCurrentSession(this);
       this.sessionInfo = Object.assign({
         balance: 0,
+        noncePos: 1,
       }, session);
       this.shareQueue = [];
       this.verifyResultQueue = [];
@@ -73,7 +75,10 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     this.options.client.setCurrentSession(this);
     return this.options.client.sendRequest("resumeSession", {
       sessionId: this.sessionInfo.sessionId
-    }).catch(() => {
+    }).then((res) => {
+      if(res.lastNonce > this.sessionInfo.noncePos)
+        this.sessionInfo.noncePos = res.lastNonce + 1;
+    }, () => {
       return this.options.client.sendRequest("recoverSession", this.sessionInfo.recovery);
     }).then(() => {
       // resumed session
@@ -132,6 +137,17 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   public updateClaimTx(res: any) {
     this.emit("claimTx", res);
+  }
+
+  public getNonceRange(count: number): number {
+    if(!this.sessionInfo)
+      return null;
+    
+    let noncePos = this.sessionInfo.noncePos;
+    this.sessionInfo.noncePos += count;
+    this.storeSessionStatus();
+
+    return noncePos;
   }
 
   public closeSession(): Promise<string> {

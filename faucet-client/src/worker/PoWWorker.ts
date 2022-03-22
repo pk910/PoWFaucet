@@ -11,6 +11,12 @@ interface IPoWWorkerParams extends IPoWParams {
   pstr: string;
 }
 
+interface IPoWWorkerNonceRange {
+  first: number;
+  last: number;
+  count: number;
+}
+
 export class PoWWorker {
   private options: IPoWWorkerOptions;
   private workerId: number;
@@ -18,6 +24,7 @@ export class PoWWorker {
   private powPreImage: string;
   private working = false;
   private workNonce: number;
+  private nonceRanges: IPoWWorkerNonceRange[];
   private statsCount: number;
   private statsPoll: number;
 
@@ -39,6 +46,9 @@ export class PoWWorker {
       case "setWork":
         this.onCtrlSetWork(msg.data);
         break;
+      case "addRange":
+        this.onCtrlAddRange(msg.data);
+        break;
       case "setParams":
         this.onCtrlSetParams(msg.data);
         break;
@@ -52,7 +62,24 @@ export class PoWWorker {
     this.workerId = data.workerid;
     this.powParams = this.getWorkerParams(data.params);
     this.powPreImage = base64ToHex(data.preimage);
+    this.nonceRanges = [{
+      first: data.nonceStart,
+      last: data.nonceStart + data.nonceCount - 1,
+      count: data.nonceCount,
+    }];
+    this.workNonce = data.nonceStart;
+
     this.startWorkLoop();
+  }
+
+  private onCtrlAddRange(data: any) {
+    this.nonceRanges.push({
+      first: data.start,
+      last: data.start + data.count - 1,
+      count: data.count,
+    });
+    if(this.nonceRanges.length === 1)
+      this.workNonce = data.start;
   }
 
   private onCtrlSetParams(data: any) {
@@ -112,7 +139,6 @@ export class PoWWorker {
     if(this.working)
       return;
     
-    this.workNonce = 0;
     this.statsCount = 0;
     this.statsPoll = (new Date()).getTime();
 
@@ -124,11 +150,21 @@ export class PoWWorker {
 
   private collectStats() {
     let now = (new Date()).getTime();
+    let nonces = 0;
+    if(this.nonceRanges.length > 0) {
+      nonces += this.nonceRanges[0].last - this.workNonce;
+      for(let i = 1; i < this.nonceRanges.length; i++) {
+        nonces += this.nonceRanges[i].count;
+      }
+    }
+
     postMessage({
       action: "stats",
       data: {
         shares: this.statsCount,
-        time: (now - this.statsPoll)
+        time: (now - this.statsPoll),
+        last: this.workNonce,
+        nonces: nonces,
       }
     });
     this.statsCount = 0;
@@ -141,13 +177,24 @@ export class PoWWorker {
     for(var i = 0; i < 8; i++) {
       this.work();
     }
-    setTimeout(() => this.workLoop(), 0);
+    let tout = (this.nonceRanges.length === 0 ? 20 : 0);
+    setTimeout(() => this.workLoop(), tout);
   }
 
   private work() {
-    this.workNonce++;
-    this.statsCount++;
-    let nonce = (this.workNonce * 128) + this.workerId;
+    let rangeCount = this.nonceRanges.length;
+    if(rangeCount === 0)
+      return;
+    let nonce = this.workNonce++;
+    if(nonce >= this.nonceRanges[0].last) {
+      this.nonceRanges.splice(0, 1);
+      if(rangeCount === 1) {
+        console.log("[PoWMiner] Ran out of nonce ranges!");
+      } else {
+        this.workNonce = this.nonceRanges[0].first;
+      }
+    }
+
     let hash: string;
     if((hash = this.checkHash(nonce, this.powPreImage))) {
       // found a nonce! :>
@@ -166,7 +213,8 @@ export class PoWWorker {
     if((nonceHex.length % 2) == 1) {
       nonceHex = `0${nonceHex}`;
     }
-
+    
+    this.statsCount++;
     let hashHex = this.options.scrypt(
       nonceHex, 
       preimg, 

@@ -28,6 +28,7 @@ interface IPowSession {
   balance: number;
   claimable: boolean;
   activeClient: IPowClient;
+  lastNonce: number;
 }
 
 export interface IPowShare {
@@ -199,6 +200,7 @@ export class PowController {
       balance: 0,
       claimable: false,
       activeClient: client,
+      lastNonce: 0,
     };
     client.session = sessionId;
     this.activeSessions[sessionId] = session;
@@ -404,7 +406,9 @@ export class PowController {
     
     session.activeClient = client;
     client.session = session.id;
-    this.sendToClient(client, "ok", null, reqId);
+    this.sendToClient(client, "ok", {
+      lastNonce: session.lastNonce,
+    }, reqId);
   }
 
   private onCliRecoverSession(client: IPowClient, message: any) {
@@ -484,6 +488,7 @@ export class PowController {
       });
       return;
     }
+    let session = this.activeSessions[client.session];
 
     if(typeof message.data !== "object" || !message.data) {
       this.sendToClient(client, "error", {
@@ -513,7 +518,19 @@ export class PowController {
       });
       return;
     }
-
+    let lastNonce = session.lastNonce;
+    for(let i = 0; i < shareData.nonces.length; i++) {
+      if(shareData.nonces[i] <= lastNonce) {
+        this.sendToClient(client, "error", {
+          code: "INVALID_SHARE",
+          message: "Nonce too low"
+        });
+        return;
+      }
+      lastNonce = shareData.nonces[i];
+    }
+    session.lastNonce = lastNonce;
+    
     let share: IPowShare = {
       shareId: getNewGuid(),
       session: client.session,
@@ -542,7 +559,7 @@ export class PowController {
     if(share.verifyLocal) {
       // verify locally
       console.log("share " + share.shareId + ": validate locally");
-      this.powValidator.validateShare(share, this.activeSessions[client.session].preimage).then((isValid) => {
+      this.powValidator.validateShare(share, session.preimage).then((isValid) => {
         if(!isValid)
           share.isInvalid = true;
         this.processShareVerification(share);
@@ -560,7 +577,7 @@ export class PowController {
         let validatorSess = this.activeSessions[validatorSessId];
         this.sendToClient(validatorSess.activeClient, "verify", {
           shareId: share.shareId,
-          preimage: this.activeSessions[client.session].preimage,
+          preimage: session.preimage,
           nonces: share.nonces,
         });
       }
