@@ -7,5 +7,10 @@
     "sourceMap": true,
     "outDir": "dist"
   },
-  "lib": ["es2015"]
+  "lib": ["es2015"],
+  "exclude": [
+    "faucet-client",
+    "faucet-wasm",
+    "node_modules"
+  ]
 }
