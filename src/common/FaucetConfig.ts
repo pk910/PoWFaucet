@@ -7,6 +7,7 @@ export interface IFaucetConfig {
 
   faucetTitle: string;
   faucetImage: string;
+  faucetLogFile: string;
 
   serverPorts: IFaucetPortConfig[];
   staticPath?: string;

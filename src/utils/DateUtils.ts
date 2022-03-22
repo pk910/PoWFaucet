@@ -1,14 +1,9 @@
+import { strPadLeft } from "./StringUtils";
 
-function padLeft(str: any, len: number, pad: string): string {
-  str = str.toString();
-  while(str.length < len)
-    str = pad + str;
-  return str;
-}
 
-export const renderDate = (date: Date, withTime?: boolean): string => {
-  return date.getFullYear() + "-" + padLeft(date.getMonth() + 1, 2, '0') + '-' + padLeft(date.getDate(), 2, '0') +
-    (withTime ? " " + padLeft(date.getHours(), 2, '0') + ":" + padLeft(date.getMinutes(), 2, '0') : "")
+export const renderDate = (date: Date, withTime?: boolean, withSec?: boolean): string => {
+  return date.getFullYear() + "-" + strPadLeft(date.getMonth() + 1, 2, '0') + '-' + strPadLeft(date.getDate(), 2, '0') +
+    (withTime ? " " + strPadLeft(date.getHours(), 2, '0') + ":" + strPadLeft(date.getMinutes(), 2, '0') + (withSec ? ":" + strPadLeft(date.getSeconds(), 2, '0') : "") : "")
 }
 
 export const renderTimespan = (time: number, maxParts?: number): string => {

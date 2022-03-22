@@ -32,6 +32,15 @@ export class PoWShareVerification {
     PoWShareVerification.verifyingShares[this.shareId] = this;
   }
 
+  public getVerificationType(): string {
+    let types: string[] = [];
+    if(this.verifyLocal)
+      types.push("local");
+    if(this.verifyMinerCount > 0)
+      types.push("miner[" + Object.keys(this.verifyMinerResults).length + "/" + this.verifyMinerCount + "]");
+    return types.length ? types.join(",") : "none";
+  }
+
   public startVerification(): Promise<boolean> {
     let session = PoWSession.getSession(this.sessionId);
     if(!session)
@@ -52,7 +61,6 @@ export class PoWShareVerification {
 
     if(this.verifyLocal) {
       // verify locally
-      console.log("share " + this.shareId + ": validate locally");
       ServiceManager.GetService(PoWValidator).validateShare(this.shareId, this.nonces, session.getPreImage()).then((isValid) => {
         if(!isValid)
           this.isInvalid = true;
@@ -62,7 +70,6 @@ export class PoWShareVerification {
     else if(faucetConfig.verifyMinerPercent > 0 && validatorSessions.length >= faucetConfig.verifyMinerPeerCount && (Math.round(Math.random() * 100) < faucetConfig.verifyMinerPercent)) {
       // redistribute to validators for verification
       this.verifyMinerCount = faucetConfig.verifyMinerIndividuals;
-      console.log("share " + this.shareId + ": validate via miners");
       for(let i = 0; i < this.verifyMinerCount; i++) {
         let randSessIdx = Math.floor(Math.random() * validatorSessions.length);
         let validatorSession = validatorSessions.splice(randSessIdx, 1)[0];
@@ -81,7 +88,6 @@ export class PoWShareVerification {
     }
     else {
       // no verification - just accept
-      console.log("share " + this.shareId + ": no validation");
       this.completeVerification();
     }
 

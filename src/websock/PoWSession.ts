@@ -8,6 +8,7 @@ import { FaucetStore } from "../services/FaucetStore";
 import { weiToEth } from "../utils/ConvertHelpers";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PoWClient } from "./PoWClient";
+import { renderDate } from "../utils/DateUtils";
 
 
 export enum IPoWSessionSlashReason {
@@ -21,6 +22,7 @@ export interface IPoWSessionRecoveryInfo {
   startTime: Date
   preimage: string;
   balance: number;
+  nonce: number;
 }
 
 export class PoWSession {
@@ -51,25 +53,32 @@ export class PoWSession {
     this.idleTime = null;
     this.targetAddr = targetAddr;
     this.claimable = false;
-    this.lastNonce = 0;
-
+    
     if(recoveryInfo) {
       this.sessionId = recoveryInfo.id;
       this.startTime = recoveryInfo.startTime;
       this.preimage = recoveryInfo.preimage;
       this.balance = recoveryInfo.balance;
+      this.lastNonce = recoveryInfo.nonce;
     }
     else {
       this.sessionId = getNewGuid();
       this.startTime = new Date();
       this.preimage = crypto.randomBytes(8).toString('base64');
       this.balance = 0;
+      this.lastNonce = 0;
     }
 
     this.activeClient = client;
     client.setSession(this);
 
     PoWSession.activeSessions[this.sessionId] = this;
+    ServiceManager.GetService(PoWStatusLog).emitLog(
+      PoWStatusLogLevel.INFO, 
+      "Created new session: " + this.sessionId + 
+      (recoveryInfo ? " [Recovered: " + (Math.round(weiToEth(this.balance)*1000)/1000) + " ETH, start: " + renderDate(recoveryInfo.startTime, true) + "]" : "") + 
+      " (Remote IP: " + this.activeClient.getRemoteIP() + ")"
+    );
 
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionAge = now - Math.floor(this.startTime.getTime() / 1000);
@@ -101,6 +110,7 @@ export class PoWSession {
     }
     
     delete PoWSession.activeSessions[this.sessionId];
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Closed session: " + this.sessionId + (this.claimable ? " (claimable reward: " + (Math.round(weiToEth(this.balance)*1000)/1000) + ")" : ""));
   }
 
 
@@ -138,10 +148,14 @@ export class PoWSession {
 
   public setActiveClient(activeClient: PoWClient) {
     this.activeClient = activeClient;
-    if(activeClient)
+    if(activeClient) {
       this.idleTime = null;
-    else
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
+    }
+    else {
       this.idleTime = new Date();
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Paused session: " + this.sessionId);
+    }
   }
 
   public addBalance(value: number) {
@@ -162,7 +176,7 @@ export class PoWSession {
         break;
     }
 
-    PoWStatusLog.get().emitLog(PoWStatusLogLevel.WARNING, "Slash Session " + this.sessionId + " (reason: " + reason + ", penalty: " + penalty + ")");
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Slashed session " + this.sessionId + " (reason: " + reason + ", penalty: " + penalty + ")");
   }
 
   private applyBalancePenalty(penalty: number): number {
@@ -199,6 +213,7 @@ export class PoWSession {
       preimage: this.preimage,
       balance: this.balance,
       claimable: this.claimable,
+      nonce: this.lastNonce,
     };
     let sessionStr = Buffer.from(JSON.stringify(sessionDict)).toString('base64');
 

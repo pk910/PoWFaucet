@@ -11,7 +11,6 @@ export class PoWValidatorWorker {
     parentPort.on("message", (evt) => this.onControlMessage(evt));
     getScryptReadyPromise().then(() => {
       this.scrypt = getScrypt();
-      console.log("validator worker initialized");
       parentPort.postMessage({ action: "init" });
     });
   }

@@ -9,6 +9,8 @@ import { isValidGuid } from '../utils/GuidUtils';
 import { EthWeb3Manager } from '../services/EthWeb3Manager';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWShareVerification } from './PoWShareVerification';
+import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { weiToEth } from '../utils/ConvertHelpers';
 
 export class PoWClient {
   private socket: WebSocket;
@@ -42,6 +44,10 @@ export class PoWClient {
 
   public setSession(session: PoWSession) {
     this.session = session;
+  }
+
+  public getRemoteIP(): string {
+    return this.remoteIp;
   }
 
   private dispose() {
@@ -95,6 +101,7 @@ export class PoWClient {
   }
 
   private sendErrorResponse(errCode: string, errMessage: string, reqId?: any) {
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Returned error to client: [" + errCode + "] " + errMessage);
     this.sendMessage("error", {
       code: errCode,
       message: errMessage
@@ -272,6 +279,7 @@ export class PoWClient {
       startTime: startTime,
       preimage: sessionInfo.preimage,
       balance: sessionInfo.balance,
+      nonce: sessionInfo.nonce,
     });
     this.sendMessage("ok", null, reqId);
   }
@@ -312,8 +320,11 @@ export class PoWClient {
     shareVerification.startVerification().then((isValid) => {
       if(!isValid)
         this.sendErrorResponse("WRONG_SHARE", "Share verification failed", reqId);
-      else if(reqId)
-        this.sendMessage("ok", null, reqId);
+      else {
+        if(reqId)
+          this.sendMessage("ok", null, reqId);
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Valid share for session " + this.session.getSessionId() + " (verify: " + shareVerification.getVerificationType() + ")");
+      }
     }, () => {
       this.sendErrorResponse("VERIFY_FAILED", "Share verification error", reqId);
     });
@@ -390,6 +401,7 @@ export class PoWClient {
 
     let claimTx = ServiceManager.GetService(EthWeb3Manager).addClaimTransaction(sessionInfo.targetAddr, sessionInfo.balance);
     this.sendMessage("ok", null, reqId);
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Claimed reward for session " + sessionInfo.id + " to " + sessionInfo.targetAddr + " (" + (Math.round(weiToEth(sessionInfo.balance)*1000)/1000)) + " ETH)";
 
     claimTx.once("confirmed", () => {
       this.sendMessage("claimTx", {

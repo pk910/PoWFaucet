@@ -6,6 +6,8 @@ import * as EthUtil from 'ethereumjs-util';
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { faucetConfig } from '../common/FaucetConfig';
 import { weiToEth } from '../utils/ConvertHelpers';
+import { ServiceManager } from '../common/ServiceManager';
+import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 
 interface WalletState {
   nonce: number;
@@ -59,7 +61,7 @@ export class EthWeb3Manager {
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
     
     this.loadWalletState().then(() => {
-      console.log("Wallet " + this.walletAddr + ":  " + (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH  [Nonce: " + this.walletState.nonce + "]" );
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH  [Nonce: " + this.walletState.nonce + "]");
       setInterval(() => this.processQueue(), 2000);
     });
   }
@@ -115,8 +117,6 @@ export class EthWeb3Manager {
   }
 
   private processQueueTx(claimTx: ClaimTx) {
-    console.log("processing TX for " + claimTx.target + ":  " + (Math.round(weiToEth(claimTx.amount)*1000)/1000) + " ETH")
-
     let ethtx = this.buildEthTx(claimTx.target, claimTx.amount);
     claimTx.nonce = ethtx.nonce;
     claimTx.txhex = ethtx.txhash;
@@ -125,6 +125,7 @@ export class EthWeb3Manager {
 
     this.pendingTxQueue[claimTx.nonce] = claimTx;
 
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending rewards tx for " + claimTx.target + ":  " + (Math.round(weiToEth(claimTx.amount)*1000)/1000) + " ETH");
     this.sendClaimTx(claimTx).then(() => {
       delete this.pendingTxQueue[claimTx.nonce];
       claimTx.status = ClaimTxStatus.CONFIRMED;
@@ -140,7 +141,7 @@ export class EthWeb3Manager {
         claimTx.txblock = res.blockNumber;
         resolve();
       }, (err) => {
-        console.error("tx error: ", err);
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Transaction for " + claimTx.target + " failed: " + err);
         return this.sendClaimTx(claimTx);
       });
     });
