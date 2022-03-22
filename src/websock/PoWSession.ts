@@ -38,6 +38,10 @@ export class PoWSession {
     });
   }
 
+  public static getAllSessions(): PoWSession[] {
+    return Object.values(this.activeSessions);
+  }
+
   private sessionId: string;
   private startTime: Date;
   private idleTime: Date | null;
@@ -46,6 +50,7 @@ export class PoWSession {
   private balance: number;
   private claimable: boolean;
   private lastNonce: number;
+  private reportedHashRate: number[];
   private activeClient: PoWClient;
   private cleanupTimer: NodeJS.Timeout;
 
@@ -53,6 +58,7 @@ export class PoWSession {
     this.idleTime = null;
     this.targetAddr = targetAddr;
     this.claimable = false;
+    this.reportedHashRate = [];
     
     if(recoveryInfo) {
       this.sessionId = recoveryInfo.id;
@@ -122,6 +128,14 @@ export class PoWSession {
     return this.startTime;
   }
 
+  public getIdleTime(): Date | null {
+    return this.idleTime;
+  }
+
+  public getTargetAddr(): string {
+    return this.targetAddr;
+  }
+
   public getPreImage(): string {
     return this.preimage;
   }
@@ -160,6 +174,18 @@ export class PoWSession {
 
   public addBalance(value: number) {
     this.balance += value;
+  }
+
+  public reportHashRate(hashRate: number) {
+    this.reportedHashRate.push(hashRate);
+    if(this.reportedHashRate.length > 5)
+      this.reportedHashRate.splice(0, 1);
+  }
+
+  public getReportedHashRate(): number {
+    let hashRateSum = 0;
+    this.reportedHashRate.forEach((hashRate) => hashRateSum += hashRate);
+    return this.reportedHashRate.length > 0 ? hashRateSum / this.reportedHashRate.length : 0;
   }
 
   public slashBadSession(reason: IPoWSessionSlashReason) {

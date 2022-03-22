@@ -145,6 +145,9 @@ export class PoWClient {
       case "claimRewards":
         this.onCliClaimRewards(message);
         break;
+      case "getFaucetStatus":
+        this.onCliGetFaucetStatus(message);
+        break;
       default:
         this.sendMessage("error", {
           code: "INVALID_ACTION",
@@ -295,6 +298,7 @@ export class PoWClient {
     let shareData: {
       nonces: number[];
       params: string;
+      hashrate: number;
     } = message.data;
 
     let powParamsStr = faucetConfig.powScryptParams.cpuAndMemory +
@@ -307,7 +311,7 @@ export class PoWClient {
       return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", reqId);
     if(shareData.nonces.length !== faucetConfig.powNonceCount)
       return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count", reqId);
-     
+    
     let lastNonce = this.session.getLastNonce();
     for(let i = 0; i < shareData.nonces.length; i++) {
       if(shareData.nonces[i] <= lastNonce)
@@ -315,6 +319,8 @@ export class PoWClient {
       lastNonce = shareData.nonces[i];
     }
     this.session.setLastNonce(lastNonce);
+    if(shareData.hashrate)
+      this.session.reportHashRate(shareData.hashrate);
     
     let shareVerification = new PoWShareVerification(this.session, shareData.nonces);
     shareVerification.startVerification().then((isValid) => {
@@ -410,6 +416,26 @@ export class PoWClient {
         txBlock: claimTx.txblock
       });
     });
+  }
+
+  private async onCliGetFaucetStatus(message: any) {
+    let reqId = message.id || undefined;
+    let statusRsp: any = {};
+
+    let sessions = PoWSession.getAllSessions();
+    statusRsp.sessions = sessions.map((session) => {
+      return {
+        id: session.getSessionId(),
+        start: Math.floor(session.getStartTime().getTime() / 1000),
+        idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
+        target: session.getTargetAddr(),
+        balance: session.getBalance(),
+        nonce: session.getLastNonce(),
+        hashrate: session.getReportedHashRate(),
+      }
+    });
+
+    this.sendMessage("ok", statusRsp, reqId);
   }
 
 }

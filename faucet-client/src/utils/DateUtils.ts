@@ -11,6 +11,10 @@ export const renderDate = (date: Date, withTime?: boolean): string => {
     (withTime ? " " + padLeft(date.getHours(), 2, '0') + ":" + padLeft(date.getMinutes(), 2, '0') : "")
 }
 
+export const renderTime = (date: Date, withSec?: boolean): string => {
+  return padLeft(date.getHours(), 2, '0') + ":" + padLeft(date.getMinutes(), 2, '0') + (withSec ? ":" + padLeft(date.getSeconds(), 2, '0') : "");
+}
+
 export const renderTimespan = (time: number, maxParts?: number): string => {
   let resParts: string[] = [];
   let group: number;

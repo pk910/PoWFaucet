@@ -11,6 +11,7 @@ import { PoWMiner } from '../common/PoWMiner';
 import { renderDate } from '../utils/DateUtils';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IPoWClaimDialogReward, PoWClaimDialog } from './PoWClaimDialog';
+import { PoWFaucetStatus } from './PoWFaucetStatus';
 
 export interface IPoWCaptchaProps {
   powApiUrl: string;
@@ -49,6 +50,7 @@ export interface IPoWCaptchaState {
   statusMessage: string;
   showRestoreSessionDialog: boolean;
   showClaimRewardDialog: IPoWClaimDialogReward;
+  showFaucetStatus: boolean;
 }
 
 export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptchaState> {
@@ -57,6 +59,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
   private hcapControl: HCaptcha;
   private powSessionUpdateListener: (() => void);
   private powSessionKilledListener: ((reason: string) => void);
+  private faucetStatucClickCount = 0;
 
   constructor(props: IPoWCaptchaProps, state: IPoWCaptchaState) {
     super(props);
@@ -100,6 +103,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
       statusMessage: null,
       showRestoreSessionDialog: false,
       showClaimRewardDialog: null,
+      showFaucetStatus: false,
 		};
   }
 
@@ -184,6 +188,9 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         </div>
       );
     }
+    else if(this.state.showFaucetStatus) {
+      return <PoWFaucetStatus powClient={this.powClient} faucetConfig={this.state.faucetConfig} />;
+    }
 
     let actionButtonControl: React.ReactElement;
     let enableCaptcha = !!this.state.faucetConfig.hcapSiteKey;
@@ -218,7 +225,10 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
 
     return (
       <div>
-        <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
+        <div className="faucet-title">
+          <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
+          <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
+        </div>
         <div className="pow-header center">
           <div className="pow-status-container">
             {this.powSession.getMiner() ? 
@@ -317,6 +327,16 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         });
       }
     });
+  }
+
+  private onFaucetStatusClick() {
+    this.faucetStatucClickCount++;
+    if(this.faucetStatucClickCount >= 10) {
+      this.faucetStatucClickCount = 0;
+      this.setState({
+        showFaucetStatus: true
+      });
+    }
   }
 
   private renderStatusDialog(): ReactElement {

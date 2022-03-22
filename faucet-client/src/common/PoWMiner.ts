@@ -36,6 +36,7 @@ export interface IPoWMinerStats {
 export interface IPoWMinerShare {
   nonces: number[];
   params: string;
+  hashrate: number;
 }
 
 export interface IPoWMinerVerification {
@@ -59,6 +60,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   private updateStatsTimer: NodeJS.Timeout;
   private totalShares: number;
   private targetNoncePrefill: number;
+  private latestStats: IPoWMinerStats;
 
   public constructor(options: IPoWMinerOptions) {
     super();
@@ -69,6 +71,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     this.nonceQueue = [];
     this.lastSaveNonce = null;
     this.targetNoncePrefill = 200;
+    this.latestStats = null;
 
     this.loadSettings();
     this.startStopWorkers();
@@ -250,6 +253,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       let share: IPoWMinerShare = {
         nonces: this.nonceQueue.splice(0, this.options.nonceCount),
         params: this.powParamsStr,
+        hashrate: this.latestStats ? this.latestStats.hashRate : 0,
       };
       
       this.totalShares++;
@@ -314,7 +318,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
         this.targetNoncePrefill = 100;
     }
 
-    let minerStats: IPoWMinerStats = {
+    let minerStats: IPoWMinerStats = this.latestStats = {
       workerCount: workerCount,
       hashRate: hashRate,
       totalShares: this.totalShares,
