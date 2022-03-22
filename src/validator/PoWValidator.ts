@@ -1,8 +1,8 @@
 import { isMainThread, Worker } from 'worker_threads';
-import { faucetConfig } from './FaucetConfig';
+import { faucetConfig } from '../common/FaucetConfig';
 import { PromiseDfd } from '../utils/PromiseDfd';
 import { IPoWValidatorValidateRequest } from './IPoWValidator';
-import { IPowShare } from './PowController';
+import { IPowShare } from '../websock/PoWContext';
 
 (() => {
   if (!isMainThread) {

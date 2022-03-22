@@ -4,8 +4,8 @@ import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } f
 import {Server as StaticServer, version, mime} from 'node-static';
 import { WebSocketServer } from 'ws';
 import * as stream from 'node:stream';
-import { faucetConfig, IFaucetPortConfig } from './FaucetConfig';
-import { PowController } from './PowController';
+import { faucetConfig, IFaucetPortConfig } from '../common/FaucetConfig';
+import { PoWClient } from '../websock/PoWClient';
 
 
 export class FaucetHttpServer {
@@ -15,9 +15,8 @@ export class FaucetHttpServer {
   }};
   private wssServer: WebSocketServer;
   private staticServer: StaticServer;
-  private powController: PowController;
 
-  public constructor(powController: PowController) {
+  public constructor() {
     this.httpServers = {};
     faucetConfig.serverPorts.forEach((portConfig) => this.addServerPort(portConfig));
 
@@ -29,8 +28,6 @@ export class FaucetHttpServer {
     this.staticServer = new StaticServer(faucetConfig.staticPath, {
       serverInfo: Buffer.from("pow-faucet/" + faucetConfig.faucetVersion)
     });
-
-    this.powController = powController;
   }
 
   private addServerPort(port: IFaucetPortConfig) {
@@ -69,7 +66,7 @@ export class FaucetHttpServer {
     }
     
     this.wssServer.handleUpgrade(req, socket, head, (ws) => {
-      this.powController.addClientSocket(ws, req.socket.remoteAddress);
+      new PoWClient(ws, req.socket.remoteAddress);
     });
   }
 

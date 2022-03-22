@@ -1,5 +1,5 @@
 import * as fs from 'fs'
-import { faucetConfig } from './FaucetConfig';
+import { faucetConfig } from '../common/FaucetConfig';
 
 export enum SessionMark {
   KILLED = "killed",

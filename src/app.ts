@@ -1,14 +1,17 @@
-import { EthWeb3Manager } from "./common/EthWeb3Manager";
-import { PowController } from "./common/PowController";
-import { FaucetHttpServer } from "./common/FaucetWebServer";
-import { FaucetStore } from "./common/FaucetStore";
+import { EthWeb3Manager } from "./services/EthWeb3Manager";
+import { PoWContext } from "./websock/PoWContext";
+import { FaucetHttpServer } from "./webserv/FaucetWebServer";
+import { FaucetStore } from "./services/FaucetStore";
+import { ServiceManager } from "./common/ServiceManager";
+import { PoWValidator } from "./validator/PoWValidator";
 
 (() => {
 
-  let faucetStore = new FaucetStore();
-  let web3Manager = new EthWeb3Manager();
-  let powController = new PowController(web3Manager, faucetStore);
-  let httpServer = new FaucetHttpServer(powController);
+  ServiceManager.InitService(FaucetStore);
+  ServiceManager.InitService(EthWeb3Manager);
+  ServiceManager.InitService(PoWValidator);
+
+  new FaucetHttpServer();
 
 })();
 

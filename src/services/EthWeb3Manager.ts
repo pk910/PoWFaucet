@@ -4,7 +4,7 @@ import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
 import * as EthUtil from 'ethereumjs-util';
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { faucetConfig } from './FaucetConfig';
+import { faucetConfig } from '../common/FaucetConfig';
 import { weiToEth } from '../utils/ConvertHelpers';
 
 interface WalletState {
