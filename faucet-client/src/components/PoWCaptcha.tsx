@@ -148,12 +148,16 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
       this.powSession.on("update", this.powSessionUpdateListener);
     }
     if(!this.powSessionKilledListener) {
-      this.powSessionKilledListener = (reason: string) => {
+      this.powSessionKilledListener = (killInfo: any) => {
+        let killMsg: string = killInfo.message;
+        if(killInfo.level === "session") {
+          killMsg = "Your session has been killed for bad behaviour (" + killMsg + "). Are you cheating?? :(";
+        }
         this.setState({
           statusDialog: {
             title: "Session killed!",
             body: (
-              <div className='alert alert-danger'>Your session has been killed for bad behaviour ({reason}). Are you cheating?? :(</div>
+              <div className='alert alert-danger'>{killMsg}</div>
             ),
             closeButton: {
               caption: "Close",

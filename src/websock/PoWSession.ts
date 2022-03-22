@@ -227,7 +227,10 @@ export class PoWSession {
   private applyKillPenalty(reason: IPoWSessionSlashReason) {
     ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.KILLED);
     if(this.activeClient)
-      this.activeClient.sendMessage("sessionKill", reason);
+      this.activeClient.sendMessage("sessionKill", {
+        level: "session",
+        message: reason
+      });
     this.closeSession();
   }
 

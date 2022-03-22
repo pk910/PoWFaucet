@@ -65,7 +65,8 @@ export class PoWClient {
     if(!this.socket)
       return;
     try {
-      this.socket.close(1, reason);
+      this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""));
+      this.socket.close();
     } catch(ex) {}
     this.socket = null;
   }
@@ -107,7 +108,6 @@ export class PoWClient {
       message: errMessage
     }, reqId);
   }
-
 
   private onClientMessage(data: RawData, isBinary: boolean) {
     let message;
@@ -237,8 +237,14 @@ export class PoWClient {
     if(!isValidGuid(sessionId) || !(session = PoWSession.getSession(sessionId)))
       return this.sendErrorResponse("INVALID_SESSIONID", "Invalid session id: " + sessionId, reqId);
 
-    if(session.getActiveClient())
-      session.getActiveClient().killClient("session resumed from another client");
+    let client: PoWClient;
+    if((client = session.getActiveClient())) {
+      client.setSession(null);
+      client.sendMessage("sessionKill", {
+        level: "client",
+        message: "session resumed from another client"
+      });
+    }
 
     session.setActiveClient(this);
     this.session = session;

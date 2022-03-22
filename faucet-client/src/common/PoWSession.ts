@@ -160,10 +160,11 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     });
   }
 
-  public processSessionKill(reason: string) {
+  public processSessionKill(killInfo: any) {
     this.sessionInfo = null;
-    this.storeSessionStatus();
-    this.emit("killed", reason);
+    if(killInfo.level === "session")
+      this.storeSessionStatus();
+    this.emit("killed", killInfo);
     this.emit("update");
   }
 

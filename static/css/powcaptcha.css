@@ -111,6 +111,10 @@
   margin-left: 12px;
 }
 
+.pow-captcha .faucet-status {
+  max-width: none;
+}
+
 .pow-captcha .faucet-status .status-panel {
   margin-bottom: 8px;
 }
