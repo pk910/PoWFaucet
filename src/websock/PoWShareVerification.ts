@@ -5,10 +5,6 @@ import { PromiseDfd } from "../utils/PromiseDfd";
 import { PoWValidator } from "../validator/PoWValidator";
 import { IPoWSessionSlashReason, PoWSession } from "./PoWSession";
 
-export interface IPowShare {
-  
-}
-
 export class PoWShareVerification {
   private static verifyingShares: {[id: string]: PoWShareVerification} = {};
 
