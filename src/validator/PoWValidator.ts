@@ -2,7 +2,6 @@ import { isMainThread, Worker } from 'worker_threads';
 import { faucetConfig } from '../common/FaucetConfig';
 import { PromiseDfd } from '../utils/PromiseDfd';
 import { IPoWValidatorValidateRequest } from './IPoWValidator';
-import { IPowShare } from '../websock/PoWContext';
 
 (() => {
   if (!isMainThread) {
@@ -26,13 +25,13 @@ export class PoWValidator {
     return Object.keys(this.validateQueue).length;
   }
 
-  public validateShare(share: IPowShare, preimg: string): Promise<boolean> {
+  public validateShare(shareId: string, nonces: number[], preimg: string): Promise<boolean> {
     let resDfd = new PromiseDfd<boolean>();
     // TODO: continue here
 
     let req: IPoWValidatorValidateRequest = {
-      shareId: share.shareId,
-      nonces: share.nonces,
+      shareId: shareId,
+      nonces: nonces,
       preimage: preimg,
       params: {
         n: faucetConfig.powScryptParams.cpuAndMemory,

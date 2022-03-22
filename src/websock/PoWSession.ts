@@ -36,7 +36,6 @@ export class PoWSession {
     });
   }
 
-
   private sessionId: string;
   private startTime: Date;
   private idleTime: Date | null;
@@ -46,6 +45,7 @@ export class PoWSession {
   private claimable: boolean;
   private lastNonce: number;
   private activeClient: PoWClient;
+  private cleanupTimer: NodeJS.Timeout;
 
   public constructor(client: PoWClient, targetAddr: string, recoveryInfo?: IPoWSessionRecoveryInfo) {
     this.idleTime = null;
@@ -70,16 +70,23 @@ export class PoWSession {
     client.setSession(this);
 
     PoWSession.activeSessions[this.sessionId] = this;
+
+    let now = Math.floor((new Date()).getTime() / 1000);
+    let sessionAge = now - Math.floor(this.startTime.getTime() / 1000);
+    let cleanupTime = faucetConfig.powSessionTimeout - sessionAge + 20;
+    if(cleanupTime > 0) {
+      this.cleanupTimer = setTimeout(() => {
+        this.closeSession();
+      }, cleanupTime * 1000);
+    }
   }
 
-  public closeSession(setMark?: boolean, makeClaimable?: boolean) {
+  public closeSession(setClosedMark?: boolean, makeClaimable?: boolean) {
     if(this.activeClient) {
       this.activeClient.setSession(null);
       this.activeClient = null;
     }
-    delete PoWSession.activeSessions[this.sessionId];
-
-    if(setMark)
+    if(setClosedMark)
       ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.CLOSED);
     
     if(makeClaimable && this.balance >= faucetConfig.claimMinAmount) {
@@ -87,6 +94,13 @@ export class PoWSession {
       if(this.balance > faucetConfig.claimMaxAmount)
         this.balance = faucetConfig.claimMaxAmount;
     }
+
+    if(this.cleanupTimer) {
+      clearTimeout(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+    
+    delete PoWSession.activeSessions[this.sessionId];
   }
 
 
@@ -124,6 +138,10 @@ export class PoWSession {
 
   public setActiveClient(activeClient: PoWClient) {
     this.activeClient = activeClient;
+    if(activeClient)
+      this.idleTime = null;
+    else
+      this.idleTime = new Date();
   }
 
   public addBalance(value: number) {
@@ -168,13 +186,9 @@ export class PoWSession {
 
   private applyKillPenalty(reason: IPoWSessionSlashReason) {
     ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.KILLED);
-
-    delete PoWSession.activeSessions[this.sessionId];
-    if(this.activeClient) {
+    if(this.activeClient)
       this.activeClient.sendMessage("sessionKill", reason);
-      this.activeClient.setSession(null);
-      this.activeClient = null;
-    }
+    this.closeSession();
   }
 
   public getSignedSession(): string {

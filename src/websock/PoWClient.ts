@@ -2,13 +2,13 @@ import { WebSocket, RawData } from 'ws';
 import * as hcaptcha from "hcaptcha";
 import * as crypto from "crypto";
 import { faucetConfig } from '../common/FaucetConfig';
-import { PoWContext } from './PoWContext';
 import { PoWSession } from './PoWSession';
 import { AddressMark, FaucetStore, SessionMark } from '../services/FaucetStore';
 import { renderTimespan } from '../utils/DateUtils';
 import { isValidGuid } from '../utils/GuidUtils';
-import { ClaimTx, EthWeb3Manager } from '../services/EthWeb3Manager';
+import { EthWeb3Manager } from '../services/EthWeb3Manager';
 import { ServiceManager } from '../common/ServiceManager';
+import { PoWShareVerification } from './PoWShareVerification';
 
 export class PoWClient {
   private socket: WebSocket;
@@ -16,7 +16,6 @@ export class PoWClient {
   private session: PoWSession = null;
   private pingTimer: NodeJS.Timer = null;
   private lastPingPong: Date;
-  private pendingTx: {[id: string]: ClaimTx} = {};
 
   public constructor(socket: WebSocket, remoteIp: string) {
     this.socket = socket;
@@ -64,7 +63,6 @@ export class PoWClient {
     } catch(ex) {}
     this.socket = null;
   }
-
 
   private pingClientLoop() {
     this.pingTimer = setInterval(() => {
@@ -244,7 +242,6 @@ export class PoWClient {
 
     if(this.session)
       return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", reqId);
-    
     if(typeof message.data !== "string" || !message.data)
       return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", reqId);
 
@@ -280,30 +277,46 @@ export class PoWClient {
   }
 
   private onCliFoundShare(message: any) {
+    let reqId = message.id || undefined;
+
     if(!this.session)
-      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found");
+      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found", reqId);
     if(typeof message.data !== "object" || !message.data)
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid share data");
+      return this.sendErrorResponse("INVALID_SHARE", "Invalid share data", reqId);
     
     let shareData: {
       nonces: number[];
       params: string;
     } = message.data;
 
-    if(shareData.params !== PoWContext.getPoWParamsStr()) 
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid share params");
+    let powParamsStr = faucetConfig.powScryptParams.cpuAndMemory +
+      "|" + faucetConfig.powScryptParams.blockSize +
+      "|" + faucetConfig.powScryptParams.paralellization +
+      "|" + faucetConfig.powScryptParams.keyLength +
+      "|" + faucetConfig.powScryptParams.difficulty;
+
+    if(shareData.params !== powParamsStr) 
+      return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", reqId);
     if(shareData.nonces.length !== faucetConfig.powNonceCount)
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count");
+      return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count", reqId);
      
     let lastNonce = this.session.getLastNonce();
     for(let i = 0; i < shareData.nonces.length; i++) {
       if(shareData.nonces[i] <= lastNonce)
-        return this.sendErrorResponse("INVALID_SHARE", "Nonce too low");
+        return this.sendErrorResponse("INVALID_SHARE", "Nonce too low", reqId);
       lastNonce = shareData.nonces[i];
     }
     this.session.setLastNonce(lastNonce);
     
-    PoWContext.processUnverifiedShare(this.session, shareData.nonces);
+    let shareVerification = new PoWShareVerification(this.session, shareData.nonces);
+    shareVerification.startVerification().then((isValid) => {
+      if(!isValid)
+        this.sendErrorResponse("WRONG_SHARE", "Share verification failed", reqId);
+      else if(reqId)
+        this.sendMessage("ok", null, reqId);
+    }, () => {
+      this.sendErrorResponse("VERIFY_FAILED", "Share verification error", reqId);
+    });
   }
   
 
@@ -318,7 +331,7 @@ export class PoWClient {
       isValid: boolean;
     } = message.data;
 
-    PoWContext.processrShareVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
+    PoWShareVerification.processVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
   }
 
   private onCliCloseSession(message: any) {
