@@ -6,9 +6,9 @@ function padLeft(str: any, len: number, pad: string): string {
   return str;
 }
 
-export const renderDate = (date: Date, withTime?: boolean): string => {
+export const renderDate = (date: Date, withTime?: boolean, withSec?: boolean): string => {
   return date.getFullYear() + "-" + padLeft(date.getMonth() + 1, 2, '0') + '-' + padLeft(date.getDate(), 2, '0') +
-    (withTime ? " " + padLeft(date.getHours(), 2, '0') + ":" + padLeft(date.getMinutes(), 2, '0') : "")
+    (withTime ? " " + padLeft(date.getHours(), 2, '0') + ":" + padLeft(date.getMinutes(), 2, '0') + (withSec ? ":" + padLeft(date.getSeconds(), 2, '0') : "") : "")
 }
 
 export const renderTime = (date: Date, withSec?: boolean): string => {

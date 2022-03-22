@@ -15,9 +15,9 @@ interface WalletState {
 }
 
 export enum ClaimTxStatus {
-  QUEUE,
-  PENDING,
-  CONFIRMED
+  QUEUE = "queue",
+  PENDING = "pending",
+  CONFIRMED = "confirmed"
 }
 
 interface ClaimTxEvents {
@@ -27,6 +27,7 @@ interface ClaimTxEvents {
 
 export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public status: ClaimTxStatus;
+  public readonly time: Date;
   public readonly target: string;
   public readonly amount: number;
   public nonce: number;
@@ -37,6 +38,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public constructor(target: string, amount: number) {
     super();
     this.status = ClaimTxStatus.QUEUE;
+    this.time = new Date();
     this.target = target;
     this.amount = amount;
   }
@@ -50,6 +52,7 @@ export class EthWeb3Manager {
   private walletState: WalletState;
   private claimTxQueue: ClaimTx[] = [];
   private pendingTxQueue: {[nonce: number]: ClaimTx} = {};
+  private confirmedTxQueue: {[nonce: number]: ClaimTx} = {};
 
   public constructor() {
     this.web3 = new Web3(faucetConfig.ethRpcHost);
@@ -64,6 +67,14 @@ export class EthWeb3Manager {
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH  [Nonce: " + this.walletState.nonce + "]");
       setInterval(() => this.processQueue(), 2000);
     });
+  }
+
+  public getTransactionQueue(): ClaimTx[] {
+    let txlist: ClaimTx[] = [];
+    Array.prototype.push.apply(txlist, this.claimTxQueue);
+    Array.prototype.push.apply(txlist, Object.values(this.pendingTxQueue));
+    Array.prototype.push.apply(txlist, Object.values(this.confirmedTxQueue));
+    return txlist;
   }
 
   private loadWalletState(): Promise<void> {
@@ -130,6 +141,11 @@ export class EthWeb3Manager {
       delete this.pendingTxQueue[claimTx.nonce];
       claimTx.status = ClaimTxStatus.CONFIRMED;
       claimTx.emit("confirmed");
+
+      this.confirmedTxQueue[claimTx.nonce] = claimTx;
+      setTimeout(() => {
+        delete this.confirmedTxQueue[claimTx.nonce];
+      }, 30 * 60 * 1000);
     })
   }
 

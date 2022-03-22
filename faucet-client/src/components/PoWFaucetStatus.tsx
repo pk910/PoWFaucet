@@ -33,7 +33,11 @@ interface IPoWFaucetStatusSession {
 }
 
 interface IPoWFaucetStatusClaim {
-
+  time: number;
+  target: string;
+  amount: number;
+  status: string;
+  nonce: number | null;
 }
 
 export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, IPoWFaucetStatusState> {
@@ -64,8 +68,8 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     this.props.powClient.sendRequest<IPoWFaucetStatus>("getFaucetStatus").then((faucetStatus) => {
       this.setState({
         refreshing: false,
-        activeSessions: faucetStatus.sessions || [],
-        activeClaims: faucetStatus.claims || [],
+        activeSessions: (faucetStatus.sessions || []).sort((a, b) => a.start - b.start),
+        activeClaims: (faucetStatus.claims || []).sort((a, b) => a.time - b.time),
       });
     });
   }
@@ -95,7 +99,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <div className="card-body">
               <h5 className="card-title">Reward claim transactions</h5>
 
-              <p className="card-text">TODO</p>
+              {this.renderActiveClaims()}
             </div>
           </div>
         </div>
@@ -121,7 +125,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           {this.state.activeSessions.length > 0 ?
             this.state.activeSessions.map((session) => this.renderActiveSessionRow(session)) :
             <tr key="none">
-              <th scope="row" colSpan={7}>No active Sessions</th>
+              <th scope="row" colSpan={7}>No active sessions</th>
             </tr>
           }
         </tbody>
@@ -144,6 +148,60 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <span className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>
           }
         </td>
+      </tr>
+    );
+  }
+
+  private renderActiveClaims(): React.ReactElement {
+    return (
+      <table className="table table-striped status-sessions">
+        <thead>
+          <tr>
+            <th scope="col">Time</th>
+            <th scope="col">To Address</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Nonce</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {this.state.activeClaims.length > 0 ?
+            this.state.activeClaims.map((claim) => this.renderActiveClaimRow(claim)) :
+            <tr key="none">
+              <th scope="row" colSpan={5}>No active claims</th>
+            </tr>
+          }
+        </tbody>
+      </table>
+    );
+  }
+
+  private renderActiveClaimRow(claim: IPoWFaucetStatusClaim): React.ReactElement {
+    let claimStatus: React.ReactElement = null;
+    switch(claim.status) {
+      case "queue":
+        claimStatus = <span className="badge bg-secondary">Queued</span>;
+        break;
+      case "pending":
+        claimStatus = <span className="badge bg-primary">Pending</span>;
+        break;
+      case "confirmed":
+        claimStatus = <span className="badge bg-success">Confirmed</span>;
+        break;
+      case "failed":
+        claimStatus = <span className="badge bg-danger">Failed</span>;
+        break;
+      default:
+        claimStatus = <span className="badge bg-light text-dark">{claim.status}</span>;
+    }
+
+    return (
+      <tr key={(claim.time + "-" + claim.target)}>
+        <th scope="row">{renderDate(new Date(claim.time * 1000), true, true)}</th>
+        <td>{claim.target}</td>
+        <td>{Math.round(weiToEth(claim.amount) * 1000) / 1000} ETH</td>
+        <td>{claim.nonce || ""}</td>
+        <td>{claimStatus}</td>
       </tr>
     );
   }

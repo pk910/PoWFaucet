@@ -444,6 +444,17 @@ export class PoWClient {
       }
     });
 
+    let claims = ServiceManager.GetService(EthWeb3Manager).getTransactionQueue();
+    statusRsp.claims = claims.map((claimTx) => {
+      return {
+        time: Math.floor(claimTx.time.getTime() / 1000),
+        target: claimTx.target,
+        amount: claimTx.amount,
+        status: claimTx.status,
+        nonce: claimTx.nonce || null,
+      }
+    });
+
     this.sendMessage("ok", statusRsp, reqId);
   }
 
