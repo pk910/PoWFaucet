@@ -430,8 +430,11 @@ export class PoWClient {
 
     let sessions = PoWSession.getAllSessions();
     statusRsp.sessions = sessions.map((session) => {
+      let sessionIdHash = crypto.createHash("sha256");
+      sessionIdHash.update(session.getSessionId());
+
       return {
-        id: session.getSessionId(),
+        id: sessionIdHash.digest("hex").substring(0, 20),
         start: Math.floor(session.getStartTime().getTime() / 1000),
         idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
         target: session.getTargetAddr(),

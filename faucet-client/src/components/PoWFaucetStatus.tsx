@@ -108,7 +108,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       <table className="table table-striped status-sessions">
         <thead>
           <tr>
-            <th scope="col">Id</th>
+            <th scope="col">Session</th>
             <th scope="col">Target Address</th>
             <th scope="col">Start Time</th>
             <th scope="col">Timeout</th>
