@@ -164,6 +164,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     this.sessionInfo = null;
     this.storeSessionStatus();
     this.emit("killed", reason);
+    this.emit("update");
   }
 
   private storeSessionStatus() {
