@@ -12,8 +12,17 @@ function copyIfFound(filename, dstpath, dstname) {
   if(!dstname)
     dstname = filename;
   if(!fs.existsSync(srcFile))
-    return;
+    return false;
   fs.copyFileSync(srcFile, path.join(dstpath, dstname));
+  return true;
+}
+
+function copyIfFoundOrRemove(filename, dstpath, dstname) {
+  if(!copyIfFound(filename, dstpath, dstname)) {
+    let dstfile = path.join(dstpath, dstname || filename);
+    if(fs.existsSync(dstfile))
+      fs.rmSync(dstfile);
+  }
 }
 
 (new Promise((resolve, reject) => {
@@ -27,16 +36,16 @@ function copyIfFound(filename, dstpath, dstname) {
   let staticPath = path.join(__dirname, "..", "static");
 
   copyIfFound("powcaptcha.css", path.join(staticPath, "css"));
-  copyIfFound("powcaptcha.css.map", path.join(staticPath, "css"));
   copyIfFound("powcaptcha.min.css", path.join(staticPath, "css"), "powcaptcha.css");
+  copyIfFoundOrRemove("powcaptcha.css.map", path.join(staticPath, "css"));
 
   copyIfFound("powcaptcha.js", path.join(staticPath, "js"));
-  copyIfFound("powcaptcha.js.map", path.join(staticPath, "js"));
   copyIfFound("powcaptcha.min.js", path.join(staticPath, "js"), "powcaptcha.js");
+  copyIfFoundOrRemove("powcaptcha.js.map", path.join(staticPath, "js"));
 
   copyIfFound("powcaptcha-worker.js", path.join(staticPath, "js"));
-  copyIfFound("powcaptcha-worker.js.map", path.join(staticPath, "js"));
   copyIfFound("powcaptcha-worker.min.js", path.join(staticPath, "js"), "powcaptcha-worker.js");
+  copyIfFoundOrRemove("powcaptcha-worker.js.map", path.join(staticPath, "js"));
 
   console.log("finished");
 });
