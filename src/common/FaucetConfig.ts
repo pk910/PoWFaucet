@@ -2,51 +2,60 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export interface IFaucetConfig {
-  appBasePath: string;
-  faucetVersion: string;
-  staticPath?: string;
+  appBasePath: string; // base path (set automatically)
+  faucetVersion: string; // faucet version (set automatically)
+
+  staticPath: string; // path to the /static directory (set automatically)
   faucetStore: string;
 
-  faucetTitle: string;
-  faucetImage: string;
-  faucetLogFile: string;
-  serverPorts: IFaucetPortConfig[];
+  faucetTitle: string; // title of the faucet
+  faucetImage: string; // faucet image displayed on the startpage
+  faucetLogFile: string; // logfile for faucet events / null for no log
+  serverPorts: IFaucetPortConfig[]; // listener ports
 
-  powShareReward: number;
-  claimMinAmount: number;
-  claimMaxAmount: number;
-  powSessionTimeout: number;
-  claimSessionTimeout: number;
-  claimAddrCooldown: number;
-  powSessionSecret: string;
-  powPingInterval: number;
-  powPingTimeout: number;
-  powScryptParams: {
-    cpuAndMemory: number;
-    blockSize: number;
-    paralellization: number;
-    keyLength: number;
-    difficulty: number;
+  /* PoW parameters */
+  powShareReward: number; // reward amount per share (in wei)
+  claimMinAmount: number; // minimum balance to payout (in wei)
+  claimMaxAmount: number; // maximum balance to payout (in wei)
+  powSessionTimeout: number; // maximum mining session time in seconds
+  claimSessionTimeout: number; // how long sessions can be payed out in seconds (should be higher than powSessionTimeout)
+  claimAddrCooldown: number; // number of seconds to wait before allow to reuse the same address to start another mining session
+  powSessionSecret: string; // random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
+  powPingInterval: number; // websocket ping interval
+  powPingTimeout: number; // kill websocket if no ping/pong for that number of seconds
+  powScryptParams: { // scrypt parameters
+    cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
+    blockSize: number; // r - block size (affects memory and CPU usage)
+    paralellization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+    keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
+    difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
   };
-  powNonceCount: number;
+  powNonceCount: number; // number of scrypt hashs to pack into a share (should be low as that just increases verification load on server side)
 
-  verifyLocalPercent: number;
-  verifyLocalMaxQueue: number;
-  verifyMinerPeerCount: number;
-  verifyLocalLowPeerPercent: number;
-  verifyMinerPercent: number;
-  verifyMinerIndividuals: number;
-  verifyMinerMissPenalty: number;
+  /* PoW-share verification
+  Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
+  As that can lead to a huge verification work load on the server, this faucet can redistribute shares back to other miners for verification.
+  These randomly selected miners need to check the share and return its validity to the server within 10 seconds or they're penalized.
+  If theres a missmatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
+  Bad shares always result in a slashing (termination of session and loss of all collected mining balance)
+  */
+  verifyLocalPercent: number; // percentage of shares validated locally (0 - 100)
+  verifyLocalMaxQueue: number; // max number of shares in local validation queue
+  verifyMinerPeerCount: number; // min number of mining sessions for verification redistribution - only local verification if not enough active sessions (should be higher than verifyMinerIndividuals)
+  verifyLocalLowPeerPercent: number; // percentage of shares validated locally if there are not enough sessions for verification redistribution (0 - 100)
+  verifyMinerPercent: number; // percentage of shares to redistribute to miners for verification (0 - 100)
+  verifyMinerIndividuals: number; // number of other mining sessions to redistribute a share to for verification
+  verifyMinerMissPenalty: number; // penalty for not responding to a verification request (shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so)
 
-  hcaptcha: IFaucetHCaptchaConfig | null;
+  hcaptcha: IFaucetHCaptchaConfig | null; // hcaptcha parameters or null to disable all hcaptchas
 
-  ethRpcHost: string;
-  ethWalletKey: string;
-  ethChainId: number;
-  ethTxGasLimit: number;
-  ethTxMaxFee: number;
-  ethTxPrioFee: number;
-  ethMaxPending: number;
+  ethRpcHost: string; // ETH execution layer RPC host
+  ethWalletKey: string; // faucet wallet private key
+  ethChainId: number; // ETH chain id
+  ethTxGasLimit: number; // transaction gas limit (wei)
+  ethTxMaxFee: number; // max transaction gas fee
+  ethTxPrioFee: number; // max transaction priority fee
+  ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
 }
 
 export interface IFaucetPortConfig {
@@ -54,10 +63,10 @@ export interface IFaucetPortConfig {
 }
 
 export interface IFaucetHCaptchaConfig {
-  siteKey: string;
-  secret: string;
-  checkSessionStart: boolean;
-  checkBalanceClaim: boolean;
+  siteKey: string; // hcaptcha site key
+  secret: string; // hcaptcha secret
+  checkSessionStart: boolean; // require hcaptcha to start a new mining session
+  checkBalanceClaim: boolean; // require hcaptcha to claim mining rewards
 }
 
 export let faucetConfig: IFaucetConfig = (() => {
