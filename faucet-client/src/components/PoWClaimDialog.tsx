@@ -31,7 +31,8 @@ export interface IPoWClaimDialogReward {
 enum PoWClaimStatus {
   PREPARE,
   PENDING,
-  CONFIRMED
+  CONFIRMED,
+  FAILED
 }
 
 export interface IPoWClaimDialogState {
@@ -42,6 +43,7 @@ export interface IPoWClaimDialogState {
   claimError: string;
   txHash: string;
   txBlock: number;
+  txError: string;
 }
 
 export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IPoWClaimDialogState> {
@@ -58,6 +60,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       claimError: null,
       txHash: null,
       txBlock: 0,
+      txError: null,
 		};
   }
 
@@ -66,11 +69,20 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       this.powSessionClaimTxListener = (res: any) => {
         if(res.session !== this.props.reward.session)
           return;
-        this.setState({
-          claimStatus: PoWClaimStatus.CONFIRMED,
-          txHash: res.txHash,
-          txBlock: res.txBlock,
-        });
+
+        if(res.error) {
+          this.setState({
+            claimStatus: PoWClaimStatus.FAILED,
+            txError: res.error,
+          });
+        }
+        else {
+          this.setState({
+            claimStatus: PoWClaimStatus.CONFIRMED,
+            txHash: res.txHash,
+            txBlock: res.txBlock,
+          });
+        }
       };
       this.props.powSession.on("claimTx", this.powSessionClaimTxListener);
     }
@@ -166,6 +178,11 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
               <div className='alert alert-success'>
                 Claim Transaction has been confirmed in block #{this.state.txBlock}!<br />
                 TX: {this.state.txHash}
+              </div>
+             : null}
+             {this.state.claimStatus == PoWClaimStatus.FAILED ?
+              <div className='alert alert-danger'>
+                Transaction failed: {this.state.txError}
               </div>
              : null}
           </div>

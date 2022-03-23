@@ -422,6 +422,12 @@ export class PoWClient {
         txBlock: claimTx.txblock
       });
     });
+    claimTx.once("failed", () => {
+      this.sendMessage("claimTx", {
+        session: sessionInfo.id,
+        error: claimTx.failReason
+      });
+    });
   }
 
   private async onCliGetFaucetStatus(message: any) {

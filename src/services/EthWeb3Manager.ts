@@ -17,12 +17,14 @@ interface WalletState {
 export enum ClaimTxStatus {
   QUEUE = "queue",
   PENDING = "pending",
-  CONFIRMED = "confirmed"
+  CONFIRMED = "confirmed",
+  FAILED = "failed",
 }
 
 interface ClaimTxEvents {
   'pending': () => void;
   'confirmed': () => void;
+  'failed': () => void;
 }
 
 export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
@@ -34,6 +36,8 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public txhex: string;
   public txhash: string;
   public txblock: number;
+  public retryCount: number;
+  public failReason: string;
 
   public constructor(target: string, amount: number) {
     super();
@@ -41,6 +45,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
     this.time = new Date();
     this.target = target;
     this.amount = amount;
+    this.retryCount = 0;
   }
 }
 
@@ -52,7 +57,8 @@ export class EthWeb3Manager {
   private walletState: WalletState;
   private claimTxQueue: ClaimTx[] = [];
   private pendingTxQueue: {[nonce: number]: ClaimTx} = {};
-  private confirmedTxQueue: {[nonce: number]: ClaimTx} = {};
+  private historyTxDict: {[nonce: number]: ClaimTx} = {};
+  private lastWalletRefresh: number;
 
   public constructor() {
     this.web3 = new Web3(faucetConfig.ethRpcHost);
@@ -63,8 +69,8 @@ export class EthWeb3Manager {
     this.walletKey = Buffer.from(faucetConfig.ethWalletKey, "hex");
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
     
+    this.lastWalletRefresh = Math.floor(new Date().getTime() / 1000);
     this.loadWalletState().then(() => {
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH  [Nonce: " + this.walletState.nonce + "]");
       setInterval(() => this.processQueue(), 2000);
     });
   }
@@ -73,7 +79,7 @@ export class EthWeb3Manager {
     let txlist: ClaimTx[] = [];
     Array.prototype.push.apply(txlist, this.claimTxQueue);
     Array.prototype.push.apply(txlist, Object.values(this.pendingTxQueue));
-    Array.prototype.push.apply(txlist, Object.values(this.confirmedTxQueue));
+    Array.prototype.push.apply(txlist, Object.values(this.historyTxDict));
     return txlist;
   }
 
@@ -82,6 +88,7 @@ export class EthWeb3Manager {
       this.web3.eth.getBalance(this.walletAddr),
       this.web3.eth.getTransactionCount(this.walletAddr),
     ]).then((res) => {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH  [Nonce: " + this.walletState.nonce + "]");
       this.walletState = {
         balance: parseInt(res[0]),
         nonce: res[1],
@@ -125,6 +132,12 @@ export class EthWeb3Manager {
       let claimTx = this.claimTxQueue.splice(0, 1)[0];
       this.processQueueTx(claimTx);
     }
+
+    let now = Math.floor(new Date().getTime() / 1000);
+    if(pendingTxCount === 0 && Object.keys(this.pendingTxQueue).length === 0 && now - this.lastWalletRefresh > 600) {
+      this.lastWalletRefresh = now;
+      this.loadWalletState();
+    }
   }
 
   private processQueueTx(claimTx: ClaimTx) {
@@ -141,16 +154,21 @@ export class EthWeb3Manager {
       delete this.pendingTxQueue[claimTx.nonce];
       claimTx.status = ClaimTxStatus.CONFIRMED;
       claimTx.emit("confirmed");
-
-      this.confirmedTxQueue[claimTx.nonce] = claimTx;
+    }, (err) => {
+      delete this.pendingTxQueue[claimTx.nonce];
+      claimTx.failReason = err;
+      claimTx.status = ClaimTxStatus.FAILED;
+      claimTx.emit("failed");
+    }).then(() => {
+      this.historyTxDict[claimTx.nonce] = claimTx;
       setTimeout(() => {
-        delete this.confirmedTxQueue[claimTx.nonce];
+        delete this.historyTxDict[claimTx.nonce];
       }, 30 * 60 * 1000);
-    })
+    });
   }
 
   private sendClaimTx(claimTx: ClaimTx): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let txPromise = this.web3.eth.sendSignedTransaction("0x" + claimTx.txhex);
       txPromise.then((res) => {
         claimTx.txhash = res.transactionHash;
@@ -158,7 +176,13 @@ export class EthWeb3Manager {
         resolve();
       }, (err) => {
         ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Transaction for " + claimTx.target + " failed: " + err);
-        return this.sendClaimTx(claimTx);
+        if(claimTx.retryCount < 3) {
+          claimTx.retryCount++;
+          this.sendClaimTx(claimTx).then(resolve, reject);
+        }
+        else {
+          reject(err);
+        }
       });
     });
   }
