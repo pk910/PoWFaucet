@@ -88,11 +88,11 @@ export class EthWeb3Manager {
       this.web3.eth.getBalance(this.walletAddr),
       this.web3.eth.getTransactionCount(this.walletAddr),
     ]).then((res) => {
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH  [Nonce: " + this.walletState.nonce + "]");
       this.walletState = {
         balance: parseInt(res[0]),
         nonce: res[1],
       };
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH  [Nonce: " + this.walletState.nonce + "]");
     });
   }
 
