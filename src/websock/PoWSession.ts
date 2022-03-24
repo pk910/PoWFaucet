@@ -11,10 +11,18 @@ import { PoWClient } from "./PoWClient";
 import { renderDate } from "../utils/DateUtils";
 
 
-export enum IPoWSessionSlashReason {
+export enum PoWSessionSlashReason {
   MISSED_VERIFICATION = "missed_verify",
   INVALID_VERIFICATION = "invalid_verify",
   INVALID_SHARE = "invalid_share",
+}
+
+export enum PoWSessionStatus {
+  IDLE = "idle",
+  MINING = "mining",
+  CLOSED = "closed",
+  CLAIMED = "claimed",
+  SLASHED = "slashed",
 }
 
 export interface IPoWSessionRecoveryInfo {
@@ -27,9 +35,14 @@ export interface IPoWSessionRecoveryInfo {
 
 export class PoWSession {
   private static activeSessions: {[sessionId: string]: PoWSession} = {};
+  private static closedSessions: {[sessionId: string]: PoWSession} = {};
 
   public static getSession(sessionId: string): PoWSession {
     return this.activeSessions[sessionId];
+  }
+
+  public static getClosedSession(sessionId: string): PoWSession {
+    return this.closedSessions[sessionId];
   }
 
   public static getVerifierSessions(ignoreId?: string): PoWSession[] {
@@ -39,7 +52,10 @@ export class PoWSession {
   }
 
   public static getAllSessions(): PoWSession[] {
-    return Object.values(this.activeSessions);
+    let sessions: PoWSession[] = [];
+    Array.prototype.push.apply(sessions, Object.values(this.activeSessions));
+    Array.prototype.push.apply(sessions, Object.values(this.closedSessions));
+    return sessions;
   }
 
   private sessionId: string;
@@ -53,12 +69,14 @@ export class PoWSession {
   private reportedHashRate: number[];
   private activeClient: PoWClient;
   private cleanupTimer: NodeJS.Timeout;
+  private sessionStatus: PoWSessionStatus;
 
   public constructor(client: PoWClient, targetAddr: string, recoveryInfo?: IPoWSessionRecoveryInfo) {
     this.idleTime = null;
     this.targetAddr = targetAddr;
     this.claimable = false;
     this.reportedHashRate = [];
+    this.sessionStatus = PoWSessionStatus.MINING;
     
     if(recoveryInfo) {
       this.sessionId = recoveryInfo.id;
@@ -115,8 +133,19 @@ export class PoWSession {
       this.cleanupTimer = null;
     }
     
+    this.setSessionStatus(PoWSessionStatus.CLOSED);
     delete PoWSession.activeSessions[this.sessionId];
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Closed session: " + this.sessionId + (this.claimable ? " (claimable reward: " + (Math.round(weiToEth(this.balance)*1000)/1000) + ")" : ""));
+
+    let now = Math.floor((new Date()).getTime() / 1000);
+    let sessionAge = now - Math.floor(this.startTime.getTime() / 1000);
+    let cleanupTime = faucetConfig.claimSessionTimeout - sessionAge + 20;
+    if(cleanupTime > 0) {
+      PoWSession.closedSessions[this.sessionId] = this;
+      setTimeout(() => {
+        delete PoWSession.closedSessions[this.sessionId];
+      }, cleanupTime * 1000);
+    }
   }
 
 
@@ -164,10 +193,12 @@ export class PoWSession {
     this.activeClient = activeClient;
     if(activeClient) {
       this.idleTime = null;
+      this.setSessionStatus(PoWSessionStatus.MINING);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
     }
     else {
       this.idleTime = new Date();
+      this.setSessionStatus(PoWSessionStatus.IDLE);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Paused session: " + this.sessionId);
     }
   }
@@ -188,15 +219,25 @@ export class PoWSession {
     return this.reportedHashRate.length > 0 ? hashRateSum / this.reportedHashRate.length : 0;
   }
 
-  public slashBadSession(reason: IPoWSessionSlashReason) {
+  public getSessionStatus(): PoWSessionStatus {
+    return this.sessionStatus;
+  }
+
+  public setSessionStatus(status: PoWSessionStatus) {
+    if(this.sessionStatus === PoWSessionStatus.SLASHED)
+      return;
+    this.sessionStatus = status;
+  }
+
+  public slashBadSession(reason: PoWSessionSlashReason) {
     let penalty: string = null;
     switch(reason) {
-      case IPoWSessionSlashReason.MISSED_VERIFICATION:
+      case PoWSessionSlashReason.MISSED_VERIFICATION:
         let balancePenalty = this.applyBalancePenalty(faucetConfig.verifyMinerMissPenalty);
         penalty = "-" + (Math.round(weiToEth(balancePenalty)*1000)/1000) + "eth";
         break;
-      case IPoWSessionSlashReason.INVALID_SHARE:
-      case IPoWSessionSlashReason.INVALID_VERIFICATION:
+      case PoWSessionSlashReason.INVALID_SHARE:
+      case PoWSessionSlashReason.INVALID_VERIFICATION:
         this.applyKillPenalty(reason);
         penalty = "killed";
         break;
@@ -224,7 +265,8 @@ export class PoWSession {
     return penalty;
   }
 
-  private applyKillPenalty(reason: IPoWSessionSlashReason) {
+  private applyKillPenalty(reason: PoWSessionSlashReason) {
+    this.setSessionStatus(PoWSessionStatus.SLASHED);
     ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.KILLED);
     if(this.activeClient)
       this.activeClient.sendMessage("sessionKill", {

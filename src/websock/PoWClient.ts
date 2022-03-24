@@ -2,7 +2,7 @@ import { WebSocket, RawData } from 'ws';
 import * as hcaptcha from "hcaptcha";
 import * as crypto from "crypto";
 import { faucetConfig } from '../common/FaucetConfig';
-import { PoWSession } from './PoWSession';
+import { PoWSession, PoWSessionStatus } from './PoWSession';
 import { AddressMark, FaucetStore, SessionMark } from '../services/FaucetStore';
 import { renderTimespan } from '../utils/DateUtils';
 import { isValidGuid } from '../utils/GuidUtils';
@@ -411,6 +411,10 @@ export class PoWClient {
 
     ServiceManager.GetService(FaucetStore).setSessionMark(sessionInfo.id, SessionMark.CLAIMED);
 
+    let closedSession = PoWSession.getClosedSession(sessionInfo.id);
+    if(closedSession)
+      closedSession.setSessionStatus(PoWSessionStatus.CLAIMED);
+
     let claimTx = ServiceManager.GetService(EthWeb3Manager).addClaimTransaction(sessionInfo.targetAddr, sessionInfo.balance);
     this.sendMessage("ok", null, reqId);
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Claimed reward for session " + sessionInfo.id + " to " + sessionInfo.targetAddr + " (" + (Math.round(weiToEth(sessionInfo.balance)*1000)/1000) + " ETH)");
@@ -447,6 +451,8 @@ export class PoWClient {
         balance: session.getBalance(),
         nonce: session.getLastNonce(),
         hashrate: session.getReportedHashRate(),
+        status: session.getSessionStatus(),
+        claimable: session.isClaimable(),
       }
     });
 

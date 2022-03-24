@@ -30,6 +30,8 @@ interface IPoWFaucetStatusSession {
   balance: number;
   nonce: number;
   hashrate: number;
+  status: string;
+  claimable: boolean;
 }
 
 interface IPoWFaucetStatusClaim {
@@ -134,6 +136,30 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
   }
 
   private renderActiveSessionRow(session: IPoWFaucetStatusSession): React.ReactElement {
+    let sessionStatus: React.ReactElement = null;
+    switch(session.status) {
+      case "idle":
+        sessionStatus = <span className="badge bg-secondary">Idle ({renderTime(new Date(session.idle * 1000))})</span>;
+        break;
+      case "mining":
+        sessionStatus = <span className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>;
+        break;
+      case "closed":
+        if(session.claimable)
+          sessionStatus = <span className="badge bg-warning text-dark">Claimable ({renderTime(new Date((session.start + this.props.faucetConfig.claimTimeout) * 1000))})</span>;
+        else
+          sessionStatus = <span className="badge bg-info text-dark">Closed</span>;
+        break;
+      case "claimed":
+        sessionStatus = <span className="badge bg-primary">Claimed</span>;
+        break;
+      case "slashed":
+        sessionStatus = <span className="badge bg-danger">Slashed</span>;
+        break;
+      default:
+        sessionStatus = <span className="badge bg-light text-dark">{session.status}</span>;
+    }
+
     return (
       <tr key={session.id}>
         <th scope="row">{session.id}</th>
@@ -142,12 +168,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{renderDate(new Date((session.start + this.props.faucetConfig.powTimeout) * 1000), true)}</td>
         <td>{Math.round(weiToEth(session.balance) * 1000) / 1000} ETH</td>
         <td>{session.nonce}</td>
-        <td>
-          {session.idle ?
-            <span className="badge bg-secondary">Idle ({renderTime(new Date(session.idle * 1000))})</span> :
-            <span className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>
-          }
-        </td>
+        <td>{sessionStatus}</td>
       </tr>
     );
   }

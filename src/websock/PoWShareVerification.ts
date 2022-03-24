@@ -3,7 +3,7 @@ import { ServiceManager } from "../common/ServiceManager";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PromiseDfd } from "../utils/PromiseDfd";
 import { PoWValidator } from "../validator/PoWValidator";
-import { IPoWSessionSlashReason, PoWSession } from "./PoWSession";
+import { PoWSessionSlashReason, PoWSession } from "./PoWSession";
 
 export class PoWShareVerification {
   private static verifyingShares: {[id: string]: PoWShareVerification} = {};
@@ -136,18 +136,18 @@ export class PoWShareVerification {
       this.verifyMinerSessions.forEach((verifierId) => {
         let session = PoWSession.getSession(verifierId);
         if(session)
-          session.slashBadSession(IPoWSessionSlashReason.MISSED_VERIFICATION);
+          session.slashBadSession(PoWSessionSlashReason.MISSED_VERIFICATION);
       });
     }
     
     Object.keys(this.verifyMinerResults).forEach((verifierId) => {
       let session = PoWSession.getSession(verifierId);
       if(this.verifyMinerResults[verifierId] !== !this.isInvalid && session)
-        session.slashBadSession(IPoWSessionSlashReason.INVALID_VERIFICATION);
+        session.slashBadSession(PoWSessionSlashReason.INVALID_VERIFICATION);
     });
 
     if(this.isInvalid)
-      session.slashBadSession(IPoWSessionSlashReason.INVALID_SHARE);
+      session.slashBadSession(PoWSessionSlashReason.INVALID_SHARE);
     else {
       // valid share - add rewards
       session.addBalance(faucetConfig.powShareReward);
