@@ -49,6 +49,7 @@ export interface IPoWClaimDialogState {
 export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IPoWClaimDialogState> {
   private powSessionClaimTxListener: ((res: any) => void);
   private updateTimer: NodeJS.Timeout;
+  private hcapControl: HCaptcha;
 
   constructor(props: IPoWClaimDialogProps, state: IPoWClaimDialogState) {
     super(props);
@@ -162,6 +163,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 <HCaptcha 
                   sitekey={this.props.faucetConfig.hcapSiteKey} 
                   onVerify={(token) => this.setState({ captchaToken: token })}
+                  ref={(cap) => this.hcapControl = cap} 
                 />
               </div>
             </div>
@@ -214,9 +216,14 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
         claimStatus: PoWClaimStatus.PENDING,
       });
     }, (err) => {
-      this.setState({
+      let stateChange: any = {
         claimProcessing: false
-      });
+      };
+      if(this.hcapControl) {
+        this.hcapControl.resetCaptcha();
+        stateChange.captchaToken = null;
+      }
+      this.setState(stateChange);
       this.props.setDialog({
         title: "Could not claim Rewards.",
         body: (
