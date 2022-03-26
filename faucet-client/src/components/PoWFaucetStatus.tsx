@@ -26,6 +26,7 @@ interface IPoWFaucetStatusSession {
   id: string;
   start: number;
   idle: number | null;
+  ip: string;
   target: string;
   balance: number;
   nonce: number;
@@ -114,7 +115,8 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       <table className="table table-striped status-sessions">
         <thead>
           <tr>
-            <th scope="col">Session</th>
+            <th scope="col">Session Hash</th>
+            <th scope="col">IP Hash</th>
             <th scope="col">Target Address</th>
             <th scope="col">Start Time</th>
             <th scope="col">Timeout</th>
@@ -127,7 +129,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           {this.state.activeSessions.length > 0 ?
             this.state.activeSessions.map((session) => this.renderActiveSessionRow(session)) :
             <tr key="none">
-              <th scope="row" colSpan={7}>No active sessions</th>
+              <th scope="row" colSpan={8}>No active sessions</th>
             </tr>
           }
         </tbody>
@@ -163,6 +165,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     return (
       <tr key={session.id}>
         <th scope="row">{session.id}</th>
+        <td>{session.ip}</td>
         <td>{session.target}</td>
         <td>{renderDate(new Date(session.start * 1000), true)}</td>
         <td>{renderDate(new Date((session.start + this.props.faucetConfig.powTimeout) * 1000), true)}</td>

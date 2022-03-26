@@ -441,13 +441,23 @@ export class PoWClient {
     let sessions = PoWSession.getAllSessions();
     statusRsp.sessions = sessions.map((session) => {
       let sessionIdHash = crypto.createHash("sha256");
+      sessionIdHash.update(faucetConfig.powSessionSecret + "\r\n");
       sessionIdHash.update(session.getSessionId());
+
+      let sessionIpHash: string = null;
+      if(session.getActiveClient()) {
+        let reoteIpHash = crypto.createHash("sha256");
+        reoteIpHash.update(faucetConfig.powSessionSecret + "\r\n");
+        reoteIpHash.update(session.getActiveClient().getRemoteIP());
+        sessionIpHash = reoteIpHash.digest("hex").substring(0, 20);
+      }
 
       return {
         id: sessionIdHash.digest("hex").substring(0, 20),
         start: Math.floor(session.getStartTime().getTime() / 1000),
         idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
         target: session.getTargetAddr(),
+        ip: sessionIpHash,
         balance: session.getBalance(),
         nonce: session.getLastNonce(),
         hashrate: session.getReportedHashRate(),
