@@ -8,6 +8,8 @@ import { faucetConfig } from '../common/FaucetConfig';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
+import { strFormatPlaceholder } from '../utils/StringUtils';
 
 interface WalletState {
   nonce: number;
@@ -19,6 +21,13 @@ export enum ClaimTxStatus {
   PENDING = "pending",
   CONFIRMED = "confirmed",
   FAILED = "failed",
+}
+
+enum FucetWalletState {
+  UNKNOWN = 0,
+  NORMAL = 1,
+  LOWFUNDS = 2,
+  NOFUNDS = 3
 }
 
 interface ClaimTxEvents {
@@ -59,6 +68,7 @@ export class EthWeb3Manager {
   private pendingTxQueue: {[nonce: number]: ClaimTx} = {};
   private historyTxDict: {[nonce: number]: ClaimTx} = {};
   private lastWalletRefresh: number;
+  private faucetStatus = FucetWalletState.UNKNOWN;
 
   public constructor() {
     this.web3 = new Web3(faucetConfig.ethRpcHost);
@@ -93,7 +103,43 @@ export class EthWeb3Manager {
         nonce: res[1],
       };
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH  [Nonce: " + this.walletState.nonce + "]");
+      this.updateFaucetStatus();
     });
+  }
+
+  private updateFaucetStatus() {
+    let newStatus = FucetWalletState.UNKNOWN;
+    if(this.walletState) {
+      newStatus = FucetWalletState.NORMAL;
+      if(this.walletState.balance <= faucetConfig.spareFundsAmount)
+        newStatus = FucetWalletState.NOFUNDS;
+      else if(this.walletState.balance <= faucetConfig.lowFundsBalance)
+        newStatus = FucetWalletState.LOWFUNDS;
+    }
+    if(newStatus !== this.faucetStatus) {
+      let statusMessage: string;
+      switch(newStatus) {
+        case FucetWalletState.LOWFUNDS:
+          if(typeof faucetConfig.lowFundsWarning === "string")
+            statusMessage = faucetConfig.lowFundsWarning;
+          else if(faucetConfig.lowFundsWarning)
+            statusMessage = "The faucet is running out of funds! Faucet Balance: {1}";
+          else
+            break;
+          ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", strFormatPlaceholder(statusMessage, (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH"), FaucetStatusLevel.WARNING);
+        case FucetWalletState.NOFUNDS:
+          if(typeof faucetConfig.noFundsError === "string")
+            statusMessage = faucetConfig.noFundsError;
+          else if(faucetConfig.noFundsError)
+            statusMessage = "The faucet is out of funds!";
+          else
+            break;
+          ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", strFormatPlaceholder(statusMessage), FaucetStatusLevel.ERROR);
+        default:
+          ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", null, null);
+      }
+      this.faucetStatus = newStatus;
+    }
   }
 
   public addClaimTransaction(target: string, amount: number): ClaimTx {
@@ -107,6 +153,7 @@ export class EthWeb3Manager {
     if(txAmount > 10000000000000000)
       txAmount = "0x" + BigInt(txAmount).toString(16);
     let nonce = this.walletState.nonce++;
+    this.walletState.balance -= amount;
 
     var rawTx = {
       nonce: nonce,
@@ -141,11 +188,20 @@ export class EthWeb3Manager {
   }
 
   private processQueueTx(claimTx: ClaimTx) {
+    if(this.walletState.balance - faucetConfig.spareFundsAmount < claimTx.amount) {
+      claimTx.failReason = "Faucet wallet is out of funds.";
+      claimTx.status = ClaimTxStatus.FAILED;
+      claimTx.emit("failed");
+      return;
+    }
+
     let ethtx = this.buildEthTx(claimTx.target, claimTx.amount);
     claimTx.nonce = ethtx.nonce;
     claimTx.txhex = ethtx.txhash;
     claimTx.status = ClaimTxStatus.PENDING;
     claimTx.emit("pending");
+
+    this.updateFaucetStatus();
 
     this.pendingTxQueue[claimTx.nonce] = claimTx;
 

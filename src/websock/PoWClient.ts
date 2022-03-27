@@ -11,8 +11,19 @@ import { ServiceManager } from '../common/ServiceManager';
 import { PoWShareVerification } from './PoWShareVerification';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { weiToEth } from '../utils/ConvertHelpers';
+import { FaucetStatus } from '../services/FaucetStatus';
 
 export class PoWClient {
+  private static activeClients: PoWClient[] = [];
+
+  public static sendToAll(action: string, data?: any) {
+    this.activeClients.forEach((client) => {
+      try {
+        client.sendMessage(action, data);
+      } catch(ex) {}
+    });
+  }
+
   private socket: WebSocket;
   private remoteIp: string;
   private session: PoWSession = null;
@@ -23,6 +34,8 @@ export class PoWClient {
     this.socket = socket;
     this.remoteIp = remoteIp;
     this.lastPingPong = new Date();
+
+    PoWClient.activeClients.push(this);
 
     this.socket.on("message", (data, isBinary) => this.onClientMessage(data, isBinary));
     this.socket.on("ping", (data) => {
@@ -52,6 +65,11 @@ export class PoWClient {
 
   private dispose() {
     this.socket = null;
+
+    let clientIdx = PoWClient.activeClients.indexOf(this);
+    if(clientIdx !== -1)
+      PoWClient.activeClients.splice(clientIdx, 1);
+
     if(this.pingTimer) {
       clearInterval(this.pingTimer);
       this.pingTimer = null;
@@ -159,8 +177,10 @@ export class PoWClient {
 
   private onCliGetConfig(message: any) {
     let reqId = message.id || undefined;
+    let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus();
     this.sendMessage("config", {
       faucetTitle: faucetConfig.faucetTitle,
+      faucetStatus: faucetStatus,
       faucetImage: faucetConfig.faucetImage,
       hcapSiteKey: faucetConfig.hcaptcha ? faucetConfig.hcaptcha.siteKey : null,
       hcapSession: faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkSessionStart,

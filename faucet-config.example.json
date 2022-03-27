@@ -37,6 +37,11 @@
     "checkBalanceClaim": true
   },
 
+  "spareFundsAmount":   10000000000000000,
+  "lowFundsBalance":  2000000000000000000,
+  "lowFundsWarning": "The faucet is running out of funds! Faucet Balance: {1}",
+  "noFundsError": "Sorry, the faucet is out of funds :(",
+
   "ethRpcHost": "http://127.0.0.1:8545/",
   "ethWalletKey": "***censored***",
   "ethChainId": 1337802,

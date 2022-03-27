@@ -1,6 +1,7 @@
 
 export interface IFaucetConfig {
   faucetTitle: string;
+  faucetStatus: IFaucetStatus;
   faucetImage: string;
   hcapSiteKey: string | null;
   hcapSession: boolean;
@@ -20,4 +21,9 @@ export interface IPoWParams {
   p: number; // paralellization
   l: number; // key length
   d: number; // difficulty
+}
+
+export interface IFaucetStatus {
+  text: string;
+  level: string
 }

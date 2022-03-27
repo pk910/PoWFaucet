@@ -1,4 +1,4 @@
-import { IFaucetConfig } from '../common/IFaucetConfig';
+import { IFaucetConfig, IFaucetStatus } from '../common/IFaucetConfig';
 import { PoWClient } from '../common/PoWClient';
 import React, { ReactElement } from 'react';
 import { Button, Modal } from 'react-bootstrap';
@@ -12,6 +12,7 @@ import { renderDate } from '../utils/DateUtils';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IPoWClaimDialogReward, PoWClaimDialog } from './PoWClaimDialog';
 import { PoWFaucetStatus } from './PoWFaucetStatus';
+import { TypedEmitter } from 'tiny-typed-emitter';
 
 export interface IPoWCaptchaProps {
   powApiUrl: string;
@@ -41,6 +42,8 @@ export interface IStatusDialog {
 export interface IPoWCaptchaState {
   initializing: boolean;
   faucetConfig: IFaucetConfig;
+  faucetStatusText: string;
+  faucetStatusLevel: string;
   targetAddr: string;
   requestCaptcha: boolean;
   captchaToken: string;
@@ -57,8 +60,12 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
   private powClient: PoWClient;
   private powSession: PoWSession;
   private hcapControl: HCaptcha;
-  private powSessionUpdateListener: (() => void);
-  private powSessionKilledListener: ((reason: string) => void);
+  private eventListeners: {[key: string]: {
+    emmiter: TypedEmitter;
+    event: string;
+    listener: Function;
+    bound?: boolean;
+  }} = {};
   private faucetStatucClickCount = 0;
 
   constructor(props: IPoWCaptchaProps, state: IPoWCaptchaState) {
@@ -72,6 +79,8 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
       this.setState({
         initializing: false,
         faucetConfig: faucetConfig,
+        faucetStatusText: faucetConfig.faucetStatus.text,
+        faucetStatusLevel: faucetConfig.faucetStatus.level,
         showRestoreSessionDialog: (this.state.miningStatus == PoWCaptchaMiningStatus.IDLE && !!this.powSession.getStoredSessionInfo()),
       });
     });
@@ -89,11 +98,31 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
           token: capToken
         };
       },
-    })
+    });
+
+    this.eventListeners = {
+      "clientFaucetStatus": {
+        emmiter: this.powClient,
+        event: "faucetStatus",
+        listener: (faucetStatus) => this.onPoWClientFaucetStatus(faucetStatus),
+      },
+      "sessionUpdate": {
+        emmiter: this.powSession,
+        event: "update",
+        listener: () => this.onPoWSessionUpdate(),
+      },
+      "sessionKilled": {
+        emmiter: this.powSession,
+        event: "killed",
+        listener: (killInfo) => this.onPoWSessionKilled(killInfo),
+      },
+    };
 
     this.state = {
       initializing: true,
       faucetConfig: null,
+      faucetStatusText: null,
+      faucetStatusLevel: null,
       targetAddr: "",
       requestCaptcha: false,
       captchaToken: null,
@@ -108,76 +137,85 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
   }
 
   public componentDidMount() {
-    if(!this.powSessionUpdateListener) {
-      this.powSessionUpdateListener = () => {
-        let sessionInfo = this.powSession.getSessionInfo();
-        if(this.state.miningStatus === PoWCaptchaMiningStatus.IDLE && sessionInfo) {
-          // start miner
-          if(!this.powSession.getMiner()) {
-            this.powSession.setMiner(new PoWMiner({
-              session: this.powSession,
-              workerSrc: this.props.minerSrc,
-              powParams: this.state.faucetConfig.powParams,
-              nonceCount: this.state.faucetConfig.powNonceCount,
-            }));
-          }
-          this.setState({
-            miningStatus: PoWCaptchaMiningStatus.RUNNING,
-            targetAddr: sessionInfo.targetAddr,
-            isClaimable: (sessionInfo.balance >= this.state.faucetConfig.minClaim),
-            statusMessage: null,
-          });
-        }
-        else if(this.state.miningStatus !== PoWCaptchaMiningStatus.IDLE && !sessionInfo) {
-          if(this.powSession.getMiner()) {
-            this.powSession.getMiner().stopMiner();
-            this.powSession.setMiner(null);
-          }
-          this.setState({
-            miningStatus: PoWCaptchaMiningStatus.IDLE,
-            targetAddr: "",
-            statusMessage: null,
-          });
-        }
-        else if(this.state.isClaimable !== (sessionInfo.balance >= this.state.faucetConfig.minClaim)) {
-          this.setState({
-            isClaimable: (sessionInfo.balance >= this.state.faucetConfig.minClaim),
-          });
-        }
-      };
-      this.powSession.on("update", this.powSessionUpdateListener);
-    }
-    if(!this.powSessionKilledListener) {
-      this.powSessionKilledListener = (killInfo: any) => {
-        let killMsg: string = killInfo.message;
-        if(killInfo.level === "session") {
-          killMsg = "Your session has been killed for bad behaviour (" + killMsg + "). Are you cheating?? :(";
-        }
-        this.setState({
-          statusDialog: {
-            title: "Session killed!",
-            body: (
-              <div className='alert alert-danger'>{killMsg}</div>
-            ),
-            closeButton: {
-              caption: "Close",
-            }
-          },
-        });
-      };
-      this.powSession.on("killed", this.powSessionKilledListener);
-    }
+    Object.keys(this.eventListeners).forEach((listenerKey) => {
+      let eventListener = this.eventListeners[listenerKey];
+      if(eventListener.bound)
+        return;
+      eventListener.emmiter.on(eventListener.event, eventListener.listener as any);
+      eventListener.bound = true;
+    });
   }
 
   public componentWillUnmount() {
-    if(this.powSessionUpdateListener) {
-      this.powSession.off("update", this.powSessionUpdateListener);
-      this.powSessionUpdateListener = null;
+    Object.keys(this.eventListeners).forEach((listenerKey) => {
+      let eventListener = this.eventListeners[listenerKey];
+      if(!eventListener.bound)
+        return;
+      eventListener.emmiter.off(eventListener.event, eventListener.listener as any);
+      eventListener.bound = false;
+    });
+  }
+
+  private onPoWClientFaucetStatus(faucetStatus: IFaucetStatus) {
+    this.setState({
+      faucetStatusText: faucetStatus.text,
+      faucetStatusLevel: faucetStatus.level,
+    });
+  }
+
+  private onPoWSessionUpdate() {
+    let sessionInfo = this.powSession.getSessionInfo();
+    if(this.state.miningStatus === PoWCaptchaMiningStatus.IDLE && sessionInfo) {
+      // start miner
+      if(!this.powSession.getMiner()) {
+        this.powSession.setMiner(new PoWMiner({
+          session: this.powSession,
+          workerSrc: this.props.minerSrc,
+          powParams: this.state.faucetConfig.powParams,
+          nonceCount: this.state.faucetConfig.powNonceCount,
+        }));
+      }
+      this.setState({
+        miningStatus: PoWCaptchaMiningStatus.RUNNING,
+        targetAddr: sessionInfo.targetAddr,
+        isClaimable: (sessionInfo.balance >= this.state.faucetConfig.minClaim),
+        statusMessage: null,
+      });
     }
-    if(this.powSessionKilledListener) {
-      this.powSession.off("killed", this.powSessionKilledListener);
-      this.powSessionKilledListener = null;
+    else if(this.state.miningStatus !== PoWCaptchaMiningStatus.IDLE && !sessionInfo) {
+      if(this.powSession.getMiner()) {
+        this.powSession.getMiner().stopMiner();
+        this.powSession.setMiner(null);
+      }
+      this.setState({
+        miningStatus: PoWCaptchaMiningStatus.IDLE,
+        targetAddr: "",
+        statusMessage: null,
+      });
     }
+    else if(this.state.isClaimable !== (sessionInfo.balance >= this.state.faucetConfig.minClaim)) {
+      this.setState({
+        isClaimable: (sessionInfo.balance >= this.state.faucetConfig.minClaim),
+      });
+    }
+  }
+
+  private onPoWSessionKilled(killInfo: any) {
+    let killMsg: string = killInfo.message;
+    if(killInfo.level === "session") {
+      killMsg = "Your session has been killed for bad behaviour (" + killMsg + "). Are you cheating?? :(";
+    }
+    this.setState({
+      statusDialog: {
+        title: "Session killed!",
+        body: (
+          <div className='alert alert-danger'>{killMsg}</div>
+        ),
+        closeButton: {
+          caption: "Close",
+        }
+      },
+    });
   }
 
 	public render(): React.ReactElement<IPoWCaptchaProps> {
@@ -227,12 +265,35 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         break;
     }
 
+    let faucetStatusClass: string = "";
+    if(this.state.faucetStatusLevel) {
+      switch(this.state.faucetStatusLevel) {
+        case "info":
+          faucetStatusClass = "alert-info";
+          break;
+        case "warn":
+          faucetStatusClass = "alert-warning";
+          break;
+        case "error":
+          faucetStatusClass = "alert-danger";
+          break;
+        default:
+          faucetStatusClass = "alert-light";
+          break;
+      }
+    }
+
     return (
       <div>
         <div className="faucet-title">
           <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
           <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
         </div>
+        {this.state.faucetStatusText ? 
+        <div className={["faucet-status-alert alert", faucetStatusClass].join(" ")} role="alert">
+          {this.state.faucetStatusText}
+        </div>
+        : null}
         <div className="pow-header center">
           <div className="pow-status-container">
             {this.powSession.getMiner() ? 

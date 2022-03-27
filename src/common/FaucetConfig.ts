@@ -49,6 +49,11 @@ export interface IFaucetConfig {
 
   hcaptcha: IFaucetHCaptchaConfig | null; // hcaptcha parameters or null to disable all hcaptchas
 
+  spareFundsAmount: number; // minimum balance to leave in the faucet wallet
+  lowFundsBalance: number; // minimum balance to show the low funds warning
+  lowFundsWarning: string | boolean; // low faucet balance warning message / true to show the generic message / false to disable the warning
+  noFundsError: string | boolean; // empty faucet error message / true to show the generic message / false to disable the error
+
   ethRpcHost: string; // ETH execution layer RPC host
   ethWalletKey: string; // faucet wallet private key
   ethChainId: number; // ETH chain id
@@ -86,9 +91,9 @@ export let faucetConfig: IFaucetConfig = (() => {
     serverPorts: [
       { port: 8080 }
     ],
-    powShareReward:     25000000000000000,
-    claimMinAmount:    100000000000000000,
-    claimMaxAmount:  10000000000000000000,
+    powShareReward:     25000000000000000, // 0,025 ETH
+    claimMinAmount:    100000000000000000, // 0,1 ETH
+    claimMaxAmount:  10000000000000000000, // 10 ETH
     powSessionTimeout: 3600,
     claimSessionTimeout: 7200,
     claimAddrCooldown: 7200,
@@ -109,6 +114,10 @@ export let faucetConfig: IFaucetConfig = (() => {
     verifyMinerIndividuals: 2,
     verifyMinerMissPenalty: 10000000000000000,
     hcaptcha: null,
+    spareFundsAmount:   10000000000000000, // 0,01 ETH
+    lowFundsBalance: 10000000000000000000, // 10 ETH
+    lowFundsWarning: true,
+    noFundsError: true,
     ethRpcHost: "http://127.0.0.1:8545/",
     ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
     ethChainId: 1337802,

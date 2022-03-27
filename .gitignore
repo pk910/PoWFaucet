@@ -3,4 +3,5 @@ build/
 dist/
 node_modules/
 faucet-config.json
+faucet-status.json
 faucet-store.json
