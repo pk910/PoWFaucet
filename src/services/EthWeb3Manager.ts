@@ -127,6 +127,7 @@ export class EthWeb3Manager {
           else
             break;
           ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", strFormatPlaceholder(statusMessage, (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH"), FaucetStatusLevel.WARNING);
+          break;
         case FucetWalletState.NOFUNDS:
           if(typeof faucetConfig.noFundsError === "string")
             statusMessage = faucetConfig.noFundsError;
@@ -135,8 +136,10 @@ export class EthWeb3Manager {
           else
             break;
           ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", strFormatPlaceholder(statusMessage), FaucetStatusLevel.ERROR);
+          break;
         default:
           ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", null, null);
+          break;
       }
       this.faucetStatus = newStatus;
     }
