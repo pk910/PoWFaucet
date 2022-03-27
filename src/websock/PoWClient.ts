@@ -464,20 +464,16 @@ export class PoWClient {
       sessionIdHash.update(faucetConfig.powSessionSecret + "\r\n");
       sessionIdHash.update(session.getSessionId());
 
-      let sessionIpHash: string = null;
-      if(session.getActiveClient()) {
-        let reoteIpHash = crypto.createHash("sha256");
-        reoteIpHash.update(faucetConfig.powSessionSecret + "\r\n");
-        reoteIpHash.update(session.getActiveClient().getRemoteIP());
-        sessionIpHash = reoteIpHash.digest("hex").substring(0, 20);
-      }
+      let sessionIpHash = crypto.createHash("sha256");
+      sessionIpHash.update(faucetConfig.powSessionSecret + "\r\n");
+      sessionIpHash.update(session.getLastRemoteIp());
 
       return {
         id: sessionIdHash.digest("hex").substring(0, 20),
         start: Math.floor(session.getStartTime().getTime() / 1000),
         idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
         target: session.getTargetAddr(),
-        ip: sessionIpHash,
+        ip: sessionIpHash.digest("hex").substring(0, 20),
         balance: session.getBalance(),
         nonce: session.getLastNonce(),
         hashrate: session.getReportedHashRate(),

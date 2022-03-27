@@ -70,6 +70,7 @@ export class PoWSession {
   private activeClient: PoWClient;
   private cleanupTimer: NodeJS.Timeout;
   private sessionStatus: PoWSessionStatus;
+  private lastRemoteIp: string;
 
   public constructor(client: PoWClient, targetAddr: string, recoveryInfo?: IPoWSessionRecoveryInfo) {
     this.idleTime = null;
@@ -95,6 +96,7 @@ export class PoWSession {
 
     this.activeClient = client;
     client.setSession(this);
+    this.lastRemoteIp = client.getRemoteIP();
 
     PoWSession.activeSessions[this.sessionId] = this;
     ServiceManager.GetService(PoWStatusLog).emitLog(
@@ -194,6 +196,7 @@ export class PoWSession {
     if(activeClient) {
       this.idleTime = null;
       this.setSessionStatus(PoWSessionStatus.MINING);
+      this.lastRemoteIp = this.activeClient.getRemoteIP();
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
     }
     else {
@@ -201,6 +204,10 @@ export class PoWSession {
       this.setSessionStatus(PoWSessionStatus.IDLE);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Paused session: " + this.sessionId);
     }
+  }
+
+  public getLastRemoteIp(): string {
+    return this.lastRemoteIp;
   }
 
   public addBalance(value: number) {
