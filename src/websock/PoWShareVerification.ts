@@ -67,7 +67,7 @@ export class PoWShareVerification {
         this.completeVerification();
       });
     }
-    else if(faucetConfig.verifyMinerPercent > 0 && validatorSessions.length >= faucetConfig.verifyMinerPeerCount && (Math.round(Math.random() * 100) < faucetConfig.verifyMinerPercent)) {
+    else if(faucetConfig.verifyMinerPercent > 0 && validatorSessions.length >= faucetConfig.verifyMinerPeerCount && (Math.floor(Math.random() * 100) < faucetConfig.verifyMinerPercent)) {
       // redistribute to validators for verification
       this.verifyMinerCount = faucetConfig.verifyMinerIndividuals;
       for(let i = 0; i < this.verifyMinerCount; i++) {
