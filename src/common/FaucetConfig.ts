@@ -45,6 +45,9 @@ export interface IFaucetConfig {
   verifyLocalLowPeerPercent: number; // percentage of shares validated locally if there are not enough sessions for verification redistribution (0 - 100)
   verifyMinerPercent: number; // percentage of shares to redistribute to miners for verification (0 - 100)
   verifyMinerIndividuals: number; // number of other mining sessions to redistribute a share to for verification
+  verifyMinerMaxPending: number; // max number of pending verifications per miner before not sending any more verification requests
+  verifyMinerMaxMissed: number; // max number of missed verifications before not sending any more verification requests
+  verifyMinerTimeout: number; // timeout for verification requests (client gets penalized if not responding within this timespan)
   verifyMinerMissPenalty: number; // penalty for not responding to a verification request (shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so)
 
   hcaptcha: IFaucetHCaptchaConfig | null; // hcaptcha parameters or null to disable all hcaptchas
@@ -119,6 +122,9 @@ export let faucetConfig: IFaucetConfig = (() => {
     verifyLocalLowPeerPercent: 100,
     verifyMinerPercent: 100,
     verifyMinerIndividuals: 2,
+    verifyMinerMaxPending: 10,
+    verifyMinerMaxMissed: 10,
+    verifyMinerTimeout: 15,
     verifyMinerMissPenalty: 10000000000000000,
     hcaptcha: null,
     spareFundsAmount:   10000000000000000, // 0,01 ETH

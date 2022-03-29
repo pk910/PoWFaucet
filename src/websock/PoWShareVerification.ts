@@ -74,6 +74,7 @@ export class PoWShareVerification {
         let randSessIdx = Math.floor(Math.random() * validatorSessions.length);
         let validatorSession = validatorSessions.splice(randSessIdx, 1)[0];
         this.verifyMinerSessions.push(validatorSession.getSessionId());
+        validatorSession.addPendingVerification();
 
         validatorSession.getActiveClient().sendMessage("verify", {
           shareId: this.shareId,
@@ -84,7 +85,7 @@ export class PoWShareVerification {
       this.verifyMinerTimer = setTimeout(() => {
         this.verifyMinerTimer = null;
         this.completeVerification();
-      }, 15 * 1000);
+      }, faucetConfig.verifyMinerTimeout * 1000);
     }
     else {
       // no verification - just accept
@@ -135,6 +136,7 @@ export class PoWShareVerification {
       // penalty for missed verification requests
       this.verifyMinerSessions.forEach((verifierId) => {
         let session = PoWSession.getSession(verifierId);
+        session.subPendingVerification();
         if(session) {
           session.addMissedVerification();
           session.slashBadSession(PoWSessionSlashReason.MISSED_VERIFICATION);
@@ -144,6 +146,7 @@ export class PoWShareVerification {
     
     Object.keys(this.verifyMinerResults).forEach((verifierId) => {
       let session = PoWSession.getSession(verifierId);
+      session.subPendingVerification();
       if(this.verifyMinerResults[verifierId] !== !this.isInvalid && session)
         session.slashBadSession(PoWSessionSlashReason.INVALID_VERIFICATION);
     });

@@ -51,7 +51,8 @@ export class PoWSession {
         !!session.activeClient && 
         session.sessionId !== ignoreId && 
         session.balance > faucetConfig.verifyMinerMissPenalty &&
-        session.missedVerifications < 10
+        session.missedVerifications < faucetConfig.verifyMinerMaxMissed &&
+        session.pendingVerifications < faucetConfig.verifyMinerMaxPending
       );
     });
   }
@@ -77,6 +78,7 @@ export class PoWSession {
   private sessionStatus: PoWSessionStatus;
   private lastRemoteIp: string;
   private missedVerifications: number;
+  private pendingVerifications: number;
 
   public constructor(client: PoWClient, targetAddr: string, recoveryInfo?: IPoWSessionRecoveryInfo) {
     this.idleTime = null;
@@ -85,6 +87,7 @@ export class PoWSession {
     this.reportedHashRate = [];
     this.sessionStatus = PoWSessionStatus.MINING;
     this.missedVerifications = 0;
+    this.pendingVerifications = 0;
     
     if(recoveryInfo) {
       this.sessionId = recoveryInfo.id;
@@ -249,6 +252,15 @@ export class PoWSession {
 
   public resetMissedVerifications() {
     this.missedVerifications = 0;
+  }
+
+  public addPendingVerification() {
+    this.pendingVerifications++;
+  }
+
+  public subPendingVerification() {
+    if(this.pendingVerifications > 0)
+      this.pendingVerifications--;
   }
 
   public slashBadSession(reason: PoWSessionSlashReason) {
