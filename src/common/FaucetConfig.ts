@@ -61,6 +61,8 @@ export interface IFaucetConfig {
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
+
+  ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
 }
 
 export interface IFaucetPortConfig {
@@ -72,6 +74,11 @@ export interface IFaucetHCaptchaConfig {
   secret: string; // hcaptcha secret
   checkSessionStart: boolean; // require hcaptcha to start a new mining session
   checkBalanceClaim: boolean; // require hcaptcha to claim mining rewards
+}
+
+export interface IFaucetEnsResolverConfig {
+  rpcHost: string; // ETH execution layer RPC host for ENS resolver
+  ensAddr: string | null; // ENS Resolver contract address or null for default resolver
 }
 
 export let faucetConfig: IFaucetConfig = (() => {
@@ -124,7 +131,8 @@ export let faucetConfig: IFaucetConfig = (() => {
     ethTxGasLimit: 500000,
     ethTxMaxFee: 1800000000,
     ethTxPrioFee: 800000000,
-    ethMaxPending: 12
+    ethMaxPending: 12,
+    ensResolver: null,
   };
 
   let configFlle = path.join(defaultConfig.appBasePath, "faucet-config.json");

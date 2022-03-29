@@ -12,6 +12,7 @@ import { PoWShareVerification } from './PoWShareVerification';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { FaucetStatus } from '../services/FaucetStatus';
+import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -198,6 +199,7 @@ export class PoWClient {
         d: faucetConfig.powScryptParams.difficulty,
       },
       powNonceCount: faucetConfig.powNonceCount,
+      resolveEnsNames: !!faucetConfig.ensResolver,
     }, reqId);
   }
 
@@ -218,8 +220,13 @@ export class PoWClient {
     }
 
     let targetAddr: string = message.data.addr;
-    // todo: resolve ens?
-
+    if(typeof targetAddr === "string" && targetAddr.match(/^[-a-zA-Z0-9@:%._\+~#=]{1,256}\.eth$/) && faucetConfig.ensResolver) {
+      try {
+        targetAddr = await ServiceManager.GetService(EnsWeb3Manager).resolveEnsName(targetAddr);
+      } catch(ex) {
+        return this.sendErrorResponse("INVALID_ENSNAME", "Could not resolve ENS Name: " + ex.toString(), reqId);
+      }
+    }
 
     if(typeof targetAddr !== "string" || !targetAddr.match(/^0x[0-9a-f]{40}$/i))
       return this.sendErrorResponse("INVALID_ADDR", "Invalid target address: " + targetAddr, reqId);

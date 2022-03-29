@@ -48,5 +48,9 @@
   "ethTxGasLimit": 500000,
   "ethTxMaxFee": 1800000000,
   "ethTxPrioFee": 800000000,
-  "ethMaxPending": 12
+  "ethMaxPending": 12,
+
+  "ensResolver": {
+    "rpcHost": "https://main-light.eth.linkpool.io/"
+  }
 }

@@ -309,7 +309,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
           <input 
             className="form-control" 
             value={this.state.targetAddr} 
-            placeholder="Please enter ETH address" 
+            placeholder={"Please enter ETH address" + (this.state.faucetConfig.resolveEnsNames ? " or ENS name" : "")} 
             onChange={(evt) => this.setState({ targetAddr: evt.target.value })} 
             disabled={this.state.miningStatus !== PoWCaptchaMiningStatus.IDLE} 
           />

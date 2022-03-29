@@ -13,6 +13,7 @@ export interface IFaucetConfig {
   claimTimeout: number;
   powParams: IPoWParams;
   powNonceCount: number;
+  resolveEnsNames: boolean;
 }
 
 export interface IPoWParams {
