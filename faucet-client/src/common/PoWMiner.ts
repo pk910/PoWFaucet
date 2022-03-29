@@ -75,8 +75,6 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
 
     this.loadSettings();
     this.startStopWorkers();
-
-    (window as any).powMiner = this;
   }
 
   public stopMiner() {
