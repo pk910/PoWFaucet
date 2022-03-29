@@ -1,7 +1,7 @@
 import * as path from 'path';
 
 import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } from 'http';
-import {Server as StaticServer, version, mime} from 'node-static';
+import {Server as StaticServer, version, mime} from '@brettz9/node-static';
 import { WebSocketServer } from 'ws';
 import * as stream from 'node:stream';
 import { faucetConfig, IFaucetPortConfig } from '../common/FaucetConfig';
