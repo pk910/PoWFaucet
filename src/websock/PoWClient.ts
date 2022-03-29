@@ -347,6 +347,7 @@ export class PoWClient {
     this.session.setLastNonce(lastNonce);
     if(shareData.hashrate)
       this.session.reportHashRate(shareData.hashrate);
+    this.session.resetMissedVerifications();
     
     let shareVerification = new PoWShareVerification(this.session, shareData.nonces);
     shareVerification.startVerification().then((isValid) => {
