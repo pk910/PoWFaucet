@@ -14,6 +14,7 @@ export interface IFaucetConfig {
   powParams: IPoWParams;
   powNonceCount: number;
   resolveEnsNames: boolean;
+  ethTxExplorerLink: string;
 }
 
 export interface IPoWParams {

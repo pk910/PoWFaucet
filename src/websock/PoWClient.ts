@@ -200,6 +200,7 @@ export class PoWClient {
       },
       powNonceCount: faucetConfig.powNonceCount,
       resolveEnsNames: !!faucetConfig.ensResolver,
+      ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
     }, reqId);
   }
 

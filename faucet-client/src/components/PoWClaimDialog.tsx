@@ -193,7 +193,9 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
              {this.state.claimStatus == PoWClaimStatus.CONFIRMED ?
               <div className='alert alert-success'>
                 Claim Transaction has been confirmed in block #{this.state.txBlock}!<br />
-                TX: {this.state.txHash}
+                TX: {this.props.faucetConfig.ethTxExplorerLink ? 
+                <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank'>{this.state.txHash}</a> :
+                <span>{this.state.txHash}</span>}
               </div>
              : null}
              {this.state.claimStatus == PoWClaimStatus.FAILED ?
@@ -226,6 +228,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       captcha: this.props.faucetConfig.hcapClaim ? this.state.captchaToken : null,
       token: this.props.reward.token
     }).then(() => {
+      this.props.powSession.storeClaimInfo(null);
       this.setState({
         claimStatus: PoWClaimStatus.PENDING,
       });

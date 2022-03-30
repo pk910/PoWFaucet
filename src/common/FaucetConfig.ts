@@ -64,6 +64,7 @@ export interface IFaucetConfig {
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
+  ethTxExplorerLink: string; // link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
 }
@@ -138,6 +139,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     ethTxMaxFee: 1800000000,
     ethTxPrioFee: 800000000,
     ethMaxPending: 12,
+    ethTxExplorerLink: null,
     ensResolver: null,
   };
 
