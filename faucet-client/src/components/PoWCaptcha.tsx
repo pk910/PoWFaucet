@@ -5,12 +5,12 @@ import { Button, Modal } from 'react-bootstrap';
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 
 import './PoWCaptcha.css'
-import { PoWSession } from '../common/PoWSession';
+import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import { PoWMinerStatus } from './PoWMinerStatus';
 import { PoWMiner } from '../common/PoWMiner';
 import { renderDate } from '../utils/DateUtils';
 import { weiToEth } from '../utils/ConvertHelpers';
-import { IPoWClaimDialogReward, PoWClaimDialog } from './PoWClaimDialog';
+import { PoWClaimDialog } from './PoWClaimDialog';
 import { PoWFaucetStatus } from './PoWFaucetStatus';
 import { TypedEmitter } from 'tiny-typed-emitter';
 
@@ -52,7 +52,7 @@ export interface IPoWCaptchaState {
   statusDialog: IStatusDialog;
   statusMessage: string;
   showRestoreSessionDialog: boolean;
-  showClaimRewardDialog: IPoWClaimDialogReward;
+  showClaimRewardDialog: IPoWClaimInfo;
   showFaucetStatus: boolean;
 }
 
@@ -67,6 +67,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
     bound?: boolean;
   }} = {};
   private faucetStatucClickCount = 0;
+  private restoredPersistedState = false;
 
   constructor(props: IPoWCaptchaProps, state: IPoWCaptchaState) {
     super(props);
@@ -81,8 +82,11 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         faucetConfig: faucetConfig,
         faucetStatusText: faucetConfig.faucetStatus.text,
         faucetStatusLevel: faucetConfig.faucetStatus.level,
-        showRestoreSessionDialog: (this.state.miningStatus == PoWCaptchaMiningStatus.IDLE && !!this.powSession.getStoredSessionInfo()),
       });
+
+      if(!this.restoredPersistedState)
+        this.restorePersistedState();
+
     });
 
     this.powSession = new PoWSession({
@@ -153,6 +157,17 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         return;
       eventListener.emmiter.off(eventListener.event, eventListener.listener as any);
       eventListener.bound = false;
+    });
+  }
+
+  private restorePersistedState() {
+    this.restoredPersistedState = true;
+    let persistedSession = this.powSession.getStoredSessionInfo();
+    let persistedClaim = this.powSession.getStoredClaimInfo();
+
+    this.setState({
+      showRestoreSessionDialog: !!persistedSession,
+      showClaimRewardDialog: persistedClaim
     });
   }
 
@@ -375,14 +390,16 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
       this.powSession.setMiner(null);
 
       if(claimToken) {
+        let claimInfo: IPoWClaimInfo = {
+          session: sessionInfo.sessionId,
+          startTime: sessionInfo.startTime,
+          target: sessionInfo.targetAddr,
+          balance: sessionInfo.balance,
+          token: claimToken
+        };
+        this.powSession.storeClaimInfo(claimInfo);
         this.setState({
-          showClaimRewardDialog: {
-            session: sessionInfo.sessionId,
-            startTime: sessionInfo.startTime,
-            target: sessionInfo.targetAddr,
-            balance: sessionInfo.balance,
-            token: claimToken
-          }
+          showClaimRewardDialog: claimInfo
         });
       }
       else {
@@ -510,7 +527,9 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         powSession={this.powSession}
         reward={this.state.showClaimRewardDialog}
         faucetConfig={this.state.faucetConfig}
-        onClose={() => {
+        onClose={(clearClaim) => {
+          if(clearClaim)
+            this.powSession.storeClaimInfo(null);
           this.setState({
             showClaimRewardDialog: null,
             miningStatus: PoWCaptchaMiningStatus.IDLE,

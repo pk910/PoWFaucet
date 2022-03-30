@@ -23,6 +23,16 @@ export interface IPoWSessionBalanceUpdate {
   reason: string;
 }
 
+export interface IPoWClaimInfo {
+  session: string;
+  startTime: number;
+  target: string;
+  balance: number;
+  token: string;
+  claiming?: boolean;
+  error?: string;
+}
+
 interface PoWSessionEvents {
   'update': () => void;
   'killed': (reason: string) => void;
@@ -206,6 +216,34 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       return;
 
     this.resumeSession();
+  }
+
+  public getStoredClaimInfo(): IPoWClaimInfo {
+    let claimStr = localStorage.getItem('powClaimStatus');
+    let claimInfo: IPoWClaimInfo = null;
+    if(claimStr) {
+      try {
+        claimInfo = JSON.parse(claimStr);
+      } catch(ex) {}
+    }
+    if(!claimInfo)
+      return null;
+
+    let now = Math.floor((new Date()).getTime() / 1000);
+    let claimAge = now - claimInfo.startTime;
+    let faucetConfig = this.options.client.getFaucetConfig();
+    if(claimAge >= faucetConfig.claimTimeout)
+      return null;
+    
+    return claimInfo;
+  }
+
+  public storeClaimInfo(claimInfo: IPoWClaimInfo) {
+    let claimStr = claimInfo ? JSON.stringify(claimInfo) : null;
+    if(claimStr)
+      localStorage.setItem('powClaimStatus', claimStr);
+    else if(localStorage.getItem('powClaimStatus'))
+      localStorage.removeItem('powClaimStatus');
   }
 
 }

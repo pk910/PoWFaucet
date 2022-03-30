@@ -1,5 +1,5 @@
 import { IPoWMinerStats, PoWMiner } from '../common/PoWMiner';
-import { PoWSession } from '../common/PoWSession';
+import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import React from 'react';
 import { Button, Modal, Spinner } from 'react-bootstrap';
 import { weiToEth } from '../utils/ConvertHelpers';
@@ -13,19 +13,9 @@ export interface IPoWClaimDialogProps {
   powClient: PoWClient;
   powSession: PoWSession;
   faucetConfig: IFaucetConfig;
-  reward: IPoWClaimDialogReward;
-  onClose: () => void;
+  reward: IPoWClaimInfo;
+  onClose: (clearClaim: boolean) => void;
   setDialog: (dialog: IStatusDialog) => void;
-}
-
-export interface IPoWClaimDialogReward {
-  session: string;
-  startTime: number;
-  target: string;
-  balance: number;
-  token: string;
-  claiming?: boolean;
-  error?: string;
 }
 
 enum PoWClaimStatus {
@@ -50,9 +40,11 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   private powSessionClaimTxListener: ((res: any) => void);
   private updateTimer: NodeJS.Timeout;
   private hcapControl: HCaptcha;
+  private isTimedOut: boolean;
 
   constructor(props: IPoWClaimDialogProps, state: IPoWClaimDialogState) {
     super(props);
+    this.isTimedOut = false;
     this.state = {
       refreshIndex: 0,
       captchaToken: null,
@@ -104,8 +96,30 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   }
 
   private setUpdateTimer() {
-    let now = (new Date()).getTime();
-    let timeLeft = (1000 - (now % 1000)) + 2;
+    let exactNow = (new Date()).getTime();
+    let now = Math.floor(exactNow / 1000);
+
+    let claimTimeout = (this.props.reward.startTime + this.props.faucetConfig.claimTimeout) - now;
+    if(claimTimeout < 0) {
+      if(!this.isTimedOut) {
+        this.isTimedOut = true;
+        this.props.onClose(true);
+        this.props.setDialog({
+          title: "Claim expired",
+          body: (
+            <div className='altert alert-danger'>
+              Sorry, your reward ({Math.round(weiToEth(this.props.reward.balance) * 100) / 100} ETH) has not been claimed in time.
+            </div>
+          ),
+          closeButton: {
+            caption: "Close"
+          }
+        });
+      }
+      return;
+    }
+
+    let timeLeft = (1000 - (exactNow % 1000)) + 2;
     this.updateTimer = setTimeout(() => {
       this.updateTimer = null;
       this.setState({
@@ -121,9 +135,9 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
 
     return (
       <Modal show centered size="lg" backdrop="static" onHide={() => {
-        this.props.onClose();
+        this.props.onClose(this.state.claimStatus !== PoWClaimStatus.PREPARE);
       }}>
-        <Modal.Header>
+        <Modal.Header closeButton>
           <Modal.Title id="contained-modal-title-vcenter">
             Claim Mining Rewards
           </Modal.Title>
@@ -239,7 +253,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   }
 
   private onCloseClick() {
-    this.props.onClose();
+    this.props.onClose(true);
   }
 
 }
