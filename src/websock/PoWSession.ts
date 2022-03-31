@@ -205,6 +205,7 @@ export class PoWSession {
 
   public setActiveClient(activeClient: PoWClient) {
     this.activeClient = activeClient;
+    this.pendingVerifications = 0;
     if(activeClient) {
       this.idleTime = null;
       this.setSessionStatus(PoWSessionStatus.MINING);

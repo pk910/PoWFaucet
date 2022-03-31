@@ -136,8 +136,8 @@ export class PoWShareVerification {
       // penalty for missed verification requests
       this.verifyMinerSessions.forEach((verifierId) => {
         let session = PoWSession.getSession(verifierId);
-        session.subPendingVerification();
         if(session) {
+          session.subPendingVerification();
           session.addMissedVerification();
           session.slashBadSession(PoWSessionSlashReason.MISSED_VERIFICATION);
         }
@@ -146,9 +146,11 @@ export class PoWShareVerification {
     
     Object.keys(this.verifyMinerResults).forEach((verifierId) => {
       let session = PoWSession.getSession(verifierId);
-      session.subPendingVerification();
-      if(this.verifyMinerResults[verifierId] !== !this.isInvalid && session)
-        session.slashBadSession(PoWSessionSlashReason.INVALID_VERIFICATION);
+      if(session) {
+        session.subPendingVerification();
+        if(this.verifyMinerResults[verifierId] !== !this.isInvalid && session)
+          session.slashBadSession(PoWSessionSlashReason.INVALID_VERIFICATION);
+      }
     });
 
     if(this.isInvalid)
