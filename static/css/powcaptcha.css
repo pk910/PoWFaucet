@@ -119,6 +119,14 @@
   margin-bottom: 8px;
 }
 
+.pow-captcha .faucet-status .ipaddr-icon {
+  margin-right: 8px;
+}
+
+#ipinfo-tooltip .tooltip-inner {
+  max-width: none;
+}
+
 #ipinfo-tooltip .ipaddr-info {
   min-width: 200px;
   text-align: left;
@@ -126,6 +134,10 @@
 
 #ipinfo-tooltip .ipaddr-info > table {
   width: 100%;
+}
+
+#ipinfo-tooltip .ipaddr-info .ipinfo-title {
+  min-width: 80px;
 }
 
 #ipinfo-tooltip .ipaddr-info .ipinfo-value {
