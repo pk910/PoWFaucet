@@ -9,6 +9,7 @@ import { weiToEth } from "../utils/ConvertHelpers";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PoWClient } from "./PoWClient";
 import { renderDate } from "../utils/DateUtils";
+import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
 
 
 export enum PoWSessionSlashReason {
@@ -77,6 +78,7 @@ export class PoWSession {
   private cleanupTimer: NodeJS.Timeout;
   private sessionStatus: PoWSessionStatus;
   private lastRemoteIp: string;
+  private lastIpInfo: IIPInfo;
   private missedVerifications: number;
   private pendingVerifications: number;
 
@@ -106,7 +108,7 @@ export class PoWSession {
 
     this.activeClient = client;
     client.setSession(this);
-    this.lastRemoteIp = client.getRemoteIP();
+    this.updateRemoteIp();
 
     PoWSession.activeSessions[this.sessionId] = this;
     ServiceManager.GetService(PoWStatusLog).emitLog(
@@ -206,7 +208,7 @@ export class PoWSession {
     if(activeClient) {
       this.idleTime = null;
       this.setSessionStatus(PoWSessionStatus.MINING);
-      this.lastRemoteIp = this.activeClient.getRemoteIP();
+      this.updateRemoteIp();
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
     }
     else {
@@ -218,6 +220,24 @@ export class PoWSession {
 
   public getLastRemoteIp(): string {
     return this.lastRemoteIp;
+  }
+
+  private updateRemoteIp() {
+    if(!this.activeClient)
+      return;
+    
+    let remoteAddr = this.activeClient.getRemoteIP();
+    if(remoteAddr.match(/^::ffff:/))
+      remoteAddr = remoteAddr.substring(7);
+    
+    this.lastRemoteIp = remoteAddr;
+    ServiceManager.GetService(IPInfoResolver).getIpInfo(remoteAddr).then((ipInfo) => {
+      this.lastIpInfo = ipInfo;
+    });
+  }
+
+  public getLastIpInfo(): IIPInfo {
+    return this.lastIpInfo;
   }
 
   public addBalance(value: number) {

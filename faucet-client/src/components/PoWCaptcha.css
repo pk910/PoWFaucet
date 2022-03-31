@@ -119,4 +119,15 @@
   margin-bottom: 8px;
 }
 
+#ipinfo-tooltip .ipaddr-info {
+  min-width: 200px;
+  text-align: left;
+}
 
+#ipinfo-tooltip .ipaddr-info > table {
+  width: 100%;
+}
+
+#ipinfo-tooltip .ipaddr-info .ipinfo-value {
+  min-width: 50px;
+}

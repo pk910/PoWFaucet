@@ -483,6 +483,7 @@ export class PoWClient {
         idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
         target: session.getTargetAddr(),
         ip: sessionIpHash.digest("hex").substring(0, 20),
+        ipInfo: session.getLastIpInfo(),
         balance: session.getBalance(),
         nonce: session.getLastNonce(),
         hashrate: session.getReportedHashRate(),

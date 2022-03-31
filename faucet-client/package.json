@@ -33,6 +33,7 @@
     "@hcaptcha/react-hcaptcha": "^1.1.1",
     "@types/react": "^17.0.38",
     "@types/react-dom": "^17.0.11",
+    "country-flag-icons": "^1.4.25",
     "react": "^17.0.2",
     "react-bootstrap": "^2.2.1",
     "react-dom": "^17.0.2",

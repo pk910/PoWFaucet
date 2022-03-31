@@ -5,6 +5,8 @@ import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTime, renderTimespan } from '../utils/DateUtils';
 import { PoWClient } from 'common/PoWClient';
+import getCountryIcon from 'country-flag-icons/unicode'
+import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 
 export interface IPoWFaucetStatusProps {
   powClient: PoWClient;
@@ -27,12 +29,32 @@ interface IPoWFaucetStatusSession {
   start: number;
   idle: number | null;
   ip: string;
+  ipInfo: IPoWFaucetStatusIPInfo;
   target: string;
   balance: number;
   nonce: number;
   hashrate: number;
   status: string;
   claimable: boolean;
+}
+
+interface IPoWFaucetStatusIPInfo {
+  addr: string;
+  status: string;
+  country?: string;
+  countryCode?: string;
+  region?: string;
+  regionCode?: string;
+  city?: string;
+  cityCode?: string;
+  locLat?: number;
+  locLon?: number;
+  zone?: string;
+  isp?: string;
+  org?: string;
+  as?: string;
+  proxy?: boolean;
+  hosting?: boolean;
 }
 
 interface IPoWFaucetStatusClaim {
@@ -165,7 +187,18 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     return (
       <tr key={session.id}>
         <th scope="row">{session.id}</th>
-        <td>{session.ip}</td>
+        <td>
+          <OverlayTrigger
+            placement="right"
+            delay={{ show: 250, hide: 400 }}
+            overlay={(props) => this.renderSessionIpInfo(session, props)}
+          >
+            <span className='ipaddr'>
+              {session.ipInfo.countryCode ? <span className='ipaddr-icon'>{getCountryIcon(session.ipInfo.countryCode)}</span> : null}
+              {session.ip}
+            </span>
+          </OverlayTrigger>
+        </td>
         <td>{session.target}</td>
         <td>{renderDate(new Date(session.start * 1000), true)}</td>
         <td>{renderDate(new Date((session.start + this.props.faucetConfig.powTimeout) * 1000), true)}</td>
@@ -173,6 +206,49 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{session.nonce}</td>
         <td>{sessionStatus}</td>
       </tr>
+    );
+  }
+
+  private renderSessionIpInfo(session: IPoWFaucetStatusSession, props: any): React.ReactElement {
+    return (
+      <Tooltip id="ipinfo-tooltip" {...props}>
+        <div className='ipaddr-info'>
+          <table>
+            <tr>
+              <td className='ipinfo-title'>Country:</td>
+              <td className='ipinfo-value'>{session.ipInfo.country} ({session.ipInfo.countryCode})</td>
+            </tr>
+            <tr>
+              <td className='ipinfo-title'>Region:</td>
+              <td className='ipinfo-value'>{session.ipInfo.region} ({session.ipInfo.regionCode})</td>
+            </tr>
+            <tr>
+              <td className='ipinfo-title'>City:</td>
+              <td className='ipinfo-value'>{session.ipInfo.city} ({session.ipInfo.cityCode})</td>
+            </tr>
+            <tr>
+              <td className='ipinfo-title'>ISP:</td>
+              <td className='ipinfo-value'>{session.ipInfo.isp}</td>
+            </tr>
+            <tr>
+              <td className='ipinfo-title'>Org:</td>
+              <td className='ipinfo-value'>{session.ipInfo.org}</td>
+            </tr>
+            <tr>
+              <td className='ipinfo-title'>AS:</td>
+              <td className='ipinfo-value'>{session.ipInfo.as}</td>
+            </tr>
+            <tr>
+              <td className='ipinfo-title'>Proxy:</td>
+              <td className='ipinfo-value'>{session.ipInfo.proxy ? "yes" : "no"}</td>
+            </tr>
+            <tr>
+              <td className='ipinfo-title'>Hosting:</td>
+              <td className='ipinfo-value'>{session.ipInfo.hosting ? "yes" : "no"}</td>
+            </tr>
+          </table>
+        </div>
+      </Tooltip>
     );
   }
 

@@ -23,6 +23,7 @@
     "ethereum-ens": "^0.8.0",
     "ethereumjs-util": "^7.1.4",
     "hcaptcha": "^0.1.1",
+    "node-fetch": "^2.6.7",
     "tiny-typed-emitter": "^2.1.0",
     "web3": "^1.7.1",
     "ws": "^8.5.0"
