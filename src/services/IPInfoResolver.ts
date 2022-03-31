@@ -2,7 +2,6 @@ import fetch from 'node-fetch';
 
 
 export interface IIPInfo {
-  addr: string;
   status: string;
   country?: string;
   countryCode?: string;
@@ -41,7 +40,6 @@ export class IPInfoResolver {
       if(!rsp || !rsp.status)
         throw "invalid ip info response";
       let ipInfo: IIPInfo = {
-        addr: ipAddr,
         status: rsp.status,
       };
       if(rsp.status === "success") {
@@ -61,6 +59,10 @@ export class IPInfoResolver {
         ipInfo.hosting = rsp.hosting;
       }
       return ipInfo;
+    }, (err) => {
+      return {
+        status: "error" + (err ? ": " + err.toString() : ""),
+      };
     });
 
     this.ipInfoCache[ipAddr] = [

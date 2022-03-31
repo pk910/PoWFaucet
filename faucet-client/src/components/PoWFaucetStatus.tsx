@@ -39,7 +39,6 @@ interface IPoWFaucetStatusSession {
 }
 
 interface IPoWFaucetStatusIPInfo {
-  addr: string;
   status: string;
   country?: string;
   countryCode?: string;
@@ -210,10 +209,18 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
   }
 
   private renderSessionIpInfo(session: IPoWFaucetStatusSession, props: any): React.ReactElement {
+    if(!session.ipInfo)
+      return null;
+    
     return (
       <Tooltip id="ipinfo-tooltip" {...props}>
         <div className='ipaddr-info'>
           <table>
+            {session.ipInfo.status !== "success" ?
+              <tr>
+                <td colSpan={2} className='ipinfo-value'>{session.ipInfo.status}</td>
+              </tr>
+            : null}
             <tr>
               <td className='ipinfo-title'>Country:</td>
               <td className='ipinfo-value'>{session.ipInfo.country} ({session.ipInfo.countryCode})</td>
