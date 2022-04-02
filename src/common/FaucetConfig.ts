@@ -51,6 +51,7 @@ export interface IFaucetConfig {
   verifyMinerMissPenalty: number; // penalty for not responding to a verification request (shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so)
 
   hcaptcha: IFaucetHCaptchaConfig | null; // hcaptcha parameters or null to disable all hcaptchas
+  concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   lowFundsBalance: number; // minimum balance to show the low funds warning
@@ -128,6 +129,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     verifyMinerTimeout: 15,
     verifyMinerMissPenalty: 10000000000000000,
     hcaptcha: null,
+    concurrentSessions: 0,
     spareFundsAmount:   10000000000000000, // 0,01 ETH
     lowFundsBalance: 10000000000000000000, // 10 ETH
     lowFundsWarning: true,

@@ -65,6 +65,17 @@ export class PoWSession {
     return sessions;
   }
 
+  public static getConcurrentSessionCount(remoteIp: string, skipSession?: PoWSession): number {
+    let concurrentSessions = 0;
+    Object.values(this.activeSessions).forEach((session) => {
+      if(skipSession && skipSession === session)
+        return;
+      if(session.activeClient && session.activeClient.getRemoteIP() === remoteIp)
+        concurrentSessions++;
+    });
+    return concurrentSessions;
+  }
+
   private sessionId: string;
   private startTime: Date;
   private idleTime: Date | null;

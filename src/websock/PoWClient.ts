@@ -220,6 +220,9 @@ export class PoWClient {
         return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha verification failed", reqId);
     }
 
+    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", reqId);
+
     let targetAddr: string = message.data.addr;
     if(typeof targetAddr === "string" && targetAddr.match(/^[-a-zA-Z0-9@:%._\+~#=]{1,256}\.eth$/) && faucetConfig.ensResolver) {
       try {
@@ -265,6 +268,9 @@ export class PoWClient {
     if(!isValidGuid(sessionId) || !(session = PoWSession.getSession(sessionId)))
       return this.sendErrorResponse("INVALID_SESSIONID", "Invalid session id: " + sessionId, reqId);
 
+    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp, session) >= faucetConfig.concurrentSessions)
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", reqId);
+
     let client: PoWClient;
     if((client = session.getActiveClient())) {
       client.setSession(null);
@@ -302,6 +308,9 @@ export class PoWClient {
     let sessionInfo = JSON.parse(Buffer.from(sessionStr, 'base64').toString("utf8"));
     if(PoWSession.getSession(sessionInfo.id))
       return this.sendErrorResponse("DUPLICATE_SESSION", "Session does already exist and cannot be recovered", reqId);
+
+    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", reqId);
 
     var startTime = new Date(sessionInfo.startTime * 1000);
     if(faucetConfig.powSessionTimeout && ((new Date()).getTime() - startTime.getTime()) / 1000 > faucetConfig.powSessionTimeout)
