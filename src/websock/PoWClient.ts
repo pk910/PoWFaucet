@@ -476,6 +476,8 @@ export class PoWClient {
     let reqId = message.id || undefined;
     let statusRsp: any = {};
 
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Client requested faucet status (IP: " + this.remoteIp + ")");
+
     let sessions = PoWSession.getAllSessions();
     statusRsp.sessions = sessions.map((session) => {
       let sessionIdHash = crypto.createHash("sha256");
