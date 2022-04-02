@@ -1,9 +1,15 @@
 import { faucetConfig } from "../common/FaucetConfig";
 import { ServiceManager } from "../common/ServiceManager";
+import { IIPInfo } from "../services/IPInfoResolver";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PromiseDfd } from "../utils/PromiseDfd";
 import { PoWValidator } from "../validator/PoWValidator";
 import { PoWSessionSlashReason, PoWSession } from "./PoWSession";
+
+export interface IPoWShareVerificationResult {
+  isValid: boolean;
+  reward: number;
+}
 
 export class PoWShareVerification {
   private static verifyingShares: {[id: string]: PoWShareVerification} = {};
@@ -23,7 +29,7 @@ export class PoWShareVerification {
   private verifyMinerResults: {[sessionId: string]: boolean} = {};
   private verifyMinerTimer: NodeJS.Timeout;
   private isInvalid = false;
-  private resultDfd: PromiseDfd<boolean>;
+  private resultDfd: PromiseDfd<IPoWShareVerificationResult>;
 
   public constructor(session: PoWSession, nonces: number[]) {
     this.shareId = getNewGuid();
@@ -41,14 +47,14 @@ export class PoWShareVerification {
     return types.length ? types.join(",") : "none";
   }
 
-  public startVerification(): Promise<boolean> {
+  public startVerification(): Promise<IPoWShareVerificationResult> {
     let session = PoWSession.getSession(this.sessionId);
     if(!session)
       return Promise.reject("session not found");
     if(this.resultDfd)
       return this.resultDfd.promise;
 
-    this.resultDfd = new PromiseDfd<boolean>();
+    this.resultDfd = new PromiseDfd<IPoWShareVerificationResult>();
 
     let validatorSessions = PoWSession.getVerifierSessions(session.getSessionId());
     let verifyLocalPercent = faucetConfig.verifyLocalPercent;
@@ -153,11 +159,29 @@ export class PoWShareVerification {
       }
     });
 
-    if(this.isInvalid)
+    let shareReward: number;
+    if(this.isInvalid) {
       session.slashBadSession(PoWSessionSlashReason.INVALID_SHARE);
+      shareReward = 0;
+    }
     else {
       // valid share - add rewards
-      session.addBalance(faucetConfig.powShareReward);
+      shareReward = faucetConfig.powShareReward;
+
+      let sessionIpInfo: IIPInfo;
+      if(faucetConfig.ipRestrictedRewardShare && (sessionIpInfo = session.getLastIpInfo())) {
+        let restrictedReward = 100;
+        if(sessionIpInfo.hosting && typeof faucetConfig.ipRestrictedRewardShare.hosting === "number" && faucetConfig.ipRestrictedRewardShare.hosting < restrictedReward)
+          restrictedReward = faucetConfig.ipRestrictedRewardShare.hosting;
+        if(sessionIpInfo.proxy && typeof faucetConfig.ipRestrictedRewardShare.proxy === "number" && faucetConfig.ipRestrictedRewardShare.proxy < restrictedReward)
+          restrictedReward = faucetConfig.ipRestrictedRewardShare.proxy;
+        if(sessionIpInfo.countryCode && typeof faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] === "number" && faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] < restrictedReward)
+          restrictedReward = faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode];
+        if(restrictedReward < 100)
+          shareReward = Math.floor(shareReward / 100 * restrictedReward);
+      }
+
+      session.addBalance(shareReward);
       if(session.getActiveClient()) {
         session.getActiveClient().sendMessage("updateBalance", {
           balance: session.getBalance(),
@@ -166,7 +190,10 @@ export class PoWShareVerification {
         });
       }
     }
-    this.resultDfd.resolve(!this.isInvalid);
+    this.resultDfd.resolve({
+      isValid: !this.isInvalid,
+      reward: shareReward
+    });
   }
 
 }

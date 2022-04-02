@@ -52,6 +52,11 @@ export interface IFaucetConfig {
 
   hcaptcha: IFaucetHCaptchaConfig | null; // hcaptcha parameters or null to disable all hcaptchas
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
+  ipRestrictedRewardShare: null | { // ip based restrictions
+    hosting?: number; // percentage of reward per share if IP is in a hosting range
+    proxy?: number; // percentage of reward per share if IP is in a proxy range
+    [country: string]: number; // percentage of reward per share if IP is from given country code (DE/US/...)
+  };
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   lowFundsBalance: number; // minimum balance to show the low funds warning
@@ -130,6 +135,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     verifyMinerMissPenalty: 10000000000000000,
     hcaptcha: null,
     concurrentSessions: 0,
+    ipRestrictedRewardShare: null,
     spareFundsAmount:   10000000000000000, // 0,01 ETH
     lowFundsBalance: 10000000000000000000, // 10 ETH
     lowFundsWarning: true,
