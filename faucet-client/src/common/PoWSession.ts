@@ -119,7 +119,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public submitShare(share: IPoWMinerShare) {
-    if(this.options.client.isReady())
+    if(this.options.client.isReady() && this.shareQueue.length === 0)
       this.options.client.sendRequest("foundShare", share);
     else
       this.shareQueue.push(share);
@@ -132,7 +132,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public submitVerifyResult(result) {
-    if(this.options.client.isReady())
+    if(this.options.client.isReady() && this.verifyResultQueue.length === 0)
       this.options.client.sendRequest("verifyResult", result);
     else
       this.verifyResultQueue.push(result);
