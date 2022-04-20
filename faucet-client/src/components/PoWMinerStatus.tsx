@@ -190,10 +190,10 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
         </div>
         <div className='row pow-status-other'>
           <div className='col-6'>
-            <div className='status-title'>Avg. Reward per Minute:</div>
+            <div className='status-title'>Avg. Reward per Hour:</div>
           </div>
           <div className='col-6'>
-            <div className='status-value'>{Math.round(weiToEth(this.state.balance / ((now - this.state.startTime) / 60)) * 1000) / 1000} ETH/min</div>
+            <div className='status-value'>{Math.round(weiToEth(this.state.balance / ((now - this.state.startTime) / 3600)) * 1000) / 1000} ETH/h</div>
           </div>
         </div>
 
