@@ -423,7 +423,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
 
   private renderStatusDialog(): ReactElement {
     return (
-      <Modal show centered onHide={() => {
+      <Modal show centered className="pow-captcha-modal" onHide={() => {
         this.setState({
           statusDialog: null,
         });
@@ -460,7 +460,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
   private renderRestoreSessionDialog(): ReactElement {
     let storedSessionInfo = this.powSession.getStoredSessionInfo();
     return (
-      <Modal show centered size="lg" onHide={() => {
+      <Modal show centered size="lg" className="pow-captcha-modal" onHide={() => {
         this.setState({
           showRestoreSessionDialog: false,
         });

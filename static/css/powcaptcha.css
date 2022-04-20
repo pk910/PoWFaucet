@@ -123,6 +123,14 @@
   margin-right: 8px;
 }
 
+.pow-captcha-modal {
+  max-width: 700px;
+}
+
+.pow-captcha-modal .container {
+  max-width: none;
+}
+
 #ipinfo-tooltip .tooltip-inner {
   max-width: none;
 }

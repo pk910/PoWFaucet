@@ -134,7 +134,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     let claimTimeout = (this.props.reward.startTime + this.props.faucetConfig.claimTimeout) - now;
 
     return (
-      <Modal show centered size="lg" backdrop="static" onHide={() => {
+      <Modal show centered size="lg" backdrop="static" className="pow-captcha-modal" onHide={() => {
         this.props.onClose(this.state.claimStatus !== PoWClaimStatus.PREPARE);
       }}>
         <Modal.Header closeButton>
