@@ -41,7 +41,8 @@ export class PoWClient {
     this.socket.on("message", (data, isBinary) => this.onClientMessage(data, isBinary));
     this.socket.on("ping", (data) => {
       this.lastPingPong = new Date();
-      this.socket.pong(data)
+      if(this.socket)
+        this.socket.pong(data)
     });
     this.socket.on("pong", (data) => {
       this.lastPingPong = new Date();
