@@ -37,7 +37,7 @@ export interface IPoWClaimDialogState {
 }
 
 export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IPoWClaimDialogState> {
-  private powSessionClaimTxListener: ((res: any) => void);
+  private powClientClaimTxListener: ((res: any) => void);
   private updateTimer: NodeJS.Timeout;
   private hcapControl: HCaptcha;
   private isTimedOut: boolean;
@@ -58,8 +58,8 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   }
 
   public componentDidMount() {
-    if(!this.powSessionClaimTxListener) {
-      this.powSessionClaimTxListener = (res: any) => {
+    if(!this.powClientClaimTxListener) {
+      this.powClientClaimTxListener = (res: any) => {
         if(res.session !== this.props.reward.session)
           return;
 
@@ -77,7 +77,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
           });
         }
       };
-      this.props.powSession.on("claimTx", this.powSessionClaimTxListener);
+      this.props.powClient.on("claimTx", this.powClientClaimTxListener);
     }
     if(!this.updateTimer) {
       this.setUpdateTimer();
@@ -85,9 +85,9 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   }
 
   public componentWillUnmount() {
-    if(this.powSessionClaimTxListener) {
-      this.props.powSession.off("claimTx", this.powSessionClaimTxListener);
-      this.powSessionClaimTxListener = null;
+    if(this.powClientClaimTxListener) {
+      this.props.powClient.off("claimTx", this.powClientClaimTxListener);
+      this.powClientClaimTxListener = null;
     }
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);

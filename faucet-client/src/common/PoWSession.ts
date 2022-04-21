@@ -36,7 +36,6 @@ export interface IPoWClaimInfo {
 interface PoWSessionEvents {
   'update': () => void;
   'killed': (reason: string) => void;
-  'claimTx': (res: any) => void;
 }
 
 export class PoWSession extends TypedEmitter<PoWSessionEvents> {
@@ -143,10 +142,6 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     this.sessionInfo.recovery = balanceUpdate.recovery;
     this.storeSessionStatus();
     this.emit("update");
-  }
-
-  public updateClaimTx(res: any) {
-    this.emit("claimTx", res);
   }
 
   public getNonceRange(count: number): number {

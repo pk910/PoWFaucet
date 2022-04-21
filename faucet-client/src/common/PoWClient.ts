@@ -13,6 +13,7 @@ interface PoWClientEvents {
   'open': () => void;
   'close': () => void;
   'faucetStatus': (faucetStatus: IFaucetStatus) => void;
+  'claimTx': (res: any) => void;
 }
 
 export class PoWClient extends TypedEmitter<PoWClientEvents> {
@@ -154,9 +155,7 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
         }
         break;
       case "claimTx":
-        if(this.currentSession) {
-          this.currentSession.updateClaimTx(message.data);
-        }
+        this.emit("claimTx", message.data);
         break;
     }
   }
