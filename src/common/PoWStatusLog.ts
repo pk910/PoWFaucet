@@ -20,6 +20,11 @@ export class PoWStatusLog extends TypedEmitter<PoWStatusLogEvents> {
 
   public constructor() {
     super();
+
+    process.on('uncaughtException', (err, origin) => {
+      this.emitLog(PoWStatusLogLevel.ERROR, `### Caught unhandled exception: ${err}\r\n` + `  Exception origin: ${origin}\r\n` + `  Stack Trace: ${err.stack}\r\n`);
+      process.exit(1);
+    });
   }
 
   public emitLog(level: PoWStatusLogLevel, message: string, data?: any) {
