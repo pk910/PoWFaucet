@@ -123,8 +123,10 @@
   margin-right: 8px;
 }
 
-.pow-captcha-modal {
-  max-width: 700px;
+@media (max-width: 576px) {
+  .pow-captcha-modal {
+    max-width: 700px;
+  }
 }
 
 .pow-captcha-modal .container {
