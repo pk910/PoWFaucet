@@ -472,6 +472,55 @@ export class PoWClient {
     });
   }
 
+  private getHashedIp(remoteAddr: string) {
+    let ipMatch: RegExpExecArray;
+    let hashParts: string[] = [];
+    let hashGlue: string;
+    let getHash = (input: string, len?: number) => {
+      let hash = crypto.createHash("sha256");
+      hash.update(faucetConfig.powSessionSecret + "\r\n");
+      hash.update("iphash\r\n");
+      hash.update(input);
+      let hashStr = hash.digest("hex");
+      if(len)
+        hashStr = hashStr.substring(0, len);
+      return hashStr;
+    };
+
+    let hashBase = "";
+    if((ipMatch = /^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/.exec(remoteAddr))) {
+      // IPv4
+      hashGlue = ".";
+
+      for(let i = 0; i < 4; i++) {
+        hashParts.push(getHash(hashBase + ipMatch[i+1], 3));
+        hashBase += (hashBase ? "." : "") + ipMatch[i+1];
+      }
+    }
+    else {
+      // IPv6
+      hashGlue = ":";
+
+      let ipSplit = remoteAddr.split(":");
+      let ipParts: string[] = [];
+      for(let i = 0; i < ipSplit.length; i++) {
+        if(ipSplit[i] === "") {
+          let skipLen = 8 - ipSplit.length + 1;
+          for(let j = 0; j < skipLen; j++)
+            ipParts.push("0");
+          break;
+        }
+        ipParts.push(ipSplit[i]);
+      }
+      for(let i = 0; i < 8; i++) {
+        hashParts.push(ipParts[i] === "0" ? "0" : getHash(hashBase + ipParts[i], 3));
+        hashBase += (hashBase ? "." : "") + ipParts[i];
+      }
+    }
+
+    return hashParts.join(hashGlue);
+  }
+
   private async onCliGetFaucetStatus(message: any) {
     let reqId = message.id || undefined;
     let statusRsp: any = {};
@@ -484,16 +533,12 @@ export class PoWClient {
       sessionIdHash.update(faucetConfig.powSessionSecret + "\r\n");
       sessionIdHash.update(session.getSessionId());
 
-      let sessionIpHash = crypto.createHash("sha256");
-      sessionIpHash.update(faucetConfig.powSessionSecret + "\r\n");
-      sessionIpHash.update(session.getLastRemoteIp());
-
       return {
         id: sessionIdHash.digest("hex").substring(0, 20),
         start: Math.floor(session.getStartTime().getTime() / 1000),
         idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
         target: session.getTargetAddr(),
-        ip: sessionIpHash.digest("hex").substring(0, 20),
+        ip: this.getHashedIp(session.getLastRemoteIp()),
         ipInfo: session.getLastIpInfo(),
         balance: session.getBalance(),
         nonce: session.getLastNonce(),
