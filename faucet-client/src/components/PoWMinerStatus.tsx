@@ -20,6 +20,7 @@ export interface IPoWMinerStatusState {
   totalShares: number;
   balance: number;
   startTime: number;
+  lastShareTime: number;
 }
 
 export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IPoWMinerStatusState> {
@@ -40,6 +41,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       totalShares: 0,
       balance: sessionInfo ? sessionInfo.balance : 0,
       startTime: sessionInfo ? sessionInfo.startTime : 0,
+      lastShareTime: 0,
 		};
   }
 
@@ -49,6 +51,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
         let stateChange: any = {
           hashRate: stats.hashRate,
           totalShares: stats.totalShares,
+          lastShareTime: stats.lastShareTime ? Math.floor(stats.lastShareTime.getTime() / 1000) : 0
         };
         if(this.state.workerCountInput === 0)
           stateChange.workerCountInput = stats.workerCount;
@@ -124,6 +127,9 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       }, 100);
     }
 
+    let lastShareTime = this.state.lastShareTime || now;
+    let miningTime = lastShareTime - this.state.startTime;
+
     return (
       <div className='grid pow-status'>
         <div className='row'>
@@ -193,7 +199,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='status-title'>Avg. Reward per Hour:</div>
           </div>
           <div className='col-6'>
-            <div className='status-value'>{Math.round(weiToEth(this.state.balance / ((now - this.state.startTime) / 3600)) * 1000) / 1000} ETH/h</div>
+            <div className='status-value'>{Math.round(weiToEth(this.state.balance / (miningTime / 3600)) * 1000) / 1000} ETH/h</div>
           </div>
         </div>
 
