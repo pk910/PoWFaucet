@@ -45,7 +45,7 @@ var webpackModuleConfigs = [
 
 var webpackBaseConfig = {
   mode: debug ? "development" : "production",
-  devtool: debug ? "source-map" : undefined,
+  devtool: "source-map",
 
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
