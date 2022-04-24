@@ -1,10 +1,15 @@
-import { IPoWCaptchaProps, PoWCaptcha } from './components/PoWCaptcha';
+import { IPoWFaucetProps, PoWFaucet } from './components/PoWFaucet';
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-export function initPoWCaptcha(container: Element, options: IPoWCaptchaProps) {
-  let captcha = React.createElement<IPoWCaptchaProps>(PoWCaptcha, options, []);
-  ReactDOM.render(captcha, container);
-};
+(() => {
+  let faucetProps: IPoWFaucetProps = {
+    powApiUrl: location.origin.replace(/^http/, "ws") + "/pow",
+    minerSrc: "/js/powfaucet-worker.js"
+  };
 
-(window as any).initPoWCaptcha = initPoWCaptcha;
+  var container = document.querySelector(".pow-faucet");
+  let faucet = React.createElement<IPoWFaucetProps>(PoWFaucet, faucetProps, []);
+  ReactDOM.render(faucet, container);
+  
+})();

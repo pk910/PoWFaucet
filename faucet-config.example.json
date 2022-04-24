@@ -1,6 +1,6 @@
 {
   "faucetTitle": "Kiln Dev PoW Faucet",
-  "faucetImage": "https://ligi.de/assets/img/fauceth_420.jpg",
+  "faucetImage": "/images/fauceth_420.jpg",
 
   "serverPorts": [
     { "port": 8080 }

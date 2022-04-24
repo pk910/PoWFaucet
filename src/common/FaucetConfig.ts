@@ -103,7 +103,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     powPingInterval: 10,
     powPingTimeout: 30,
     faucetTitle: "PoW Faucet",
-    faucetImage: "https://ligi.de/assets/img/fauceth_420.jpg",
+    faucetImage: "/images/fauceth_420.jpg",
     faucetLogFile: null,
     serverPorts: [
       { port: 8080 }

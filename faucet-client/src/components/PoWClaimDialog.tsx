@@ -7,7 +7,7 @@ import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTimespan } from '../utils/DateUtils';
 import { PoWClient } from '../common/PoWClient';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
-import { IStatusDialog } from './PoWCaptcha';
+import { IPoWStatusDialogProps } from './PoWStatusDialog';
 
 export interface IPoWClaimDialogProps {
   powClient: PoWClient;
@@ -15,7 +15,7 @@ export interface IPoWClaimDialogProps {
   faucetConfig: IFaucetConfig;
   reward: IPoWClaimInfo;
   onClose: (clearClaim: boolean) => void;
-  setDialog: (dialog: IStatusDialog) => void;
+  setDialog: (dialog: IPoWStatusDialogProps) => void;
 }
 
 enum PoWClaimStatus {

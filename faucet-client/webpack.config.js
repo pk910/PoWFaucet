@@ -3,6 +3,7 @@ const webpack = require('webpack');
 const wpmerge = require('webpack-merge');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const TerserPlugin = require("terser-webpack-plugin");
+const Visualizer = require('webpack-visualizer-plugin2');
 var cliArgs = require('./utils/CliArgs');
 
 var debug = false;
@@ -14,7 +15,7 @@ var webpackModuleConfigs = [
     entry: './src/main',
     output: {
       path: path.join(__dirname, '/dist'),
-      filename: 'powcaptcha.js'
+      filename: 'powfaucet.js'
     },
     module: {
       rules: [
@@ -26,8 +27,8 @@ var webpackModuleConfigs = [
     },
     plugins: [
       new MiniCssExtractPlugin({
-        filename: 'powcaptcha.css',
-        chunkFilename: 'powcaptcha.[name].css',
+        filename: 'powfaucet.css',
+        chunkFilename: 'powfaucet.[name].css',
 
       }),
     ]
@@ -36,7 +37,7 @@ var webpackModuleConfigs = [
     entry: './src/worker',
     output: {
       path: path.join(__dirname, '/dist'),
-      filename: 'powcaptcha-worker.js',
+      filename: 'powfaucet-worker.js',
     },
 
   },
@@ -49,6 +50,7 @@ var webpackBaseConfig = {
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
   },
+  target: ['web', 'es5'],
 
   module: {
     rules: [
@@ -72,15 +74,6 @@ var webpackBaseConfig = {
             ]
           },
         },
-      },
-
-      // url-loader to bundle images & fonts
-      {
-        test: /\.(png|jpg|gif|svg|eot|ttf|woff|woff2)$/,
-        loader: 'url-loader',
-        options: {
-          limit: 10000
-        }
       }
     ]
   },
@@ -92,6 +85,8 @@ var webpackBaseConfig = {
         parallel: true,
         extractComments: true,
         terserOptions: {
+          compress: true,
+          keep_fnames: false,
           mangle: true,
           toplevel: true,
           module: true,
@@ -105,6 +100,9 @@ var webpackBaseConfig = {
         'process.env': {
             
         }
+    }),
+    new Visualizer({
+      filename: 'webpack-stats.html'
     })
   ]
 };

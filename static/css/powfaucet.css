@@ -1,28 +1,50 @@
 
-.pow-captcha .loading-spinner {
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.faucet-wrapper {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+}
+
+.faucet-container {
+  padding: 8px;
+  margin: 8px;
+  background-color: white;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+  transition: 0.3s;
+}
+
+.pow-faucet .loading-spinner {
   padding: 16px 0;
 }
 
-.pow-captcha .loading-spinner .spinner {
+.pow-faucet .loading-spinner .spinner {
   height: 30px;
   margin: 0 16px;
 }
 
-.pow-captcha .faucet-image {
+.pow-faucet .faucet-image {
   margin: 8px 8px 8px 8px;
 }
  
 @media screen and (max-height:700px) {
-  .pow-captcha .faucet-image {
+  .pow-faucet .faucet-image {
     display:none;
   }
 }
 
-.pow-captcha .faucet-actions {
+.pow-faucet .faucet-actions {
   margin: 8px 0;
 }
 
-.pow-captcha .faucet-actions button {
+.pow-faucet .faucet-actions button {
   width: 100%;
   border: none;
   color: white;
@@ -35,34 +57,34 @@
   cursor: pointer;
 }
 
-.pow-captcha .faucet-actions button.start-action {
+.pow-faucet .faucet-actions button.start-action {
   background-color: #4CAF50;
 }
 
-.pow-captcha .faucet-actions button.stop-action {
+.pow-faucet .faucet-actions button.stop-action {
   background-color: #af4c4c;
 }
 
-.pow-captcha .faucet-actions button:disabled {
+.pow-faucet .faucet-actions button:disabled {
   background-color: gray;
   color: #ccc;
   cursor: wait;
 }
 
-.pow-captcha .faucet-inputs {
+.pow-faucet .faucet-inputs {
   margin-top: 24px;
 }
 
-.pow-captcha .faucet-captcha {
+.pow-faucet .faucet-captcha {
   text-align: center;
   margin-top: 8px;
 }
 
-.pow-captcha .faucet-title {
+.pow-faucet .faucet-title {
   position: relative;
 }
 
-.pow-captcha .faucet-title .faucet-status-link {
+.pow-faucet .faucet-title .faucet-status-link {
   position: absolute;
   right: 0;
   top: 0;
@@ -70,35 +92,35 @@
   height: 50px;
 }
 
-.pow-captcha .pow-header {
+.pow-faucet .pow-header {
   position: relative;
 }
 
-.pow-captcha .pow-status {
+.pow-faucet .pow-status {
   height: 100%;
   background-color: white;
   border: 1px solid darkgray;
   padding: 8px;
 }
 
-.pow-captcha .pow-status .pow-status-top .status-title {
+.pow-faucet .pow-status .pow-status-top .status-title {
   text-align: center;
 }
 
-.pow-captcha .pow-status .pow-status-top .status-value {
+.pow-faucet .pow-status .pow-status-top .status-value {
   text-align: center;
   font-size: 28px;
 }
 
-.pow-captcha .pow-status .pow-status-spacer {
+.pow-faucet .pow-status .pow-status-spacer {
   height: 16px;
 }
 
-.pow-captcha .pow-status .pow-status-other {
+.pow-faucet .pow-status .pow-status-other {
   margin-top: 4px;
 }
 
-.pow-captcha .pow-status .pow-worker-controls button {
+.pow-faucet .pow-status .pow-worker-controls button {
   width: 27px;
   margin-right: 6px;
   border-radius: 15px;
@@ -111,15 +133,15 @@
   margin-left: 12px;
 }
 
-.pow-captcha .faucet-status {
+.pow-faucet .faucet-status {
   max-width: none;
 }
 
-.pow-captcha .faucet-status .status-panel {
+.pow-faucet .faucet-status .status-panel {
   margin-bottom: 8px;
 }
 
-.pow-captcha .faucet-status .ipaddr-icon {
+.pow-faucet .faucet-status .ipaddr-icon {
   margin-right: 8px;
 }
 

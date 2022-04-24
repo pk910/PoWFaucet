@@ -9,7 +9,7 @@
 		// Process & infer types from .js files.
 		"allowJs": true,
 		// Don't emit; allow Babel to transform files.
-		"noEmit": true,
+		"noEmit": false,
 		// Import non-ES modules as default imports.
 		"esModuleInterop": true,
 		// use typescript to transpile jsx to js

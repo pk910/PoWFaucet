@@ -4,7 +4,7 @@ import React, { ReactElement } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 
-import './PoWCaptcha.css'
+import './PoWFaucet.css'
 import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import { PoWMinerStatus } from './PoWMinerStatus';
 import { PoWMiner } from '../common/PoWMiner';
@@ -13,13 +13,15 @@ import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWClaimDialog } from './PoWClaimDialog';
 import { PoWFaucetStatus } from './PoWFaucetStatus';
 import { TypedEmitter } from 'tiny-typed-emitter';
+import { IPoWStatusDialogProps, PoWStatusDialog } from './PoWStatusDialog';
+import { PoWRestoreSessionDialog } from './PoWRestoreSessionDialog';
 
-export interface IPoWCaptchaProps {
+export interface IPoWFaucetProps {
   powApiUrl: string;
   minerSrc: string;
 }
 
-enum PoWCaptchaMiningStatus {
+enum PoWFaucetMiningStatus {
   IDLE = 0,
   STARTING = 1,
   RUNNING = 2,
@@ -27,19 +29,7 @@ enum PoWCaptchaMiningStatus {
   STOPPING = 4
 };
 
-export interface IStatusDialog {
-  title: string;
-  body: ReactElement;
-  closeButton?: {
-    caption: string;
-  },
-  applyButton?: {
-    caption: string;
-    applyFn: () => void,
-  },
-}
-
-export interface IPoWCaptchaState {
+export interface IPoWFaucetState {
   initializing: boolean;
   faucetConfig: IFaucetConfig;
   faucetStatusText: string;
@@ -47,16 +37,16 @@ export interface IPoWCaptchaState {
   targetAddr: string;
   requestCaptcha: boolean;
   captchaToken: string;
-  miningStatus: PoWCaptchaMiningStatus;
+  miningStatus: PoWFaucetMiningStatus;
   isClaimable: boolean;
-  statusDialog: IStatusDialog;
+  statusDialog: IPoWStatusDialogProps;
   statusMessage: string;
   showRestoreSessionDialog: boolean;
   showClaimRewardDialog: IPoWClaimInfo;
   showFaucetStatus: boolean;
 }
 
-export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptchaState> {
+export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetState> {
   private powClient: PoWClient;
   private powSession: PoWSession;
   private hcapControl: HCaptcha;
@@ -69,7 +59,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
   private faucetStatucClickCount = 0;
   private restoredPersistedState = false;
 
-  constructor(props: IPoWCaptchaProps, state: IPoWCaptchaState) {
+  constructor(props: IPoWFaucetProps, state: IPoWFaucetState) {
     super(props);
 
     this.powClient = new PoWClient({
@@ -130,7 +120,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
       targetAddr: "",
       requestCaptcha: false,
       captchaToken: null,
-      miningStatus: PoWCaptchaMiningStatus.IDLE,
+      miningStatus: PoWFaucetMiningStatus.IDLE,
       isClaimable: false,
       statusDialog: null,
       statusMessage: null,
@@ -180,7 +170,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
 
   private onPoWSessionUpdate() {
     let sessionInfo = this.powSession.getSessionInfo();
-    if(this.state.miningStatus === PoWCaptchaMiningStatus.IDLE && sessionInfo) {
+    if(this.state.miningStatus === PoWFaucetMiningStatus.IDLE && sessionInfo) {
       // start miner
       if(!this.powSession.getMiner()) {
         this.powSession.setMiner(new PoWMiner({
@@ -191,19 +181,19 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         }));
       }
       this.setState({
-        miningStatus: PoWCaptchaMiningStatus.RUNNING,
+        miningStatus: PoWFaucetMiningStatus.RUNNING,
         targetAddr: sessionInfo.targetAddr,
         isClaimable: (sessionInfo.balance >= this.state.faucetConfig.minClaim),
         statusMessage: null,
       });
     }
-    else if(this.state.miningStatus !== PoWCaptchaMiningStatus.IDLE && !sessionInfo) {
+    else if(this.state.miningStatus !== PoWFaucetMiningStatus.IDLE && !sessionInfo) {
       if(this.powSession.getMiner()) {
         this.powSession.getMiner().stopMiner();
         this.powSession.setMiner(null);
       }
       this.setState({
-        miningStatus: PoWCaptchaMiningStatus.IDLE,
+        miningStatus: PoWFaucetMiningStatus.IDLE,
         targetAddr: "",
         statusMessage: null,
       });
@@ -233,7 +223,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
     });
   }
 
-	public render(): React.ReactElement<IPoWCaptchaProps> {
+	public render(): React.ReactElement<IPoWFaucetProps> {
     let renderControl: React.ReactElement;
     if(this.state.initializing) {
       return (
@@ -254,26 +244,26 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
     let requestCaptcha = false;
 
     switch(this.state.miningStatus) {
-      case PoWCaptchaMiningStatus.IDLE:
+      case PoWFaucetMiningStatus.IDLE:
         requestCaptcha = enableCaptcha && this.state.faucetConfig.hcapSession;
-      case PoWCaptchaMiningStatus.STARTING:
+      case PoWFaucetMiningStatus.STARTING:
         actionButtonControl = (
           <button 
             className="btn btn-success start-action" 
             onClick={(evt) => this.onStartMiningClick()} 
-            disabled={this.state.miningStatus == PoWCaptchaMiningStatus.STARTING}>
+            disabled={this.state.miningStatus == PoWFaucetMiningStatus.STARTING}>
               {this.state.statusMessage ? this.state.statusMessage : "Start Mining"}
           </button>
         );
         break;
-      case PoWCaptchaMiningStatus.RUNNING:
-      case PoWCaptchaMiningStatus.INTERRUPTED:
-      case PoWCaptchaMiningStatus.STOPPING:
+      case PoWFaucetMiningStatus.RUNNING:
+      case PoWFaucetMiningStatus.INTERRUPTED:
+      case PoWFaucetMiningStatus.STOPPING:
         actionButtonControl = (
           <button 
             className="btn btn-danger stop-action" 
             onClick={(evt) => this.onStopMiningClick()} 
-            disabled={this.state.miningStatus !== PoWCaptchaMiningStatus.RUNNING}>
+            disabled={this.state.miningStatus !== PoWFaucetMiningStatus.RUNNING}>
               {this.state.statusMessage ? this.state.statusMessage : (this.state.isClaimable ? "Stop Mining & Claim Rewards" : "Stop Mining")}
           </button>
         );
@@ -317,16 +307,47 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
             }
           </div>
         </div>
-        {this.state.showRestoreSessionDialog ? this.renderRestoreSessionDialog() : null}
-        {this.state.showClaimRewardDialog ? this.renderClaimRewardDialog() : null}
-        {this.state.statusDialog ? this.renderStatusDialog() : null}
+        {this.state.showRestoreSessionDialog ? 
+          <PoWRestoreSessionDialog 
+            powSession={this.powSession} 
+            closeFn={() => this.setState({ showRestoreSessionDialog: false })}
+          /> 
+        : null}
+        {this.state.showClaimRewardDialog ? 
+          <PoWClaimDialog 
+            powClient={this.powClient}
+            powSession={this.powSession}
+            reward={this.state.showClaimRewardDialog}
+            faucetConfig={this.state.faucetConfig}
+            onClose={(clearClaim) => {
+              if(clearClaim)
+                this.powSession.storeClaimInfo(null);
+              this.setState({
+                showClaimRewardDialog: null,
+                miningStatus: PoWFaucetMiningStatus.IDLE,
+                statusMessage: null,
+              });
+            }}
+            setDialog={(dialog) => {
+              this.setState({
+                statusDialog: dialog
+              });
+            }} 
+          />
+        : null}
+        {this.state.statusDialog ? 
+          <PoWStatusDialog 
+            {...this.state.statusDialog} 
+            closeFn={() => this.setState({ statusDialog: null })} 
+          /> 
+        : null}
         <div className="faucet-inputs">
           <input 
             className="form-control" 
             value={this.state.targetAddr} 
             placeholder={"Please enter ETH address" + (this.state.faucetConfig.resolveEnsNames ? " or ENS name" : "")} 
             onChange={(evt) => this.setState({ targetAddr: evt.target.value })} 
-            disabled={this.state.miningStatus !== PoWCaptchaMiningStatus.IDLE} 
+            disabled={this.state.miningStatus !== PoWFaucetMiningStatus.IDLE} 
           />
           {requestCaptcha ? 
             <div className='faucet-captcha'>
@@ -348,7 +369,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
 
   private onStartMiningClick() {
     this.setState({
-      miningStatus: PoWCaptchaMiningStatus.STARTING,
+      miningStatus: PoWFaucetMiningStatus.STARTING,
       statusMessage: "Starting mining..."
     });
     this.powSession.startSession().then(() => {
@@ -359,13 +380,13 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         nonceCount: this.state.faucetConfig.powNonceCount,
       }));
       this.setState({
-        miningStatus: PoWCaptchaMiningStatus.RUNNING,
+        miningStatus: PoWFaucetMiningStatus.RUNNING,
         isClaimable: false,
         statusMessage: null,
       });
     }, (err) => {
       this.setState({
-        miningStatus: PoWCaptchaMiningStatus.IDLE,
+        miningStatus: PoWFaucetMiningStatus.IDLE,
         statusDialog: {
           title: "Could not start session.",
           body: (<div className='alert alert-danger'>{(err && err.message ? err.message : err)}</div>),
@@ -380,7 +401,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
 
   private onStopMiningClick() {
     this.setState({
-      miningStatus: PoWCaptchaMiningStatus.STOPPING,
+      miningStatus: PoWFaucetMiningStatus.STOPPING,
       statusMessage: "Claiming rewards..."
     });
     this.powSession.getMiner().stopMiner();
@@ -404,7 +425,7 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
       }
       else {
         this.setState({
-          miningStatus: PoWCaptchaMiningStatus.IDLE,
+          miningStatus: PoWFaucetMiningStatus.IDLE,
           statusMessage: null,
         });
       }
@@ -419,130 +440,6 @@ export class PoWCaptcha extends React.PureComponent<IPoWCaptchaProps, IPoWCaptch
         showFaucetStatus: true
       });
     }
-  }
-
-  private renderStatusDialog(): ReactElement {
-    return (
-      <Modal show centered className="pow-captcha-modal" onHide={() => {
-        this.setState({
-          statusDialog: null,
-        });
-      }}>
-        <Modal.Header closeButton>
-          <Modal.Title id="contained-modal-title-vcenter">
-            {this.state.statusDialog.title}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {this.state.statusDialog.body}
-        </Modal.Body>
-        <Modal.Footer>
-          {this.state.statusDialog.applyButton ? 
-            <Button onClick={() => {
-              this.state.statusDialog.applyButton.applyFn();
-              this.setState({
-                statusDialog: null,
-              });
-            }}>{this.state.statusDialog.applyButton.caption}</Button>
-          : null}
-          {this.state.statusDialog.closeButton ? 
-            <Button onClick={() => {
-              this.setState({
-                statusDialog: null,
-              });
-            }}>{this.state.statusDialog.closeButton.caption}</Button>
-          : null}
-        </Modal.Footer>
-      </Modal>
-    );
-  }
-
-  private renderRestoreSessionDialog(): ReactElement {
-    let storedSessionInfo = this.powSession.getStoredSessionInfo();
-    return (
-      <Modal show centered size="lg" className="pow-captcha-modal" onHide={() => {
-        this.setState({
-          showRestoreSessionDialog: false,
-        });
-      }}>
-        <Modal.Header closeButton>
-          <Modal.Title id="contained-modal-title-vcenter">
-            Continue mining on previous session?
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className='container'>
-            <div className='row'>
-              <div className='col'>
-                Do you want to continue mining on your previous session?
-              </div>
-            </div>
-            <div className='row'>
-              <div className='col-3'>
-                Address:
-              </div>
-              <div className='col'>
-                {storedSessionInfo.targetAddr}
-              </div>
-            </div>
-            <div className='row'>
-              <div className='col-3'>
-                Start Time:
-              </div>
-              <div className='col'>
-                {renderDate(new Date(storedSessionInfo.startTime * 1000), true)}
-              </div>
-            </div>
-            <div className='row'>
-              <div className='col-3'>
-                Balance:
-              </div>
-              <div className='col'>
-                {Math.round(weiToEth(storedSessionInfo.balance) * 100) / 100} ETH
-              </div>
-            </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button onClick={() => {
-            this.setState({
-              showRestoreSessionDialog: false,
-            });
-            this.powSession.restoreStoredSession();
-          }}>Continue previous session</Button>
-          <Button onClick={() => {
-            this.setState({
-              showRestoreSessionDialog: false,
-            });
-          }}>Start new session</Button>
-        </Modal.Footer>
-      </Modal>
-    );
-  }
-
-  private renderClaimRewardDialog(): ReactElement {
-    return (
-      <PoWClaimDialog 
-        powClient={this.powClient}
-        powSession={this.powSession}
-        reward={this.state.showClaimRewardDialog}
-        faucetConfig={this.state.faucetConfig}
-        onClose={(clearClaim) => {
-          if(clearClaim)
-            this.powSession.storeClaimInfo(null);
-          this.setState({
-            showClaimRewardDialog: null,
-            miningStatus: PoWCaptchaMiningStatus.IDLE,
-            statusMessage: null,
-          });
-        }}
-        setDialog={(dialog) => {
-          this.setState({
-            statusDialog: dialog
-          });
-        }} 
-      />
-    );
   }
 
 }
