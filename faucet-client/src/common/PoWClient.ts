@@ -81,7 +81,7 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.startClient();
-    }, 10 * 1000);
+    }, (5 * 1000) + (1000 * 5 * Math.random()));
   }
 
   public sendRequest<T = any>(action: string, data?: any): Promise<T> {
