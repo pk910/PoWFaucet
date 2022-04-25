@@ -43,3 +43,7 @@ This faucet contains parts of code from the following projects:
 [pow-captcha](https://git.sequentialread.com/forest/pow-captcha) - faucet-wasm build script
 
 [FaucETH](https://github.com/komputing/FaucETH) - faucet page design
+
+# License
+
+AGPLv3
