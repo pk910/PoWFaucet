@@ -1,7 +1,7 @@
 {
   "name": "pow-faucet-client",
   "version": "1.0.0",
-  "description": "",
+  "description": "PoW Faucet Client",
   "scripts": {
     "bundle": "webpack",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,8 +9,8 @@
     "build": "webpack --mode production",
     "check-types": "tsc"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "pk910 (https://pk910.de)",
+  "license": "AGPL-3.0",
   "devDependencies": {
     "@babel/core": "^7.16.7",
     "@babel/plugin-proposal-class-properties": "^7.16.7",

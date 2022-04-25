@@ -1,14 +1,14 @@
 {
   "name": "pow-faucet-server",
   "version": "1.0.0",
-  "description": "",
+  "description": "PoW Faucet Server",
   "main": "dist/app.js",
   "scripts": {
     "start": "tsc && node dist/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "pk910",
-  "license": "ISC",
+  "author": "pk910 (https://pk910.de)",
+  "license": "AGPL-3.0",
   "devDependencies": {
     "@types/node-static": "^0.7.7",
     "@types/ws": "^8.5.3",
