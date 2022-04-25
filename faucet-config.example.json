@@ -1,6 +1,7 @@
 {
   "faucetTitle": "Kiln Dev PoW Faucet",
   "faucetImage": "/images/fauceth_420.jpg",
+  "faucetHomeHtml": "<div class='pow-info'><h5>What is a PoW Faucet?</h5>This is a Ethereum Faucet running on the Kiln Testnet.<br>To prevent malicious actors from exhausting all available funds or accumulating enough Ether to mount long running spam attacks, this faucet requires some mining work to be done in exchange for free testnet funds.</div><div class='pow-info'><h5>How does this work?</h5>Just enter your ETH Address and start mining. When you've collected enough ETH, stop mining and claim your rewards.</div>",
 
   "serverPorts": [
     { "port": 8080 }

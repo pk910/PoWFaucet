@@ -3,6 +3,7 @@ export interface IFaucetConfig {
   faucetTitle: string;
   faucetStatus: IFaucetStatus;
   faucetImage: string;
+  faucetHtml: string;
   hcapSiteKey: string | null;
   hcapSession: boolean;
   hcapClaim: boolean;

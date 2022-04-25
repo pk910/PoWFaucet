@@ -21,6 +21,10 @@ html, body {
   transition: 0.3s;
 }
 
+.pow-faucet .faucet-page {
+  width: 440px;
+}
+
 .pow-faucet .loading-spinner {
   padding: 16px 0;
 }
@@ -28,6 +32,14 @@ html, body {
 .pow-faucet .loading-spinner .spinner {
   height: 30px;
   margin: 0 16px;
+}
+
+.pow-faucet .pow-faucet-home {
+  text-align: center;
+}
+
+.pow-faucet .pow-faucet-home .image {
+  max-width: 100%;
 }
 
 .pow-faucet .faucet-image {
@@ -144,6 +156,18 @@ html, body {
 .pow-faucet .faucet-status .ipaddr-icon {
   margin-right: 8px;
 }
+
+.pow-faucet .faucet-description {
+  font-size: 11pt;
+  color: #343a40;
+  margin-top: 16px;
+}
+
+.pow-faucet .faucet-description .pow-info {
+  margin-top: 8px;
+}
+
+
 
 @media (max-width: 576px) {
   .pow-captcha-modal {

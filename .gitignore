@@ -2,6 +2,7 @@
 build/
 dist/
 node_modules/
+static/index.seo.html
 faucet-config.json
 faucet-status.json
 faucet-store.json

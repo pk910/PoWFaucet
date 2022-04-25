@@ -10,6 +10,8 @@ import ReactDOM from 'react-dom';
 
   var container = document.querySelector(".pow-faucet");
   let faucet = React.createElement<IPoWFaucetProps>(PoWFaucet, faucetProps, []);
+
+  container.innerHTML = "";
   ReactDOM.render(faucet, container);
   
 })();

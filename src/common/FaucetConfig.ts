@@ -6,10 +6,13 @@ export interface IFaucetConfig {
   faucetVersion: string; // faucet version (set automatically)
 
   staticPath: string; // path to the /static directory (set automatically)
+  buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
+  buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
   faucetStore: string;
 
   faucetTitle: string; // title of the faucet
   faucetImage: string; // faucet image displayed on the startpage
+  faucetHomeHtml: string; // some additional html to show on the startpage
   faucetLogFile: string; // logfile for faucet events / null for no log
   serverPorts: IFaucetPortConfig[]; // listener ports
 
@@ -98,12 +101,17 @@ export let faucetConfig: IFaucetConfig = (() => {
     appBasePath: basePath,
     faucetVersion: packageJson.version,
     staticPath: path.join(basePath, "static"),
+    buildSeoIndex: true,
+    buildSeoMeta: {
+      "keywords": "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow",
+    },
     faucetStore: path.join(basePath, "faucet-store.json"),
 
     powPingInterval: 10,
     powPingTimeout: 30,
     faucetTitle: "PoW Faucet",
     faucetImage: "/images/fauceth_420.jpg",
+    faucetHomeHtml: "",
     faucetLogFile: null,
     serverPorts: [
       { port: 8080 }

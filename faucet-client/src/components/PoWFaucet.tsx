@@ -289,7 +289,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     }
 
     return (
-      <div>
+      <div className='faucet-page'>
         <div className="faucet-title">
           <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
           <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
@@ -303,7 +303,11 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           <div className="pow-status-container">
             {this.powSession.getMiner() ? 
               <PoWMinerStatus powMiner={this.powSession.getMiner()} powSession={this.powSession} faucetConfig={this.state.faucetConfig} stopMinerFn={() => this.onStopMiningClick()} /> :
-              <img src={this.state.faucetConfig.faucetImage} className="image" />
+              <div className='pow-faucet-home'>
+                {this.state.faucetConfig.faucetImage ?
+                  <img src={this.state.faucetConfig.faucetImage} className="image" />
+                : null}
+              </div>
             }
           </div>
         </div>
@@ -362,6 +366,11 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
             {actionButtonControl}  
           </div>
           {renderControl}
+        </div>
+        <div className='faucet-description'>
+          {this.state.faucetConfig.faucetHtml ?
+            <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.state.faucetConfig.faucetHtml}} />
+          : null}
         </div>
       </div>
     );

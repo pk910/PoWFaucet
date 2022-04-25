@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 
 import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } from 'http';
@@ -6,7 +7,7 @@ import { WebSocketServer } from 'ws';
 import * as stream from 'node:stream';
 import { faucetConfig, IFaucetPortConfig } from '../common/FaucetConfig';
 import { PoWClient } from '../websock/PoWClient';
-
+import { encode } from 'html-entities';
 
 export class FaucetHttpServer {
   private httpServers: {[port: number]: {
@@ -28,6 +29,9 @@ export class FaucetHttpServer {
     this.staticServer = new StaticServer(faucetConfig.staticPath, {
       serverInfo: Buffer.from("pow-faucet/" + faucetConfig.faucetVersion)
     });
+
+    if(faucetConfig.buildSeoIndex)
+      this.buildSeoIndex();
   }
 
   private addServerPort(port: IFaucetPortConfig) {
@@ -47,7 +51,11 @@ export class FaucetHttpServer {
       req.on("end", () => {
         switch(req.url) {
           case "/":
-            this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
+          case "/index.html":
+            if(faucetConfig.buildSeoIndex)
+              this.staticServer.serveFile("/index.seo.html", 200, {}, req, rsp);
+            else
+              this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
             break;
           default:
             this.staticServer.serve(req, rsp);
@@ -70,5 +78,37 @@ export class FaucetHttpServer {
     });
   }
 
+  private buildSeoIndex() {
+    let indexFile = path.join(faucetConfig.staticPath, "index.html");
+    if(!fs.existsSync(indexFile))
+      return;
+    let indexHtml = fs.readFileSync(indexFile, "utf8");
 
+    let seoHtml = [
+      '<div class="faucet-title">',
+        '<h1 class="center">' + encode(faucetConfig.faucetTitle) + '</h1>',
+      '</div>',
+      '<div class="pow-header center">',
+        '<div class="pow-status-container">',
+          '<div class="pow-faucet-home">',
+            faucetConfig.faucetImage ? '<img src="' + faucetConfig.faucetImage + '" className="image" />' : '',
+          '</div>',
+        '</div>',
+      '</div>',
+    ].join("");
+    let seoMeta = "";
+    if(faucetConfig.buildSeoMeta) {
+      seoMeta = Object.keys(faucetConfig.buildSeoMeta).filter((metaName) => faucetConfig.buildSeoMeta.hasOwnProperty(metaName)).map((metaName) => {
+        return '<meta name="' + metaName + '" content="' + faucetConfig.buildSeoMeta[metaName] + '">';
+      }).join("");
+    }
+
+    indexHtml = indexHtml.replace(/<title>.*?<\/title>/, '<title>' + encode(faucetConfig.faucetTitle) + '</title>');
+    indexHtml = indexHtml.replace(/<!-- pow-faucet-content -->/, seoHtml);
+    indexHtml = indexHtml.replace(/<!-- pow-faucet-header -->/, seoMeta);
+    indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, faucetConfig.faucetHomeHtml ? faucetConfig.faucetHomeHtml : '');
+
+    let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
+    fs.writeFileSync(seoFile, indexHtml);
+  }
 }
