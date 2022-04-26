@@ -10,6 +10,7 @@ import { getNewGuid } from "../utils/GuidUtils";
 import { PoWClient } from "./PoWClient";
 import { renderDate } from "../utils/DateUtils";
 import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
+import { FaucetStatsLog } from "../services/FaucetStatsLog";
 
 
 export enum PoWSessionSlashReason {
@@ -161,6 +162,7 @@ export class PoWSession {
     this.setSessionStatus(PoWSessionStatus.CLOSED);
     delete PoWSession.activeSessions[this.sessionId];
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Closed session: " + this.sessionId + (this.claimable ? " (claimable reward: " + (Math.round(weiToEth(this.balance)*1000)/1000) + ")" : ""));
+    ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
 
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionAge = now - Math.floor(this.startTime.getTime() / 1000);

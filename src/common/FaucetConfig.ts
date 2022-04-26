@@ -76,6 +76,7 @@ export interface IFaucetConfig {
   ethTxExplorerLink: string; // link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
+  faucetStats: IFaucetStatsConfig | null; // RRD Stats config or null to disable rrd stats
 }
 
 export interface IFaucetPortConfig {
@@ -92,6 +93,10 @@ export interface IFaucetHCaptchaConfig {
 export interface IFaucetEnsResolverConfig {
   rpcHost: string; // ETH execution layer RPC host for ENS resolver
   ensAddr: string | null; // ENS Resolver contract address or null for default resolver
+}
+
+export interface IFaucetStatsConfig {
+  logfile: string;
 }
 
 export let faucetConfig: IFaucetConfig = (() => {
@@ -157,6 +162,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     ethMaxPending: 12,
     ethTxExplorerLink: null,
     ensResolver: null,
+    faucetStats: null,
   };
 
   let configFlle = path.join(defaultConfig.appBasePath, "faucet-config.json");

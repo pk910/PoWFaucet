@@ -10,6 +10,7 @@ import { ServiceManager } from '../common/ServiceManager';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
 import { strFormatPlaceholder } from '../utils/StringUtils';
+import { FaucetStatsLog } from './FaucetStatsLog';
 
 interface WalletState {
   nonce: number;
@@ -41,6 +42,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public readonly time: Date;
   public readonly target: string;
   public readonly amount: number;
+  public readonly session: string;
   public nonce: number;
   public txhex: string;
   public txhash: string;
@@ -48,12 +50,13 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public retryCount: number;
   public failReason: string;
 
-  public constructor(target: string, amount: number) {
+  public constructor(target: string, amount: number, sessId: string) {
     super();
     this.status = ClaimTxStatus.QUEUE;
     this.time = new Date();
     this.target = target;
     this.amount = amount;
+    this.session = sessId;
     this.retryCount = 0;
   }
 }
@@ -145,8 +148,8 @@ export class EthWeb3Manager {
     }
   }
 
-  public addClaimTransaction(target: string, amount: number): ClaimTx {
-    let claimTx = new ClaimTx(target, amount);
+  public addClaimTransaction(target: string, amount: number, sessId: string): ClaimTx {
+    let claimTx = new ClaimTx(target, amount, sessId);
     this.claimTxQueue.push(claimTx);
     return claimTx;
   }
@@ -232,6 +235,7 @@ export class EthWeb3Manager {
       txPromise.then((res) => {
         claimTx.txhash = res.transactionHash;
         claimTx.txblock = res.blockNumber;
+        ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
         resolve();
       }, (err) => {
         ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Transaction for " + claimTx.target + " failed: " + err);

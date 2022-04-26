@@ -6,3 +6,4 @@ static/index.seo.html
 faucet-config.json
 faucet-status.json
 faucet-store.json
+faucet-stats.log
