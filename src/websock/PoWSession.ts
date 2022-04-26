@@ -248,6 +248,8 @@ export class PoWSession {
     this.lastRemoteIp = remoteAddr;
     ServiceManager.GetService(IPInfoResolver).getIpInfo(remoteAddr).then((ipInfo) => {
       this.lastIpInfo = ipInfo;
+      if(this.activeClient)
+        this.activeClient.refreshFaucetStatus();
     });
   }
 

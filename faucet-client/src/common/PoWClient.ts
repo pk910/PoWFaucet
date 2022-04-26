@@ -1,7 +1,6 @@
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { PromiseDfd } from "../utils/PromiseDfd";
 import { IFaucetConfig, IFaucetStatus } from './IFaucetConfig';
-import { IPoWMinerVerification } from './PoWMiner';
 import { PoWSession } from "./PoWSession";
 
 
@@ -12,7 +11,7 @@ export interface IPoWClientOptions {
 interface PoWClientEvents {
   'open': () => void;
   'close': () => void;
-  'faucetStatus': (faucetStatus: IFaucetStatus) => void;
+  'faucetStatus': (faucetStatus: IFaucetStatus[]) => void;
   'claimTx': (res: any) => void;
 }
 
@@ -134,10 +133,7 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
     // parse message
     switch(message.action) {
       case "faucetStatus":
-        this.emit("faucetStatus", {
-          text: message.data.text,
-          level: message.data.level,
-        });
+        this.emit("faucetStatus", message.data);
         break;
       case "sessionKill":
         if(this.currentSession) {

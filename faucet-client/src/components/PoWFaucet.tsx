@@ -32,8 +32,7 @@ enum PoWFaucetMiningStatus {
 export interface IPoWFaucetState {
   initializing: boolean;
   faucetConfig: IFaucetConfig;
-  faucetStatusText: string;
-  faucetStatusLevel: string;
+  faucetStatus: IFaucetStatus[];
   targetAddr: string;
   requestCaptcha: boolean;
   captchaToken: string;
@@ -70,8 +69,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       this.setState({
         initializing: false,
         faucetConfig: faucetConfig,
-        faucetStatusText: faucetConfig.faucetStatus.text,
-        faucetStatusLevel: faucetConfig.faucetStatus.level,
+        faucetStatus: faucetConfig.faucetStatus,
       });
 
       if(!this.restoredPersistedState)
@@ -115,8 +113,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     this.state = {
       initializing: true,
       faucetConfig: null,
-      faucetStatusText: null,
-      faucetStatusLevel: null,
+      faucetStatus: [],
       targetAddr: "",
       requestCaptcha: false,
       captchaToken: null,
@@ -161,10 +158,9 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     });
   }
 
-  private onPoWClientFaucetStatus(faucetStatus: IFaucetStatus) {
+  private onPoWClientFaucetStatus(faucetStatus: IFaucetStatus[]) {
     this.setState({
-      faucetStatusText: faucetStatus.text,
-      faucetStatusLevel: faucetStatus.level,
+      faucetStatus: faucetStatus
     });
   }
 
@@ -270,9 +266,9 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         break;
     }
 
-    let faucetStatusClass: string = "";
-    if(this.state.faucetStatusLevel) {
-      switch(this.state.faucetStatusLevel) {
+    let faucetStatusEls = this.state.faucetStatus.map((status, idx) => {
+      let faucetStatusClass: string = "";
+      switch(status.level) {
         case "info":
           faucetStatusClass = "alert-info";
           break;
@@ -286,19 +282,23 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           faucetStatusClass = "alert-light";
           break;
       }
-    }
 
+      return (
+        <div key={"status" + idx} className={["faucet-status-alert alert", faucetStatusClass].join(" ")} role="alert">
+          {status.ishtml ? 
+          <div dangerouslySetInnerHTML={{__html: status.text}} /> :
+          <span>{status.text}</span>}
+        </div>
+      );
+    })
+    
     return (
       <div className='faucet-page'>
         <div className="faucet-title">
           <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
           <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
         </div>
-        {this.state.faucetStatusText ? 
-        <div className={["faucet-status-alert alert", faucetStatusClass].join(" ")} role="alert">
-          {this.state.faucetStatusText}
-        </div>
-        : null}
+        {faucetStatusEls}
         <div className="pow-header center">
           <div className="pow-status-container">
             {this.powSession.getMiner() ? 

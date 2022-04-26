@@ -11,7 +11,7 @@ import { ServiceManager } from '../common/ServiceManager';
 import { PoWShareVerification } from './PoWShareVerification';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { weiToEth } from '../utils/ConvertHelpers';
-import { FaucetStatus } from '../services/FaucetStatus';
+import { FaucetStatus, IFaucetStatus } from '../services/FaucetStatus';
 import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
 import { FaucetStatsLog } from '../services/FaucetStatsLog';
 
@@ -26,6 +26,10 @@ export class PoWClient {
     });
   }
 
+  public static getAllClients(): PoWClient[] {
+    return this.activeClients;
+  }
+
   public static getClientCount(): number {
     return this.activeClients.length;
   }
@@ -35,6 +39,7 @@ export class PoWClient {
   private session: PoWSession = null;
   private pingTimer: NodeJS.Timer = null;
   private lastPingPong: Date;
+  private statusHash: string;
 
   public constructor(socket: WebSocket, remoteIp: string) {
     this.socket = socket;
@@ -64,6 +69,7 @@ export class PoWClient {
 
   public setSession(session: PoWSession) {
     this.session = session;
+    this.refreshFaucetStatus();
   }
 
   public getRemoteIP(): string {
@@ -134,6 +140,18 @@ export class PoWClient {
     }, reqId);
   }
 
+  public sendFaucetStatus(status: IFaucetStatus[], hash: string) {
+    if(this.statusHash === hash)
+      return;
+    this.statusHash = hash;
+    this.sendMessage("faucetStatus", status);
+  }
+
+  public refreshFaucetStatus() {
+    let status = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this.session);
+    this.sendFaucetStatus(status.status, status.hash);
+  }
+
   private onClientMessage(data: RawData, isBinary: boolean) {
     let message;
     try {
@@ -184,10 +202,11 @@ export class PoWClient {
 
   private onCliGetConfig(message: any) {
     let reqId = message.id || undefined;
-    let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus();
+    let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this.session);
+    this.statusHash = faucetStatus.hash;
     this.sendMessage("config", {
       faucetTitle: faucetConfig.faucetTitle,
-      faucetStatus: faucetStatus,
+      faucetStatus: faucetStatus.status,
       faucetImage: faucetConfig.faucetImage,
       faucetHtml: faucetConfig.faucetHomeHtml,
       hcapSiteKey: faucetConfig.hcaptcha ? faucetConfig.hcaptcha.siteKey : null,

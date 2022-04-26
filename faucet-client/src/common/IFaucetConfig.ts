@@ -1,7 +1,7 @@
 
 export interface IFaucetConfig {
   faucetTitle: string;
-  faucetStatus: IFaucetStatus;
+  faucetStatus: IFaucetStatus[];
   faucetImage: string;
   faucetHtml: string;
   hcapSiteKey: string | null;
@@ -28,5 +28,6 @@ export interface IPoWParams {
 
 export interface IFaucetStatus {
   text: string;
-  level: string
+  level: string;
+  ishtml: boolean;
 }
