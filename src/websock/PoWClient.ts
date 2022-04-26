@@ -369,13 +369,14 @@ export class PoWClient {
     this.session.resetMissedVerifications();
     
     let shareVerification = new PoWShareVerification(this.session, shareData.nonces);
+    let sessionId = this.session.getSessionId();
     shareVerification.startVerification().then((result) => {
       if(!result.isValid)
         this.sendErrorResponse("WRONG_SHARE", "Share verification failed", reqId);
       else {
         if(reqId)
           this.sendMessage("ok", null, reqId);
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Valid share for session " + this.session.getSessionId() + " (verify: " + shareVerification.getVerificationType() + "): " + (Math.round(weiToEth(result.reward)*1000)/1000) + " ETH");
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Valid share for session " + sessionId + " (verify: " + shareVerification.getVerificationType() + "): " + (Math.round(weiToEth(result.reward)*1000)/1000) + " ETH");
       }
     }, () => {
       this.sendErrorResponse("VERIFY_FAILED", "Share verification error", reqId);
