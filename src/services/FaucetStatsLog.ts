@@ -2,12 +2,24 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { faucetConfig } from '../common/FaucetConfig';
-import { PoWSession } from '../websock/PoWSession';
+import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { ServiceManager } from '../common/ServiceManager';
+import { weiToEth } from '../utils/ConvertHelpers';
+import { PoWClient } from '../websock/PoWClient';
+import { PoWSession, PoWSessionStatus } from '../websock/PoWSession';
 import { ClaimTx } from './EthWeb3Manager';
 
 export class FaucetStatsLog {
+  public statShareCount: number = 0;
+  public statShareRewards: number = 0;
+  public statVerifyCount: number = 0;
+  public statVerifyMisses: number = 0;
+  public statClaimCount: number = 0;
+  public statClaimRewards: number = 0;
+
   private enabled: boolean;
   private statsFile: string;
+  private statsTimer: NodeJS.Timer;
 
   public constructor() {
     if(faucetConfig.faucetStats) {
@@ -17,6 +29,24 @@ export class FaucetStatsLog {
     else {
       this.enabled = false;
     }
+
+    this.sheduleStatsLoop();
+  }
+
+  private sheduleStatsLoop() {
+    let now = (new Date()).getTime();
+    let loopInterval = faucetConfig.faucetLogStatsInterval * 1000;
+    let loopIndex = Math.floor(now / loopInterval);
+    let nextLoopTime = (loopIndex + 1) * loopInterval;
+    let loopDelay = nextLoopTime - now + 10;
+    
+    if(this.statsTimer)
+      clearTimeout(this.statsTimer);
+    this.statsTimer = setTimeout(() => {
+      this.statsTimer = null;
+      this.processFaucetStats();
+      this.sheduleStatsLoop();
+    }, loopDelay);
   }
 
   private addStatsEntry(type: string, data: any) {
@@ -52,6 +82,45 @@ export class FaucetStatsLog {
       val: claim.amount,
       sess: claim.session,
     });
+  }
+
+  private processFaucetStats() {
+    let sessions = PoWSession.getAllSessions(true);
+    let idleSessCount = sessions.filter((s) => !s.getActiveClient()).length;
+    let hashRate = 0;
+    sessions.forEach((s) => {
+      if(s.getSessionStatus() !== PoWSessionStatus.MINING)
+        return;
+      hashRate += s.getReportedHashRate() || 0;
+    });
+    hashRate = Math.round(hashRate);
+
+    let statsLog = [];
+    statsLog.push("clients: " + PoWClient.getClientCount());
+    statsLog.push("sessions: " + sessions.length + " (" + hashRate + " H/s, " + idleSessCount + " idle)");
+    statsLog.push("shares: " + this.statShareCount + " (" + (Math.round(weiToEth(this.statShareRewards)*1000)/1000) + " ETH, " + (this.statVerifyCount -  this.statVerifyMisses) + "/" + this.statVerifyCount + " verified)");
+    statsLog.push("claims: " + this.statClaimCount + " (" + (Math.round(weiToEth(this.statClaimRewards)*1000)/1000) + " ETH)");
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "# STATS # " + statsLog.join(", "));
+
+    this.addStatsEntry("STATS", {
+      cliCnt: PoWClient.getClientCount(),
+      sessCnt: sessions.length,
+      sessIdl: idleSessCount,
+      hashRate: hashRate,
+      shareCnt: this.statShareCount,
+      shareVal: this.statShareRewards,
+      vrfyCnt: this.statVerifyCount,
+      vrfyMisa: this.statVerifyMisses,
+      claimCnt: this.statClaimCount,
+      claimVal: this.statClaimRewards,
+    });
+
+    this.statShareCount = 0;
+    this.statShareRewards = 0;
+    this.statVerifyCount = 0;
+    this.statVerifyMisses = 0;
+    this.statClaimCount = 0;
+    this.statClaimRewards = 0;
   }
 
 }

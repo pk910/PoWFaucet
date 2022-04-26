@@ -59,10 +59,11 @@ export class PoWSession {
     });
   }
 
-  public static getAllSessions(): PoWSession[] {
+  public static getAllSessions(activeOnly?: boolean): PoWSession[] {
     let sessions: PoWSession[] = [];
     Array.prototype.push.apply(sessions, Object.values(this.activeSessions));
-    Array.prototype.push.apply(sessions, Object.values(this.closedSessions));
+    if(!activeOnly)
+      Array.prototype.push.apply(sessions, Object.values(this.closedSessions));
     return sessions;
   }
 

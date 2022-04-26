@@ -211,7 +211,6 @@ export class EthWeb3Manager {
 
     this.pendingTxQueue[claimTx.nonce] = claimTx;
 
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending rewards tx for " + claimTx.target + ":  " + (Math.round(weiToEth(claimTx.amount)*1000)/1000) + " ETH");
     this.sendClaimTx(claimTx).then(() => {
       delete this.pendingTxQueue[claimTx.nonce];
       claimTx.status = ClaimTxStatus.CONFIRMED;

@@ -14,6 +14,7 @@ export interface IFaucetConfig {
   faucetImage: string; // faucet image displayed on the startpage
   faucetHomeHtml: string; // some additional html to show on the startpage
   faucetLogFile: string; // logfile for faucet events / null for no log
+  faucetLogStatsInterval: number; // print faucet stats to log interval (10min default)
   serverPorts: IFaucetPortConfig[]; // listener ports
 
   /* PoW parameters */
@@ -118,6 +119,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     faucetImage: "/images/fauceth_420.jpg",
     faucetHomeHtml: "",
     faucetLogFile: null,
+    faucetLogStatsInterval: 600,
     serverPorts: [
       { port: 8080 }
     ],

@@ -47,6 +47,14 @@ export class PoWShareVerification {
     return types.length ? types.join(",") : "none";
   }
 
+  public getMinerVerifyCount(): number {
+    return this.verifyMinerCount;
+  }
+
+  public getMinerVerifyMisses(): number {
+    return this.verifyMinerCount - Object.keys(this.verifyMinerResults).length;
+  }
+
   public startVerification(): Promise<IPoWShareVerificationResult> {
     let session = PoWSession.getSession(this.sessionId);
     if(!session)

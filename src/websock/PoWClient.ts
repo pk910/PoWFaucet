@@ -13,6 +13,7 @@ import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { FaucetStatus } from '../services/FaucetStatus';
 import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
+import { FaucetStatsLog } from '../services/FaucetStatsLog';
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -23,6 +24,10 @@ export class PoWClient {
         client.sendMessage(action, data);
       } catch(ex) {}
     });
+  }
+
+  public static getClientCount(): number {
+    return this.activeClients.length;
   }
 
   private socket: WebSocket;
@@ -376,7 +381,12 @@ export class PoWClient {
       else {
         if(reqId)
           this.sendMessage("ok", null, reqId);
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Valid share for session " + sessionId + " (verify: " + shareVerification.getVerificationType() + "): " + (Math.round(weiToEth(result.reward)*1000)/1000) + " ETH");
+        
+        let faucetStats = ServiceManager.GetService(FaucetStatsLog);
+        faucetStats.statShareCount++;
+        faucetStats.statShareRewards += result.reward;
+        faucetStats.statVerifyCount += shareVerification.getMinerVerifyCount();
+        faucetStats.statVerifyMisses += shareVerification.getMinerVerifyMisses();
       }
     }, () => {
       this.sendErrorResponse("VERIFY_FAILED", "Share verification error", reqId);
@@ -461,6 +471,10 @@ export class PoWClient {
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Claimed reward for session " + sessionInfo.id + " to " + sessionInfo.targetAddr + " (" + (Math.round(weiToEth(sessionInfo.balance)*1000)/1000) + " ETH)");
 
     claimTx.once("confirmed", () => {
+      let faucetStats = ServiceManager.GetService(FaucetStatsLog);
+      faucetStats.statClaimCount++;
+      faucetStats.statClaimRewards += sessionInfo.balance;
+
       this.sendMessage("claimTx", {
         session: sessionInfo.id,
         txHash: claimTx.txhash,
