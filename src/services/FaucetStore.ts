@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import { faucetConfig } from '../common/FaucetConfig';
+import { IIPInfo } from './IPInfoResolver';
 
 export enum SessionMark {
   KILLED = "killed",
@@ -14,10 +15,16 @@ export enum AddressMark {
 interface IFaucetStore {
   sessionMarks: {[sessionId: string]: IFaucetStoreMarks<SessionMark>};
   addressMarks: {[sessionId: string]: IFaucetStoreMarks<AddressMark>};
+  ipInfoCache: {[ip: string]: IFaucetStoreEntry<IIPInfo>};
 }
 
 interface IFaucetStoreMarks<T> {
   m: T[];
+  t: number;
+}
+
+interface IFaucetStoreEntry<T> {
+  m: T;
   t: number;
 } 
 
@@ -40,8 +47,12 @@ export class FaucetStore {
       this.store = {
         sessionMarks: {},
         addressMarks: {},
+        ipInfoCache: {},
       };
     }
+    if(!this.store.ipInfoCache)
+      this.store.ipInfoCache = {};
+
     this.dirty = false;
   }
 
@@ -83,6 +94,15 @@ export class FaucetStore {
     for(let i = 0; i < addresses.length; i++) {
       if(this.store.addressMarks[addresses[i]].t < addressTout) {
         delete this.store.addressMarks[addresses[i]];
+        cleared = true;
+      }
+    }
+
+    let ipInfoTout = now - (60 * 60 * 12);
+    let ipinfos = Object.keys(this.store.ipInfoCache);
+    for(let i = 0; i < ipinfos.length; i++) {
+      if(this.store.ipInfoCache[ipinfos[i]].t < ipInfoTout) {
+        delete this.store.ipInfoCache[ipinfos[i]];
         cleared = true;
       }
     }
@@ -164,6 +184,28 @@ export class FaucetStore {
         t: now
       };
     }
+
+    this.dirty = true;
+    this.saveStore();
+  }
+
+  public getIPInfo(ip: string): IIPInfo {
+    ip = ip.toLowerCase();
+    let ipInfoEntry = this.store.ipInfoCache[ip];
+    
+    if(!ipInfoEntry)
+      return null;
+    return ipInfoEntry.m;
+  }
+
+  public setIPInfo(ip: string, info: IIPInfo) {
+    ip = ip.toLowerCase();
+    let now = Math.floor((new Date()).getTime() / 1000);
+
+    let ipinfoEntry = this.store.ipInfoCache[ip] = {
+      m: info,
+      t: now
+    };
 
     this.dirty = true;
     this.saveStore();
