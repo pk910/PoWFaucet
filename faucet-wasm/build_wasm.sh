@@ -5,8 +5,8 @@ if [ ! -f build_wasm.sh ]; then
 fi
 
 if [ ! -d scrypt-wasm ]; then
-  printf "Cloning https://github.com/MyEtherWallet/scrypt-wasm... \n"
-  git clone https://github.com/MyEtherWallet/scrypt-wasm
+  printf "Cloning https://github.com/pk910/scrypt-wasm... \n"
+  git clone https://github.com/pk910/scrypt-wasm.git
 fi
 
 cd scrypt-wasm
@@ -28,7 +28,7 @@ if [ "$rust_is_installed" == "0" ]; then
 fi
 
 if [ ! -d pkg ]; then
-  printf "running Makefile for MyEtherWallet/scrypt-wasm... \n"
+  printf "running Makefile for scrypt-wasm... \n"
   make
 fi
 
