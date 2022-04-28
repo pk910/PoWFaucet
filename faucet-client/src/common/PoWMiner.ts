@@ -316,8 +316,8 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       // workers should have enough nounces to work for 4 seconds
       // workers report their nonce count every 2 seconds so there is enough time to add more nonce ranges
       this.targetNoncePrefill = Math.ceil(hashRate * 4 / this.workers.length);
-      if(this.targetNoncePrefill < 100)
-        this.targetNoncePrefill = 100;
+      if(this.targetNoncePrefill < 20)
+        this.targetNoncePrefill = 20;
     }
 
     let minerStats: IPoWMinerStats = this.latestStats = {
