@@ -23,26 +23,21 @@ console.log(`
 
 var cryptonightPromise, cryptonight;
 
+module.exports = {
+  getCryptoNight: function() { return cryptonight; },
+  getCryptoNightReadyPromise: function() { return cryptonightPromise; }
+};
+
 function getWasmBinary() {
   ${base32768Module}
   const base32768WASM = "${base32768WASM}";
   return base32768.decode(base32768WASM);
 }
 
-function onWasmReady(module, cfns) {
-  console.log("WASM READY", arguments);
-  cryptonight = cfns.cwrap('hash_cn', 'string', ['string','number','number','number']);
-}
-
 (function() {
   var wasmMeta = {};
   ${customWASMWrappperJS}
-  cryptonightPromise = Module["ready"];
+  cryptonightPromise = Module();
 })();
-
-module.exports = {
-  getCryptoNight: function() { return cryptonight; },
-  getCryptoNightReadyPromise: function() { return cryptonightPromise; }
-};
 
 `);
