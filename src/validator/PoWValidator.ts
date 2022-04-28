@@ -1,5 +1,5 @@
 import { isMainThread, Worker } from 'worker_threads';
-import { faucetConfig } from '../common/FaucetConfig';
+import { faucetConfig, PoWHashAlgo } from '../common/FaucetConfig';
 import { PromiseDfd } from '../utils/PromiseDfd';
 import { IPoWValidatorValidateRequest } from './IPoWValidator';
 
@@ -27,19 +27,20 @@ export class PoWValidator {
 
   public validateShare(shareId: string, nonces: number[], preimg: string): Promise<boolean> {
     let resDfd = new PromiseDfd<boolean>();
-    // TODO: continue here
 
     let req: IPoWValidatorValidateRequest = {
       shareId: shareId,
       nonces: nonces,
       preimage: preimg,
-      params: {
-        n: faucetConfig.powScryptParams.cpuAndMemory,
-        r: faucetConfig.powScryptParams.blockSize,
-        p: faucetConfig.powScryptParams.paralellization,
-        l: faucetConfig.powScryptParams.keyLength,
-        d: faucetConfig.powScryptParams.difficulty,
-      }
+      algo: faucetConfig.powHashAlgo,
+      params: (() => {
+        switch(faucetConfig.powHashAlgo) {
+          case PoWHashAlgo.SCRYPT: 
+            return faucetConfig.powScryptParams;
+          case PoWHashAlgo.CRYPTONIGHT: 
+            return faucetConfig.powCryptoNightParams;
+        }
+      })()
     };
     this.validateQueue[req.shareId] = resDfd;
     this.readyDfd.promise.then(() => {

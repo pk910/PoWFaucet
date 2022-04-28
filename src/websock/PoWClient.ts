@@ -1,7 +1,7 @@
 import { WebSocket, RawData } from 'ws';
 import * as hcaptcha from "hcaptcha";
 import * as crypto from "crypto";
-import { faucetConfig } from '../common/FaucetConfig';
+import { faucetConfig, PoWHashAlgo } from '../common/FaucetConfig';
 import { PoWSession, PoWSessionStatus } from './PoWSession';
 import { AddressMark, FaucetStore, SessionMark } from '../services/FaucetStore';
 import { renderTimespan } from '../utils/DateUtils';
@@ -14,6 +14,7 @@ import { weiToEth } from '../utils/ConvertHelpers';
 import { FaucetStatus, IFaucetStatus } from '../services/FaucetStatus';
 import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
 import { FaucetStatsLog } from '../services/FaucetStatsLog';
+import { getPoWParamsStr } from '../utils/PoWParamsHelper';
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -204,6 +205,28 @@ export class PoWClient {
     let reqId = message.id || undefined;
     let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this.session);
     this.statusHash = faucetStatus.hash;
+    let powParams;
+    switch(faucetConfig.powHashAlgo) {
+      case PoWHashAlgo.SCRYPT:
+        powParams = {
+          a: PoWHashAlgo.SCRYPT,
+          n: faucetConfig.powScryptParams.cpuAndMemory,
+          r: faucetConfig.powScryptParams.blockSize,
+          p: faucetConfig.powScryptParams.paralellization,
+          l: faucetConfig.powScryptParams.keyLength,
+          d: faucetConfig.powScryptParams.difficulty,
+        };
+        break;
+      case PoWHashAlgo.CRYPTONIGHT:
+        powParams = {
+          a: PoWHashAlgo.CRYPTONIGHT,
+          c: faucetConfig.powCryptoNightParams.algo,
+          v: faucetConfig.powCryptoNightParams.variant,
+          h: faucetConfig.powCryptoNightParams.height,
+          d: faucetConfig.powScryptParams.difficulty,
+        };
+        break;
+    }
     this.sendMessage("config", {
       faucetTitle: faucetConfig.faucetTitle,
       faucetStatus: faucetStatus.status,
@@ -217,13 +240,7 @@ export class PoWClient {
       maxClaim: faucetConfig.claimMaxAmount,
       powTimeout: faucetConfig.powSessionTimeout,
       claimTimeout: faucetConfig.claimSessionTimeout,
-      powParams: {
-        n: faucetConfig.powScryptParams.cpuAndMemory,
-        r: faucetConfig.powScryptParams.blockSize,
-        p: faucetConfig.powScryptParams.paralellization,
-        l: faucetConfig.powScryptParams.keyLength,
-        d: faucetConfig.powScryptParams.difficulty,
-      },
+      powParams: powParams,
       powNonceCount: faucetConfig.powNonceCount,
       resolveEnsNames: !!faucetConfig.ensResolver,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
@@ -370,13 +387,7 @@ export class PoWClient {
       hashrate: number;
     } = message.data;
 
-    let powParamsStr = faucetConfig.powScryptParams.cpuAndMemory +
-      "|" + faucetConfig.powScryptParams.blockSize +
-      "|" + faucetConfig.powScryptParams.paralellization +
-      "|" + faucetConfig.powScryptParams.keyLength +
-      "|" + faucetConfig.powScryptParams.difficulty;
-
-    if(shareData.params !== powParamsStr) 
+    if(shareData.params !== getPoWParamsStr()) 
       return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", reqId);
     if(shareData.nonces.length !== faucetConfig.powNonceCount)
       return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count", reqId);
@@ -393,7 +404,6 @@ export class PoWClient {
     this.session.resetMissedVerifications();
     
     let shareVerification = new PoWShareVerification(this.session, shareData.nonces);
-    let sessionId = this.session.getSessionId();
     shareVerification.startVerification().then((result) => {
       if(!result.isValid)
         this.sendErrorResponse("WRONG_SHARE", "Share verification failed", reqId);
@@ -412,7 +422,6 @@ export class PoWClient {
     });
   }
   
-
   private onCliVerifyResult(message: any) {
     if(!this.session)
       return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found");

@@ -171,6 +171,10 @@ function getWasmBinary() {
 
 (function() {
   var wasmMeta = {};
+  if(typeof self === "undefined") {
+    var self = {location:{href:""}};
+  }
+
   
 var Module = (() => {
   var _scriptDir = wasmMeta.url;

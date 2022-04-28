@@ -27,13 +27,9 @@ export interface IFaucetConfig {
   powSessionSecret: string; // random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
   powPingInterval: number; // websocket ping interval
   powPingTimeout: number; // kill websocket if no ping/pong for that number of seconds
-  powScryptParams: { // scrypt parameters
-    cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
-    blockSize: number; // r - block size (affects memory and CPU usage)
-    paralellization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
-    keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
-    difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
-  };
+  powHashAlgo: PoWHashAlgo; // hash algorithm to use ("sc" = SCrypt, "cn" = CryptoNight), defaults to SCrypt
+  powScryptParams: IPoWSCryptParams; // scrypt parameters
+  powCryptoNightParams: IPoWCryptoNightParams; // cryptonight parameters
   powNonceCount: number; // number of scrypt hashs to pack into a share (should be low as that just increases verification load on server side)
 
   /* PoW-share verification
@@ -79,6 +75,28 @@ export interface IFaucetConfig {
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
   faucetStats: IFaucetStatsConfig | null; // RRD Stats config or null to disable rrd stats
 }
+
+export enum PoWHashAlgo {
+  SCRYPT      = "sc",
+  CRYPTONIGHT = "cn",
+}
+
+export interface IPoWSCryptParams {
+  cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
+  blockSize: number; // r - block size (affects memory and CPU usage)
+  paralellization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+  keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export interface IPoWCryptoNightParams {
+  algo: number;
+  variant: number;
+  height: number;
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams;
 
 export interface IFaucetPortConfig {
   port: number;
@@ -130,11 +148,18 @@ export let faucetConfig: IFaucetConfig = (() => {
     claimSessionTimeout: 7200,
     claimAddrCooldown: 7200,
     powSessionSecret: "***insecure***",
+    powHashAlgo: PoWHashAlgo.SCRYPT,
     powScryptParams: {
       cpuAndMemory: 4096,
       blockSize: 8,
       paralellization: 1,
       keyLength: 16,
+      difficulty: 9
+    },
+    powCryptoNightParams: {
+      algo: 0,
+      variant: 0,
+      height: 0,
       difficulty: 9
     },
     powNonceCount: 2,

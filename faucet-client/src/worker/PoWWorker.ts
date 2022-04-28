@@ -1,12 +1,15 @@
-import { IPoWParams } from "../common/IFaucetConfig";
-import { Scrypt } from "../../../libs/scrypt_wasm";
+import { getPoWParamsStr } from "../utils/PoWParamsHelper";
+import { PoWHashAlgo, PoWParams } from "../common/IFaucetConfig";
 import { base64ToHex } from "../utils/ConvertHelpers";
 
+export type PoWWorkerHashFn = (nonceHex: string, preimgHex: string, params: PoWParams) => string;
+
 export interface IPoWWorkerOptions {
-  scrypt: Scrypt;
+  hashFn: PoWWorkerHashFn;
 }
 
-interface IPoWWorkerParams extends IPoWParams {
+interface IPoWWorkerParams {
+  params: PoWParams;
   dmask: string;
   pstr: string;
 }
@@ -109,11 +112,12 @@ export class PoWWorker {
     });
   }
 
-  private getWorkerParams(params: IPoWParams): IPoWWorkerParams {
-    let workerParams: IPoWWorkerParams = Object.assign(params, {
+  private getWorkerParams(params: PoWParams): IPoWWorkerParams {
+    let workerParams: IPoWWorkerParams = {
+      params: params,
       dmask: this.getDifficultyMask(params.d),
-      pstr: this.getPoWParamsStr(params),
-    });
+      pstr: getPoWParamsStr(params),
+    };
 
     return workerParams;
   }
@@ -129,10 +133,6 @@ export class PoWWorker {
     }
 
     return mask;
-  }
-
-  private getPoWParamsStr(params: IPoWParams): string {
-    return params.n + "|" + params.r + "|" + params.p + "|" + params.l + "|" + params.d;
   }
 
   private startWorkLoop() {
@@ -215,14 +215,7 @@ export class PoWWorker {
     }
     
     this.statsCount++;
-    let hashHex = this.options.scrypt(
-      nonceHex, 
-      preimg, 
-      this.powParams.n, 
-      this.powParams.r, 
-      this.powParams.p, 
-      this.powParams.l
-    );
+    let hashHex = this.options.hashFn(nonceHex, preimg, this.powParams.params);
 
     let startOfHash = hashHex.substring(0, this.powParams.dmask.length);
     return (startOfHash <= this.powParams.dmask) ? hashHex : null;

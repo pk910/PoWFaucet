@@ -12,17 +12,29 @@ export interface IFaucetConfig {
   maxClaim: number;
   powTimeout: number;
   claimTimeout: number;
-  powParams: IPoWParams;
+  powParams: PoWParams;
   powNonceCount: number;
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
 }
 
-export interface IPoWParams {
+export enum PoWHashAlgo {
+  SCRYPT      = "sc",
+  CRYPTONIGHT = "cn",
+}
+
+export type PoWParams = {
+  a: PoWHashAlgo.SCRYPT,
   n: number; // cpu and memory cost
   r: number; // block size
   p: number; // paralellization
   l: number; // key length
+  d: number; // difficulty
+} | {
+  a: PoWHashAlgo.CRYPTONIGHT,
+  c: number; // cn-algo
+  v: number; // variant
+  h: number; // height
   d: number; // difficulty
 }
 

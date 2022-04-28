@@ -36,6 +36,10 @@ function getWasmBinary() {
 
 (function() {
   var wasmMeta = {};
+  if(typeof self === "undefined") {
+    var self = {location:{href:""}};
+  }
+
   ${customWASMWrappperJS}
   cryptonightPromise = Module();
 })();

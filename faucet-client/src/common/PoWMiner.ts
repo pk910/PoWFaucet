@@ -1,14 +1,19 @@
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { IPoWParams } from "./IFaucetConfig";
+import { getPoWParamsStr } from '../utils/PoWParamsHelper';
+import { PoWHashAlgo, PoWParams } from "./IFaucetConfig";
 import { PoWClient } from "./PoWClient";
 import { PoWSession } from "./PoWSession";
 
 export interface IPoWMinerOptions {
   session: PoWSession;
-  workerSrc: string;
-  powParams: IPoWParams;
+  workerSrc: PoWMinerWorkerSrc;
+  powParams: PoWParams;
   nonceCount: number;
 }
+
+export type PoWMinerWorkerSrc = {
+  [algo in PoWHashAlgo]: string;
+};
 
 interface IPoWMinerSettings {
   workerCount: number;
@@ -68,7 +73,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     super();
     this.options = options;
     this.workers = [];
-    this.powParamsStr = this.getPoWParamsStr(options.powParams);
+    this.powParamsStr = getPoWParamsStr(options.powParams);
     this.totalShares = 0;
     this.lastShareTime = null;
     this.nonceQueue = [];
@@ -81,31 +86,37 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   }
 
   public stopMiner() {
-    while(this.workers.length > 0) {
-      this.stopWorker();
-    }
+    this.stopAllWorker();
   }
 
-  public setPoWParams(params: IPoWParams, nonceCount: number) {
+  public setPoWParams(params: PoWParams, nonceCount: number) {
     this.options.nonceCount = nonceCount;
 
-    let powParamsStr = this.getPoWParamsStr(params);
+    let powParamsStr = getPoWParamsStr(params);
     if(this.powParamsStr === powParamsStr)
       return;
+    let needRestart = (this.options.powParams.a !== params.a);
 
     this.powParamsStr = powParamsStr;
     this.options.powParams = params;
     this.nonceQueue = [];
 
-    // forward to workers
-    this.workers.forEach((worker) => {
-      if(!worker.ready)
-        return;
-      worker.worker.postMessage({
-        action: "setParams",
-        data: params
+    if(needRestart) {
+      this.stopAllWorker();
+      this.startStopWorkers();
+    }
+    else {
+      // forward to workers
+      this.workers.forEach((worker) => {
+        if(!worker.ready)
+          return;
+        
+        worker.worker.postMessage({
+          action: "setParams",
+          data: params
+        });
       });
-    })
+    }
   }
 
   public setWorkerCount(count: number) {
@@ -116,10 +127,6 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
 
   public getTargetWorkerCount(): number {
     return this.settings.workerCount;
-  }
-
-  private getPoWParamsStr(params: IPoWParams): string {
-    return params.n + "|" + params.r + "|" + params.p + "|" + params.l + "|" + params.d;
   }
 
   private loadSettings() {
@@ -151,9 +158,13 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   }
 
   private startWorker() {
+    let workerSrc = this.options.workerSrc[this.options.powParams.a];
+    if(!workerSrc)
+      throw "No worker src for '" + this.options.powParams.a + "' algorithm";
+    
     let worker: IPoWMinerWorker = {
       id: this.workers.length,
-      worker: new Worker(this.options.workerSrc),
+      worker: new Worker(workerSrc),
       ready: false,
       stats: [],
       lastNonce: 0,
@@ -167,6 +178,12 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       return;
     let worker = this.workers.pop();
     worker.worker.terminate();
+  }
+
+  private stopAllWorker() {
+    while(this.workers.length > 0) {
+      this.stopWorker();
+    }
   }
 
   private onWorkerMessage(worker: IPoWMinerWorker, evt: MessageEvent) {

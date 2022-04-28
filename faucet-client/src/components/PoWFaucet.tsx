@@ -7,7 +7,7 @@ import HCaptcha from "@hcaptcha/react-hcaptcha";
 import './PoWFaucet.css'
 import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import { PoWMinerStatus } from './PoWMinerStatus';
-import { PoWMiner } from '../common/PoWMiner';
+import { PoWMiner, PoWMinerWorkerSrc } from '../common/PoWMiner';
 import { renderDate } from '../utils/DateUtils';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWClaimDialog } from './PoWClaimDialog';
@@ -18,7 +18,7 @@ import { PoWRestoreSessionDialog } from './PoWRestoreSessionDialog';
 
 export interface IPoWFaucetProps {
   powApiUrl: string;
-  minerSrc: string;
+  minerSrc: PoWMinerWorkerSrc;
 }
 
 enum PoWFaucetMiningStatus {

@@ -51,16 +51,16 @@ function copyIfFoundOrRemove(filename, dstpath, dstname) {
   let staticPath = path.join(__dirname, "..", "static");
 
   copyIfFound("powfaucet.css", path.join(staticPath, "css"));
-  copyIfFound("powfaucet.min.css", path.join(staticPath, "css"), "powfaucet.css");
   copyIfFoundOrRemove("powfaucet.css.map", path.join(staticPath, "css"));
 
   copyIfFound("powfaucet.js", path.join(staticPath, "js"));
-  copyIfFound("powfaucet.min.js", path.join(staticPath, "js"), "powfaucet.js");
   copyIfFoundOrRemove("powfaucet.js.map", path.join(staticPath, "js"));
 
-  copyIfFound("powfaucet-worker.js", path.join(staticPath, "js"));
-  copyIfFound("powfaucet-worker.min.js", path.join(staticPath, "js"), "powfaucet-worker.js");
-  copyIfFoundOrRemove("powfaucet-worker.js.map", path.join(staticPath, "js"));
+  copyIfFound("powfaucet-worker-sc.js", path.join(staticPath, "js"));
+  copyIfFoundOrRemove("powfaucet-worker-sc.js.map", path.join(staticPath, "js"));
+
+  copyIfFound("powfaucet-worker-cn.js", path.join(staticPath, "js"));
+  copyIfFoundOrRemove("powfaucet-worker-cn.js.map", path.join(staticPath, "js"));
 
   console.log("finished");
 });

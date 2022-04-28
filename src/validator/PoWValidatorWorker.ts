@@ -1,18 +1,44 @@
-import { getScrypt, getScryptReadyPromise, Scrypt } from "../../libs/scrypt_wasm";
 import { parentPort } from "worker_threads";
 import { base64ToHex } from "../utils/ConvertHelpers";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator";
+import { faucetConfig, IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from "../common/FaucetConfig";
+
+export type PoWHashFn = (nonceHex: string, preimgHex: string, params: PoWCryptoParams) => string;
 
 export class PoWValidatorWorker {
-  private scrypt: Scrypt;
+  private hashFn: PoWHashFn;
   private difficultyMasks: {[difficulty: number]: string} = {};
   
   public constructor() {
     parentPort.on("message", (evt) => this.onControlMessage(evt));
-    getScryptReadyPromise().then(() => {
-      this.scrypt = getScrypt();
+
+    this.initHashFn().then((hashFn) => {
+      this.hashFn = hashFn;
       parentPort.postMessage({ action: "init" });
     });
+  }
+
+  private initHashFn(): Promise<PoWHashFn> {
+    switch(faucetConfig.powHashAlgo) {
+      case PoWHashAlgo.SCRYPT:
+        return import("../../libs/scrypt_wasm").then((module) => {
+          return module.getScryptReadyPromise().then(() => {
+            let scrypt = module.getScrypt();
+            return (nonce, preimg, params: IPoWSCryptParams) => {
+              return scrypt(nonce, preimg, params.cpuAndMemory, params.blockSize, params.paralellization, params.keyLength);
+            };
+          });
+        });
+      case PoWHashAlgo.CRYPTONIGHT:
+        return import("../../libs/cryptonight_wasm").then((module) => {
+          return module.getCryptoNightReadyPromise().then(() => {
+            let cryptonight = module.getCryptoNight();
+            return (nonce, preimg, params: IPoWCryptoNightParams) => {
+              return cryptonight(preimg + nonce, params.algo, params.variant, params.height);
+            };
+          });
+        });
+    }
   }
   
   private onControlMessage(msg: any) {
@@ -44,9 +70,9 @@ export class PoWValidatorWorker {
   private onCtrlValidate(req: IPoWValidatorValidateRequest) {
     let preimg = base64ToHex(req.preimage);
 
-    let dmask = this.difficultyMasks[req.params.d];
+    let dmask = this.difficultyMasks[req.params.difficulty];
     if(!dmask)
-      dmask = this.difficultyMasks[req.params.d] = this.getDifficultyMask(req.params.d);
+      dmask = this.difficultyMasks[req.params.difficulty] = this.getDifficultyMask(req.params.difficulty);
 
     let isValid = (req.nonces.length > 0);
     for(var i = 0; i < req.nonces.length && isValid; i++) {
@@ -55,13 +81,10 @@ export class PoWValidatorWorker {
         nonceHex = `0${nonceHex}`;
       }
 
-      let hashHex = this.scrypt(
+      let hashHex = this.hashFn(
         nonceHex, 
         preimg, 
-        req.params.n, 
-        req.params.r, 
-        req.params.p, 
-        req.params.l
+        req.params
       );
       let startOfHash = hashHex.substring(0, dmask.length);
       if(!(startOfHash <= dmask)) {
