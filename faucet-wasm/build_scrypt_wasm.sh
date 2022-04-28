@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-if [ ! -f build_wasm.sh ]; then
+if [ ! -f build_scrypt_wasm.sh ]; then
   printf "Please run this script from the faucet-wasm folder.\n"
 fi
 
