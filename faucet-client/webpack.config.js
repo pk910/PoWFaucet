@@ -5,6 +5,7 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const TerserPlugin = require("terser-webpack-plugin");
 const Visualizer = require('webpack-visualizer-plugin2');
 var cliArgs = require('./utils/CliArgs');
+var pkgJson = require('./package.json');
 
 var debug = false;
 if(cliArgs['dev'])
@@ -97,9 +98,8 @@ var webpackBaseConfig = {
 
   plugins: [
     new webpack.DefinePlugin({
-        'process.env': {
-            
-        }
+      FAUCET_CLIENT_VERSION: JSON.stringify(pkgJson.version),
+      FAUCET_CLIENT_BUILDTIME: (new Date()).getTime(),
     }),
     new Visualizer({
       filename: 'webpack-stats.html'
