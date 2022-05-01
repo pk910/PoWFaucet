@@ -161,6 +161,9 @@ export class EthWeb3Manager {
     let nonce = this.walletState.nonce++;
     this.walletState.balance -= amount;
 
+    if(target.match(/^0X/))
+      target = "0x" + target.substring(2);
+
     var rawTx = {
       nonce: nonce,
       gasLimit: faucetConfig.ethTxGasLimit,
