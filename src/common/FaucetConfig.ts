@@ -56,6 +56,7 @@ export interface IFaucetConfig {
 
   hcaptcha: IFaucetHCaptchaConfig | null; // hcaptcha parameters or null to disable all hcaptchas
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
+  ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
   ipRestrictedRewardShare: null | { // ip based restrictions
     hosting?: number; // percentage of reward per share if IP is in a hosting range
     proxy?: number; // percentage of reward per share if IP is in a proxy range
@@ -150,6 +151,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     verifyMinerMissPenalty: 10000000000000000,
     hcaptcha: null,
     concurrentSessions: 0,
+    ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
     ipRestrictedRewardShare: null,
     spareFundsAmount:   10000000000000000, // 0,01 ETH
     lowFundsBalance: 10000000000000000000, // 10 ETH
