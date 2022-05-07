@@ -220,7 +220,7 @@ export class EthWeb3Manager {
       claimTx.emit("confirmed");
     }, (err) => {
       delete this.pendingTxQueue[claimTx.nonce];
-      claimTx.failReason = err;
+      claimTx.failReason = err.toString();
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
     }).then(() => {
