@@ -22,6 +22,7 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   private readyDfd: PromiseDfd<void>;
   private requestCounter: number = 1;
   private reconnectTimer: NodeJS.Timeout;
+  private disconnectTimer: NodeJS.Timeout;
   private requestQueue: {[id: number]: PromiseDfd<any>} = {};
   private currentSession: PoWSession;
   private faucetConfig: IFaucetConfig;
@@ -163,6 +164,15 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
       this.readyDfd.resolve();
       this.readyDfd = null;
     }
+    if(!this.disconnectTimer) {
+      this.disconnectTimer = setTimeout(() => {
+        this.disconnectTimer = null;
+        // reconnect after 24h
+        if(this.clientSocket) {
+          this.clientSocket.close(1, "24h reconnect");
+        }
+      }, 60 * 60 * 24 * 1000);
+    }
     if(this.currentSession) {
       this.currentSession.resumeSession();
     }
@@ -172,6 +182,10 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   private onClientClose() {
     this.clientSocket = null;
     this.clientStatus = 0;
+    if(this.disconnectTimer) {
+      clearTimeout(this.disconnectTimer);
+      this.disconnectTimer = null;
+    }
     this.emit("close");
     this.reconnectClient();
   }
