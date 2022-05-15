@@ -71,7 +71,6 @@ export class EthWeb3Manager {
   private pendingTxQueue: {[nonce: number]: ClaimTx} = {};
   private historyTxDict: {[nonce: number]: ClaimTx} = {};
   private lastWalletRefresh: number;
-  private faucetStatus = FucetWalletState.UNKNOWN;
 
   public constructor() {
     this.web3 = new Web3(faucetConfig.ethRpcHost);
@@ -119,33 +118,31 @@ export class EthWeb3Manager {
       else if(this.walletState.balance <= faucetConfig.lowFundsBalance)
         newStatus = FucetWalletState.LOWFUNDS;
     }
-    if(newStatus !== this.faucetStatus) {
-      let statusMessage: string;
-      switch(newStatus) {
-        case FucetWalletState.LOWFUNDS:
-          if(typeof faucetConfig.lowFundsWarning === "string")
-            statusMessage = faucetConfig.lowFundsWarning;
-          else if(faucetConfig.lowFundsWarning)
-            statusMessage = "The faucet is running out of funds! Faucet Balance: {1}";
-          else
-            break;
-          ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", strFormatPlaceholder(statusMessage, (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH"), FaucetStatusLevel.WARNING);
+    let statusMessage: string = null;
+    let statusLevel: FaucetStatusLevel = null;
+    switch(newStatus) {
+      case FucetWalletState.LOWFUNDS:
+        if(typeof faucetConfig.lowFundsWarning === "string")
+          statusMessage = faucetConfig.lowFundsWarning;
+        else if(faucetConfig.lowFundsWarning)
+          statusMessage = "The faucet is running out of funds! Faucet Balance: {1}";
+        else
           break;
-        case FucetWalletState.NOFUNDS:
-          if(typeof faucetConfig.noFundsError === "string")
-            statusMessage = faucetConfig.noFundsError;
-          else if(faucetConfig.noFundsError)
-            statusMessage = "The faucet is out of funds!";
-          else
-            break;
-          ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", strFormatPlaceholder(statusMessage), FaucetStatusLevel.ERROR);
+        statusMessage = strFormatPlaceholder(statusMessage, (Math.round(weiToEth(this.walletState.balance)*1000)/1000) + " ETH");
+        statusLevel = FaucetStatusLevel.WARNING;
+        break;
+      case FucetWalletState.NOFUNDS:
+        if(typeof faucetConfig.noFundsError === "string")
+          statusMessage = faucetConfig.noFundsError;
+        else if(faucetConfig.noFundsError)
+          statusMessage = "The faucet is out of funds!";
+        else
           break;
-        default:
-          ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", null, null);
-          break;
-      }
-      this.faucetStatus = newStatus;
+        statusMessage = strFormatPlaceholder(statusMessage);
+        statusLevel = FaucetStatusLevel.ERROR;
+        break;
     }
+    ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", statusMessage, statusLevel);
   }
 
   public addClaimTransaction(target: string, amount: number, sessId: string): ClaimTx {
