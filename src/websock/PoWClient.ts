@@ -57,6 +57,14 @@ export class PoWClient {
     this.socket.on("pong", (data) => {
       this.lastPingPong = new Date();
     });
+    this.socket.on("error", (err) => {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "WebSocket error: " + err.toString());
+      try {
+        if(this.socket)
+          this.socket.close();
+      } catch(ex) {}
+      this.dispose();
+    });
     this.socket.on("close", () => {
       this.dispose();
     });
