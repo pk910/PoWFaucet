@@ -98,7 +98,7 @@ export class EthWeb3Manager {
   private loadWalletState(): Promise<void> {
     return Promise.all([
       this.web3.eth.getBalance(this.walletAddr),
-      this.web3.eth.getTransactionCount(this.walletAddr),
+      this.web3.eth.getTransactionCount(this.walletAddr, "pending"),
     ]).then((res) => {
       this.walletState = {
         balance: parseInt(res[0]),
