@@ -35,7 +35,8 @@ export interface IPoWClaimInfo {
 
 interface PoWSessionEvents {
   'update': () => void;
-  'killed': (reason: string) => void;
+  'killed': (killInfo: any) => void;
+  'error': (message: string) => void;
 }
 
 export class PoWSession extends TypedEmitter<PoWSessionEvents> {
@@ -74,22 +75,29 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     });
   }
 
-  public resumeSession(): Promise<void> {
-    if(!this.sessionInfo)
-      return;
+  public resumeSession(sessionInfo?: IPoWSessionInfo): Promise<void> {
+    if(!sessionInfo) {
+      if(!this.sessionInfo)
+        return Promise.resolve();
+      sessionInfo = this.sessionInfo;
+    }
     if(this.miner) {
       let faucetConfig = this.options.client.getFaucetConfig();
       this.miner.setPoWParams(faucetConfig.powParams, faucetConfig.powNonceCount);
     }
     this.options.client.setCurrentSession(this);
     return this.options.client.sendRequest("resumeSession", {
-      sessionId: this.sessionInfo.sessionId
+      sessionId: sessionInfo.sessionId
     }).then((res) => {
-      if(res.lastNonce > this.sessionInfo.noncePos)
-        this.sessionInfo.noncePos = res.lastNonce + 1;
-    }, () => {
-      return this.options.client.sendRequest("recoverSession", this.sessionInfo.recovery);
+      if(res.lastNonce > sessionInfo.noncePos)
+        sessionInfo.noncePos = res.lastNonce + 1;
+    }, (err) => {
+      if(err && err.code && err.code === "INVALID_SESSIONID") // server doesn't know about this session id anymore - try recover
+        return this.options.client.sendRequest("recoverSession", sessionInfo.recovery);
+      throw err;
     }).then(() => {
+      this.sessionInfo = sessionInfo;
+
       // resumed session
       if(this.shareQueue.length) {
         this.shareQueue.forEach((share) => {
@@ -103,12 +111,6 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
         });
         this.verifyResultQueue = [];
       }
-    }, () => {
-      // clear sessiop
-      this.sessionInfo = null;
-      this.storeSessionStatus();
-      
-    }).then(() => {
       this.emit("update");
     });
   }
@@ -157,12 +159,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   public closeSession(): Promise<string> {
     return this.options.client.sendRequest("closeSession").then((rsp) => {
-      this.sessionInfo = null;
-      this.storeSessionStatus();
-      this.emit("update");
-
+      this.closedSession();
       return rsp.claimable ? rsp.token : null;
     });
+  }
+
+  public closedSession(): void {
+    this.sessionInfo = null;
+    this.storeSessionStatus();
+    this.emit("update");
   }
 
   public processSessionKill(killInfo: any) {
@@ -204,13 +209,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     return session;
   }
 
-  public restoreStoredSession() {
+  public restoreStoredSession(): Promise<void> {
     if(this.sessionInfo)
-      return;
-    if(!(this.sessionInfo = this.getStoredSessionInfo()))
-      return;
+      return Promise.resolve();
+    
+    let sessionInfo = this.getStoredSessionInfo();
+    if(!sessionInfo)
+      return Promise.reject("no session found that can be restored (did you restore it in another tab already?)");
 
-    this.resumeSession();
+    return this.resumeSession(sessionInfo);
   }
 
   public getStoredClaimInfo(): IPoWClaimInfo {

@@ -3,10 +3,12 @@ import React, { ReactElement } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { renderDate } from '../utils/DateUtils';
+import { IPoWStatusDialogProps } from './PoWStatusDialog';
 
 export interface IPoWRestoreSessionDialogProps {
   powSession: PoWSession,
   closeFn: () => void,
+  setDialog: (dialog: IPoWStatusDialogProps) => void;
 }
 
 export interface IPoWRestoreSessionDialogState {
@@ -64,8 +66,22 @@ export class PoWRestoreSessionDialog extends React.PureComponent<IPoWRestoreSess
         </Modal.Body>
         <Modal.Footer>
           <Button onClick={() => {
-            this.props.powSession.restoreStoredSession();
-            this.props.closeFn();
+            this.props.powSession.restoreStoredSession().then(() => {
+              this.props.closeFn();
+            }, (err) => {
+              this.props.setDialog({
+                title: "Could not restore session.",
+                body: (
+                  <div className='altert alert-danger'>
+                    {(err && err.message ? err.message : err)}
+                  </div>
+                ),
+                closeButton: {
+                  caption: "Close"
+                }
+              });
+            });
+            
           }}>Continue previous session</Button>
           <Button onClick={() => {
             this.props.closeFn();

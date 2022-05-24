@@ -33,6 +33,7 @@ export interface IPoWFaucetState {
   initializing: boolean;
   faucetConfig: IFaucetConfig;
   faucetStatus: IFaucetStatus[];
+  isConnected: boolean;
   targetAddr: string;
   requestCaptcha: boolean;
   captchaToken: string;
@@ -70,11 +71,16 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         initializing: false,
         faucetConfig: faucetConfig,
         faucetStatus: faucetConfig.faucetStatus,
+        isConnected: true,
       });
 
       if(!this.restoredPersistedState)
         this.restorePersistedState();
-
+    });
+    this.powClient.on("close", () => {
+      this.setState({
+        isConnected: false,
+      });
     });
 
     this.powSession = new PoWSession({
@@ -108,12 +114,18 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         event: "killed",
         listener: (killInfo) => this.onPoWSessionKilled(killInfo),
       },
+      "sessionError": {
+        emmiter: this.powSession,
+        event: "error",
+        listener: (error) => this.onPoWSessionError(error),
+      },
     };
 
     this.state = {
       initializing: true,
       faucetConfig: null,
       faucetStatus: [],
+      isConnected: false,
       targetAddr: "",
       requestCaptcha: false,
       captchaToken: null,
@@ -219,6 +231,20 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     });
   }
 
+  private onPoWSessionError(err: any) {
+    this.setState({
+      statusDialog: {
+        title: "Session Error",
+        body: (
+          <div className='alert alert-danger'>{err && err.message ? err.message : err ? err.toString() : ""}</div>
+        ),
+        closeButton: {
+          caption: "Close",
+        }
+      },
+    });
+  }
+
 	public render(): React.ReactElement<IPoWFaucetProps> {
     let renderControl: React.ReactElement;
     if(this.state.initializing) {
@@ -247,7 +273,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           <button 
             className="btn btn-success start-action" 
             onClick={(evt) => this.onStartMiningClick()} 
-            disabled={this.state.miningStatus == PoWFaucetMiningStatus.STARTING}>
+            disabled={!this.state.isConnected || this.state.miningStatus == PoWFaucetMiningStatus.STARTING}>
               {this.state.statusMessage ? this.state.statusMessage : "Start Mining"}
           </button>
         );
@@ -259,7 +285,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           <button 
             className="btn btn-danger stop-action" 
             onClick={(evt) => this.onStopMiningClick()} 
-            disabled={this.state.miningStatus !== PoWFaucetMiningStatus.RUNNING}>
+            disabled={!this.state.isConnected || this.state.miningStatus !== PoWFaucetMiningStatus.RUNNING}>
               {this.state.statusMessage ? this.state.statusMessage : (this.state.isClaimable ? "Stop Mining & Claim Rewards" : "Stop Mining")}
           </button>
         );
@@ -299,6 +325,11 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
         </div>
         {faucetStatusEls}
+        {!this.state.isConnected ? 
+          <div className="faucet-status-alert alert alert-danger" role="alert">
+            <span>Connection to faucet server lost. Reconnecting...</span>
+          </div>
+        : null}
         <div className="pow-header center">
           <div className="pow-status-container">
             {this.powSession.getMiner() ? 
@@ -315,6 +346,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           <PoWRestoreSessionDialog 
             powSession={this.powSession} 
             closeFn={() => this.setState({ showRestoreSessionDialog: false })}
+            setDialog={(dialog) => this.setState({ statusDialog: dialog })}
           /> 
         : null}
         {this.state.showClaimRewardDialog ? 
@@ -332,11 +364,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
                 statusMessage: null,
               });
             }}
-            setDialog={(dialog) => {
-              this.setState({
-                statusDialog: dialog
-              });
-            }} 
+            setDialog={(dialog) => this.setState({ statusDialog: dialog })}
           />
         : null}
         {this.state.statusDialog ? 

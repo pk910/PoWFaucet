@@ -34,11 +34,11 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   }
 
   public isReady(): boolean {
-    return this.clientStatus == 1;
+    return this.clientStatus == 2;
   }
 
   public getReadyPromise(): Promise<void> {
-    if(this.clientStatus == 1)
+    if(this.clientStatus == 2)
       return Promise.resolve();
     if(!this.readyDfd)
       this.readyDfd = new PromiseDfd<void>();
@@ -56,22 +56,23 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   private startClient() {
     this.clientSocket = new WebSocket(this.options.powApiUrl);
     this.clientSocket.addEventListener("open", (evt) => {
-      console.log("[PoWSock] websocket opened");
+      console.log("[PoWClient] faucet websocket opened");
+      this.clientStatus = 1;
       
       this.sendRequest<IFaucetConfig>("getConfig", {
         version: FAUCET_CLIENT_VERSION,
       }).then((faucetConfig) => {
         this.faucetConfig = faucetConfig;
-        this.clientStatus = 1;
+        this.clientStatus = 2;
         this.onClientReady();
       });
     });
     this.clientSocket.addEventListener("close", (evt) => {
-      console.log("[PoWSock] websocket closed");
+      console.log("[PoWClient] faucet websocket closed");
       this.onClientClose();
     });
     this.clientSocket.addEventListener("error", (evt) => {
-      console.log("[PoWSock] websocket error", evt);
+      console.log("[PoWClient] faucet websocket error", evt);
       this.onClientClose();
     });
     this.clientSocket.addEventListener("message", (evt) => this.onClientMessage(evt));
@@ -87,6 +88,9 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   }
 
   public sendRequest<T = any>(action: string, data?: any): Promise<T> {
+    if(this.clientStatus == 0)
+      return Promise.reject("Not connected to faucet server. Please check your internet connection and try again in a few seconds.");
+
     var requestId = this.requestCounter++;
     var reqDfd = this.requestQueue[requestId] = new PromiseDfd<T>();
     var message: any = {
@@ -174,7 +178,10 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
       }, 60 * 60 * 24 * 1000);
     }
     if(this.currentSession) {
-      this.currentSession.resumeSession();
+      this.currentSession.resumeSession().catch((ex) => {
+        this.currentSession.emit("error", ex);
+        this.currentSession.closedSession();
+      });
     }
     this.emit("open");
   }
