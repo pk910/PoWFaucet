@@ -1,5 +1,6 @@
 
 import Web3 from 'web3';
+import net from 'net';
 import { TransactionReceipt } from 'web3-core';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
@@ -67,6 +68,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
 
 export class EthWeb3Manager {
   private web3: Web3;
+  private web3ReadyPromise: Promise<void>;
   private chainCommon: EthCom.default;
   private walletKey: Buffer;
   private walletAddr: string;
@@ -78,7 +80,7 @@ export class EthWeb3Manager {
   private queueProcessing: boolean = false;
 
   public constructor() {
-    this.web3 = new Web3(faucetConfig.ethRpcHost);
+    this.startWeb3();
     this.chainCommon = EthCom.default.forCustomChain('mainnet', {
       networkId: faucetConfig.ethChainId,
       chainId: faucetConfig.ethChainId,
@@ -89,6 +91,32 @@ export class EthWeb3Manager {
     this.loadWalletState().then(() => {
       setInterval(() => this.processQueue(), 2000);
     });
+  }
+
+  private startWeb3() {
+    let provider: any;
+    if(faucetConfig.ethRpcHost.match(/^wss?:\/\//))
+      provider = new Web3.providers.WebsocketProvider(faucetConfig.ethRpcHost);
+    else if(faucetConfig.ethRpcHost.match(/^\//))
+      provider = new Web3.providers.IpcProvider(faucetConfig.ethRpcHost, net);
+    else
+      provider = new Web3.providers.HttpProvider(faucetConfig.ethRpcHost);
+    
+    this.web3 = new Web3(provider);
+
+    if(provider.on) {
+      provider.on('error', e => {
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Web3 provider error: " + e.toString());
+      });
+      provider.on('end', e => {
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Web3 connection lost...");
+        this.web3 = null;
+
+        setTimeout(() => {
+          this.startWeb3();
+        }, 2000);
+      });
+    }
   }
 
   public getTransactionQueue(): ClaimTx[] {
