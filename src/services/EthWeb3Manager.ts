@@ -1,5 +1,6 @@
 
 import Web3 from 'web3';
+import { TransactionReceipt } from 'web3-core';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
 import * as EthUtil from 'ethereumjs-util';
@@ -11,6 +12,7 @@ import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
 import { strFormatPlaceholder } from '../utils/StringUtils';
 import { FaucetStatsLog } from './FaucetStatsLog';
+import { PromiseDfd } from '../utils/PromiseDfd';
 
 interface WalletState {
   nonce: number;
@@ -19,6 +21,7 @@ interface WalletState {
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
+  PROCESSING = "processing",
   PENDING = "pending",
   CONFIRMED = "confirmed",
   FAILED = "failed",
@@ -32,6 +35,7 @@ enum FucetWalletState {
 }
 
 interface ClaimTxEvents {
+  'processing': () => void;
   'pending': () => void;
   'confirmed': () => void;
   'failed': () => void;
@@ -68,9 +72,10 @@ export class EthWeb3Manager {
   private walletAddr: string;
   private walletState: WalletState;
   private claimTxQueue: ClaimTx[] = [];
-  private pendingTxQueue: {[nonce: number]: ClaimTx} = {};
+  private pendingTxQueue: {[hash: string]: ClaimTx} = {};
   private historyTxDict: {[nonce: number]: ClaimTx} = {};
   private lastWalletRefresh: number;
+  private queueProcessing: boolean = false;
 
   public constructor() {
     this.web3 = new Web3(faucetConfig.ethRpcHost);
@@ -80,8 +85,7 @@ export class EthWeb3Manager {
     }, 'london');
     this.walletKey = Buffer.from(faucetConfig.ethWalletKey, "hex");
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
-    
-    this.lastWalletRefresh = Math.floor(new Date().getTime() / 1000);
+
     this.loadWalletState().then(() => {
       setInterval(() => this.processQueue(), 2000);
     });
@@ -96,6 +100,7 @@ export class EthWeb3Manager {
   }
 
   private loadWalletState(): Promise<void> {
+    this.lastWalletRefresh = Math.floor(new Date().getTime() / 1000);
     return Promise.all([
       this.web3.eth.getBalance(this.walletAddr),
       this.web3.eth.getTransactionCount(this.walletAddr, "pending"),
@@ -151,12 +156,10 @@ export class EthWeb3Manager {
     return claimTx;
   }
 
-  private buildEthTx(target: string, amount: number): {txhash: string, nonce: number} {
+  private buildEthTx(target: string, amount: number, nonce: number): string {
     let txAmount: number|string = amount;
     if(txAmount > 10000000000000000)
       txAmount = "0x" + BigInt(txAmount).toString(16);
-    let nonce = this.walletState.nonce++;
-    this.walletState.balance -= amount;
 
     if(target.match(/^0X/))
       target = "0x" + target.substring(2);
@@ -172,28 +175,43 @@ export class EthWeb3Manager {
     };
     var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
     tx = tx.sign(this.walletKey);
-    return {
-      txhash: tx.serialize().toString('hex'),
-      nonce: nonce
-    };
+    return tx.serialize().toString('hex');
   }
 
-  private processQueue() {
-    let pendingTxCount = Object.keys(this.pendingTxQueue).length;
-    while(pendingTxCount < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
-      // build tx
-      let claimTx = this.claimTxQueue.splice(0, 1)[0];
-      this.processQueueTx(claimTx);
-    }
+  private async processQueue() {
+    if(this.queueProcessing)
+      return;
+    this.queueProcessing = true;
 
-    let now = Math.floor(new Date().getTime() / 1000);
-    if(pendingTxCount === 0 && Object.keys(this.pendingTxQueue).length === 0 && now - this.lastWalletRefresh > 600) {
-      this.lastWalletRefresh = now;
-      this.loadWalletState();
+    try {
+      while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
+        let claimTx = this.claimTxQueue.splice(0, 1)[0];
+        await this.processQueueTx(claimTx);
+      }
+
+      let now = Math.floor(new Date().getTime() / 1000);
+      if(Object.keys(this.pendingTxQueue).length === 0 && now - this.lastWalletRefresh > 600) {
+        await this.loadWalletState();
+      }
+    } catch(ex) {
+      let stack;
+      try {
+        throw new Error();
+      } catch(ex) {
+        stack = ex.stack;
+      }
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Exception in transaction queue processing: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : stack}`);
     }
+    this.queueProcessing = false;
   }
 
-  private processQueueTx(claimTx: ClaimTx) {
+  private sleepPromise(delay: number): Promise<void> {
+    return new Promise((resolve) => {
+      setTimeout(resolve, delay);
+    });
+  }
+
+  private async processQueueTx(claimTx: ClaimTx) {
     if(this.walletState.balance - faucetConfig.spareFundsAmount < claimTx.amount) {
       claimTx.failReason = "Faucet wallet is out of funds.";
       claimTx.status = ClaimTxStatus.FAILED;
@@ -201,52 +219,93 @@ export class EthWeb3Manager {
       return;
     }
 
-    let ethtx = this.buildEthTx(claimTx.target, claimTx.amount);
-    claimTx.nonce = ethtx.nonce;
-    claimTx.txhex = ethtx.txhash;
-    claimTx.status = ClaimTxStatus.PENDING;
-    claimTx.emit("pending");
+    try {
+      claimTx.status = ClaimTxStatus.PROCESSING;
+      claimTx.emit("processing");
 
-    this.updateFaucetStatus();
+      // send transaction
+      let txPromise: Promise<TransactionReceipt>;
+      let retryCount = 0;
+      let txError: Error;
+      let buildTx = () => {
+        claimTx.nonce = this.walletState.nonce;
+        return this.buildEthTx(claimTx.target, claimTx.amount, claimTx.nonce);
+      };
 
-    this.pendingTxQueue[claimTx.nonce] = claimTx;
+      do {
+        try {
+          txPromise = (await this.sendClaimTx(claimTx, buildTx()))[0];
+        } catch(ex) {
+          if(!txError)
+            txError = ex;
+          ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Sending TX for " + claimTx.target + " failed [try: " + retryCount + "]: " + ex.toString());
+          await this.sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
+          await this.loadWalletState();
+        }
+      } while(!txPromise && retryCount++ < 3);
+      if(!txPromise)
+        throw txError;
 
-    this.sendClaimTx(claimTx).then(() => {
-      delete this.pendingTxQueue[claimTx.nonce];
-      claimTx.status = ClaimTxStatus.CONFIRMED;
-      claimTx.emit("confirmed");
-    }, (err) => {
-      delete this.pendingTxQueue[claimTx.nonce];
-      claimTx.failReason = err.toString();
+      this.walletState.nonce++;
+      this.walletState.balance -= claimTx.amount;
+      this.updateFaucetStatus();
+
+      this.pendingTxQueue[claimTx.txhash] = claimTx;
+
+      claimTx.status = ClaimTxStatus.PENDING;
+      claimTx.emit("pending");
+
+      // await transaction receipt
+      txPromise.then((receipt) => {
+        delete this.pendingTxQueue[claimTx.txhash];
+        claimTx.txblock = receipt.blockNumber;
+        claimTx.status = ClaimTxStatus.CONFIRMED;
+        claimTx.emit("confirmed");
+        ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
+      }, (error) => {
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
+        delete this.pendingTxQueue[claimTx.txhash];
+        claimTx.failReason = "Transaction Error: " + error.toString();
+        claimTx.status = ClaimTxStatus.FAILED;
+        claimTx.emit("failed");
+      }).then(() => {
+        this.historyTxDict[claimTx.nonce] = claimTx;
+        setTimeout(() => {
+          delete this.historyTxDict[claimTx.nonce];
+        }, 30 * 60 * 1000);
+      });
+    } catch(ex) {
+      claimTx.failReason = "Processing Exception: " + ex.toString();
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
-    }).then(() => {
-      this.historyTxDict[claimTx.nonce] = claimTx;
-      setTimeout(() => {
-        delete this.historyTxDict[claimTx.nonce];
-      }, 30 * 60 * 1000);
-    });
+    }
   }
 
-  private sendClaimTx(claimTx: ClaimTx): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let txPromise = this.web3.eth.sendSignedTransaction("0x" + claimTx.txhex);
-      txPromise.then((res) => {
-        claimTx.txhash = res.transactionHash;
-        claimTx.txblock = res.blockNumber;
-        ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
-        resolve();
-      }, (err) => {
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Transaction for " + claimTx.target + " failed: " + err);
-        if(claimTx.retryCount < 3) {
-          claimTx.retryCount++;
-          this.sendClaimTx(claimTx).then(resolve, reject);
-        }
-        else {
-          reject(err);
-        }
-      });
+  private async sendClaimTx(claimTx: ClaimTx, txhex: string): Promise<[Promise<TransactionReceipt>]> {
+    let txhashDfd = new PromiseDfd<string>();
+    let receiptDfd = new PromiseDfd<TransactionReceipt>();
+    let txStatus = 0;
+
+    let txPromise = this.web3.eth.sendSignedTransaction("0x" + txhex);
+    txPromise.once('transactionHash', (hash) => {
+      txStatus = 1;
+      txhashDfd.resolve(hash);
     });
+    txPromise.once('receipt', (receipt) => {
+      txStatus = 2;
+      receiptDfd.resolve(receipt);
+    });
+    txPromise.on('error', (error) => {
+      if(txStatus === 0)
+        txhashDfd.reject(error);
+      else
+        receiptDfd.reject(error);
+    });
+
+    let txHash = await txhashDfd.promise;
+    claimTx.txhash = txHash;
+
+    return [receiptDfd.promise];
   }
 
 
