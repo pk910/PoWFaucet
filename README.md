@@ -12,6 +12,10 @@ Kiln Testnet: [https://kiln-faucet.pk910.de](https://kiln-faucet.pk910.de)
 
 Goerli Testnet: [https://goerli-faucet.pk910.de](https://goerli-faucet.pk910.de)
 
+Ropsten Testnet: [https://ropsten-faucet.pk910.de](https://ropsten-faucet.pk910.de)
+
+Sepolia Testnet: [https://sepolia-faucet.pk910.de](https://sepolia-faucet.pk910.de)
+
 # Run Yourself
 
 `npm install`
