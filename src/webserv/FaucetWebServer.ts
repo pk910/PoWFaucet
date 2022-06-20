@@ -8,6 +8,22 @@ import * as stream from 'node:stream';
 import { faucetConfig, IFaucetPortConfig } from '../common/FaucetConfig';
 import { PoWClient } from '../websock/PoWClient';
 import { encode } from 'html-entities';
+import { OutgoingHttpHeaders } from 'http2';
+import { FaucetWebApi } from './FaucetWebApi';
+
+export class FaucetHttpResponse {
+  public readonly code: number;
+  public readonly reason: string;
+  public readonly body: string;
+  public readonly headers: OutgoingHttpHeaders;
+
+  public constructor(code: number, reason: string, body?: string, headers?: OutgoingHttpHeaders) {
+    this.code = code;
+    this.reason = reason;
+    this.body = body;
+    this.headers = headers;
+  }
+}
 
 export class FaucetHttpServer {
   private httpServers: {[port: number]: {
@@ -16,6 +32,7 @@ export class FaucetHttpServer {
   }};
   private wssServer: WebSocketServer;
   private staticServer: StaticServer;
+  private faucetApi: FaucetWebApi;
 
   public constructor() {
     this.httpServers = {};
@@ -25,10 +42,11 @@ export class FaucetHttpServer {
       noServer: true
     });
 
-    console.log(faucetConfig.staticPath);
     this.staticServer = new StaticServer(faucetConfig.staticPath, {
       serverInfo: Buffer.from("pow-faucet/" + faucetConfig.faucetVersion)
     });
+
+    this.faucetApi = new FaucetWebApi();
 
     if(faucetConfig.buildSeoIndex)
       this.buildSeoIndex();
@@ -49,17 +67,41 @@ export class FaucetHttpServer {
     if(req.method === "GET") {
       // serve static files
       req.on("end", () => {
-        switch(req.url) {
-          case "/":
-          case "/index.html":
-            if(faucetConfig.buildSeoIndex)
-              this.staticServer.serveFile("/index.seo.html", 200, {}, req, rsp);
-            else
-              this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
-            break;
-          default:
-            this.staticServer.serve(req, rsp);
-            break;
+        if((req.url + "").match(/^\/api\//i)) {
+          this.faucetApi.onApiRequest(req).then((res: object) => {
+            if(res && typeof res === "object" && res instanceof FaucetHttpResponse) {
+              rsp.writeHead(res.code, res.reason, res.headers);
+              rsp.end(res.body);
+            }
+            else {
+              let body = JSON.stringify(res);
+              rsp.writeHead(200, {'Content-Type': 'application/json'});
+              rsp.end(body);
+            }
+          }).catch((err) => {
+            if(err && typeof err === "object" && err instanceof FaucetHttpResponse) {
+              rsp.writeHead(err.code, err.reason, err.headers);
+              rsp.end(err.body);
+            }
+            else {
+              rsp.writeHead(500, "Internal Server Error");
+              rsp.end(err ? err.toString() : "");
+            }
+          });
+        }
+        else {
+          switch(req.url) {
+            case "/":
+            case "/index.html":
+              if(faucetConfig.buildSeoIndex)
+                this.staticServer.serveFile("/index.seo.html", 200, {}, req, rsp);
+              else
+                this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
+              break;
+            default:
+              this.staticServer.serve(req, rsp);
+              break;
+          }
         }
       });
     }
