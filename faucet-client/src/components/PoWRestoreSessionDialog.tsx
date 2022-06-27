@@ -1,4 +1,5 @@
-import { PoWSession } from 'common/PoWSession';
+import { IFaucetConfig } from '../common/IFaucetConfig';
+import { PoWSession } from '../common/PoWSession';
 import React, { ReactElement } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import { weiToEth } from '../utils/ConvertHelpers';
@@ -6,8 +7,9 @@ import { renderDate } from '../utils/DateUtils';
 import { IPoWStatusDialogProps } from './PoWStatusDialog';
 
 export interface IPoWRestoreSessionDialogProps {
-  powSession: PoWSession,
-  closeFn: () => void,
+  powSession: PoWSession;
+  faucetConfig: IFaucetConfig;
+  closeFn: () => void;
   setDialog: (dialog: IPoWStatusDialogProps) => void;
 }
 
@@ -59,7 +61,7 @@ export class PoWRestoreSessionDialog extends React.PureComponent<IPoWRestoreSess
                 Balance:
               </div>
               <div className='col'>
-                {Math.round(weiToEth(storedSessionInfo.balance) * 100) / 100} ETH
+                {Math.round(weiToEth(storedSessionInfo.balance) * 100) / 100} {this.props.faucetConfig.faucetCoinSymbol}
               </div>
             </div>
           </div>

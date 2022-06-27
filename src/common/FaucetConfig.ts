@@ -13,6 +13,7 @@ export interface IFaucetConfig {
   faucetTitle: string; // title of the faucet
   faucetImage: string; // faucet image displayed on the startpage
   faucetHomeHtml: string; // some additional html to show on the startpage
+  faucetCoinSymbol: string; // symbol (short name) of the coin that can be mined
   faucetLogFile: string; // logfile for faucet events / null for no log
   faucetLogStatsInterval: number; // print faucet stats to log interval (10min default)
   serverPorts: IFaucetPortConfig[]; // listener ports
@@ -119,6 +120,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     faucetTitle: "PoW Faucet",
     faucetImage: "/images/fauceth_420.jpg",
     faucetHomeHtml: "",
+    faucetCoinSymbol: "ETH",
     faucetLogFile: null,
     faucetLogStatsInterval: 600,
     serverPorts: [

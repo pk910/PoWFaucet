@@ -217,6 +217,7 @@ export class PoWClient {
       faucetStatus: faucetStatus.status,
       faucetImage: faucetConfig.faucetImage,
       faucetHtml: faucetConfig.faucetHomeHtml,
+      faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
       hcapSiteKey: faucetConfig.hcaptcha ? faucetConfig.hcaptcha.siteKey : null,
       hcapSession: faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkSessionStart,
       hcapClaim: faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkBalanceClaim,

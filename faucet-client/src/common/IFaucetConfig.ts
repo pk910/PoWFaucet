@@ -4,6 +4,7 @@ export interface IFaucetConfig {
   faucetStatus: IFaucetStatus[];
   faucetImage: string;
   faucetHtml: string;
+  faucetCoinSymbol: string;
   hcapSiteKey: string | null;
   hcapSession: boolean;
   hcapClaim: boolean;

@@ -345,6 +345,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         {this.state.showRestoreSessionDialog ? 
           <PoWRestoreSessionDialog 
             powSession={this.powSession} 
+            faucetConfig={this.state.faucetConfig} 
             closeFn={() => this.setState({ showRestoreSessionDialog: false })}
             setDialog={(dialog) => this.setState({ statusDialog: dialog })}
           /> 

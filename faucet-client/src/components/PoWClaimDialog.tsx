@@ -108,7 +108,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
           title: "Claim expired",
           body: (
             <div className='altert alert-danger'>
-              Sorry, your reward ({Math.round(weiToEth(this.props.reward.balance) * 100) / 100} ETH) has not been claimed in time.
+              Sorry, your reward ({Math.round(weiToEth(this.props.reward.balance) * 100) / 100} {this.props.faucetConfig.faucetCoinSymbol}) has not been claimed in time.
             </div>
           ),
           closeButton: {
@@ -157,7 +157,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 Claimable Reward:
               </div>
               <div className='col'>
-                {Math.round(weiToEth(this.props.reward.balance) * 100) / 100} ETH
+                {Math.round(weiToEth(this.props.reward.balance) * 100) / 100} {this.props.faucetConfig.faucetCoinSymbol}
               </div>
             </div>
             <div className='row'>

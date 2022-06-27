@@ -201,7 +201,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{session.target}</td>
         <td>{renderDate(new Date(session.start * 1000), true)}</td>
         <td>{renderDate(new Date((session.start + this.props.faucetConfig.powTimeout) * 1000), true)}</td>
-        <td>{Math.round(weiToEth(session.balance) * 1000) / 1000} ETH</td>
+        <td>{Math.round(weiToEth(session.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{session.nonce}</td>
         <td>{sessionStatus}</td>
       </tr>
@@ -306,7 +306,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       <tr key={(claim.time + "-" + claim.target)}>
         <th scope="row">{renderDate(new Date(claim.time * 1000), true, true)}</th>
         <td>{claim.target}</td>
-        <td>{Math.round(weiToEth(claim.amount) * 1000) / 1000} ETH</td>
+        <td>{Math.round(weiToEth(claim.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{claim.nonce || ""}</td>
         <td>{claimStatus}</td>
       </tr>
