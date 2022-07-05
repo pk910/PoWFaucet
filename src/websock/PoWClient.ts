@@ -334,7 +334,7 @@ export class PoWClient {
     let sessionStr = sessionSplit[0];
 
     let sessionHash = crypto.createHash("sha256");
-    sessionHash.update(faucetConfig.powSessionSecret + "\r\n");
+    sessionHash.update(faucetConfig.faucetSecret + "\r\n");
     sessionHash.update(sessionStr);
 
     if(!sessionStr || sessionSplit[1] !== sessionHash.digest('base64'))
@@ -470,7 +470,7 @@ export class PoWClient {
     let sessionStr = sessionSplit[0];
 
     let sessionHash = crypto.createHash("sha256");
-    sessionHash.update(faucetConfig.powSessionSecret + "\r\n");
+    sessionHash.update(faucetConfig.faucetSecret + "\r\n");
     sessionHash.update(sessionStr);
 
     if(!sessionStr || sessionSplit[1] !== sessionHash.digest('base64')) 
@@ -523,7 +523,7 @@ export class PoWClient {
     let hashGlue: string;
     let getHash = (input: string, len?: number) => {
       let hash = crypto.createHash("sha256");
-      hash.update(faucetConfig.powSessionSecret + "\r\n");
+      hash.update(faucetConfig.faucetSecret + "\r\n");
       hash.update("iphash\r\n");
       hash.update(input);
       let hashStr = hash.digest("hex");
@@ -575,7 +575,7 @@ export class PoWClient {
     let sessions = PoWSession.getAllSessions();
     statusRsp.sessions = sessions.map((session) => {
       let sessionIdHash = crypto.createHash("sha256");
-      sessionIdHash.update(faucetConfig.powSessionSecret + "\r\n");
+      sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
       sessionIdHash.update(session.getSessionId());
 
       return {

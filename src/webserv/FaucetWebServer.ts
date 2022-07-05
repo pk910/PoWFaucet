@@ -5,7 +5,7 @@ import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } f
 import {Server as StaticServer, version, mime} from '@brettz9/node-static';
 import { WebSocketServer } from 'ws';
 import * as stream from 'node:stream';
-import { faucetConfig, IFaucetPortConfig } from '../common/FaucetConfig';
+import { faucetConfig } from '../common/FaucetConfig';
 import { PoWClient } from '../websock/PoWClient';
 import { encode } from 'html-entities';
 import { OutgoingHttpHeaders } from 'http2';
@@ -26,17 +26,15 @@ export class FaucetHttpResponse {
 }
 
 export class FaucetHttpServer {
-  private httpServers: {[port: number]: {
-    portConfig: IFaucetPortConfig,
-    httpServer: HttpServer,
-  }};
   private wssServer: WebSocketServer;
   private staticServer: StaticServer;
   private faucetApi: FaucetWebApi;
 
   public constructor() {
-    this.httpServers = {};
-    faucetConfig.serverPorts.forEach((portConfig) => this.addServerPort(portConfig));
+    let server = createServer();
+    server.on("request", (req, rsp) => this.onHttpRequest(req, rsp));
+    server.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock, head));
+    server.listen(faucetConfig.serverPort);
 
     this.wssServer = new WebSocketServer({
       noServer: true
@@ -50,17 +48,6 @@ export class FaucetHttpServer {
 
     if(faucetConfig.buildSeoIndex)
       this.buildSeoIndex();
-  }
-
-  private addServerPort(port: IFaucetPortConfig) {
-    let server = createServer();
-    server.on("request", (req, rsp) => this.onHttpRequest(req, rsp));
-    server.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock, head));
-    server.listen(port.port);
-    this.httpServers[port.port] = {
-      portConfig: port,
-      httpServer: server
-    };
   }
 
   private onHttpRequest(req: IncomingMessage, rsp: ServerResponse) {

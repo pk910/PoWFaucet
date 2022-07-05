@@ -48,7 +48,7 @@
   "ethWalletKey": "***censored***",
   "ethChainId": 1337802,
   "ethTxGasLimit": 500000,
-  "ethTxMaxFee": 1800000000,
+  "ethTxMaxFee": 10000000000,
   "ethTxPrioFee": 800000000,
   "ethMaxPending": 12,
 

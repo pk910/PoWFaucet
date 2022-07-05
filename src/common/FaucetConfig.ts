@@ -1,11 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import YAML from 'yaml'
 
 export interface IFaucetConfig {
   appBasePath: string; // base path (set automatically)
   faucetVersion: string; // faucet version (set automatically)
-
   staticPath: string; // path to the /static directory (set automatically)
+
   buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
   buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
   faucetStore: string;
@@ -16,7 +17,8 @@ export interface IFaucetConfig {
   faucetCoinSymbol: string; // symbol (short name) of the coin that can be mined
   faucetLogFile: string; // logfile for faucet events / null for no log
   faucetLogStatsInterval: number; // print faucet stats to log interval (10min default)
-  serverPorts: IFaucetPortConfig[]; // listener ports
+  serverPort: number; // listener port
+  faucetSecret: string; // random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 
   /* PoW parameters */
   powShareReward: number; // reward amount per share (in wei)
@@ -25,7 +27,6 @@ export interface IFaucetConfig {
   powSessionTimeout: number; // maximum mining session time in seconds
   claimSessionTimeout: number; // how long sessions can be payed out in seconds (should be higher than powSessionTimeout)
   claimAddrCooldown: number; // number of seconds to wait before allow to reuse the same address to start another mining session
-  powSessionSecret: string; // random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
   powPingInterval: number; // websocket ping interval
   powPingTimeout: number; // kill websocket if no ping/pong for that number of seconds
   powScryptParams: { // scrypt parameters
@@ -79,11 +80,7 @@ export interface IFaucetConfig {
   ethTxExplorerLink: string; // link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
-  faucetStats: IFaucetStatsConfig | null; // RRD Stats config or null to disable rrd stats
-}
-
-export interface IFaucetPortConfig {
-  port: number;
+  faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
 }
 
 export interface IFaucetHCaptchaConfig {
@@ -123,16 +120,14 @@ export let faucetConfig: IFaucetConfig = (() => {
     faucetCoinSymbol: "ETH",
     faucetLogFile: null,
     faucetLogStatsInterval: 600,
-    serverPorts: [
-      { port: 8080 }
-    ],
+    serverPort: 8080,
+    faucetSecret: null,
     powShareReward:     25000000000000000, // 0,025 ETH
     claimMinAmount:    100000000000000000, // 0,1 ETH
     claimMaxAmount:  10000000000000000000, // 10 ETH
     powSessionTimeout: 3600,
     claimSessionTimeout: 7200,
     claimAddrCooldown: 7200,
-    powSessionSecret: "***insecure***",
     powScryptParams: {
       cpuAndMemory: 4096,
       blockSize: 8,
@@ -162,7 +157,7 @@ export let faucetConfig: IFaucetConfig = (() => {
     ethRpcHost: "http://127.0.0.1:8545/",
     ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
     ethChainId: 1337802,
-    ethTxGasLimit: 500000,
+    ethTxGasLimit: 21000,
     ethTxMaxFee: 1800000000,
     ethTxPrioFee: 800000000,
     ethMaxPending: 12,
@@ -170,10 +165,34 @@ export let faucetConfig: IFaucetConfig = (() => {
     ensResolver: null,
     faucetStats: null,
   };
+  let config: IFaucetConfig;
 
-  let configFlle = path.join(defaultConfig.appBasePath, "faucet-config.json");
-  let configJson = fs.readFileSync(configFlle, "utf8");
-  return Object.assign(defaultConfig, JSON.parse(configJson));
+  let yamlConfigFile = path.join(defaultConfig.appBasePath, "faucet-config.yaml");
+  let jsonConfigFile = path.join(defaultConfig.appBasePath, "faucet-config.json");
+  if(fs.existsSync(yamlConfigFile)) {
+    console.log("Loading yaml faucet config from " + yamlConfigFile);
+    let yamlSrc = fs.readFileSync(yamlConfigFile, "utf8");
+    let yamlObj = YAML.parse(yamlSrc);
+    config = Object.assign(defaultConfig, yamlObj);
+  }
+  else if(fs.existsSync(jsonConfigFile)) {
+    console.log("Loading legacy json faucet config from " + jsonConfigFile);
+    let jsonSrc = fs.readFileSync(jsonConfigFile, "utf8");
+    let jsonObj = JSON.parse(jsonSrc);
+    config = Object.assign(defaultConfig, jsonObj);
+  }
+  else {
+    throw "faucet configuration not found";
+  }
+
+  if(!config.faucetSecret) {
+    if((config as any).powSessionSecret)
+      config.faucetSecret = (config as any).powSessionSecret;
+    else
+      throw "faucetSecret in config must not be left empty";
+  }
+  
+  return config;
 })();
 
 

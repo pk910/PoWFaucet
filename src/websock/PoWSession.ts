@@ -360,7 +360,7 @@ export class PoWSession {
     let sessionStr = Buffer.from(JSON.stringify(sessionDict)).toString('base64');
 
     let sessionHash = crypto.createHash("sha256");
-    sessionHash.update(faucetConfig.powSessionSecret + "\r\n");
+    sessionHash.update(faucetConfig.faucetSecret + "\r\n");
     sessionHash.update(sessionStr);
 
     return sessionStr + "|" + sessionHash.digest('base64');
