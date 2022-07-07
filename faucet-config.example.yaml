@@ -8,6 +8,9 @@ faucetStore: "faucet-store.json"
 # logfile for faucet events (comment out for no logging)
 faucetLogFile: "faucet-events.log"
 
+# path to file to write the process pid to (comment out to disable)
+#faucetPidFile: "faucet-pid.txt"
+
 # faucet http/ws server port
 serverPort: 8080
 
@@ -173,6 +176,10 @@ hcaptcha:
 
   # require hcaptcha to claim mining rewards (default: false)
   checkBalanceClaim: true
+
+# ip info pattern based restrictions
+#ipInfoMatchRestrictedReward:
+  #"^.*Tencent Cloud.*$": 1
 
 
 

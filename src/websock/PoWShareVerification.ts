@@ -1,6 +1,6 @@
 import { faucetConfig } from "../common/FaucetConfig";
 import { ServiceManager } from "../common/ServiceManager";
-import { IIPInfo } from "../services/IPInfoResolver";
+import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PromiseDfd } from "../utils/PromiseDfd";
 import { PoWValidator } from "../validator/PoWValidator";
@@ -177,14 +177,25 @@ export class PoWShareVerification {
       shareReward = faucetConfig.powShareReward;
 
       let sessionIpInfo: IIPInfo;
-      if(faucetConfig.ipRestrictedRewardShare && (sessionIpInfo = session.getLastIpInfo())) {
+      if((sessionIpInfo = session.getLastIpInfo())) {
         let restrictedReward = 100;
-        if(sessionIpInfo.hosting && typeof faucetConfig.ipRestrictedRewardShare.hosting === "number" && faucetConfig.ipRestrictedRewardShare.hosting < restrictedReward)
-          restrictedReward = faucetConfig.ipRestrictedRewardShare.hosting;
-        if(sessionIpInfo.proxy && typeof faucetConfig.ipRestrictedRewardShare.proxy === "number" && faucetConfig.ipRestrictedRewardShare.proxy < restrictedReward)
-          restrictedReward = faucetConfig.ipRestrictedRewardShare.proxy;
-        if(sessionIpInfo.countryCode && typeof faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] === "number" && faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] < restrictedReward)
-          restrictedReward = faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode];
+
+        if(faucetConfig.ipRestrictedRewardShare) {
+          if(sessionIpInfo.hosting && typeof faucetConfig.ipRestrictedRewardShare.hosting === "number" && faucetConfig.ipRestrictedRewardShare.hosting < restrictedReward)
+            restrictedReward = faucetConfig.ipRestrictedRewardShare.hosting;
+          if(sessionIpInfo.proxy && typeof faucetConfig.ipRestrictedRewardShare.proxy === "number" && faucetConfig.ipRestrictedRewardShare.proxy < restrictedReward)
+            restrictedReward = faucetConfig.ipRestrictedRewardShare.proxy;
+          if(sessionIpInfo.countryCode && typeof faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] === "number" && faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] < restrictedReward)
+            restrictedReward = faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode];
+        }
+        if(faucetConfig.ipInfoMatchRestrictedReward) {
+          let infoStr = IPInfoResolver.getIPInfoString(sessionIpInfo);
+          Object.keys(faucetConfig.ipInfoMatchRestrictedReward).forEach((pattern) => {
+            if(infoStr.match(new RegExp(pattern, "mi")) && faucetConfig.ipInfoMatchRestrictedReward[pattern] < restrictedReward)
+              restrictedReward = faucetConfig.ipInfoMatchRestrictedReward[pattern];
+          });
+        }
+        
         if(restrictedReward < 100)
           shareReward = Math.floor(shareReward / 100 * restrictedReward);
       }

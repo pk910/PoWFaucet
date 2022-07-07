@@ -9,3 +9,4 @@ faucet-status.json
 faucet-store.json
 faucet-stats.log
 faucet-events.log
+faucet-pid.txt

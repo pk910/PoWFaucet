@@ -6,6 +6,7 @@ export interface IFaucetConfig {
   appBasePath: string; // base path (set automatically)
   faucetVersion: string; // faucet version (set automatically)
   staticPath: string; // path to the /static directory (set automatically)
+  faucetPidFile: string; // path to file to write the process pid to
 
   buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
   buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
@@ -64,6 +65,9 @@ export interface IFaucetConfig {
     proxy?: number; // percentage of reward per share if IP is in a proxy range
     [country: string]: number; // percentage of reward per share if IP is from given country code (DE/US/...)
   };
+  ipInfoMatchRestrictedReward: null | { // ip info pattern based restrictions
+    [pattern: string]: number; // percentage of reward per share if IP info matches regex pattern
+  };
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   lowFundsBalance: number; // minimum balance to show the low funds warning
@@ -99,72 +103,77 @@ export interface IFaucetStatsConfig {
   logfile: string;
 }
 
-export let faucetConfig: IFaucetConfig = (() => {
-  var packageJson = require('../../package.json');
-  var basePath = path.join(__dirname, "..", "..");
-  let defaultConfig: IFaucetConfig = {
-    appBasePath: basePath,
-    faucetVersion: packageJson.version,
-    staticPath: path.join(basePath, "static"),
-    buildSeoIndex: true,
-    buildSeoMeta: {
-      "keywords": "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow",
-    },
-    faucetStore: path.join(basePath, "faucet-store.json"),
+let packageJson = require('../../package.json');
+let basePath = path.join(__dirname, "..", "..");
+let defaultConfig: IFaucetConfig = {
+  appBasePath: basePath,
+  faucetVersion: packageJson.version,
+  staticPath: path.join(basePath, "static"),
+  faucetPidFile: null,
+  buildSeoIndex: true,
+  buildSeoMeta: {
+    "keywords": "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow",
+  },
+  faucetStore: path.join(basePath, "faucet-store.json"),
 
-    powPingInterval: 10,
-    powPingTimeout: 30,
-    faucetTitle: "PoW Faucet",
-    faucetImage: "/images/fauceth_420.jpg",
-    faucetHomeHtml: "",
-    faucetCoinSymbol: "ETH",
-    faucetLogFile: null,
-    faucetLogStatsInterval: 600,
-    serverPort: 8080,
-    faucetSecret: null,
-    powShareReward:     25000000000000000, // 0,025 ETH
-    claimMinAmount:    100000000000000000, // 0,1 ETH
-    claimMaxAmount:  10000000000000000000, // 10 ETH
-    powSessionTimeout: 3600,
-    claimSessionTimeout: 7200,
-    claimAddrCooldown: 7200,
-    powScryptParams: {
-      cpuAndMemory: 4096,
-      blockSize: 8,
-      paralellization: 1,
-      keyLength: 16,
-      difficulty: 9
-    },
-    powNonceCount: 2,
-    verifyLocalPercent: 10,
-    verifyLocalMaxQueue: 100,
-    verifyMinerPeerCount: 2,
-    verifyLocalLowPeerPercent: 100,
-    verifyMinerPercent: 100,
-    verifyMinerIndividuals: 2,
-    verifyMinerMaxPending: 10,
-    verifyMinerMaxMissed: 10,
-    verifyMinerTimeout: 15,
-    verifyMinerMissPenalty: 10000000000000000,
-    hcaptcha: null,
-    concurrentSessions: 0,
-    ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
-    ipRestrictedRewardShare: null,
-    spareFundsAmount:   10000000000000000, // 0,01 ETH
-    lowFundsBalance: 10000000000000000000, // 10 ETH
-    lowFundsWarning: true,
-    noFundsError: true,
-    ethRpcHost: "http://127.0.0.1:8545/",
-    ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
-    ethChainId: 1337802,
-    ethTxGasLimit: 21000,
-    ethTxMaxFee: 1800000000,
-    ethTxPrioFee: 800000000,
-    ethMaxPending: 12,
-    ethTxExplorerLink: null,
-    ensResolver: null,
-    faucetStats: null,
-  };
+  powPingInterval: 10,
+  powPingTimeout: 30,
+  faucetTitle: "PoW Faucet",
+  faucetImage: "/images/fauceth_420.jpg",
+  faucetHomeHtml: "",
+  faucetCoinSymbol: "ETH",
+  faucetLogFile: null,
+  faucetLogStatsInterval: 600,
+  serverPort: 8080,
+  faucetSecret: null,
+  powShareReward:     25000000000000000, // 0,025 ETH
+  claimMinAmount:    100000000000000000, // 0,1 ETH
+  claimMaxAmount:  10000000000000000000, // 10 ETH
+  powSessionTimeout: 3600,
+  claimSessionTimeout: 7200,
+  claimAddrCooldown: 7200,
+  powScryptParams: {
+    cpuAndMemory: 4096,
+    blockSize: 8,
+    paralellization: 1,
+    keyLength: 16,
+    difficulty: 9
+  },
+  powNonceCount: 2,
+  verifyLocalPercent: 10,
+  verifyLocalMaxQueue: 100,
+  verifyMinerPeerCount: 2,
+  verifyLocalLowPeerPercent: 100,
+  verifyMinerPercent: 100,
+  verifyMinerIndividuals: 2,
+  verifyMinerMaxPending: 10,
+  verifyMinerMaxMissed: 10,
+  verifyMinerTimeout: 15,
+  verifyMinerMissPenalty: 10000000000000000,
+  hcaptcha: null,
+  concurrentSessions: 0,
+  ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
+  ipRestrictedRewardShare: null,
+  ipInfoMatchRestrictedReward: null,
+  spareFundsAmount:   10000000000000000, // 0,01 ETH
+  lowFundsBalance: 10000000000000000000, // 10 ETH
+  lowFundsWarning: true,
+  noFundsError: true,
+  ethRpcHost: "http://127.0.0.1:8545/",
+  ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
+  ethChainId: 1337802,
+  ethTxGasLimit: 21000,
+  ethTxMaxFee: 1800000000,
+  ethTxPrioFee: 800000000,
+  ethMaxPending: 12,
+  ethTxExplorerLink: null,
+  ensResolver: null,
+  faucetStats: null,
+};
+
+export let faucetConfig: IFaucetConfig = null;
+
+export function loadFaucetConfig() {
   let config: IFaucetConfig;
 
   let yamlConfigFile = path.join(defaultConfig.appBasePath, "faucet-config.yaml");
@@ -173,13 +182,13 @@ export let faucetConfig: IFaucetConfig = (() => {
     console.log("Loading yaml faucet config from " + yamlConfigFile);
     let yamlSrc = fs.readFileSync(yamlConfigFile, "utf8");
     let yamlObj = YAML.parse(yamlSrc);
-    config = Object.assign(defaultConfig, yamlObj);
+    config = yamlObj;
   }
   else if(fs.existsSync(jsonConfigFile)) {
     console.log("Loading legacy json faucet config from " + jsonConfigFile);
     let jsonSrc = fs.readFileSync(jsonConfigFile, "utf8");
     let jsonObj = JSON.parse(jsonSrc);
-    config = Object.assign(defaultConfig, jsonObj);
+    config = jsonObj;
   }
   else {
     throw "faucet configuration not found";
@@ -191,8 +200,8 @@ export let faucetConfig: IFaucetConfig = (() => {
     else
       throw "faucetSecret in config must not be left empty";
   }
-  
-  return config;
-})();
 
-
+  if(!faucetConfig)
+    faucetConfig = {} as any;
+  Object.assign(faucetConfig, defaultConfig, config);
+}
