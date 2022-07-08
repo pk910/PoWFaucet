@@ -83,6 +83,18 @@ export interface IFaucetConfig {
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
   ethTxExplorerLink: string; // link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 
+  ethRefillContract: null | { // refill from vault contract or null to disable automatic refilling
+    contract: string; // vault contract address
+    abi: string; // vault contract abi
+    allowanceFn: string; // vault contract getAllowance function name
+    withdrawFn: string; // vault contract withdraw function name
+    withdrawGasLimit: number; // gas limit for withdraw transaction (in wei)
+
+    triggerBalance: number;
+    cooldownTime: number;
+    requestAmount: number;
+  };
+
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
 }
@@ -167,6 +179,7 @@ let defaultConfig: IFaucetConfig = {
   ethTxPrioFee: 800000000,
   ethMaxPending: 12,
   ethTxExplorerLink: null,
+  ethRefillContract: null,
   ensResolver: null,
   faucetStats: null,
 };

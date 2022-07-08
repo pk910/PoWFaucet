@@ -217,6 +217,24 @@ noFundsError: "Sorry, the faucet is out of funds :("
 
 
 
+### Automatic wallet refill
+
+# refill contract options
+# advanced configuration to limit the amount of funds that can be mined on the faucet via a separate vault contract
+# the faucet tries to refill its wallet balance from the vault contract when it gets empty
+# see contract code in docs folder
+ethRefillContract:
+  #contract: "0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb"
+  #abi: '[{"inputs":[{"internalType":"address","name":"addr","type":"address"}],"name":"getAllowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+  #allowanceFn: "getAllowance"
+  #withdrawFn: "withdraw"
+  #withdrawGasLimit: 200000
+  #triggerBalance: 4500000000000000000000  # 4500 ETH
+  #cooldownTime: 3600
+  #requestAmount: 500000000000000000000 # 500 ETH
+
+
+
 ### ENS Resolver
 # comment out to disable ENS names
 ensResolver:
