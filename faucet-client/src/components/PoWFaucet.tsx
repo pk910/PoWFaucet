@@ -284,7 +284,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         actionButtonControl = (
           <button 
             className="btn btn-danger stop-action" 
-            onClick={(evt) => this.onStopMiningClick()} 
+            onClick={(evt) => this.onStopMiningClick(false)} 
             disabled={!this.state.isConnected || this.state.miningStatus !== PoWFaucetMiningStatus.RUNNING}>
               {this.state.statusMessage ? this.state.statusMessage : (this.state.isClaimable ? "Stop Mining & Claim Rewards" : "Stop Mining")}
           </button>
@@ -333,7 +333,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         <div className="pow-header center">
           <div className="pow-status-container">
             {this.powSession.getMiner() ? 
-              <PoWMinerStatus powMiner={this.powSession.getMiner()} powSession={this.powSession} faucetConfig={this.state.faucetConfig} stopMinerFn={() => this.onStopMiningClick()} /> :
+              <PoWMinerStatus powMiner={this.powSession.getMiner()} powSession={this.powSession} faucetConfig={this.state.faucetConfig} stopMinerFn={(force) => this.onStopMiningClick(force)} /> :
               <div className='pow-faucet-home'>
                 {this.state.faucetConfig.faucetImage ?
                   <img src={this.state.faucetConfig.faucetImage} className="image" />
@@ -437,14 +437,40 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     });
   }
 
-  private onStopMiningClick() {
+  private onStopMiningClick(force: boolean) {
+    let sessionInfo = this.powSession.getSessionInfo();
+    if(!this.state.isClaimable && sessionInfo.balance > 0 && !force) {
+      this.setState({
+        statusDialog: {
+          title: "Mining balance too low",
+          body: (
+            <div className='alert alert-warning'>
+              Your mining balance of {Math.round(weiToEth(sessionInfo.balance) * 1000) / 1000} {this.state.faucetConfig.faucetCoinSymbol} is too low to be claimed.<br />
+              The minimum allowed amount is {Math.round(weiToEth(this.state.faucetConfig.minClaim) * 1000) / 1000} {this.state.faucetConfig.faucetCoinSymbol}.<br />
+              Do you want to stop mining and loose the rewards you've already collected?
+              </div>
+          ),
+          closeButton: {
+            caption: "Continue mining",
+          },
+          applyButton: {
+            caption: "Stop mining",
+            applyFn: () => {
+              this.onStopMiningClick(true);
+            }
+          }
+        },
+      });
+      return;
+    }
+    
     this.setState({
       miningStatus: PoWFaucetMiningStatus.STOPPING,
       statusMessage: "Claiming rewards..."
     });
     this.powSession.getMiner().stopMiner();
 
-    let sessionInfo = this.powSession.getSessionInfo();
+    
     this.powSession.closeSession().then((claimToken) => {
       this.powSession.setMiner(null);
 

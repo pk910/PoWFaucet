@@ -9,7 +9,7 @@ export interface IPoWMinerStatusProps {
   powMiner: PoWMiner;
   powSession: PoWSession;
   faucetConfig: IFaucetConfig;
-  stopMinerFn: () => void;
+  stopMinerFn: (force: boolean) => void;
 }
 
 export interface IPoWMinerStatusState {
@@ -115,7 +115,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       if(sessionLifetime < 5 && !this.stoppedMiner) {
         this.stoppedMiner = true;
         setTimeout(() => {
-          this.props.stopMinerFn();
+          this.props.stopMinerFn(true);
         }, 100);
       }
     }
@@ -123,7 +123,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
     if(this.state.balance >= this.props.faucetConfig.maxClaim && !this.stoppedMiner) {
       this.stoppedMiner = true;
       setTimeout(() => {
-        this.props.stopMinerFn();
+        this.props.stopMinerFn(true);
       }, 100);
     }
 
