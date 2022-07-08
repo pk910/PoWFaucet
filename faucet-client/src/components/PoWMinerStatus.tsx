@@ -27,7 +27,9 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
   private powMinerStatsListener: ((stats: IPoWMinerStats) => void);
   private powSessionUpdateListener: (() => void);
   private updateTimer: NodeJS.Timer;
+  private animationTimer: NodeJS.Timer;
   private stoppedMiner: boolean = false;
+  private progressPlayer: HTMLElement;
 
   constructor(props: IPoWMinerStatusProps, state: IPoWMinerStatusState) {
     super(props);
@@ -103,8 +105,40 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       this.setState({
         refreshIndex: this.state.refreshIndex + 1,
       });
+
+      if(!this.animationTimer) {
+        this.setAnimationTimer();
+      }
+      if(this.progressPlayer) {
+        
+      }
       this.setUpdateTimer();
     }, timeLeft);
+  }
+
+  private setAnimationTimer() {
+    if(!this.progressPlayer)
+      return;
+
+    // make the cat run faster with more hash power :D
+    let animationTime: number;
+    if(this.state.hashRate === 0) {
+      this.progressPlayer.style.animationDuration = "3600s";
+      return;
+    }
+    else if(this.state.hashRate < 100)
+      animationTime = 2;
+    else {
+      animationTime = 2 / ((this.state.hashRate / 200)+1);
+    }
+    
+    this.progressPlayer.style.animationDuration = (Math.round(animationTime * 100) / 100).toString() + "s";
+
+    let animationDelay = Math.floor(10 / animationTime);
+    this.animationTimer = setTimeout(() => {
+      this.animationTimer = null;
+      this.setAnimationTimer();
+    }, Math.floor(animationTime * animationDelay * 1000));
   }
 
 	public render(): React.ReactElement<IPoWMinerStatusProps> {
@@ -129,12 +163,12 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
 
     let lastShareTime = this.state.lastShareTime || now;
     let miningTime = lastShareTime - this.state.startTime;
-
+    // <img src="/images/progress.gif"  />
     return (
       <div className='grid pow-status'>
         <div className='row'>
-          <div className='col pow-status-image'>
-            <img src="/images/progress.gif" />
+          <div className='col pow-status-image' >
+            <div className='pow-progress-player' ref={(el) => this.progressPlayer = el} />
           </div>
         </div>
 

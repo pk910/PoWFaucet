@@ -115,6 +115,22 @@ html, body {
   padding: 8px;
 }
 
+.pow-faucet .pow-status .pow-status-image {
+  text-align: center;
+}
+
+.pow-faucet .pow-status .pow-status-image .pow-progress-player {
+  display: inline-block;
+  background-image: url('/images/progress-sprite.png');
+  width: 400px;
+  height: 200px;
+  animation: pow-progress 1.0s steps(12) infinite;
+}
+
+@keyframes pow-progress {
+  100% { background-position: -4800px; }
+}
+
 .pow-faucet .pow-status .pow-status-top .status-title {
   text-align: center;
 }
