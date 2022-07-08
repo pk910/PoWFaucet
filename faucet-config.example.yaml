@@ -177,10 +177,6 @@ hcaptcha:
   # require hcaptcha to claim mining rewards (default: false)
   checkBalanceClaim: true
 
-# ip info pattern based restrictions
-#ipInfoMatchRestrictedReward:
-  #"^.*Tencent Cloud.*$": 1
-
 
 
 ### IP-based Restrictions
@@ -198,6 +194,10 @@ ipRestrictedRewardShare:
 
   # percentage of reward per share if IP is from given country code (DE/US/...)
   #US: 100
+
+# ip info pattern based restrictions
+#ipInfoMatchRestrictedReward:
+  #"^.*Tencent Cloud.*$": 1
 
 
 
@@ -229,6 +229,7 @@ ethRefillContract:
   #allowanceFn: "getAllowance"
   #withdrawFn: "withdraw"
   #withdrawGasLimit: 200000
+  #checkContractBalance: true
   #triggerBalance: 4500000000000000000000  # 4500 ETH
   #cooldownTime: 3600
   #requestAmount: 500000000000000000000 # 500 ETH

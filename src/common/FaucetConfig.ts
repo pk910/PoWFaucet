@@ -89,6 +89,7 @@ export interface IFaucetConfig {
     allowanceFn: string; // vault contract getAllowance function name
     withdrawFn: string; // vault contract withdraw function name
     withdrawGasLimit: number; // gas limit for withdraw transaction (in wei)
+    checkContractBalance: boolean | string; // check balance of contract before withdrawing
 
     triggerBalance: number;
     cooldownTime: number;

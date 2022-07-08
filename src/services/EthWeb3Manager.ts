@@ -404,6 +404,15 @@ export class EthWeb3Manager {
         refillAmount = refillAllowance;
     }
 
+    if(faucetConfig.ethRefillContract.checkContractBalance) {
+      let checkAddr = (typeof faucetConfig.ethRefillContract.checkContractBalance === "string" ? faucetConfig.ethRefillContract.checkContractBalance : faucetConfig.ethRefillContract.contract);
+      let contractBalance = parseInt(await this.web3.eth.getBalance(checkAddr));
+      if(contractBalance == 0)
+        throw "refill contract is out of funds";
+      if(refillAmount > contractBalance)
+        refillAmount = contractBalance;
+    }
+
     var rawTx = {
       nonce: this.walletState.nonce,
       gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit || faucetConfig.ethTxGasLimit,
