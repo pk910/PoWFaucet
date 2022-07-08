@@ -28,6 +28,7 @@ export interface IFaucetConfig {
   powSessionTimeout: number; // maximum mining session time in seconds
   claimSessionTimeout: number; // how long sessions can be payed out in seconds (should be higher than powSessionTimeout)
   claimAddrCooldown: number; // number of seconds to wait before allow to reuse the same address to start another mining session
+  claimAddrMaxBalance: null | number; // check balance and deny mining if balance exceeds the limit
   powPingInterval: number; // websocket ping interval
   powPingTimeout: number; // kill websocket if no ping/pong for that number of seconds
   powScryptParams: { // scrypt parameters
@@ -145,6 +146,7 @@ let defaultConfig: IFaucetConfig = {
   powSessionTimeout: 3600,
   claimSessionTimeout: 7200,
   claimAddrCooldown: 7200,
+  claimAddrMaxBalance: null,
   powScryptParams: {
     cpuAndMemory: 4096,
     blockSize: 8,

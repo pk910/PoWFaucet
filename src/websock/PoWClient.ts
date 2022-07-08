@@ -276,6 +276,17 @@ export class PoWClient {
     else if(addressMarks.length > 0)
       return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (" + addressMarks.join(",") + ")", reqId);
     
+    if(typeof faucetConfig.claimAddrMaxBalance === "number") {
+      let walletBalance: number;
+      try {
+        walletBalance = await ServiceManager.GetService(EthWeb3Manager).getWalletBalance(targetAddr);
+      } catch(ex) {
+        return this.sendErrorResponse("BALANCE_ERROR", "Could not get balance of Wallet " + targetAddr + ": " + ex.toString(), reqId);
+      }
+      if(walletBalance > faucetConfig.claimAddrMaxBalance)
+        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + (Math.round(weiToEth(walletBalance)*1000)/1000) + " " + faucetConfig.faucetCoinSymbol + " in your wallet. Please give others a chance to get some funds too.", reqId);
+    }
+    
     ServiceManager.GetService(FaucetStore).setAddressMark(targetAddr, AddressMark.USED);
 
     // create new session
