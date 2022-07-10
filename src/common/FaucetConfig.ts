@@ -69,6 +69,10 @@ export interface IFaucetConfig {
   ipInfoMatchRestrictedReward: null | { // ip info pattern based restrictions
     [pattern: string]: number; // percentage of reward per share if IP info matches regex pattern
   };
+  ipInfoMatchRestrictedRewardFile: null | { // ip info pattern based restrictions from file
+    file: string; // path to file
+    refresh: number; // refresh interval
+  };
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   lowFundsBalance: number; // minimum balance to show the low funds warning
@@ -170,6 +174,7 @@ let defaultConfig: IFaucetConfig = {
   ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
   ipRestrictedRewardShare: null,
   ipInfoMatchRestrictedReward: null,
+  ipInfoMatchRestrictedRewardFile: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,

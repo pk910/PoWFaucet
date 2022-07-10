@@ -5,6 +5,8 @@ import { getNewGuid } from "../utils/GuidUtils";
 import { PromiseDfd } from "../utils/PromiseDfd";
 import { PoWValidator } from "../validator/PoWValidator";
 import { PoWSessionSlashReason, PoWSession } from "./PoWSession";
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -13,11 +15,32 @@ export interface IPoWShareVerificationResult {
 
 export class PoWShareVerification {
   private static verifyingShares: {[id: string]: PoWShareVerification} = {};
+  private static ipInfoMatchRestrictions: {}
+  private static ipInfoMatchRestrictionsRefresh: number;
 
   public static processVerificationResult(shareId: string, verifier: string, isValid: boolean) {
     if(!this.verifyingShares[shareId])
       return;
     this.verifyingShares[shareId].processVerificationResult(verifier, isValid);
+  }
+
+  private static refreshIpInfoMatchRestrictions() {
+    let now = Math.floor((new Date()).getTime() / 1000);
+    let refresh = faucetConfig.ipInfoMatchRestrictedRewardFile ? faucetConfig.ipInfoMatchRestrictedRewardFile.refresh : 30;
+    if(this.ipInfoMatchRestrictionsRefresh > now - refresh)
+      return;
+    
+    this.ipInfoMatchRestrictionsRefresh = now;
+    this.ipInfoMatchRestrictions = Object.assign({}, faucetConfig.ipInfoMatchRestrictedReward);
+    
+    if(faucetConfig.ipInfoMatchRestrictedRewardFile && faucetConfig.ipInfoMatchRestrictedRewardFile.file && fs.existsSync(faucetConfig.ipInfoMatchRestrictedRewardFile.file)) {
+      fs.readFileSync(faucetConfig.ipInfoMatchRestrictedRewardFile.file, "utf8").split(/\r?\n/).forEach((line) => {
+        let match = /^([0-9]{1,2}): (.*)$/.exec(line);
+        if(!match)
+          return;
+        this.ipInfoMatchRestrictions[match[2]] = parseInt(match[1]);
+      });
+    }
   }
 
   private shareId: string;
@@ -188,11 +211,12 @@ export class PoWShareVerification {
           if(sessionIpInfo.countryCode && typeof faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] === "number" && faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] < restrictedReward)
             restrictedReward = faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode];
         }
-        if(faucetConfig.ipInfoMatchRestrictedReward) {
-          let infoStr = IPInfoResolver.getIPInfoString(sessionIpInfo);
-          Object.keys(faucetConfig.ipInfoMatchRestrictedReward).forEach((pattern) => {
-            if(infoStr.match(new RegExp(pattern, "mi")) && faucetConfig.ipInfoMatchRestrictedReward[pattern] < restrictedReward)
-              restrictedReward = faucetConfig.ipInfoMatchRestrictedReward[pattern];
+        if(faucetConfig.ipInfoMatchRestrictedReward || faucetConfig.ipInfoMatchRestrictedRewardFile) {
+          PoWShareVerification.refreshIpInfoMatchRestrictions();
+          let infoStr = IPInfoResolver.getIPInfoString(session.getLastRemoteIp(), sessionIpInfo);
+          Object.keys(PoWShareVerification.ipInfoMatchRestrictions).forEach((pattern) => {
+            if(infoStr.match(new RegExp(pattern, "mi")) && PoWShareVerification.ipInfoMatchRestrictions[pattern] < restrictedReward)
+              restrictedReward = PoWShareVerification.ipInfoMatchRestrictions[pattern];
           });
         }
         
