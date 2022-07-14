@@ -43,6 +43,22 @@ export class PoWShareVerification {
     }
   }
 
+  private static getIPInfoString(ipaddr: string, ipinfo: IIPInfo, ethaddr: string) {
+    let infoStr = [
+      "ETH: " + ethaddr,
+      "IP: " + ipaddr,
+      "Country: " + ipinfo.countryCode,
+      "Region: " + ipinfo.regionCode,
+      "City: " + ipinfo.city,
+      "ISP: " + ipinfo.isp,
+      "Org: " + ipinfo.org,
+      "AS: " + ipinfo.as,
+      "Proxy: " + (ipinfo.proxy ? "true" : "false"),
+      "Hosting: " + (ipinfo.hosting ? "true" : "false")
+    ].join("\n");
+    return infoStr;
+  }
+
   private shareId: string;
   private sessionId: string;
   private nonces: number[];
@@ -213,7 +229,7 @@ export class PoWShareVerification {
         }
         if(faucetConfig.ipInfoMatchRestrictedReward || faucetConfig.ipInfoMatchRestrictedRewardFile) {
           PoWShareVerification.refreshIpInfoMatchRestrictions();
-          let infoStr = IPInfoResolver.getIPInfoString(session.getLastRemoteIp(), sessionIpInfo);
+          let infoStr = PoWShareVerification.getIPInfoString(session.getLastRemoteIp(), sessionIpInfo, session.getTargetAddr());
           Object.keys(PoWShareVerification.ipInfoMatchRestrictions).forEach((pattern) => {
             if(infoStr.match(new RegExp(pattern, "mi")) && PoWShareVerification.ipInfoMatchRestrictions[pattern] < restrictedReward)
               restrictedReward = PoWShareVerification.ipInfoMatchRestrictions[pattern];

@@ -25,21 +25,6 @@ export interface IIPInfo {
 export class IPInfoResolver {
   private ipInfoCache: {[ip: string]: [number, Promise<IIPInfo>]} = {};
 
-  public static getIPInfoString(ipaddr: string, ipinfo: IIPInfo) {
-    let infoStr = [
-      "IP: " + ipaddr,
-      "Country: " + ipinfo.countryCode,
-      "Region: " + ipinfo.regionCode,
-      "City: " + ipinfo.city,
-      "ISP: " + ipinfo.isp,
-      "Org: " + ipinfo.org,
-      "AS: " + ipinfo.as,
-      "Proxy: " + (ipinfo.proxy ? "true" : "false"),
-      "Hosting: " + (ipinfo.hosting ? "true" : "false")
-    ].join("\n");
-    return infoStr;
-  }
-
   public constructor() {
     setInterval(() => {
       this.cleanIpInfoCache();
