@@ -7,6 +7,7 @@ import { PoWValidator } from "../validator/PoWValidator";
 import { PoWSessionSlashReason, PoWSession } from "./PoWSession";
 import * as fs from 'fs';
 import * as path from 'path';
+import { EthWeb3Manager } from "../services/EthWeb3Manager";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -214,6 +215,25 @@ export class PoWShareVerification {
     else {
       // valid share - add rewards
       shareReward = faucetConfig.powShareReward;
+
+      if(faucetConfig.faucetBalanceRestrictedReward) {
+        // apply balance restriction if faucet wallet is low on funds
+        let restrictedReward = 100;
+
+        let minbalances = Object.keys(faucetConfig.faucetBalanceRestrictedReward).map((v) => parseInt(v)).sort();
+        let faucetBalance = ServiceManager.GetService(EthWeb3Manager).getFaucetBalance();
+        if(faucetBalance <= minbalances[minbalances.length - 1]) {
+          for(let i = 0; i < minbalances.length; i++) {
+            if(faucetBalance > minbalances[i])
+              break;
+            if(faucetConfig.faucetBalanceRestrictedReward[minbalances[i]] < restrictedReward)
+              restrictedReward = faucetConfig.faucetBalanceRestrictedReward[minbalances[i]];
+          }
+        }
+
+        if(restrictedReward < 100)
+          shareReward = Math.floor(shareReward / 100 * restrictedReward);
+      }
 
       let sessionIpInfo: IIPInfo;
       if((sessionIpInfo = session.getLastIpInfo())) {

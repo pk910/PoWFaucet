@@ -218,6 +218,10 @@ lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
 # empty faucet error message / false to disable the error
 noFundsError: "Sorry, the faucet is out of funds :("
 
+# reward restriction based on faucet wallet balance. lowest value applies
+faucetBalanceRestrictedReward:
+  100000000000000000000: 50  # 50% if lower than 100 ETH
+
 
 
 ### Automatic wallet refill

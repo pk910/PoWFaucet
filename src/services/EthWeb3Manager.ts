@@ -185,6 +185,10 @@ export class EthWeb3Manager {
     return this.web3.eth.getBalance(addr).then((res) => parseInt(res));
   }
 
+  public getFaucetBalance(): number {
+    return this.walletState?.balance;
+  }
+
   public addClaimTransaction(target: string, amount: number, sessId: string): ClaimTx {
     let claimTx = new ClaimTx(target, amount, sessId);
     this.claimTxQueue.push(claimTx);

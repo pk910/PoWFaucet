@@ -73,6 +73,9 @@ export interface IFaucetConfig {
     file: string; // path to file
     refresh: number; // refresh interval
   };
+  faucetBalanceRestrictedReward: null | { // reward restriction based on faucet wallet balance. lowest value applies
+    [limit: number]: number; // limit: min balance in wei, value: percent of normal reward (eg. 50 = half rewards)
+  };
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   lowFundsBalance: number; // minimum balance to show the low funds warning
@@ -175,6 +178,7 @@ let defaultConfig: IFaucetConfig = {
   ipRestrictedRewardShare: null,
   ipInfoMatchRestrictedReward: null,
   ipInfoMatchRestrictedRewardFile: null,
+  faucetBalanceRestrictedReward: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,
