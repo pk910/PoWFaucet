@@ -267,7 +267,7 @@ export class PoWClient {
       }
     }
 
-    if(typeof targetAddr !== "string" || !targetAddr.match(/^0x[0-9a-f]{40}$/i))
+    if(typeof targetAddr !== "string" || !targetAddr.match(/^0x[0-9a-f]{40}$/i) || targetAddr.match(/^0x0{40}$/i))
       return this.sendErrorResponse("INVALID_ADDR", "Invalid target address: " + targetAddr, reqId);
 
     let addressMarks = ServiceManager.GetService(FaucetStore).getAddressMarks(targetAddr);
