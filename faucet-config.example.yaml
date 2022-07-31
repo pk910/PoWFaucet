@@ -237,6 +237,7 @@ ethRefillContract:
   #withdrawFn: "withdraw"
   #withdrawGasLimit: 200000
   #checkContractBalance: true
+  #contractDustBalance: 1000000000000000000  # 1 ETH
   #triggerBalance: 4500000000000000000000  # 4500 ETH
   #cooldownTime: 3600
   #requestAmount: 500000000000000000000 # 500 ETH

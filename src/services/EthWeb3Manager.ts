@@ -371,6 +371,7 @@ export class EthWeb3Manager {
     
     try {
       let txResult = await this.refillWallet();
+      this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
 
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending withdraw transaction to vault contract: " + txResult[0]);
 
@@ -388,8 +389,6 @@ export class EthWeb3Manager {
       }).catch((err) => {
         ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Faucet wallet refill transaction reverted: " + err.toString());
       });
-      
-      this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
     } catch(ex) {
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Faucet wallet refill from vault contract failed: " + ex.toString());
       this.walletRefilling = false;
@@ -415,7 +414,7 @@ export class EthWeb3Manager {
     if(faucetConfig.ethRefillContract.checkContractBalance) {
       let checkAddr = (typeof faucetConfig.ethRefillContract.checkContractBalance === "string" ? faucetConfig.ethRefillContract.checkContractBalance : faucetConfig.ethRefillContract.contract);
       let contractBalance = parseInt(await this.web3.eth.getBalance(checkAddr));
-      if(contractBalance == 0)
+      if(contractBalance <= (faucetConfig.ethRefillContract.contractDustBalance || 1000000000))
         throw "refill contract is out of funds";
       if(refillAmount > contractBalance)
         refillAmount = contractBalance;
