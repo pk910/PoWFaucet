@@ -314,7 +314,7 @@ export class PoWSession {
         break;
     }
 
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Slashed session " + this.sessionId + " (reason: " + reason + ", penalty: " + penalty + ")");
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: " + reason + ", penalty: " + penalty + ")");
   }
 
   private applyBalancePenalty(penalty: number): number {

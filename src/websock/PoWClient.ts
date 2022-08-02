@@ -105,7 +105,7 @@ export class PoWClient {
     if(!this.socket)
       return;
     try {
-      this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""));
+      this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""), null, true);
       this.socket.close();
     } catch(ex) {}
     this.socket = null;
@@ -141,8 +141,9 @@ export class PoWClient {
     this.socket.send(JSON.stringify(message));
   }
 
-  private sendErrorResponse(errCode: string, errMessage: string, reqId?: any) {
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Returned error to client: [" + errCode + "] " + errMessage);
+  private sendErrorResponse(errCode: string, errMessage: string, reqId?: any, skipLog?: boolean) {
+    if(!skipLog)
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Returned error to client: [" + errCode + "] " + errMessage);
     this.sendMessage("error", {
       code: errCode,
       message: errMessage
