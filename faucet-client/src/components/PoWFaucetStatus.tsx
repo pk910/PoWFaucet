@@ -36,6 +36,7 @@ interface IPoWFaucetStatusSession {
   hashrate: number;
   status: string;
   claimable: boolean;
+  limit: number;
 }
 
 interface IPoWFaucetStatusIPInfo {
@@ -58,9 +59,11 @@ interface IPoWFaucetStatusIPInfo {
 
 interface IPoWFaucetStatusClaim {
   time: number;
+  session: string;
   target: string;
   amount: number;
   status: string;
+  error: string;
   nonce: number | null;
 }
 
@@ -159,28 +162,30 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
   }
 
   private renderActiveSessionRow(session: IPoWFaucetStatusSession): React.ReactElement {
-    let sessionStatus: React.ReactElement = null;
+    let sessionStatus: React.ReactElement[] = [];
     switch(session.status) {
       case "idle":
-        sessionStatus = <span className="badge bg-secondary">Idle ({renderTime(new Date(session.idle * 1000))})</span>;
+        sessionStatus.push(<span key="status" className="badge bg-secondary">Idle ({renderTime(new Date(session.idle * 1000))})</span>);
         break;
       case "mining":
-        sessionStatus = <span className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>;
+        sessionStatus.push(<span key="status" className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>);
+        if(session.limit < 100)
+          sessionStatus.push(<span key="limit" className="badge bg-warning">{session.limit} %</span>);
         break;
       case "closed":
         if(session.claimable)
-          sessionStatus = <span className="badge bg-warning text-dark">Claimable ({renderTime(new Date((session.start + this.props.faucetConfig.claimTimeout) * 1000))})</span>;
+          sessionStatus.push(<span key="status" className="badge bg-warning text-dark">Claimable ({renderTime(new Date((session.start + this.props.faucetConfig.claimTimeout) * 1000))})</span>);
         else
-          sessionStatus = <span className="badge bg-info text-dark">Closed</span>;
+          sessionStatus.push(<span key="status" className="badge bg-info text-dark">Closed</span>);
         break;
       case "claimed":
-        sessionStatus = <span className="badge bg-primary">Claimed</span>;
+        sessionStatus.push(<span key="status" className="badge bg-primary">Claimed</span>);
         break;
       case "slashed":
-        sessionStatus = <span className="badge bg-danger">Slashed</span>;
+        sessionStatus.push(<span key="status" className="badge bg-danger">Slashed</span>);
         break;
       default:
-        sessionStatus = <span className="badge bg-light text-dark">{session.status}</span>;
+        sessionStatus.push(<span key="status" className="badge bg-light text-dark">{session.status}</span>);
     }
 
     return (
@@ -265,6 +270,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <thead>
           <tr>
             <th scope="col">Time</th>
+            <th scope="col">Session Hash</th>
             <th scope="col">To Address</th>
             <th scope="col">Amount</th>
             <th scope="col">Nonce</th>
@@ -275,7 +281,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           {this.state.activeClaims.length > 0 ?
             this.state.activeClaims.map((claim) => this.renderActiveClaimRow(claim)) :
             <tr key="none">
-              <th scope="row" colSpan={5}>No active claims</th>
+              <th scope="row" colSpan={6}>No active claims</th>
             </tr>
           }
         </tbody>
@@ -296,7 +302,13 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         claimStatus = <span className="badge bg-success">Confirmed</span>;
         break;
       case "failed":
-        claimStatus = <span className="badge bg-danger">Failed</span>;
+        claimStatus = <OverlayTrigger
+          placement="right"
+          delay={{ show: 250, hide: 400 }}
+          overlay={(props) => this.renderClaimFailInfo(claim, props)}
+        >
+          <span className="badge bg-danger">Failed</span>
+        </OverlayTrigger>;
         break;
       default:
         claimStatus = <span className="badge bg-light text-dark">{claim.status}</span>;
@@ -305,11 +317,25 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     return (
       <tr key={(claim.time + "-" + claim.target)}>
         <th scope="row">{renderDate(new Date(claim.time * 1000), true, true)}</th>
+        <td>{claim.session}</td>
         <td>{claim.target}</td>
         <td>{Math.round(weiToEth(claim.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{claim.nonce || ""}</td>
         <td>{claimStatus}</td>
       </tr>
+    );
+  }
+
+  private renderClaimFailInfo(claim: IPoWFaucetStatusClaim, props: any): React.ReactElement {
+    if(!claim.error)
+      return null;
+    
+    return (
+      <Tooltip id="ipinfo-tooltip" {...props}>
+        <div className='ipaddr-info'>
+          {claim.error}
+        </div>
+      </Tooltip>
     );
   }
 

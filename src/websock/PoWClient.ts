@@ -14,6 +14,7 @@ import { weiToEth } from '../utils/ConvertHelpers';
 import { FaucetStatus, IFaucetStatus } from '../services/FaucetStatus';
 import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
 import { FaucetStatsLog } from '../services/FaucetStatsLog';
+import { PoWRewardLimiter } from '../services/PoWRewardLimiter';
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -584,6 +585,7 @@ export class PoWClient {
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Client requested faucet status (IP: " + this.remoteIp + ")");
 
     let sessions = PoWSession.getAllSessions();
+    let rewardLimiter = ServiceManager.GetService(PoWRewardLimiter);
     statusRsp.sessions = sessions.map((session) => {
       let sessionIdHash = crypto.createHash("sha256");
       sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
@@ -601,16 +603,23 @@ export class PoWClient {
         hashrate: session.getReportedHashRate(),
         status: session.getSessionStatus(),
         claimable: session.isClaimable(),
+        limit: rewardLimiter.getSessionRestriction(session),
       }
     });
 
     let claims = ServiceManager.GetService(EthWeb3Manager).getTransactionQueue();
     statusRsp.claims = claims.map((claimTx) => {
+      let sessionIdHash = crypto.createHash("sha256");
+      sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
+      sessionIdHash.update(claimTx.session);
+
       return {
         time: Math.floor(claimTx.time.getTime() / 1000),
+        session: sessionIdHash.digest("hex").substring(0, 20),
         target: claimTx.target,
         amount: claimTx.amount,
         status: claimTx.status,
+        error: claimTx.failReason,
         nonce: claimTx.nonce || null,
       }
     });

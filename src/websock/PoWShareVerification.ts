@@ -1,13 +1,12 @@
 import { faucetConfig } from "../common/FaucetConfig";
 import { ServiceManager } from "../common/ServiceManager";
-import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
+import { IIPInfo } from "../services/IPInfoResolver";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PromiseDfd } from "../utils/PromiseDfd";
 import { PoWValidator } from "../validator/PoWValidator";
 import { PoWSessionSlashReason, PoWSession } from "./PoWSession";
-import * as fs from 'fs';
-import * as path from 'path';
 import { EthWeb3Manager } from "../services/EthWeb3Manager";
+import { PoWRewardLimiter } from "../services/PoWRewardLimiter";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -16,48 +15,12 @@ export interface IPoWShareVerificationResult {
 
 export class PoWShareVerification {
   private static verifyingShares: {[id: string]: PoWShareVerification} = {};
-  private static ipInfoMatchRestrictions: {}
-  private static ipInfoMatchRestrictionsRefresh: number;
+  
 
   public static processVerificationResult(shareId: string, verifier: string, isValid: boolean) {
     if(!this.verifyingShares[shareId])
       return;
     this.verifyingShares[shareId].processVerificationResult(verifier, isValid);
-  }
-
-  private static refreshIpInfoMatchRestrictions() {
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let refresh = faucetConfig.ipInfoMatchRestrictedRewardFile ? faucetConfig.ipInfoMatchRestrictedRewardFile.refresh : 30;
-    if(this.ipInfoMatchRestrictionsRefresh > now - refresh)
-      return;
-    
-    this.ipInfoMatchRestrictionsRefresh = now;
-    this.ipInfoMatchRestrictions = Object.assign({}, faucetConfig.ipInfoMatchRestrictedReward);
-    
-    if(faucetConfig.ipInfoMatchRestrictedRewardFile && faucetConfig.ipInfoMatchRestrictedRewardFile.file && fs.existsSync(faucetConfig.ipInfoMatchRestrictedRewardFile.file)) {
-      fs.readFileSync(faucetConfig.ipInfoMatchRestrictedRewardFile.file, "utf8").split(/\r?\n/).forEach((line) => {
-        let match = /^([0-9]{1,2}): (.*)$/.exec(line);
-        if(!match)
-          return;
-        this.ipInfoMatchRestrictions[match[2]] = parseInt(match[1]);
-      });
-    }
-  }
-
-  private static getIPInfoString(ipaddr: string, ipinfo: IIPInfo, ethaddr: string) {
-    let infoStr = [
-      "ETH: " + ethaddr,
-      "IP: " + ipaddr,
-      "Country: " + ipinfo.countryCode,
-      "Region: " + ipinfo.regionCode,
-      "City: " + ipinfo.city,
-      "ISP: " + ipinfo.isp,
-      "Org: " + ipinfo.org,
-      "AS: " + ipinfo.as,
-      "Proxy: " + (ipinfo.proxy ? "true" : "false"),
-      "Hosting: " + (ipinfo.hosting ? "true" : "false")
-    ].join("\n");
-    return infoStr;
   }
 
   private shareId: string;
@@ -214,53 +177,9 @@ export class PoWShareVerification {
     }
     else {
       // valid share - add rewards
-      shareReward = faucetConfig.powShareReward;
-
-      if(faucetConfig.faucetBalanceRestrictedReward) {
-        // apply balance restriction if faucet wallet is low on funds
-        let restrictedReward = 100;
-
-        let minbalances = Object.keys(faucetConfig.faucetBalanceRestrictedReward).map((v) => parseInt(v)).sort();
-        let faucetBalance = ServiceManager.GetService(EthWeb3Manager).getFaucetBalance();
-        if(faucetBalance <= minbalances[minbalances.length - 1]) {
-          for(let i = 0; i < minbalances.length; i++) {
-            if(faucetBalance > minbalances[i])
-              break;
-            if(faucetConfig.faucetBalanceRestrictedReward[minbalances[i]] < restrictedReward)
-              restrictedReward = faucetConfig.faucetBalanceRestrictedReward[minbalances[i]];
-          }
-        }
-
-        if(restrictedReward < 100)
-          shareReward = Math.floor(shareReward / 100 * restrictedReward);
-      }
-
-      let sessionIpInfo: IIPInfo;
-      if((sessionIpInfo = session.getLastIpInfo())) {
-        let restrictedReward = 100;
-
-        if(faucetConfig.ipRestrictedRewardShare) {
-          if(sessionIpInfo.hosting && typeof faucetConfig.ipRestrictedRewardShare.hosting === "number" && faucetConfig.ipRestrictedRewardShare.hosting < restrictedReward)
-            restrictedReward = faucetConfig.ipRestrictedRewardShare.hosting;
-          if(sessionIpInfo.proxy && typeof faucetConfig.ipRestrictedRewardShare.proxy === "number" && faucetConfig.ipRestrictedRewardShare.proxy < restrictedReward)
-            restrictedReward = faucetConfig.ipRestrictedRewardShare.proxy;
-          if(sessionIpInfo.countryCode && typeof faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] === "number" && faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] < restrictedReward)
-            restrictedReward = faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode];
-        }
-        if(faucetConfig.ipInfoMatchRestrictedReward || faucetConfig.ipInfoMatchRestrictedRewardFile) {
-          PoWShareVerification.refreshIpInfoMatchRestrictions();
-          let infoStr = PoWShareVerification.getIPInfoString(session.getLastRemoteIp(), sessionIpInfo, session.getTargetAddr());
-          Object.keys(PoWShareVerification.ipInfoMatchRestrictions).forEach((pattern) => {
-            if(infoStr.match(new RegExp(pattern, "mi")) && PoWShareVerification.ipInfoMatchRestrictions[pattern] < restrictedReward)
-              restrictedReward = PoWShareVerification.ipInfoMatchRestrictions[pattern];
-          });
-        }
-        
-        if(restrictedReward < 100)
-          shareReward = Math.floor(shareReward / 100 * restrictedReward);
-      }
-
+      shareReward = ServiceManager.GetService(PoWRewardLimiter).getShareReward(session);
       session.addBalance(shareReward);
+      
       if(session.getActiveClient()) {
         session.getActiveClient().sendMessage("updateBalance", {
           balance: session.getBalance(),
