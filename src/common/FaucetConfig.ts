@@ -162,7 +162,7 @@ let defaultConfig: IFaucetConfig = {
     keyLength: 16,
     difficulty: 9
   },
-  powNonceCount: 2,
+  powNonceCount: 1,
   verifyLocalPercent: 10,
   verifyLocalMaxQueue: 100,
   verifyMinerPeerCount: 2,
