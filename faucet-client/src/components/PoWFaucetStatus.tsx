@@ -169,8 +169,6 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         break;
       case "mining":
         sessionStatus.push(<span key="status" className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>);
-        if(session.limit < 100)
-          sessionStatus.push(<span key="limit" className="badge bg-warning">{session.limit} %</span>);
         break;
       case "closed":
         if(session.claimable)
@@ -187,6 +185,8 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       default:
         sessionStatus.push(<span key="status" className="badge bg-light text-dark">{session.status}</span>);
     }
+    if(session.limit < 100)
+      sessionStatus.push(<span key="limit" className="badge bg-warning">{session.limit} %</span>);
 
     return (
       <tr key={session.id}>
@@ -303,7 +303,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         break;
       case "failed":
         claimStatus = <OverlayTrigger
-          placement="right"
+          placement="left"
           delay={{ show: 250, hide: 400 }}
           overlay={(props) => this.renderClaimFailInfo(claim, props)}
         >
@@ -332,7 +332,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     
     return (
       <Tooltip id="ipinfo-tooltip" {...props}>
-        <div className='ipaddr-info'>
+        <div className='ipaddr-info claim-error'>
           {claim.error}
         </div>
       </Tooltip>
