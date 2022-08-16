@@ -20,6 +20,7 @@ interface IPoWMinerWorker {
   ready: boolean;
   stats: IPoWMinerWorkerStats[];
   lastNonce: number;
+  verifyWorker: boolean;
 }
 
 interface IPoWMinerWorkerStats {
@@ -55,6 +56,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   private options: IPoWMinerOptions;
   private settings: IPoWMinerSettings;
   private workers: IPoWMinerWorker[];
+  private verifyWorker: IPoWMinerWorker;
   private powParamsStr: string;
   private nonceQueue: number[];
   private lastSaveNonce: number;
@@ -84,6 +86,10 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     while(this.workers.length > 0) {
       this.stopWorker();
     }
+    if(this.verifyWorker) {
+      this.verifyWorker.worker.terminate();
+      this.verifyWorker = null;
+    }
   }
 
   public setPoWParams(params: IPoWParams, nonceCount: number) {
@@ -98,6 +104,12 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     this.nonceQueue = [];
 
     // forward to workers
+    if(this.verifyWorker) {
+      this.verifyWorker.worker.postMessage({
+        action: "setParams",
+        data: params
+      });
+    }
     this.workers.forEach((worker) => {
       if(!worker.ready)
         return;
@@ -146,20 +158,26 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     }
     while(this.workers.length < this.settings.workerCount) {
       // start worker
-      this.startWorker();
+      this.workers.push(this.startWorker());
+    }
+    if(!this.verifyWorker) {
+      this.verifyWorker = this.startWorker();
+      this.verifyWorker.id = -1;
+      this.verifyWorker.verifyWorker = true;
     }
   }
 
-  private startWorker() {
+  private startWorker(): IPoWMinerWorker {
     let worker: IPoWMinerWorker = {
       id: this.workers.length,
       worker: new Worker(this.options.workerSrc),
       ready: false,
       stats: [],
       lastNonce: 0,
+      verifyWorker: false,
     };
     worker.worker.addEventListener("message", (evt) => this.onWorkerMessage(worker, evt));
-    this.workers.push(worker);
+    return worker;
   }
 
   private stopWorker() {
@@ -192,22 +210,31 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   }
 
   private onWorkerInit(worker: IPoWMinerWorker) {
-    let sessionInfo = this.options.session.getSessionInfo();
-    let nonceRange = this.options.session.getNonceRange(this.targetNoncePrefill);
-
     worker.ready = true;
-    worker.lastNonce = nonceRange;
-    
-    worker.worker.postMessage({
-      action: "setWork",
-      data: {
-        workerid: worker.id,
-        preimage: sessionInfo.preimage,
-        params: this.options.powParams,
-        nonceStart: nonceRange,
-        nonceCount: this.targetNoncePrefill,
-      }
-    });
+
+    if(worker.verifyWorker) {
+      // don't assign any work to the verification worker to avoid verification delays
+      worker.worker.postMessage({
+        action: "setParams",
+        data: this.options.powParams
+      });
+    }
+    else {
+      let sessionInfo = this.options.session.getSessionInfo();
+      let nonceRange = this.options.session.getNonceRange(this.targetNoncePrefill);
+      worker.lastNonce = nonceRange;
+      
+      worker.worker.postMessage({
+        action: "setWork",
+        data: {
+          workerid: worker.id,
+          preimage: sessionInfo.preimage,
+          params: this.options.powParams,
+          nonceStart: nonceRange,
+          nonceCount: this.targetNoncePrefill,
+        }
+      });
+    }
   }
 
   private onWorkerNonce(worker: IPoWMinerWorker, nonce: any) {
@@ -330,9 +357,13 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   }
 
   public processVerification(verification: IPoWMinerVerification) {
-    if(this.workers.length == 0)
+    let verifyWorker = this.verifyWorker;
+    if(!verifyWorker && this.workers.length > 0)
+      verifyWorker = this.workers[0];
+    if(!verifyWorker)
       return;
-    this.workers[0].worker.postMessage({
+
+    verifyWorker.worker.postMessage({
       action: "verify",
       data: verification
     });
