@@ -56,6 +56,7 @@ export interface IFaucetConfig {
   verifyMinerMaxPending: number; // max number of pending verifications per miner before not sending any more verification requests
   verifyMinerMaxMissed: number; // max number of missed verifications before not sending any more verification requests
   verifyMinerTimeout: number; // timeout for verification requests (client gets penalized if not responding within this timespan)
+  verifyMinerReward: number; // reward for responding to a verification request in time
   verifyMinerMissPenalty: number; // penalty for not responding to a verification request (shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so)
 
   hcaptcha: IFaucetHCaptchaConfig | null; // hcaptcha parameters or null to disable all hcaptchas
@@ -172,6 +173,7 @@ let defaultConfig: IFaucetConfig = {
   verifyMinerMaxPending: 10,
   verifyMinerMaxMissed: 10,
   verifyMinerTimeout: 15,
+  verifyMinerReward: 0,
   verifyMinerMissPenalty: 10000000000000000,
   hcaptcha: null,
   concurrentSessions: 0,

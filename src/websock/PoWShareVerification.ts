@@ -1,11 +1,9 @@
 import { faucetConfig } from "../common/FaucetConfig";
 import { ServiceManager } from "../common/ServiceManager";
-import { IIPInfo } from "../services/IPInfoResolver";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PromiseDfd } from "../utils/PromiseDfd";
 import { PoWValidator } from "../validator/PoWValidator";
 import { PoWSessionSlashReason, PoWSession } from "./PoWSession";
-import { EthWeb3Manager } from "../services/EthWeb3Manager";
 import { PoWRewardLimiter } from "../services/PoWRewardLimiter";
 
 export interface IPoWShareVerificationResult {
@@ -17,10 +15,10 @@ export class PoWShareVerification {
   private static verifyingShares: {[id: string]: PoWShareVerification} = {};
   
 
-  public static processVerificationResult(shareId: string, verifier: string, isValid: boolean) {
+  public static processVerificationResult(shareId: string, verifier: string, isValid: boolean): boolean {
     if(!this.verifyingShares[shareId])
-      return;
-    this.verifyingShares[shareId].processVerificationResult(verifier, isValid);
+      return false;
+    return this.verifyingShares[shareId].processVerificationResult(verifier, isValid);
   }
 
   private shareId: string;
@@ -112,16 +110,18 @@ export class PoWShareVerification {
     return this.resultDfd.promise;
   }
 
-  public processVerificationResult(verifier: string, isValid: boolean) {
+  public processVerificationResult(verifier: string, isValid: boolean): boolean {
     let validatorIdx = this.verifyMinerSessions.indexOf(verifier);
     if(validatorIdx === -1)
-      return;
+      return false;
     
     this.verifyMinerSessions.splice(validatorIdx, 1);
     this.verifyMinerResults[verifier] = isValid;
     
     if(this.verifyMinerSessions.length === 0)
       this.completeVerification();
+    
+    return true;
   }
 
   private completeVerification() {

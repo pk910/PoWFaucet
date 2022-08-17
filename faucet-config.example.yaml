@@ -90,6 +90,11 @@ claimMaxAmount: 17000000000000000000  # 17 ETH
 # shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so
 verifyMinerMissPenalty: 5000000000000000  # 0.005 ETH
 
+# reward for responding to a verification request in time (in wei)
+# some extra reward for slow miners - should be much lower than powShareReward
+# comment out to disable rewards for verification requests
+verifyMinerReward: 3125000000000000  # 0.003125 ETH  (1/4th of powShareReward)
+
 # maximum mining session time (in seconds)
 powSessionTimeout: 10800  # 3h
 

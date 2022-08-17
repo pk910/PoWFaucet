@@ -109,5 +109,22 @@ export class PoWRewardLimiter {
 
     return shareReward;
   }
+
+  public getVerificationReward(session: PoWSession): number {
+    let shareReward = faucetConfig.verifyMinerReward;
+
+    if(faucetConfig.faucetBalanceRestrictedReward) {
+      // apply balance restriction if faucet wallet is low on funds
+      let balanceRestriction = this.getBalanceRestriction();
+      if(balanceRestriction < 100)
+        shareReward = Math.floor(shareReward / 100 * balanceRestriction);
+    }
+
+    let restrictedReward = this.getSessionRestriction(session);
+    if(restrictedReward < 100)
+      shareReward = Math.floor(shareReward / 100 * restrictedReward);
+
+    return shareReward;
+  }
   
 }

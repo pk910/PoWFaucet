@@ -467,7 +467,16 @@ export class PoWClient {
       isValid: boolean;
     } = message.data;
 
-    PoWShareVerification.processVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
+    let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
+    let verifyReward: number;
+    if(verifyValid && (verifyReward = ServiceManager.GetService(PoWRewardLimiter).getVerificationReward(this.session)) > 0) {
+      this.session.addBalance(verifyReward);
+      this.sendMessage("updateBalance", {
+        balance: this.session.getBalance(),
+        recovery: this.session.getSignedSession(),
+        reason: "valid verification"
+      });
+    }
   }
 
   private onCliCloseSession(message: any) {
