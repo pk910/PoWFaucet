@@ -136,16 +136,23 @@ export class PoWSession {
     let cleanupTime = faucetConfig.powSessionTimeout - sessionAge;
     if(cleanupTime > 0) {
       this.cleanupTimer = setTimeout(() => {
-        if(this.activeClient)
-          this.activeClient.sendMessage("sessionKill", {
-            level: "timeout",
-            message: "Session timed out."
-          });
-        this.closeSession(true, true);
+        this.timeoutSession();
       }, cleanupTime * 1000);
     }
     else {
-      this.closeSession(true, true);
+      this.timeoutSession();
+    }
+  }
+
+  private timeoutSession() {
+    let activeClient = this.activeClient;
+    this.closeSession(true, true);
+    if(activeClient) {
+      activeClient.sendMessage("sessionKill", {
+        level: "timeout",
+        message: "Session timed out.",
+        token: this.isClaimable() ? this.getSignedSession() : null,
+      });
     }
   }
 
@@ -350,7 +357,8 @@ export class PoWSession {
     if(this.activeClient)
       this.activeClient.sendMessage("sessionKill", {
         level: "session",
-        message: reason
+        message: reason,
+        token: null
       });
     this.closeSession();
   }

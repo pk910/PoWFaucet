@@ -345,7 +345,8 @@ export class PoWClient {
       client.setSession(null);
       client.sendMessage("sessionKill", {
         level: "client",
-        message: "session resumed from another client"
+        message: "session resumed from another client",
+        token: null
       });
     }
 
