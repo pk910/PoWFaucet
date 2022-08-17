@@ -119,6 +119,11 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         event: "error",
         listener: (error) => this.onPoWSessionError(error),
       },
+      "sessionClaimable": {
+        emmiter: this.powSession,
+        event: "claimable",
+        listener: (claimInfo) => this.onPoWSessionClaimable(claimInfo),
+      },
     };
 
     this.state = {
@@ -245,6 +250,12 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     });
   }
 
+  private onPoWSessionClaimable(claimInfo: IPoWClaimInfo) {
+    this.setState({
+      showClaimRewardDialog: claimInfo
+    });
+  }
+
 	public render(): React.ReactElement<IPoWFaucetProps> {
     let renderControl: React.ReactElement;
     if(this.state.initializing) {
@@ -361,8 +372,6 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
                 this.powSession.storeClaimInfo(null);
               this.setState({
                 showClaimRewardDialog: null,
-                miningStatus: PoWFaucetMiningStatus.IDLE,
-                statusMessage: null,
               });
             }}
             setDialog={(dialog) => this.setState({ statusDialog: dialog })}
@@ -463,36 +472,19 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       });
       return;
     }
-    
+
     this.setState({
       miningStatus: PoWFaucetMiningStatus.STOPPING,
       statusMessage: "Claiming rewards..."
     });
     this.powSession.getMiner().stopMiner();
 
-    
-    this.powSession.closeSession().then((claimToken) => {
+    this.powSession.closeSession().then(() => {
       this.powSession.setMiner(null);
-
-      if(claimToken) {
-        let claimInfo: IPoWClaimInfo = {
-          session: sessionInfo.sessionId,
-          startTime: sessionInfo.startTime,
-          target: sessionInfo.targetAddr,
-          balance: sessionInfo.balance,
-          token: claimToken
-        };
-        this.powSession.storeClaimInfo(claimInfo);
-        this.setState({
-          showClaimRewardDialog: claimInfo
-        });
-      }
-      else {
-        this.setState({
-          miningStatus: PoWFaucetMiningStatus.IDLE,
-          statusMessage: null,
-        });
-      }
+      this.setState({
+        miningStatus: PoWFaucetMiningStatus.IDLE,
+        statusMessage: null,
+      });
     });
   }
 

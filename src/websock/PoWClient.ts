@@ -141,13 +141,17 @@ export class PoWClient {
     this.socket.send(JSON.stringify(message));
   }
 
-  private sendErrorResponse(errCode: string, errMessage: string, reqId?: any, skipLog?: boolean) {
+  private sendErrorResponse(errCode: string, errMessage: string, reqId?: any, skipLog?: boolean, data?: any) {
     if(!skipLog)
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Returned error to client: [" + errCode + "] " + errMessage);
-    this.sendMessage("error", {
+    
+    let resObj: any = {
       code: errCode,
       message: errMessage
-    }, reqId);
+    };
+    if(data)
+      resObj.data = data;
+    this.sendMessage("error", resObj, reqId);
   }
 
   public sendFaucetStatus(status: IFaucetStatus[], hash: string) {
@@ -313,8 +317,25 @@ export class PoWClient {
 
     let sessionId: string = message.data.sessionId;
     let session: PoWSession;
-    if(!isValidGuid(sessionId) || !(session = PoWSession.getSession(sessionId)))
+    if(!isValidGuid(sessionId))
       return this.sendErrorResponse("INVALID_SESSIONID", "Invalid session id: " + sessionId, reqId);
+
+    if(!(session = PoWSession.getSession(sessionId))) {
+      if((session = PoWSession.getClosedSession(sessionId))) {
+        let sessClaim: any = null;
+        // check if closed session is claimable and return claim token if so
+        if(session.isClaimable() && ServiceManager.GetService(FaucetStore).getSessionMarks(session.getSessionId(), []).indexOf(SessionMark.CLAIMED) === -1) {
+          sessClaim = {
+            balance: session.getBalance(),
+            token: session.getSignedSession(),
+          };
+        }
+        return this.sendErrorResponse("SESSION_CLOSED", "Session has been closed.", reqId, false, sessClaim);
+      }
+      else
+        return this.sendErrorResponse("INVALID_SESSIONID", "Unknown session id: " + sessionId, reqId);
+    }
+    
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp, session) >= faucetConfig.concurrentSessions)
       return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", reqId);
@@ -360,10 +381,9 @@ export class PoWClient {
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
       return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", reqId);
 
-    var startTime = new Date(sessionInfo.startTime * 1000);
+    let startTime = new Date(sessionInfo.startTime * 1000);
     if(faucetConfig.powSessionTimeout && ((new Date()).getTime() - startTime.getTime()) / 1000 > faucetConfig.powSessionTimeout)
       return this.sendErrorResponse("SESSION_TIMEOUT", "Session is too old to recover (timeout)", reqId);
-
     let sessionMarks = ServiceManager.GetService(FaucetStore).getSessionMarks(sessionInfo.id, []);
     if(sessionMarks.length > 0)
       return this.sendErrorResponse("INVALID_SESSION", "Session cannot be recovered (" + sessionMarks.join(",") + ")", reqId);

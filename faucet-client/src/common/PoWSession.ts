@@ -37,6 +37,7 @@ interface PoWSessionEvents {
   'update': () => void;
   'killed': (killInfo: any) => void;
   'error': (message: string) => void;
+  'claimable': (claimInfo: IPoWClaimInfo) => void;
 }
 
 export class PoWSession extends TypedEmitter<PoWSessionEvents> {
@@ -92,10 +93,27 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       if(res.lastNonce > sessionInfo.noncePos)
         sessionInfo.noncePos = res.lastNonce + 1;
     }, (err) => {
-      if(err && err.code && err.code === "INVALID_SESSIONID") // server doesn't know about this session id anymore - try recover
-        return this.options.client.sendRequest("recoverSession", sessionInfo.recovery);
+      if(err && err.code) {
+        switch(err.code) {
+          case "INVALID_SESSIONID":
+            // server doesn't know about this session id anymore - try recover
+            return this.options.client.sendRequest("recoverSession", sessionInfo.recovery);
+          case "SESSION_CLOSED":
+            if(!err.data || !err.data.token)
+              break;
+            // session was closed, but we've got a claim token
+            let claimInfo = this.getClaimInfo(err.data.token, sessionInfo);
+            this.storeClaimInfo(claimInfo);
+            this.emit("claimable", claimInfo);
+            this.closedSession();
+            sessionInfo = null;
+            return;
+        }
+      }
       throw err;
     }).then(() => {
+      if(!sessionInfo)
+        return;
       this.sessionInfo = sessionInfo;
 
       // resumed session
@@ -157,10 +175,16 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     return noncePos;
   }
 
-  public closeSession(): Promise<string> {
+  public closeSession(): Promise<void> {
     return this.options.client.sendRequest("closeSession").then((rsp) => {
+
+      if(rsp.claimable) {
+        let claimInfo = this.getClaimInfo(rsp.token);
+        this.storeClaimInfo(claimInfo);
+        this.emit("claimable", claimInfo);
+      }
+
       this.closedSession();
-      return rsp.claimable ? rsp.token : null;
     });
   }
 
@@ -218,6 +242,18 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       return Promise.reject("no session found that can be restored (did you restore it in another tab already?)");
 
     return this.resumeSession(sessionInfo);
+  }
+
+  public getClaimInfo(claimToken: string, sessionInfo?: IPoWSessionInfo): IPoWClaimInfo {
+    if(!sessionInfo)
+    sessionInfo = this.sessionInfo;
+    return {
+      session: sessionInfo.sessionId,
+      startTime: sessionInfo.startTime,
+      target: sessionInfo.targetAddr,
+      balance: sessionInfo.balance,
+      token: claimToken
+    };
   }
 
   public getStoredClaimInfo(): IPoWClaimInfo {

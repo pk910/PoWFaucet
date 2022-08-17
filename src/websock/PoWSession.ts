@@ -133,11 +133,19 @@ export class PoWSession {
 
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionAge = now - Math.floor(this.startTime.getTime() / 1000);
-    let cleanupTime = faucetConfig.powSessionTimeout - sessionAge + 20;
+    let cleanupTime = faucetConfig.powSessionTimeout - sessionAge;
     if(cleanupTime > 0) {
       this.cleanupTimer = setTimeout(() => {
-        this.closeSession();
+        if(this.activeClient)
+          this.activeClient.sendMessage("sessionKill", {
+            level: "timeout",
+            message: "Session timed out."
+          });
+        this.closeSession(true, true);
       }, cleanupTime * 1000);
+    }
+    else {
+      this.closeSession(true, true);
     }
   }
 
