@@ -471,6 +471,10 @@ export class PoWClient {
     let verifyReward: number;
     if(verifyValid && (verifyReward = ServiceManager.GetService(PoWRewardLimiter).getVerificationReward(this.session)) > 0) {
       this.session.addBalance(verifyReward);
+
+      let faucetStats = ServiceManager.GetService(FaucetStatsLog);
+      faucetStats.statVerifyReward += verifyReward;
+
       this.sendMessage("updateBalance", {
         balance: this.session.getBalance(),
         recovery: this.session.getSignedSession(),

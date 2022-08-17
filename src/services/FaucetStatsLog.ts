@@ -14,6 +14,7 @@ export class FaucetStatsLog {
   public statShareRewards: number = 0;
   public statVerifyCount: number = 0;
   public statVerifyMisses: number = 0;
+  public statVerifyReward: number = 0;
   public statClaimCount: number = 0;
   public statClaimRewards: number = 0;
 
@@ -98,7 +99,7 @@ export class FaucetStatsLog {
     let statsLog = [];
     statsLog.push("clients: " + PoWClient.getClientCount());
     statsLog.push("sessions: " + sessions.length + " (" + hashRate + " H/s, " + idleSessCount + " idle)");
-    statsLog.push("shares: " + this.statShareCount + " (" + (Math.round(weiToEth(this.statShareRewards)*1000)/1000) + " ETH, " + (this.statVerifyCount -  this.statVerifyMisses) + "/" + this.statVerifyCount + " verified)");
+    statsLog.push("shares: " + this.statShareCount + " (" + (Math.round(weiToEth(this.statShareRewards)*1000)/1000) + " ETH, " + (this.statVerifyCount -  this.statVerifyMisses) + "/" + this.statVerifyCount + " verified, " + (Math.round(weiToEth(this.statVerifyReward)*1000)/1000) + " ETH)");
     statsLog.push("claims: " + this.statClaimCount + " (" + (Math.round(weiToEth(this.statClaimRewards)*1000)/1000) + " ETH)");
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "# STATS # " + statsLog.join(", "));
 
@@ -111,6 +112,7 @@ export class FaucetStatsLog {
       shareVal: this.statShareRewards,
       vrfyCnt: this.statVerifyCount,
       vrfyMisa: this.statVerifyMisses,
+      vrfyVal: this.statVerifyReward,
       claimCnt: this.statClaimCount,
       claimVal: this.statClaimRewards,
     });
@@ -119,6 +121,7 @@ export class FaucetStatsLog {
     this.statShareRewards = 0;
     this.statVerifyCount = 0;
     this.statVerifyMisses = 0;
+    this.statVerifyReward = 0;
     this.statClaimCount = 0;
     this.statClaimRewards = 0;
   }
