@@ -469,7 +469,7 @@ export class PoWClient {
 
     let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
     let verifyReward: number;
-    if(verifyValid && (verifyReward = ServiceManager.GetService(PoWRewardLimiter).getVerificationReward(this.session)) > 0) {
+    if(verifyValid && this.session && (verifyReward = ServiceManager.GetService(PoWRewardLimiter).getVerificationReward(this.session)) > 0) {
       this.session.addBalance(verifyReward);
 
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
