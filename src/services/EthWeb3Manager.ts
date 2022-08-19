@@ -185,6 +185,10 @@ export class EthWeb3Manager {
     return this.web3.eth.getBalance(addr).then((res) => parseInt(res));
   }
 
+  public checkIsContract(addr: string): Promise<boolean> {
+    return this.web3.eth.getCode(addr).then((res) => res && !!res.match(/^0x[0-9a-f]{2,}$/));
+  }
+
   public getFaucetBalance(): number {
     return this.walletState?.balance;
   }

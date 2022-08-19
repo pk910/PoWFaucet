@@ -108,6 +108,9 @@ claimAddrCooldown: 7200  # 2h
 # check balance and deny mining if balance exceeds the limit (in wei)
 claimAddrMaxBalance: 100000000000000000000 # 100 ETH
 
+# check and prevent mining if target address is a contract
+claimAddrDenyContract: true
+
 # number of concurrent mining sessions allowed per IP (0 = unlimited)
 concurrentSessions: 1
 
