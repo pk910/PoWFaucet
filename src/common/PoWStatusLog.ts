@@ -14,6 +14,7 @@ export enum PoWStatusLogLevel {
   ERROR   = "ERROR",
   WARNING = "WARNING",
   INFO    = "INFO",
+  HIDDEN  = "HIDDEN",
 }
 
 export class PoWStatusLog extends TypedEmitter<PoWStatusLogEvents> {
@@ -45,6 +46,9 @@ export class PoWStatusLog extends TypedEmitter<PoWStatusLogEvents> {
   }
 
   public emitLog(level: PoWStatusLogLevel, message: string, data?: any) {
+    if(level === PoWStatusLogLevel.HIDDEN)
+      return;
+    
     let logLine = renderDate(new Date(), true, true) + "  " + strPadRight(level, 7, " ") + "  " + message;
 
     if(faucetConfig.faucetLogFile) {

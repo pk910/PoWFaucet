@@ -105,7 +105,7 @@ export class PoWClient {
     if(!this.socket)
       return;
     try {
-      this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""), null, true);
+      this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""), null, PoWStatusLogLevel.HIDDEN);
       this.socket.close();
     } catch(ex) {}
     this.socket = null;
@@ -141,9 +141,11 @@ export class PoWClient {
     this.socket.send(JSON.stringify(message));
   }
 
-  private sendErrorResponse(errCode: string, errMessage: string, reqId?: any, skipLog?: boolean, data?: any) {
-    if(!skipLog)
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Returned error to client: [" + errCode + "] " + errMessage);
+  private sendErrorResponse(errCode: string, errMessage: string, reqMsg?: any, logLevel?: PoWStatusLogLevel, data?: any) {
+    if(!logLevel)
+      logLevel = PoWStatusLogLevel.WARNING;
+    let logReqMsg = reqMsg && logLevel !== PoWStatusLogLevel.INFO;
+    ServiceManager.GetService(PoWStatusLog).emitLog(logLevel, "Returned error to client: [" + errCode + "] " + errMessage + (logReqMsg ? "\n    Message: " + JSON.stringify(reqMsg) : ""));
     
     let resObj: any = {
       code: errCode,
@@ -151,7 +153,7 @@ export class PoWClient {
     };
     if(data)
       resObj.data = data;
-    this.sendMessage("error", resObj, reqId);
+    this.sendMessage("error", resObj, reqMsg ? reqMsg.id : undefined);
   }
 
   public sendFaucetStatus(status: IFaucetStatus[], hash: string) {
@@ -249,57 +251,57 @@ export class PoWClient {
     let reqId = message.id || undefined;
 
     if(this.session)
-      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", reqId);
+      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
     if(typeof message.data !== "object" || !message.data)
-      return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", reqId);
+      return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", message);
 
     if(faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkSessionStart) {
       if(!message.data.token)
-        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha token required to start new session", reqId);
+        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha token required to start new session", message, PoWStatusLogLevel.INFO);
       let hcaptchaResponse = await hcaptcha.verify(faucetConfig.hcaptcha.secret, message.data.token, this.remoteIp, faucetConfig.hcaptcha.siteKey);
       if(!hcaptchaResponse.success)
-        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha verification failed", reqId);
+        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha verification failed", message, PoWStatusLogLevel.INFO);
     }
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
-      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", reqId);
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
 
     let targetAddr: string = message.data.addr;
     if(typeof targetAddr === "string" && targetAddr.match(/^[-a-zA-Z0-9@:%._\+~#=]{1,256}\.eth$/) && faucetConfig.ensResolver) {
       try {
         targetAddr = await ServiceManager.GetService(EnsWeb3Manager).resolveEnsName(targetAddr);
       } catch(ex) {
-        return this.sendErrorResponse("INVALID_ENSNAME", "Could not resolve ENS Name: " + ex.toString(), reqId);
+        return this.sendErrorResponse("INVALID_ENSNAME", "Could not resolve ENS Name '" + targetAddr + "': " + ex.toString(), message, PoWStatusLogLevel.INFO);
       }
     }
 
     if(typeof targetAddr !== "string" || !targetAddr.match(/^0x[0-9a-f]{40}$/i) || targetAddr.match(/^0x0{40}$/i))
-      return this.sendErrorResponse("INVALID_ADDR", "Invalid target address: " + targetAddr, reqId);
+      return this.sendErrorResponse("INVALID_ADDR", "Invalid target address: " + targetAddr, message, PoWStatusLogLevel.INFO);
 
     let addressMarks = ServiceManager.GetService(FaucetStore).getAddressMarks(targetAddr);
     if(addressMarks.indexOf(AddressMark.USED) !== -1)
-      return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (please wait " + renderTimespan(faucetConfig.claimAddrCooldown) + " between requests)", reqId);
+      return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (please wait " + renderTimespan(faucetConfig.claimAddrCooldown) + " between requests)", message, PoWStatusLogLevel.INFO);
     else if(addressMarks.length > 0)
-      return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (" + addressMarks.join(",") + ")", reqId);
+      return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (" + addressMarks.join(",") + ")", message, PoWStatusLogLevel.INFO);
     
     if(typeof faucetConfig.claimAddrMaxBalance === "number") {
       let walletBalance: number;
       try {
         walletBalance = await ServiceManager.GetService(EthWeb3Manager).getWalletBalance(targetAddr);
       } catch(ex) {
-        return this.sendErrorResponse("BALANCE_ERROR", "Could not get balance of Wallet " + targetAddr + ": " + ex.toString(), reqId);
+        return this.sendErrorResponse("BALANCE_ERROR", "Could not get balance of Wallet " + targetAddr + ": " + ex.toString(), message);
       }
       if(walletBalance > faucetConfig.claimAddrMaxBalance)
-        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + (Math.round(weiToEth(walletBalance)*1000)/1000) + " " + faucetConfig.faucetCoinSymbol + " in your wallet. Please give others a chance to get some funds too.", reqId);
+        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + (Math.round(weiToEth(walletBalance)*1000)/1000) + " " + faucetConfig.faucetCoinSymbol + " in your wallet. Please give others a chance to get some funds too.", message, PoWStatusLogLevel.INFO);
     }
 
     if(faucetConfig.claimAddrDenyContract) {
       try {
         if(await ServiceManager.GetService(EthWeb3Manager).checkIsContract(targetAddr)) {
-          return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (address is a contract)", reqId);
+          return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (address is a contract)", message, PoWStatusLogLevel.INFO);
         }
       } catch(ex) {
-        return this.sendErrorResponse("BALANCE_ERROR", "Could not check contract status of wallet " + targetAddr + ": " + ex.toString(), reqId);
+        return this.sendErrorResponse("BALANCE_ERROR", "Could not check contract status of wallet " + targetAddr + ": " + ex.toString(), message);
       }
     }
     
@@ -321,14 +323,14 @@ export class PoWClient {
     let reqId = message.id || undefined;
 
     if(this.session)
-      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", reqId);
+      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
     if(typeof message.data !== "object" || !message.data) 
-      return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", reqId);
+      return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", message);
 
     let sessionId: string = message.data.sessionId;
     let session: PoWSession;
     if(!isValidGuid(sessionId))
-      return this.sendErrorResponse("INVALID_SESSIONID", "Invalid session id: " + sessionId, reqId);
+      return this.sendErrorResponse("INVALID_SESSIONID", "Invalid session id: " + sessionId, message);
 
     if(!(session = PoWSession.getSession(sessionId))) {
       if((session = PoWSession.getClosedSession(sessionId))) {
@@ -340,15 +342,15 @@ export class PoWClient {
             token: session.getSignedSession(),
           };
         }
-        return this.sendErrorResponse("SESSION_CLOSED", "Session has been closed.", reqId, false, sessClaim);
+        return this.sendErrorResponse("SESSION_CLOSED", "Session has been closed.", message, PoWStatusLogLevel.INFO, sessClaim);
       }
       else
-        return this.sendErrorResponse("INVALID_SESSIONID", "Unknown session id: " + sessionId, reqId);
+        return this.sendErrorResponse("INVALID_SESSIONID", "Unknown session id: " + sessionId, message, PoWStatusLogLevel.INFO);
     }
     
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp, session) >= faucetConfig.concurrentSessions)
-      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", reqId);
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
 
     let client: PoWClient;
     if((client = session.getActiveClient())) {
@@ -371,9 +373,9 @@ export class PoWClient {
     let reqId = message.id || undefined;
 
     if(this.session)
-      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", reqId);
+      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
     if(typeof message.data !== "string" || !message.data)
-      return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", reqId);
+      return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", message);
 
     let sessionSplit = message.data.split("|", 2);
     let sessionStr = sessionSplit[0];
@@ -383,21 +385,21 @@ export class PoWClient {
     sessionHash.update(sessionStr);
 
     if(!sessionStr || sessionSplit[1] !== sessionHash.digest('base64'))
-      return this.sendErrorResponse("INVALID_DATA", "Invalid recovery data", reqId);
+      return this.sendErrorResponse("INVALID_DATA", "Invalid recovery data", message);
 
     let sessionInfo = JSON.parse(Buffer.from(sessionStr, 'base64').toString("utf8"));
     if(PoWSession.getSession(sessionInfo.id))
-      return this.sendErrorResponse("DUPLICATE_SESSION", "Session does already exist and cannot be recovered", reqId);
+      return this.sendErrorResponse("DUPLICATE_SESSION", "Session does already exist and cannot be recovered", message);
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
-      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", reqId);
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
 
     let startTime = new Date(sessionInfo.startTime * 1000);
     if(faucetConfig.powSessionTimeout && ((new Date()).getTime() - startTime.getTime()) / 1000 > faucetConfig.powSessionTimeout)
-      return this.sendErrorResponse("SESSION_TIMEOUT", "Session is too old to recover (timeout)", reqId);
+      return this.sendErrorResponse("SESSION_TIMEOUT", "Session is too old to recover (timeout)", message);
     let sessionMarks = ServiceManager.GetService(FaucetStore).getSessionMarks(sessionInfo.id, []);
     if(sessionMarks.length > 0)
-      return this.sendErrorResponse("INVALID_SESSION", "Session cannot be recovered (" + sessionMarks.join(",") + ")", reqId);
+      return this.sendErrorResponse("INVALID_SESSION", "Session cannot be recovered (" + sessionMarks.join(",") + ")", message);
 
     let session = new PoWSession(this, sessionInfo.targetAddr, {
       id: sessionInfo.id,
@@ -413,9 +415,9 @@ export class PoWClient {
     let reqId = message.id || undefined;
 
     if(!this.session)
-      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found", reqId);
+      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found", message);
     if(typeof message.data !== "object" || !message.data)
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid share data", reqId);
+      return this.sendErrorResponse("INVALID_SHARE", "Invalid share data", message);
     
     let shareData: {
       nonces: number[];
@@ -430,14 +432,14 @@ export class PoWClient {
       "|" + faucetConfig.powScryptParams.difficulty;
 
     if(shareData.params !== powParamsStr) 
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", reqId);
+      return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", message);
     if(shareData.nonces.length !== faucetConfig.powNonceCount)
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count", reqId);
+      return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count", message);
     
     let lastNonce = this.session.getLastNonce();
     for(let i = 0; i < shareData.nonces.length; i++) {
       if(shareData.nonces[i] <= lastNonce)
-        return this.sendErrorResponse("INVALID_SHARE", "Nonce too low", reqId);
+        return this.sendErrorResponse("INVALID_SHARE", "Nonce too low", message);
       lastNonce = shareData.nonces[i];
     }
     this.session.setLastNonce(lastNonce);
@@ -449,7 +451,7 @@ export class PoWClient {
     let sessionId = this.session.getSessionId();
     shareVerification.startVerification().then((result) => {
       if(!result.isValid)
-        this.sendErrorResponse("WRONG_SHARE", "Share verification failed", reqId);
+        this.sendErrorResponse("WRONG_SHARE", "Share verification failed", message);
       else {
         if(reqId)
           this.sendMessage("ok", null, reqId);
@@ -461,7 +463,7 @@ export class PoWClient {
         faucetStats.statVerifyMisses += shareVerification.getMinerVerifyMisses();
       }
     }, () => {
-      this.sendErrorResponse("VERIFY_FAILED", "Share verification error", reqId);
+      this.sendErrorResponse("VERIFY_FAILED", "Share verification error", message);
     });
   }
   
@@ -497,7 +499,7 @@ export class PoWClient {
     let reqId = message.id || undefined;
 
     if(!this.session) 
-      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found", reqId);
+      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found", message);
 
     let session = this.session;
     this.session.closeSession(true, true);
@@ -513,14 +515,14 @@ export class PoWClient {
     let reqId = message.id || undefined;
 
     if(typeof message.data !== "object" || !message.data || !message.data.token)
-      return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (missing)", reqId);
+      return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (missing)", message);
 
     if(faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkBalanceClaim) {
       if(!message.data.captcha) 
-        return this.sendErrorResponse("INVALID_CAPTCHA", "HCaptcha token required to claim rewards", reqId);
+        return this.sendErrorResponse("INVALID_CAPTCHA", "HCaptcha token required to claim rewards", message, PoWStatusLogLevel.INFO);
       let hcaptchaResponse = await hcaptcha.verify(faucetConfig.hcaptcha.secret, message.data.captcha, this.remoteIp, faucetConfig.hcaptcha.siteKey);
       if(!hcaptchaResponse.success) 
-        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha verification failed", reqId);
+        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha verification failed", message, PoWStatusLogLevel.INFO);
     }
 
     let sessionSplit = message.data.token.split("|", 2);
@@ -531,19 +533,19 @@ export class PoWClient {
     sessionHash.update(sessionStr);
 
     if(!sessionStr || sessionSplit[1] !== sessionHash.digest('base64')) 
-      return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (verification failed)", reqId);
+      return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (verification failed)", message);
 
     let sessionInfo = JSON.parse(Buffer.from(sessionStr, 'base64').toString("utf8"));
     if(!sessionInfo.claimable)
-      return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (not claimable)", reqId);
+      return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (not claimable)", message);
 
     var startTime = new Date(sessionInfo.startTime * 1000);
     if(faucetConfig.claimSessionTimeout && ((new Date()).getTime() - startTime.getTime()) / 1000 > faucetConfig.claimSessionTimeout)
-      return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (expired)", reqId);
+      return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (expired)", message);
 
     let sessionMarks = ServiceManager.GetService(FaucetStore).getSessionMarks(sessionInfo.id, [SessionMark.CLOSED]);
     if(sessionMarks.length > 0) 
-      return this.sendErrorResponse("INVALID_CLAIM", "Session is not allowed to claim (" + sessionMarks.join(",") + ")", reqId);
+      return this.sendErrorResponse("INVALID_CLAIM", "Session is not allowed to claim (" + sessionMarks.join(",") + ")", message);
 
     ServiceManager.GetService(FaucetStore).setSessionMark(sessionInfo.id, SessionMark.CLAIMED);
 

@@ -15,8 +15,10 @@ export class FaucetStatsLog {
   public statVerifyCount: number = 0;
   public statVerifyMisses: number = 0;
   public statVerifyReward: number = 0;
+  public statVerifyPenalty: number = 0;
   public statClaimCount: number = 0;
   public statClaimRewards: number = 0;
+  public statSlashCount: number = 0;
 
   private enabled: boolean;
   private statsFile: string;
@@ -99,7 +101,8 @@ export class FaucetStatsLog {
     let statsLog = [];
     statsLog.push("clients: " + PoWClient.getClientCount());
     statsLog.push("sessions: " + sessions.length + " (" + hashRate + " H/s, " + idleSessCount + " idle)");
-    statsLog.push("shares: " + this.statShareCount + " (" + (Math.round(weiToEth(this.statShareRewards)*1000)/1000) + " ETH, " + (this.statVerifyCount -  this.statVerifyMisses) + "/" + this.statVerifyCount + " verified, " + (Math.round(weiToEth(this.statVerifyReward)*1000)/1000) + " ETH)");
+    statsLog.push("shares: " + this.statShareCount + " (" + (Math.round(weiToEth(this.statShareRewards)*1000)/1000) + " ETH)");
+    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + (Math.round(weiToEth(this.statVerifyReward)*1000)/1000) + " ETH,  missed: " + this.statVerifyMisses + " (-" + (Math.round(weiToEth(this.statVerifyPenalty)*1000)/1000) + " ETH))");
     statsLog.push("claims: " + this.statClaimCount + " (" + (Math.round(weiToEth(this.statClaimRewards)*1000)/1000) + " ETH)");
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "# STATS # " + statsLog.join(", "));
 
@@ -113,8 +116,10 @@ export class FaucetStatsLog {
       vrfyCnt: this.statVerifyCount,
       vrfyMisa: this.statVerifyMisses,
       vrfyVal: this.statVerifyReward,
+      vrfyPen: this.statVerifyPenalty,
       claimCnt: this.statClaimCount,
       claimVal: this.statClaimRewards,
+      slashCnt: this.statSlashCount,
     });
 
     this.statShareCount = 0;
@@ -122,8 +127,10 @@ export class FaucetStatsLog {
     this.statVerifyCount = 0;
     this.statVerifyMisses = 0;
     this.statVerifyReward = 0;
+    this.statVerifyPenalty = 0;
     this.statClaimCount = 0;
     this.statClaimRewards = 0;
+    this.statSlashCount = 0;
   }
 
 }
