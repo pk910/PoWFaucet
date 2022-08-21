@@ -41,6 +41,7 @@ export class PoWClient {
   private pingTimer: NodeJS.Timer = null;
   private lastPingPong: Date;
   private statusHash: string;
+  private clientVersion: string;
 
   public constructor(socket: WebSocket, remoteIp: string) {
     this.socket = socket;
@@ -218,6 +219,9 @@ export class PoWClient {
 
   private onCliGetConfig(message: any) {
     let reqId = message.id || undefined;
+    if(message.data && message.data.version)
+      this.clientVersion = message.data.version;
+
     let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this.session);
     this.statusHash = faucetStatus.hash;
     this.sendMessage("config", {
@@ -638,6 +642,12 @@ export class PoWClient {
       sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
       sessionIdHash.update(session.getSessionId());
 
+      let activeClient = session.getActiveClient();
+      let clientVersion = null;
+      if(activeClient) {
+        clientVersion = activeClient.clientVersion;
+      }
+
       return {
         id: sessionIdHash.digest("hex").substring(0, 20),
         start: Math.floor(session.getStartTime().getTime() / 1000),
@@ -651,6 +661,7 @@ export class PoWClient {
         status: session.getSessionStatus(),
         claimable: session.isClaimable(),
         limit: rewardLimiter.getSessionRestriction(session),
+        cliver: clientVersion,
       }
     });
 

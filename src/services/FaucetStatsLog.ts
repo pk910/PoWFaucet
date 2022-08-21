@@ -102,7 +102,7 @@ export class FaucetStatsLog {
     statsLog.push("clients: " + PoWClient.getClientCount());
     statsLog.push("sessions: " + sessions.length + " (" + hashRate + " H/s, " + idleSessCount + " idle)");
     statsLog.push("shares: " + this.statShareCount + " (" + (Math.round(weiToEth(this.statShareRewards)*1000)/1000) + " ETH)");
-    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + (Math.round(weiToEth(this.statVerifyReward)*1000)/1000) + " ETH,  missed: " + this.statVerifyMisses + " (-" + (Math.round(weiToEth(this.statVerifyPenalty)*1000)/1000) + " ETH))");
+    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + (Math.round(weiToEth(this.statVerifyReward)*1000)/1000) + " ETH, missed: " + this.statVerifyMisses + " / -" + (Math.round(weiToEth(this.statVerifyPenalty)*1000)/1000) + " ETH)");
     statsLog.push("claims: " + this.statClaimCount + " (" + (Math.round(weiToEth(this.statClaimRewards)*1000)/1000) + " ETH)");
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "# STATS # " + statsLog.join(", "));
 

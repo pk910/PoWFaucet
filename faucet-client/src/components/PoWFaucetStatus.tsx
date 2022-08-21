@@ -37,6 +37,7 @@ interface IPoWFaucetStatusSession {
   status: string;
   claimable: boolean;
   limit: number;
+  cliver?: string;
 }
 
 interface IPoWFaucetStatusIPInfo {
@@ -146,6 +147,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <th scope="col">Timeout</th>
             <th scope="col">Balance</th>
             <th scope="col">Nonce</th>
+            <th scope="col">CliVer</th>
             <th scope="col">Status</th>
           </tr>
         </thead>
@@ -153,7 +155,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           {this.state.activeSessions.length > 0 ?
             this.state.activeSessions.map((session) => this.renderActiveSessionRow(session)) :
             <tr key="none">
-              <th scope="row" colSpan={8}>No active sessions</th>
+              <th scope="row" colSpan={9}>No active sessions</th>
             </tr>
           }
         </tbody>
@@ -208,6 +210,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{renderDate(new Date((session.start + this.props.faucetConfig.powTimeout) * 1000), true)}</td>
         <td>{Math.round(weiToEth(session.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{session.nonce}</td>
+        <td>{session.cliver}</td>
         <td>{sessionStatus}</td>
       </tr>
     );
