@@ -117,6 +117,8 @@ export class PoWShareVerification {
     
     this.verifyMinerSessions.splice(validatorIdx, 1);
     this.verifyMinerResults[verifier] = isValid;
+    if(!isValid)
+      this.isInvalid = true;
     
     if(this.verifyMinerSessions.length === 0)
       this.completeVerification();
