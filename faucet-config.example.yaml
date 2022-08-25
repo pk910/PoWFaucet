@@ -228,7 +228,7 @@ noFundsError: "Sorry, the faucet is out of funds :("
 
 # reward restriction based on faucet wallet balance. lowest value applies
 faucetBalanceRestrictedReward:
-  100000000000000000000: 50  # 50% if lower than 100 ETH
+  100: 50  # 50% if lower than 100 ETH
 
 
 

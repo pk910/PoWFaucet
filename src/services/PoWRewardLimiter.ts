@@ -2,6 +2,7 @@
 import * as fs from 'fs';
 import { faucetConfig } from "../common/FaucetConfig";
 import { ServiceManager } from '../common/ServiceManager';
+import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWSession } from '../websock/PoWSession';
 import { EthWeb3Manager } from './EthWeb3Manager';
 import { IIPInfo } from "./IPInfoResolver";
@@ -54,14 +55,15 @@ export class PoWRewardLimiter {
       return 100;
 
     let restrictedReward = 100;
-    let minbalances = Object.keys(faucetConfig.faucetBalanceRestrictedReward).map((v) => parseInt(v)).sort();
-    let faucetBalance = ServiceManager.GetService(EthWeb3Manager).getFaucetBalance();
+    let minbalances = Object.keys(faucetConfig.faucetBalanceRestrictedReward).map((v) => parseInt(v)).sort((a, b) => a - b);
+    let faucetBalance = weiToEth(ServiceManager.GetService(EthWeb3Manager).getFaucetBalance());
     if(faucetBalance <= minbalances[minbalances.length - 1]) {
       for(let i = 0; i < minbalances.length; i++) {
-        if(faucetBalance > minbalances[i])
-          break;
-        if(faucetConfig.faucetBalanceRestrictedReward[minbalances[i]] < restrictedReward)
-          restrictedReward = faucetConfig.faucetBalanceRestrictedReward[minbalances[i]];
+        if(faucetBalance <= minbalances[i]) {
+          let restriction = faucetConfig.faucetBalanceRestrictedReward[minbalances[i]];
+          if(restriction < restrictedReward)
+            restrictedReward = restriction;
+        }
       }
     }
 
