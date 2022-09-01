@@ -14,6 +14,7 @@ import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
 import { strFormatPlaceholder } from '../utils/StringUtils';
 import { FaucetStatsLog } from './FaucetStatsLog';
 import { PromiseDfd } from '../utils/PromiseDfd';
+import { AccessList, FeeMarketEIP1559TxData } from '@ethereumjs/tx';
 
 interface WalletState {
   nonce: number;
@@ -424,17 +425,36 @@ export class EthWeb3Manager {
         refillAmount = contractBalance;
     }
 
-    var rawTx = {
+    let withdrawalCall = refillContract.methods[faucetConfig.ethRefillContract.withdrawFn](BigInt(refillAmount));
+    let gasLimit = faucetConfig.ethRefillContract.withdrawGasLimit || faucetConfig.ethTxGasLimit;
+
+    let accessList: AccessList;
+    try {
+      let accessListResult = await withdrawalCall.createAccessList({
+        from: this.walletAddr,
+        gas: gasLimit
+      });
+      if(accessListResult.error)
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Refill transaction reverted in access list simulation: " + accessListResult.error);
+      else if(accessListResult.accessList)
+        accessList = accessListResult.accessList;
+    } catch(ex) {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Error getting access list for wallet refill transaction: " + ex.toString());
+      accessList = undefined;
+    }
+
+    let rawTx: FeeMarketEIP1559TxData = {
       nonce: this.walletState.nonce,
-      gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit || faucetConfig.ethTxGasLimit,
+      gasLimit: gasLimit,
       maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
       maxFeePerGas: faucetConfig.ethTxMaxFee,
-      from: this.walletAddr,
       to: faucetConfig.ethRefillContract.contract,
       value: 0,
-      data: refillContract.methods[faucetConfig.ethRefillContract.withdrawFn](BigInt(refillAmount)).encodeABI()
+      data: withdrawalCall.encodeABI(),
+      accessList: accessList
     };
-    var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
+    console.log(rawTx);
+    let tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
     tx = tx.sign(this.walletKey);
     let txHex = tx.serialize().toString('hex');
 
