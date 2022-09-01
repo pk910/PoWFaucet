@@ -453,7 +453,6 @@ export class EthWeb3Manager {
       data: withdrawalCall.encodeABI(),
       accessList: accessList
     };
-    console.log(rawTx);
     let tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
     tx = tx.sign(this.walletKey);
     let txHex = tx.serialize().toString('hex');
