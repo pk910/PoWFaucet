@@ -86,6 +86,10 @@ export class PoWClient {
     return this.remoteIp;
   }
 
+  public getClientVersion(): string {
+    return this.clientVersion;
+  }
+
   private dispose() {
     this.socket = null;
 
@@ -165,7 +169,7 @@ export class PoWClient {
   }
 
   public refreshFaucetStatus() {
-    let status = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this.session);
+    let status = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this, this.session);
     this.sendFaucetStatus(status.status, status.hash);
   }
 
@@ -222,7 +226,7 @@ export class PoWClient {
     if(message.data && message.data.version)
       this.clientVersion = message.data.version;
 
-    let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this.session);
+    let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this, this.session);
     this.statusHash = faucetStatus.hash;
     this.sendMessage("config", {
       faucetTitle: faucetConfig.faucetTitle,

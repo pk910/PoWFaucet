@@ -4,6 +4,7 @@ import * as crypto from "crypto";
 import { faucetConfig } from '../common/FaucetConfig';
 import { PoWClient } from "../websock/PoWClient";
 import { PoWSession } from '../websock/PoWSession';
+import { isVersionLower } from '../utils/VersionCompare';
 
 export enum FaucetStatusLevel {
   INFO    = "info",
@@ -25,6 +26,7 @@ export interface IFaucetStatusEntry extends IFaucetStatus {
     country?: string | string[];
     hosting?: boolean;
     proxy?: boolean;
+    lt_version?: string; // lower than version
   };
 }
 
@@ -82,17 +84,14 @@ export class FaucetStatus {
 
   private updateFaucetStatus() {
     // update faucet status for each client
-    let noSessionStatus: {status: IFaucetStatus[], hash: string} = null;
     PoWClient.getAllClients().forEach((client) => {
       let session = client.getSession();
-      let status = (!session && noSessionStatus) ? noSessionStatus : this.getFaucetStatus(session);
-      if(!session && !noSessionStatus)
-        noSessionStatus = status;
+      let status = this.getFaucetStatus(client, session);
       client.sendFaucetStatus(status.status, status.hash);
     });
   }
 
-  public getFaucetStatus(session?: PoWSession): {status: IFaucetStatus[], hash: string} {
+  public getFaucetStatus(client: PoWClient, session?: PoWSession): {status: IFaucetStatus[], hash: string} {
     let statusList: IFaucetStatus[] = [];
     let statusHash = crypto.createHash("sha256");
 
@@ -121,6 +120,8 @@ export class FaucetStatus {
       if(status.filter.hosting !== undefined && (!ipinfo || !!ipinfo.hosting !== status.filter.hosting))
         return false;
       if(status.filter.proxy !== undefined && (!ipinfo || !!ipinfo.proxy !== status.filter.proxy))
+        return false;
+      if(status.filter.lt_version !== undefined && client.getClientVersion() && !isVersionLower(client.getClientVersion(), status.filter.lt_version))
         return false;
       return true;
     };
