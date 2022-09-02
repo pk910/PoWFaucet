@@ -92,6 +92,10 @@ html, body {
   margin-top: 8px;
 }
 
+.pow-faucet .faucet-captcha > div {
+  display: inline-block;
+}
+
 .pow-faucet .faucet-title {
   position: relative;
 }

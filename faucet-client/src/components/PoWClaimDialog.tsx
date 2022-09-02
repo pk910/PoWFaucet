@@ -8,6 +8,7 @@ import { renderDate, renderTimespan } from '../utils/DateUtils';
 import { PoWClient } from '../common/PoWClient';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { IPoWStatusDialogProps } from './PoWStatusDialog';
+import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
 
 export interface IPoWClaimDialogProps {
   powClient: PoWClient;
@@ -39,7 +40,7 @@ export interface IPoWClaimDialogState {
 export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IPoWClaimDialogState> {
   private powClientClaimTxListener: ((res: any) => void);
   private updateTimer: NodeJS.Timeout;
-  private hcapControl: HCaptcha;
+  private captchaControl: PoWFaucetCaptcha;
   private isTimedOut: boolean;
 
   constructor(props: IPoWClaimDialogProps, state: IPoWClaimDialogState) {
@@ -174,10 +175,10 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 Captcha:
               </div>
               <div className='col'>
-                <HCaptcha 
-                  sitekey={this.props.faucetConfig.hcapSiteKey} 
-                  onVerify={(token) => this.setState({ captchaToken: token })}
-                  ref={(cap) => this.hcapControl = cap} 
+                <PoWFaucetCaptcha 
+                  faucetConfig={this.props.faucetConfig} 
+                  onChange={(token) => this.setState({ captchaToken: token })}
+                  ref={(cap) => this.captchaControl = cap} 
                 />
               </div>
             </div>
@@ -236,8 +237,8 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       let stateChange: any = {
         claimProcessing: false
       };
-      if(this.hcapControl) {
-        this.hcapControl.resetCaptcha();
+      if(this.captchaControl) {
+        this.captchaControl.resetToken();
         stateChange.captchaToken = null;
       }
       this.setState(stateChange);

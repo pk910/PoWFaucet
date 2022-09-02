@@ -5,6 +5,7 @@ export interface IFaucetConfig {
   faucetImage: string;
   faucetHtml: string;
   faucetCoinSymbol: string;
+  hcapProvider: string;
   hcapSiteKey: string | null;
   hcapSession: boolean;
   hcapClaim: boolean;

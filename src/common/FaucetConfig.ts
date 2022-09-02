@@ -60,7 +60,7 @@ export interface IFaucetConfig {
   verifyMinerReward: number; // reward for responding to a verification request in time
   verifyMinerMissPenalty: number; // penalty for not responding to a verification request (shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so)
 
-  hcaptcha: IFaucetHCaptchaConfig | null; // hcaptcha parameters or null to disable all hcaptchas
+  captchas: IFaucetCaptchaConfig | null; // captcha related settings or null to disable all captchas
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
   ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
   ipRestrictedRewardShare: null | { // ip based restrictions
@@ -111,11 +111,12 @@ export interface IFaucetConfig {
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
 }
 
-export interface IFaucetHCaptchaConfig {
-  siteKey: string; // hcaptcha site key
-  secret: string; // hcaptcha secret
-  checkSessionStart: boolean; // require hcaptcha to start a new mining session
-  checkBalanceClaim: boolean; // require hcaptcha to claim mining rewards
+export interface IFaucetCaptchaConfig {
+  provider: "hcaptcha"|"recaptcha";
+  siteKey: string; // site key
+  secret: string; // secret key
+  checkSessionStart: boolean; // require captcha to start a new mining session
+  checkBalanceClaim: boolean; // require captcha to claim mining rewards
 }
 
 export interface IFaucetEnsResolverConfig {
@@ -177,7 +178,7 @@ let defaultConfig: IFaucetConfig = {
   verifyMinerTimeout: 15,
   verifyMinerReward: 0,
   verifyMinerMissPenalty: 10000000000000000,
-  hcaptcha: null,
+  captchas: null,
   concurrentSessions: 0,
   ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
   ipRestrictedRewardShare: null,
@@ -230,6 +231,8 @@ export function loadFaucetConfig() {
     else
       throw "faucetSecret in config must not be left empty";
   }
+  if(!config.captchas && (config as any).hcaptcha)
+    config.captchas = (config as any).hcaptcha;
 
   if(!faucetConfig)
     faucetConfig = {} as any;

@@ -15,6 +15,7 @@ import { PoWFaucetStatus } from './PoWFaucetStatus';
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { IPoWStatusDialogProps, PoWStatusDialog } from './PoWStatusDialog';
 import { PoWRestoreSessionDialog } from './PoWRestoreSessionDialog';
+import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
 
 export interface IPoWFaucetProps {
   powApiUrl: string;
@@ -49,7 +50,7 @@ export interface IPoWFaucetState {
 export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetState> {
   private powClient: PoWClient;
   private powSession: PoWSession;
-  private hcapControl: HCaptcha;
+  private captchaControl: PoWFaucetCaptcha;
   private eventListeners: {[key: string]: {
     emmiter: TypedEmitter;
     event: string;
@@ -87,8 +88,8 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       client: this.powClient,
       getInputs: () => {
         var capToken = this.state.captchaToken;
-        if(this.hcapControl) {
-          this.hcapControl.resetCaptcha();
+        if(this.captchaControl) {
+          this.captchaControl.resetToken();
           this.setState({ captchaToken: null, })
         }
         return {
@@ -393,10 +394,10 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           />
           {requestCaptcha ? 
             <div className='faucet-captcha'>
-              <HCaptcha 
-                sitekey={this.state.faucetConfig.hcapSiteKey} 
-                onVerify={(token) => this.setState({ captchaToken: token })}
-                ref={(cap) => this.hcapControl = cap} 
+              <PoWFaucetCaptcha 
+                faucetConfig={this.state.faucetConfig} 
+                onChange={(token) => this.setState({ captchaToken: token })}
+                ref={(cap) => this.captchaControl = cap} 
               />
             </div>
           : null}

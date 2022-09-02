@@ -175,17 +175,22 @@ verifyMinerTimeout: 30
 
 ### Captcha Options
 # comment out to disable all hcaptchas
-hcaptcha:
-  # hcaptcha site key
+captchas:
+  # captcha provider:
+  # hcaptcha:  HCaptcha (https://hcaptcha.com)
+  # recaptcha: ReCAPTCHA (https://developers.google.com/recaptcha)
+  provider: "hcaptcha"
+
+  # captcha site key
   siteKey: "00000000-0000-0000-0000-000000000000"
 
-  # hcaptcha secret
+  # captcha secret key
   secret: "0xCensoredHCaptchaSecretKey"
 
-  # require hcaptcha to start a new mining session (default: false)
+  # require captcha to start a new mining session (default: false)
   checkSessionStart: true
 
-  # require hcaptcha to claim mining rewards (default: false)
+  # require captcha to claim mining rewards (default: false)
   checkBalanceClaim: true
 
 

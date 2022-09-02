@@ -1,5 +1,4 @@
 import { WebSocket, RawData } from 'ws';
-import * as hcaptcha from "hcaptcha";
 import * as crypto from "crypto";
 import { faucetConfig } from '../common/FaucetConfig';
 import { PoWSession, PoWSessionStatus } from './PoWSession';
@@ -15,6 +14,7 @@ import { FaucetStatus, IFaucetStatus } from '../services/FaucetStatus';
 import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
 import { FaucetStatsLog } from '../services/FaucetStatsLog';
 import { PoWRewardLimiter } from '../services/PoWRewardLimiter';
+import { CaptchaVerifier } from '../services/CaptchaVerifier';
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -230,9 +230,10 @@ export class PoWClient {
       faucetImage: faucetConfig.faucetImage,
       faucetHtml: faucetConfig.faucetHomeHtml,
       faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
-      hcapSiteKey: faucetConfig.hcaptcha ? faucetConfig.hcaptcha.siteKey : null,
-      hcapSession: faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkSessionStart,
-      hcapClaim: faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkBalanceClaim,
+      hcapProvider: faucetConfig.captchas ? faucetConfig.captchas.provider : null,
+      hcapSiteKey: faucetConfig.captchas ? faucetConfig.captchas.siteKey : null,
+      hcapSession: faucetConfig.captchas && faucetConfig.captchas.checkSessionStart,
+      hcapClaim: faucetConfig.captchas && faucetConfig.captchas.checkBalanceClaim,
       shareReward: faucetConfig.powShareReward,
       minClaim: faucetConfig.claimMinAmount,
       maxClaim: faucetConfig.claimMaxAmount,
@@ -259,12 +260,12 @@ export class PoWClient {
     if(typeof message.data !== "object" || !message.data)
       return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", message);
 
-    if(faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkSessionStart) {
+    if(faucetConfig.captchas && faucetConfig.captchas.checkSessionStart) {
       if(!message.data.token)
-        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha token required to start new session", message, PoWStatusLogLevel.INFO);
-      let hcaptchaResponse = await hcaptcha.verify(faucetConfig.hcaptcha.secret, message.data.token, this.remoteIp, faucetConfig.hcaptcha.siteKey);
-      if(!hcaptchaResponse.success)
-        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha verification failed", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha check required to start new session", message, PoWStatusLogLevel.INFO);
+      let tokenValidity = await ServiceManager.GetService(CaptchaVerifier).verifyToken(message.data.token, this.remoteIp);
+      if(!tokenValidity)
+        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha verification failed", message, PoWStatusLogLevel.INFO);
     }
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
@@ -521,12 +522,12 @@ export class PoWClient {
     if(typeof message.data !== "object" || !message.data || !message.data.token)
       return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (missing)", message);
 
-    if(faucetConfig.hcaptcha && faucetConfig.hcaptcha.checkBalanceClaim) {
+    if(faucetConfig.captchas && faucetConfig.captchas.checkBalanceClaim) {
       if(!message.data.captcha) 
-        return this.sendErrorResponse("INVALID_CAPTCHA", "HCaptcha token required to claim rewards", message, PoWStatusLogLevel.INFO);
-      let hcaptchaResponse = await hcaptcha.verify(faucetConfig.hcaptcha.secret, message.data.captcha, this.remoteIp, faucetConfig.hcaptcha.siteKey);
-      if(!hcaptchaResponse.success) 
-        return this.sendErrorResponse("INVALID_HCAPTCHA", "HCaptcha verification failed", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha check required to claim rewards", message, PoWStatusLogLevel.INFO);
+      let tokenValidity = ServiceManager.GetService(CaptchaVerifier).verifyToken(message.data.captcha, this.remoteIp);
+      if(!tokenValidity)
+        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha verification failed", message, PoWStatusLogLevel.INFO);
     }
 
     let sessionSplit = message.data.token.split("|", 2);
