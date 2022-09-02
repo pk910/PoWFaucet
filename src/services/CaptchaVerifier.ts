@@ -43,13 +43,14 @@ export class CaptchaVerifier {
   }
 
   private async verifyCustomToken(token: string, remoteIp: string): Promise<boolean> {
+    let verifyData = new URLSearchParams();
+    verifyData.append("response", token);
+    verifyData.append("remoteip", remoteIp);
+
     let verifyRsp = await fetch(faucetConfig.captchas.secret, {
       method: 'POST',
-      body: JSON.stringify({
-        token: token,
-        remoteip: remoteIp,
-      }),
-      headers: {'Content-Type': 'application/json'}
+      body: verifyData,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}
     }).then((rsp) => rsp.json());
 
     if(!verifyRsp || !verifyRsp.success)

@@ -277,8 +277,8 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
 
     switch(this.state.miningStatus) {
       case PoWFaucetMiningStatus.IDLE:
-        requestCaptcha = enableCaptcha && this.state.faucetConfig.hcapSession;
       case PoWFaucetMiningStatus.STARTING:
+        requestCaptcha = enableCaptcha && this.state.faucetConfig.hcapSession;
         actionButtonControl = (
           <button 
             className="btn btn-success start-action" 

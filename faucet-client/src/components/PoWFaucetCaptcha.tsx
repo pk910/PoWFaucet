@@ -22,6 +22,7 @@ interface IPoWFaucetCustomCaptcha {
   render(container: Element): void;
   getToken(): string;
   reset(): void;
+  unmount(): void;
 }
 
 export class PoWFaucetCaptcha extends React.PureComponent<IPoWFaucetCaptchaProps, IPoWFaucetCaptchaState> {
@@ -56,6 +57,17 @@ export class PoWFaucetCaptcha extends React.PureComponent<IPoWFaucetCaptchaProps
     this.lastToken = token;
     if(this.props.onChange)
       this.props.onChange(token);
+  }
+
+  public componentWillUnmount() {
+    if(this.hcapControl) {
+      this.hcapControl.removeCaptcha();
+      this.hcapControl = null;
+    }
+    if(this.customControl) {
+      this.customControl.unmount();
+      this.customControl = null;
+    }
   }
 
 	public render(): React.ReactElement<IPoWFaucetCaptchaProps> {
@@ -177,7 +189,7 @@ export class PoWFaucetCaptcha extends React.PureComponent<IPoWFaucetCaptchaProps
             console.error(err);
           });
         }
-      }}></div>
+      }}>Loading captcha...</div>
     )
   }
 
