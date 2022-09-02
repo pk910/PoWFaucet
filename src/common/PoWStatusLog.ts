@@ -8,6 +8,7 @@ import { faucetConfig, loadFaucetConfig } from './FaucetConfig';
 
 interface PoWStatusLogEvents {
   'event': () => void;
+  'reload': () => void;
 }
 
 export enum PoWStatusLogLevel {
@@ -42,6 +43,7 @@ export class PoWStatusLog extends TypedEmitter<PoWStatusLogEvents> {
     process.on('SIGUSR1', () => {
       this.emitLog(PoWStatusLogLevel.INFO, `# Received SIGURS1 signal - reloading faucet config`);
       loadFaucetConfig();
+      this.emit("reload");
    });
   }
 

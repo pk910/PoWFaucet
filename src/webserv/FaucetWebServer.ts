@@ -10,6 +10,8 @@ import { PoWClient } from '../websock/PoWClient';
 import { encode } from 'html-entities';
 import { OutgoingHttpHeaders } from 'http2';
 import { FaucetWebApi } from './FaucetWebApi';
+import { ServiceManager } from '../common/ServiceManager';
+import { PoWStatusLog } from '../common/PoWStatusLog';
 
 export class FaucetHttpResponse {
   public readonly code: number;
@@ -46,8 +48,12 @@ export class FaucetHttpServer {
 
     this.faucetApi = new FaucetWebApi();
 
-    if(faucetConfig.buildSeoIndex)
+    if(faucetConfig.buildSeoIndex) {
       this.buildSeoIndex();
+      ServiceManager.GetService(PoWStatusLog).addListener("reload", () => {
+        this.buildSeoIndex();
+      });
+    }
   }
 
   private onHttpRequest(req: IncomingMessage, rsp: ServerResponse) {
@@ -111,8 +117,17 @@ export class FaucetHttpServer {
     let indexFile = path.join(faucetConfig.staticPath, "index.html");
     if(!fs.existsSync(indexFile))
       return;
-    let indexHtml = fs.readFileSync(indexFile, "utf8");
+    
+    let clientVersion: {version: string, build: number};
+    try {
+      let clientFile = path.join(faucetConfig.staticPath, "js", "powfaucet.js");
+      let clientSrc = fs.readFileSync(clientFile, "utf8");
+      let match = /@pow-faucet-client: ({[^}]+})/.exec(clientSrc);
+      if(match)
+        clientVersion = JSON.parse(match[1]);
+    } catch(ex) {}
 
+    let indexHtml = fs.readFileSync(indexFile, "utf8");
     let seoHtml = [
       '<div class="faucet-title">',
         '<h1 class="center">' + encode(faucetConfig.faucetTitle) + '</h1>',
@@ -136,6 +151,9 @@ export class FaucetHttpServer {
     indexHtml = indexHtml.replace(/<!-- pow-faucet-content -->/, seoHtml);
     indexHtml = indexHtml.replace(/<!-- pow-faucet-header -->/, seoMeta);
     indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, faucetConfig.faucetHomeHtml ? faucetConfig.faucetHomeHtml : '');
+    
+    if(clientVersion)
+      indexHtml = indexHtml.replace(/"\/js\/powfaucet.js"/, '"/js/powfaucet.js?' + clientVersion.build + '"');
 
     let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
     fs.writeFileSync(seoFile, indexHtml);

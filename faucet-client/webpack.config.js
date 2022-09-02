@@ -11,6 +11,8 @@ var debug = false;
 if(cliArgs['dev'])
   debug = true;
 
+var buildTime = (new Date()).getTime();
+
 var webpackModuleConfigs = [
   {
     entry: './src/main',
@@ -84,7 +86,12 @@ var webpackBaseConfig = {
     minimizer: [
       new TerserPlugin({
         parallel: true,
-        extractComments: true,
+        extractComments: {
+          banner: '@pow-faucet-client: ' + JSON.stringify({
+            version: pkgJson.version,
+            build: buildTime,
+          }) + "\n",
+        },
         terserOptions: {
           compress: true,
           keep_fnames: false,
@@ -99,7 +106,7 @@ var webpackBaseConfig = {
   plugins: [
     new webpack.DefinePlugin({
       FAUCET_CLIENT_VERSION: JSON.stringify(pkgJson.version),
-      FAUCET_CLIENT_BUILDTIME: (new Date()).getTime(),
+      FAUCET_CLIENT_BUILDTIME: buildTime,
     }),
     new Visualizer({
       filename: 'webpack-stats.html'
