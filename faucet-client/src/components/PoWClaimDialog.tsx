@@ -28,7 +28,6 @@ enum PoWClaimStatus {
 
 export interface IPoWClaimDialogState {
   refreshIndex: number;
-  captchaToken: string;
   claimStatus: PoWClaimStatus;
   claimProcessing: boolean;
   claimError: string;
@@ -48,7 +47,6 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     this.isTimedOut = false;
     this.state = {
       refreshIndex: 0,
-      captchaToken: null,
       claimStatus: PoWClaimStatus.PREPARE,
       claimProcessing: false,
       claimError: null,
@@ -177,7 +175,6 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
               <div className='col'>
                 <PoWFaucetCaptcha 
                   faucetConfig={this.props.faucetConfig} 
-                  onChange={(token) => this.setState({ captchaToken: token })}
                   ref={(cap) => this.captchaControl = cap} 
                 />
               </div>
@@ -226,7 +223,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     });
 
     this.props.powClient.sendRequest("claimRewards", {
-      captcha: this.props.faucetConfig.hcapClaim ? this.state.captchaToken : null,
+      captcha: this.props.faucetConfig.hcapClaim ? this.captchaControl.getToken() : null,
       token: this.props.reward.token
     }).then(() => {
       this.props.powSession.storeClaimInfo(null);
@@ -239,7 +236,6 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       };
       if(this.captchaControl) {
         this.captchaControl.resetToken();
-        stateChange.captchaToken = null;
       }
       this.setState(stateChange);
       this.props.setDialog({

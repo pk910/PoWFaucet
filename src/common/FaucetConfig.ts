@@ -112,7 +112,7 @@ export interface IFaucetConfig {
 }
 
 export interface IFaucetCaptchaConfig {
-  provider: "hcaptcha"|"recaptcha";
+  provider: "hcaptcha"|"recaptcha"|"custom";
   siteKey: string; // site key
   secret: string; // secret key
   checkSessionStart: boolean; // require captcha to start a new mining session

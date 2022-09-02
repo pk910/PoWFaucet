@@ -37,7 +37,6 @@ export interface IPoWFaucetState {
   isConnected: boolean;
   targetAddr: string;
   requestCaptcha: boolean;
-  captchaToken: string;
   miningStatus: PoWFaucetMiningStatus;
   isClaimable: boolean;
   statusDialog: IPoWStatusDialogProps;
@@ -87,10 +86,10 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     this.powSession = new PoWSession({
       client: this.powClient,
       getInputs: () => {
-        var capToken = this.state.captchaToken;
+        var capToken = "";
         if(this.captchaControl) {
+          capToken = this.captchaControl.getToken();
           this.captchaControl.resetToken();
-          this.setState({ captchaToken: null, })
         }
         return {
           addr: this.state.targetAddr,
@@ -134,7 +133,6 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       isConnected: false,
       targetAddr: "",
       requestCaptcha: false,
-      captchaToken: null,
       miningStatus: PoWFaucetMiningStatus.IDLE,
       isClaimable: false,
       statusDialog: null,
@@ -396,7 +394,6 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
             <div className='faucet-captcha'>
               <PoWFaucetCaptcha 
                 faucetConfig={this.state.faucetConfig} 
-                onChange={(token) => this.setState({ captchaToken: token })}
                 ref={(cap) => this.captchaControl = cap} 
               />
             </div>
