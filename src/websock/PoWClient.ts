@@ -404,7 +404,7 @@ export class PoWClient {
       return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
 
     let startTime = new Date(sessionInfo.startTime * 1000);
-    if(faucetConfig.powSessionTimeout && ((new Date()).getTime() - startTime.getTime()) / 1000 > faucetConfig.powSessionTimeout)
+    if(faucetConfig.claimSessionTimeout && ((new Date()).getTime() - startTime.getTime()) / 1000 > faucetConfig.claimSessionTimeout)
       return this.sendErrorResponse("SESSION_TIMEOUT", "Session is too old to recover (timeout)", message);
     let sessionMarks = ServiceManager.GetService(FaucetStore).getSessionMarks(sessionInfo.id, []);
     if(sessionMarks.length > 0)

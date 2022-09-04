@@ -140,7 +140,9 @@ export class PoWSession {
       }, cleanupTime * 1000);
     }
     else {
-      this.timeoutSession();
+      setTimeout(() => {
+        this.timeoutSession();
+      }, 0);
     }
   }
 
