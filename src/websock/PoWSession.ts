@@ -148,7 +148,7 @@ export class PoWSession {
 
   private timeoutSession() {
     let activeClient = this.activeClient;
-    this.closeSession(true, true);
+    this.closeSession(false, true);
     if(activeClient) {
       activeClient.sendMessage("sessionKill", {
         level: "timeout",
