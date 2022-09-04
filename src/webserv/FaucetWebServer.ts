@@ -152,8 +152,10 @@ export class FaucetHttpServer {
     indexHtml = indexHtml.replace(/<!-- pow-faucet-header -->/, seoMeta);
     indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, faucetConfig.faucetHomeHtml ? faucetConfig.faucetHomeHtml : '');
     
-    if(clientVersion)
-      indexHtml = indexHtml.replace(/"\/js\/powfaucet.js"/, '"/js/powfaucet.js?' + clientVersion.build + '"');
+    if(clientVersion) {
+      indexHtml = indexHtml.replace(/"\/js\/powfaucet\.js"/, '"/js/powfaucet.js?' + clientVersion.build + '"');
+      indexHtml = indexHtml.replace(/"\/css\/powfaucet\.css"/, '"/css/powfaucet.css?' + clientVersion.build + '"');
+    }
 
     let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
     fs.writeFileSync(seoFile, indexHtml);
