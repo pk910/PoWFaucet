@@ -171,6 +171,15 @@ html, body {
   margin-top: 8px;
 }
 
+.pow-faucet .faucet-footer {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding: 4px;
+  font-size: 12px;
+  color: #343a40;
+  pointer-events: none;
+}
 
 
 @media (max-width: 576px) {

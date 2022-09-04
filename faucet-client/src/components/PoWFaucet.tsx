@@ -408,6 +408,9 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
             <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.state.faucetConfig.faucetHtml}} />
           : null}
         </div>
+        <div className='faucet-footer'>
+          <div className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</div>
+        </div>
       </div>
     );
 	}
