@@ -36,6 +36,7 @@ export class FaucetStatus {
   private currentStatus: {[key: string]: IFaucetStatusEntry} = {};
 
   public constructor() {
+    this.updateLocalStatus();
     setInterval(() => this.updateLocalStatus(), 10000);
   }
 
@@ -63,7 +64,6 @@ export class FaucetStatus {
       }
     }
     if(faucetStatusStr !== this.localStatusJson) {
-
       this.updateFaucetStatus();
     }
   }
