@@ -94,10 +94,24 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       refreshing: true
     });
     this.props.powClient.sendRequest<IPoWFaucetStatus>("getFaucetStatus").then((faucetStatus) => {
+      let activeClaims = (faucetStatus.claims || []).sort((a, b) => a.time - b.time);
+      let activeClaimIds = {};
+      activeClaims.forEach((claim) => {
+        activeClaimIds[claim.session] = true;
+      });
+
+      let activeSessions = (faucetStatus.sessions || []).filter((session) => {
+        if(session.status === "closed" && !session.claimable)
+          return false;
+        if(session.status === "claimed" && !activeClaimIds[session.id])
+          return false;
+        return true;
+      }).sort((a, b) => a.start - b.start);
+
       this.setState({
         refreshing: false,
-        activeSessions: (faucetStatus.sessions || []).sort((a, b) => a.start - b.start),
-        activeClaims: (faucetStatus.claims || []).sort((a, b) => a.time - b.time),
+        activeSessions: activeSessions,
+        activeClaims: activeClaims,
       });
     });
   }
