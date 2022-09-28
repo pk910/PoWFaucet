@@ -14,6 +14,7 @@ import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
 import { strFormatPlaceholder } from '../utils/StringUtils';
 import { FaucetStatsLog } from './FaucetStatsLog';
 import { PromiseDfd } from '../utils/PromiseDfd';
+import { FaucetStore } from './FaucetStore';
 
 interface WalletState {
   nonce: number;
@@ -42,6 +43,13 @@ interface ClaimTxEvents {
   'failed': () => void;
 }
 
+export interface IQueuedClaimTx {
+  time: number;
+  target: string;
+  amount: number;
+  session: string;
+}
+
 export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public status: ClaimTxStatus;
   public readonly time: Date;
@@ -55,15 +63,25 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public retryCount: number;
   public failReason: string;
 
-  public constructor(target: string, amount: number, sessId: string) {
+  public constructor(target: string, amount: number, sessId: string, date?: number) {
     super();
     this.status = ClaimTxStatus.QUEUE;
-    this.time = new Date();
+    this.time = date ? new Date(date) : new Date();
     this.target = target;
     this.amount = amount;
     this.session = sessId;
     this.retryCount = 0;
   }
+
+  public serialize(): IQueuedClaimTx {
+    return {
+      time: this.time.getTime(),
+      target: this.target,
+      amount: this.amount,
+      session: this.session,
+    };
+  }
+
 }
 
 export class EthWeb3Manager {
@@ -91,8 +109,17 @@ export class EthWeb3Manager {
     this.walletKey = Buffer.from(faucetConfig.ethWalletKey, "hex");
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
 
+    // restore saved claimTx queue
+    ServiceManager.GetService(FaucetStore).getClaimTxQueue().forEach((claimTx) => {
+      let claim = new ClaimTx(claimTx.target, claimTx.amount, claimTx.session, claimTx.time);
+      this.claimTxQueue.push(claim);
+    });
+
     this.loadWalletState().then(() => {
       setInterval(() => this.processQueue(), 2000);
+    }, (err) => {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Error loading wallet state for " + this.walletAddr + ": " + err.toString());
+      process.exit(0);
     });
   }
 
@@ -122,11 +149,13 @@ export class EthWeb3Manager {
     }
   }
 
-  public getTransactionQueue(): ClaimTx[] {
+  public getTransactionQueue(queueOnly?: boolean): ClaimTx[] {
     let txlist: ClaimTx[] = [];
     Array.prototype.push.apply(txlist, this.claimTxQueue);
-    Array.prototype.push.apply(txlist, Object.values(this.pendingTxQueue));
-    Array.prototype.push.apply(txlist, Object.values(this.historyTxDict));
+    if(!queueOnly) {
+      Array.prototype.push.apply(txlist, Object.values(this.pendingTxQueue));
+      Array.prototype.push.apply(txlist, Object.values(this.historyTxDict));
+    }
     return txlist;
   }
 
@@ -196,6 +225,7 @@ export class EthWeb3Manager {
   public addClaimTransaction(target: string, amount: number, sessId: string): ClaimTx {
     let claimTx = new ClaimTx(target, amount, sessId);
     this.claimTxQueue.push(claimTx);
+    ServiceManager.GetService(FaucetStore).addQueuedClaimTx(claimTx.serialize());
     return claimTx;
   }
 
@@ -228,6 +258,10 @@ export class EthWeb3Manager {
 
     try {
       while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
+        if(faucetConfig.ethQueueNoFunds && this.walletState.balance - faucetConfig.spareFundsAmount < this.claimTxQueue[0].amount) {
+          break; // skip processing (out of funds)
+        }
+
         let claimTx = this.claimTxQueue.splice(0, 1)[0];
         await this.processQueueTx(claimTx);
       }
@@ -299,6 +333,8 @@ export class EthWeb3Manager {
       this.updateFaucetStatus();
 
       this.pendingTxQueue[claimTx.txhash] = claimTx;
+      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + (Math.round(weiToEth(claimTx.amount)*1000)/1000) + " ETH] to: " + claimTx.target + ": " + claimTx.txhash);
 
       claimTx.status = ClaimTxStatus.PENDING;
       claimTx.emit("pending");

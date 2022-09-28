@@ -91,6 +91,7 @@ export interface IFaucetConfig {
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
+  ethQueueNoFunds: boolean; // queue transactions when faucet is out of funds
   ethTxExplorerLink: string; // link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 
   ethRefillContract: null | { // refill from vault contract or null to disable automatic refilling
@@ -196,6 +197,7 @@ let defaultConfig: IFaucetConfig = {
   ethTxMaxFee: 1800000000,
   ethTxPrioFee: 800000000,
   ethMaxPending: 12,
+  ethQueueNoFunds: false,
   ethTxExplorerLink: null,
   ethRefillContract: null,
   ensResolver: null,

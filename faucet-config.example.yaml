@@ -70,6 +70,9 @@ ethTxPrioFee: 2000000000  # 2 gwei
 # max number of unconfirmed transactions to create simultaneously
 ethMaxPending: 12
 
+# queue transactions and wait for funding when faucet is out of funds (show "No Funds" error when false)
+ethQueueNoFunds: false
+
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
 
