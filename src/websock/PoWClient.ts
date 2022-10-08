@@ -15,6 +15,7 @@ import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
 import { FaucetStatsLog } from '../services/FaucetStatsLog';
 import { PoWRewardLimiter } from '../services/PoWRewardLimiter';
 import { CaptchaVerifier } from '../services/CaptchaVerifier';
+import { FaucetWebApi } from '../webserv/FaucetWebApi';
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -169,7 +170,7 @@ export class PoWClient {
   }
 
   public refreshFaucetStatus() {
-    let status = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this, this.session);
+    let status = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this.clientVersion, this.session);
     this.sendFaucetStatus(status.status, status.hash);
   }
 
@@ -209,9 +210,6 @@ export class PoWClient {
       case "claimRewards":
         this.onCliClaimRewards(message);
         break;
-      case "getFaucetStatus":
-        this.onCliGetFaucetStatus(message);
-        break;
       default:
         this.sendMessage("error", {
           code: "INVALID_ACTION",
@@ -226,34 +224,10 @@ export class PoWClient {
     if(message.data && message.data.version)
       this.clientVersion = message.data.version;
 
-    let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(this, this.session);
-    this.statusHash = faucetStatus.hash;
-    this.sendMessage("config", {
-      faucetTitle: faucetConfig.faucetTitle,
-      faucetStatus: faucetStatus.status,
-      faucetImage: faucetConfig.faucetImage,
-      faucetHtml: faucetConfig.faucetHomeHtml,
-      faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
-      hcapProvider: faucetConfig.captchas ? faucetConfig.captchas.provider : null,
-      hcapSiteKey: faucetConfig.captchas ? faucetConfig.captchas.siteKey : null,
-      hcapSession: faucetConfig.captchas && faucetConfig.captchas.checkSessionStart,
-      hcapClaim: faucetConfig.captchas && faucetConfig.captchas.checkBalanceClaim,
-      shareReward: faucetConfig.powShareReward,
-      minClaim: faucetConfig.claimMinAmount,
-      maxClaim: faucetConfig.claimMaxAmount,
-      powTimeout: faucetConfig.powSessionTimeout,
-      claimTimeout: faucetConfig.claimSessionTimeout,
-      powParams: {
-        n: faucetConfig.powScryptParams.cpuAndMemory,
-        r: faucetConfig.powScryptParams.blockSize,
-        p: faucetConfig.powScryptParams.paralellization,
-        l: faucetConfig.powScryptParams.keyLength,
-        d: faucetConfig.powScryptParams.difficulty,
-      },
-      powNonceCount: faucetConfig.powNonceCount,
-      resolveEnsNames: !!faucetConfig.ensResolver,
-      ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
-    }, reqId);
+    let clientFaucetConfig = ServiceManager.GetService(FaucetWebApi).getFaucetConfig(this);
+    this.statusHash = clientFaucetConfig.faucetStatusHash;
+
+    this.sendMessage("config", clientFaucetConfig, reqId);
   }
 
   private async onCliStartSession(message: any) {
@@ -583,111 +557,6 @@ export class PoWClient {
         error: claimTx.failReason
       });
     });
-  }
-
-  private getHashedIp(remoteAddr: string) {
-    let ipMatch: RegExpExecArray;
-    let hashParts: string[] = [];
-    let hashGlue: string;
-    let getHash = (input: string, len?: number) => {
-      let hash = crypto.createHash("sha256");
-      hash.update(faucetConfig.faucetSecret + "\r\n");
-      hash.update("iphash\r\n");
-      hash.update(input);
-      let hashStr = hash.digest("hex");
-      if(len)
-        hashStr = hashStr.substring(0, len);
-      return hashStr;
-    };
-
-    let hashBase = "";
-    if((ipMatch = /^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/.exec(remoteAddr))) {
-      // IPv4
-      hashGlue = ".";
-
-      for(let i = 0; i < 4; i++) {
-        hashParts.push(getHash(hashBase + ipMatch[i+1], 3));
-        hashBase += (hashBase ? "." : "") + ipMatch[i+1];
-      }
-    }
-    else {
-      // IPv6
-      hashGlue = ":";
-
-      let ipSplit = remoteAddr.split(":");
-      let ipParts: string[] = [];
-      for(let i = 0; i < ipSplit.length; i++) {
-        if(ipSplit[i] === "") {
-          let skipLen = 8 - ipSplit.length + 1;
-          for(let j = 0; j < skipLen; j++)
-            ipParts.push("0");
-          break;
-        }
-        ipParts.push(ipSplit[i]);
-      }
-      for(let i = 0; i < 8; i++) {
-        hashParts.push(ipParts[i] === "0" ? "0" : getHash(hashBase + ipParts[i], 3));
-        hashBase += (hashBase ? "." : "") + ipParts[i];
-      }
-    }
-
-    return hashParts.join(hashGlue);
-  }
-
-  private async onCliGetFaucetStatus(message: any) {
-    let reqId = message.id || undefined;
-    let statusRsp: any = {};
-
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Client requested faucet status (IP: " + this.remoteIp + ")");
-
-    let sessions = PoWSession.getAllSessions();
-    let rewardLimiter = ServiceManager.GetService(PoWRewardLimiter);
-    statusRsp.sessions = sessions.map((session) => {
-      let sessionIdHash = crypto.createHash("sha256");
-      sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
-      sessionIdHash.update(session.getSessionId());
-
-      let activeClient = session.getActiveClient();
-      let clientVersion = null;
-      if(activeClient) {
-        clientVersion = activeClient.clientVersion;
-      }
-
-      return {
-        id: sessionIdHash.digest("hex").substring(0, 20),
-        start: Math.floor(session.getStartTime().getTime() / 1000),
-        idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
-        target: session.getTargetAddr(),
-        ip: this.getHashedIp(session.getLastRemoteIp()),
-        ipInfo: session.getLastIpInfo(),
-        balance: session.getBalance(),
-        nonce: session.getLastNonce(),
-        hashrate: session.getReportedHashRate(),
-        status: session.getSessionStatus(),
-        claimable: session.isClaimable(),
-        limit: rewardLimiter.getSessionRestriction(session),
-        cliver: clientVersion,
-      }
-    });
-
-    let claims = ServiceManager.GetService(EthWeb3Manager).getTransactionQueue();
-    statusRsp.claims = claims.map((claimTx) => {
-      let sessionIdHash = crypto.createHash("sha256");
-      sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
-      sessionIdHash.update(claimTx.session);
-
-      return {
-        time: Math.floor(claimTx.time.getTime() / 1000),
-        session: sessionIdHash.digest("hex").substring(0, 20),
-        target: claimTx.target,
-        amount: claimTx.amount,
-        status: claimTx.status,
-        error: claimTx.failReason,
-        nonce: claimTx.nonce || null,
-      }
-    });
-
-    this.sendMessage("ok", statusRsp, reqId);
   }
 
 }

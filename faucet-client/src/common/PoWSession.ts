@@ -1,5 +1,6 @@
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { PoWClient } from "./PoWClient";
+import { IFaucetConfig } from './IFaucetConfig';
+import { IPoWClientConnectionKeeper, PoWClient } from "./PoWClient";
 import { IPoWMinerShare, IPoWMinerVerification, PoWMiner } from "./PoWMiner";
 
 export interface IPoWSessionOptions {
@@ -221,7 +222,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       localStorage.removeItem('powSessionStatus');
   }
 
-  public getStoredSessionInfo(): IPoWSessionInfo {
+  public getStoredSessionInfo(faucetConfig: IFaucetConfig): IPoWSessionInfo {
     let sessionStr = localStorage.getItem('powSessionStatus');
     let session: IPoWSessionInfo = null;
     if(sessionStr) {
@@ -234,22 +235,10 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionAge = now - session.startTime;
-    let faucetConfig = this.options.client.getFaucetConfig();
     if(sessionAge >= faucetConfig.powTimeout)
       return null;
     
     return session;
-  }
-
-  public restoreStoredSession(): Promise<void> {
-    if(this.sessionInfo)
-      return Promise.resolve();
-    
-    let sessionInfo = this.getStoredSessionInfo();
-    if(!sessionInfo)
-      return Promise.reject("no session found that can be restored (did you restore it in another tab already?)");
-
-    return this.resumeSession(sessionInfo);
   }
 
   public getClaimInfo(claimToken: string, sessionInfo?: IPoWSessionInfo): IPoWClaimInfo {
@@ -264,7 +253,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     };
   }
 
-  public getStoredClaimInfo(): IPoWClaimInfo {
+  public getStoredClaimInfo(faucetConfig: IFaucetConfig): IPoWClaimInfo {
     let claimStr = localStorage.getItem('powClaimStatus');
     let claimInfo: IPoWClaimInfo = null;
     if(claimStr) {
@@ -277,7 +266,6 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
     let now = Math.floor((new Date()).getTime() / 1000);
     let claimAge = now - claimInfo.startTime;
-    let faucetConfig = this.options.client.getFaucetConfig();
     if(claimAge >= faucetConfig.claimTimeout)
       return null;
     

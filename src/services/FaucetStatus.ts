@@ -86,12 +86,12 @@ export class FaucetStatus {
     // update faucet status for each client
     PoWClient.getAllClients().forEach((client) => {
       let session = client.getSession();
-      let status = this.getFaucetStatus(client, session);
+      let status = this.getFaucetStatus(client.getClientVersion(), session);
       client.sendFaucetStatus(status.status, status.hash);
     });
   }
 
-  public getFaucetStatus(client: PoWClient, session?: PoWSession): {status: IFaucetStatus[], hash: string} {
+  public getFaucetStatus(clientVersion: string, session?: PoWSession): {status: IFaucetStatus[], hash: string} {
     let statusList: IFaucetStatus[] = [];
     let statusHash = crypto.createHash("sha256");
 
@@ -121,7 +121,8 @@ export class FaucetStatus {
         return false;
       if(status.filter.proxy !== undefined && (!ipinfo || !!ipinfo.proxy !== status.filter.proxy))
         return false;
-      if(status.filter.lt_version !== undefined && client.getClientVersion() && !isVersionLower(client.getClientVersion(), status.filter.lt_version))
+      
+      if(status.filter.lt_version !== undefined && clientVersion && !isVersionLower(clientVersion, status.filter.lt_version))
         return false;
       return true;
     };

@@ -1,5 +1,5 @@
 import { IFaucetConfig } from '../common/IFaucetConfig';
-import { PoWSession } from '../common/PoWSession';
+import { IPoWSessionInfo, PoWSession } from '../common/PoWSession';
 import React, { ReactElement } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import { weiToEth } from '../utils/ConvertHelpers';
@@ -10,6 +10,7 @@ export interface IPoWRestoreSessionDialogProps {
   powSession: PoWSession;
   faucetConfig: IFaucetConfig;
   closeFn: () => void;
+  restoreFn: (sessionInfo: IPoWSessionInfo) => Promise<void>;
   setDialog: (dialog: IPoWStatusDialogProps) => void;
 }
 
@@ -25,7 +26,7 @@ export class PoWRestoreSessionDialog extends React.PureComponent<IPoWRestoreSess
   }
 
 	public render(): React.ReactElement<IPoWRestoreSessionDialogProps> {
-    let storedSessionInfo = this.props.powSession.getStoredSessionInfo();
+    let storedSessionInfo = this.props.powSession.getStoredSessionInfo(this.props.faucetConfig);
     return (
       <Modal show centered size="lg" className="pow-captcha-modal" onHide={() => this.props.closeFn()}>
         <Modal.Header closeButton>
@@ -68,7 +69,8 @@ export class PoWRestoreSessionDialog extends React.PureComponent<IPoWRestoreSess
         </Modal.Body>
         <Modal.Footer>
           <Button onClick={() => {
-            this.props.powSession.restoreStoredSession().then(() => {
+            let sessionInfo = this.props.powSession.getStoredSessionInfo(this.props.faucetConfig);
+            this.props.restoreFn(sessionInfo).then(() => {
               this.props.closeFn();
             }, (err) => {
               this.props.setDialog({

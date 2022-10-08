@@ -30,7 +30,6 @@ export class FaucetHttpResponse {
 export class FaucetHttpServer {
   private wssServer: WebSocketServer;
   private staticServer: StaticServer;
-  private faucetApi: FaucetWebApi;
 
   public constructor() {
     let server = createServer();
@@ -46,8 +45,6 @@ export class FaucetHttpServer {
       serverInfo: Buffer.from("pow-faucet/" + faucetConfig.faucetVersion)
     });
 
-    this.faucetApi = new FaucetWebApi();
-
     if(faucetConfig.buildSeoIndex) {
       this.buildSeoIndex();
       ServiceManager.GetService(PoWStatusLog).addListener("reload", () => {
@@ -61,7 +58,7 @@ export class FaucetHttpServer {
       // serve static files
       req.on("end", () => {
         if((req.url + "").match(/^\/api\//i)) {
-          this.faucetApi.onApiRequest(req).then((res: object) => {
+          ServiceManager.GetService(FaucetWebApi).onApiRequest(req).then((res: object) => {
             if(res && typeof res === "object" && res instanceof FaucetHttpResponse) {
               rsp.writeHead(res.code, res.reason, res.headers);
               rsp.end(res.body);

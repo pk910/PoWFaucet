@@ -5,7 +5,7 @@ import { Button, Modal, Spinner } from 'react-bootstrap';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTimespan } from '../utils/DateUtils';
-import { PoWClient } from '../common/PoWClient';
+import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { IPoWStatusDialogProps } from './PoWStatusDialog';
 import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
@@ -41,6 +41,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   private updateTimer: NodeJS.Timeout;
   private captchaControl: PoWFaucetCaptcha;
   private isTimedOut: boolean;
+  private claimConnKeeper: IPoWClientConnectionKeeper;
 
   constructor(props: IPoWClaimDialogProps, state: IPoWClaimDialogState) {
     super(props);
@@ -74,6 +75,10 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
             txHash: res.txHash,
             txBlock: res.txBlock,
           });
+        }
+        if(this.claimConnKeeper) {
+          this.claimConnKeeper.close();
+          this.claimConnKeeper = null;
         }
       };
       this.props.powClient.on("claimTx", this.powClientClaimTxListener);
@@ -221,6 +226,9 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     this.setState({
       claimProcessing: true
     });
+    if(this.claimConnKeeper)
+      this.claimConnKeeper.close();
+    this.claimConnKeeper = this.props.powClient.newConnectionKeeper();
 
     this.props.powClient.sendRequest("claimRewards", {
       captcha: this.props.faucetConfig.hcapClaim ? this.captchaControl.getToken() : null,
@@ -238,6 +246,11 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
         this.captchaControl.resetToken();
       }
       this.setState(stateChange);
+
+      if(this.claimConnKeeper) {
+        this.claimConnKeeper.close();
+        this.claimConnKeeper = null;
+      }
       this.props.setDialog({
         title: "Could not claim Rewards.",
         body: (
@@ -253,6 +266,10 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   }
 
   private onCloseClick() {
+    if(this.claimConnKeeper) {
+      this.claimConnKeeper.close();
+      this.claimConnKeeper = null;
+    }
     this.props.onClose(true);
   }
 

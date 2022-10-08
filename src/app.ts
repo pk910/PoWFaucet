@@ -6,6 +6,7 @@ import { FaucetStore } from "./services/FaucetStore";
 import { ServiceManager } from "./common/ServiceManager";
 import { PoWValidator } from "./validator/PoWValidator";
 import { FaucetStatsLog } from "./services/FaucetStatsLog";
+import { FaucetWebApi } from "./webserv/FaucetWebApi";
 
 (() => {
 
@@ -15,8 +16,8 @@ import { FaucetStatsLog } from "./services/FaucetStatsLog";
   ServiceManager.InitService(EnsWeb3Manager);
   ServiceManager.InitService(PoWValidator);
   ServiceManager.InitService(FaucetStatsLog);
-
-  new FaucetHttpServer();
+  ServiceManager.InitService(FaucetWebApi);
+  ServiceManager.InitService(FaucetHttpServer);
 
 })();
 

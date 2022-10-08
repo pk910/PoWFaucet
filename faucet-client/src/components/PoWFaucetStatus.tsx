@@ -4,12 +4,12 @@ import React from 'react';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTime, renderTimespan } from '../utils/DateUtils';
-import { PoWClient } from 'common/PoWClient';
 import getCountryIcon from 'country-flag-icons/unicode'
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { PoWApi } from 'common/PoWApi';
 
 export interface IPoWFaucetStatusProps {
-  powClient: PoWClient;
+  powApi: PoWApi;
   faucetConfig: IFaucetConfig;
 }
 
@@ -19,12 +19,12 @@ export interface IPoWFaucetStatusState {
   activeClaims: IPoWFaucetStatusClaim[];
 }
 
-interface IPoWFaucetStatus {
+export interface IPoWFaucetStatus {
   sessions: IPoWFaucetStatusSession[];
   claims: IPoWFaucetStatusClaim[];
 }
 
-interface IPoWFaucetStatusSession {
+export interface IPoWFaucetStatusSession {
   id: string;
   start: number;
   idle: number | null;
@@ -40,7 +40,7 @@ interface IPoWFaucetStatusSession {
   cliver?: string;
 }
 
-interface IPoWFaucetStatusIPInfo {
+export interface IPoWFaucetStatusIPInfo {
   status: string;
   country?: string;
   countryCode?: string;
@@ -58,7 +58,7 @@ interface IPoWFaucetStatusIPInfo {
   hosting?: boolean;
 }
 
-interface IPoWFaucetStatusClaim {
+export interface IPoWFaucetStatusClaim {
   time: number;
   session: string;
   target: string;
@@ -93,7 +93,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     this.setState({
       refreshing: true
     });
-    this.props.powClient.sendRequest<IPoWFaucetStatus>("getFaucetStatus").then((faucetStatus) => {
+    this.props.powApi.getFaucetStatus().then((faucetStatus) => {
       let activeClaims = (faucetStatus.claims || []).sort((a, b) => a.time - b.time);
       let activeClaimIds = {};
       activeClaims.forEach((claim) => {

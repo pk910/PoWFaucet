@@ -4,7 +4,8 @@ import ReactDOM from 'react-dom';
 
 (() => {
   let faucetProps: IPoWFaucetProps = {
-    powApiUrl: location.origin.replace(/^http/, "ws") + "/pow",
+    powWebsockUrl: location.origin.replace(/^http/, "ws") + "/pow",
+    powApiUrl: "/api",
     minerSrc: "/js/powfaucet-worker.js?" + FAUCET_CLIENT_BUILDTIME,
   };
 
