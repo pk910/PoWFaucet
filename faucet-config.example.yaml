@@ -41,7 +41,7 @@ faucetHomeHtml: |
   <div class='pow-info'>
     <h5>How to help the faucet?</h5>
     Replenish the faucet by sending funds you don't need anymore to:<br>
-    0x6Cc9397c3B38739daCbfaA68EaD5F5D77Ba5F455
+    0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb
   </div>
 
 # random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
@@ -49,7 +49,8 @@ faucetHomeHtml: |
 faucetSecret: "RandomStringThatShouldBeVerySecret!"
 
 # ETH execution layer RPC host
-ethRpcHost: "http://127.0.0.1:8545/"
+#ethRpcHost: "http://127.0.0.1:8545/"
+ethRpcHost: "https://rpc.goerli.mudit.blog"
 
 # faucet wallet private key (hex, without 0x prefix)
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
@@ -71,7 +72,7 @@ ethTxPrioFee: 2000000000  # 2 gwei
 ethMaxPending: 12
 
 # queue transactions and wait for funding when faucet is out of funds (show "No Funds" error when false)
-ethQueueNoFunds: false
+ethQueueNoFunds: true
 
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
@@ -79,37 +80,43 @@ ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
 
 
 ### Mining & Verification Options
+#  Avg. Mining Reward:
+#    reward_per_sec = 1/(2**powScryptParams.difficulty) * hashrate * powShareReward
 
 # reward amount per egliable hash (in wei)
-powShareReward: 12500000000000000  # 0.0125
+#powShareReward: 12500000000000000  # 0.0125
+powShareReward:   2000000000000000  # 0.002 ETH
 
 # minimum balance to payout (in wei)
-claimMinAmount: 100000000000000000  # 0.1 ETH
+#claimMinAmount: 100000000000000000  # 0.1 ETH
+claimMinAmount:   25000000000000000  # 0.025 ETH
 
 # maximum balance to payout (in wei)
-claimMaxAmount: 17000000000000000000  # 17 ETH
+#claimMaxAmount: 17000000000000000000  # 17 ETH
+claimMaxAmount:   6010000000000000000  # 6.01 ETH
 
 # penalty for not responding to a verification request (in wei)
 # shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so
-verifyMinerMissPenalty: 5000000000000000  # 0.005 ETH
+#verifyMinerMissPenalty: 5000000000000000  # 0.005 ETH
+verifyMinerMissPenalty: 1250000000000000  # 0.00125 ETH
 
 # reward for responding to a verification request in time (in wei)
 # some extra reward for slow miners - should be much lower than powShareReward
 # comment out to disable rewards for verification requests
-verifyMinerReward: 3125000000000000  # 0.003125 ETH  (1/4th of powShareReward)
+verifyMinerReward:   300000000000000  # 0.0003 ETH  (~1/6th of powShareReward)
 
 # maximum mining session time (in seconds)
-powSessionTimeout: 10800  # 3h
+powSessionTimeout: 18000   # 5h
 
 # how long sessions can be payed out (in seconds)
 # should be higher than powSessionTimeout
-claimSessionTimeout: 18000  # 5h
+claimSessionTimeout: 43200  # 12h
 
 # number of seconds to wait before allow to reuse the same address to start another mining session
-claimAddrCooldown: 7200  # 2h
+claimAddrCooldown: 600  # 10min
 
 # check balance and deny mining if balance exceeds the limit (in wei)
-claimAddrMaxBalance: 100000000000000000000 # 100 ETH
+claimAddrMaxBalance: 50000000000000000000 # 50 ETH
 
 # check and prevent mining if target address is a contract
 claimAddrDenyContract: true
@@ -162,7 +169,7 @@ verifyMinerPeerCount: 4
 verifyLocalLowPeerPercent: 80
 
 # percentage of shares to redistribute to miners for verification (0 - 100)
-verifyMinerPercent: 80
+verifyMinerPercent: 75
 
 # number of other mining sessions to redistribute a share to for verification
 verifyMinerIndividuals: 2
@@ -175,7 +182,7 @@ verifyMinerMaxMissed: 10
 
 # timeout for verification requests 
 # client gets penalized if not responding within this timespan
-verifyMinerTimeout: 30
+verifyMinerTimeout: 40
 
 
 
@@ -204,32 +211,35 @@ captchas:
 ### IP-based Restrictions
 
 # ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
-#ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
+ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
 
 # ip info based restrictions
 ipRestrictedRewardShare:
   # percentage of reward per share if IP is in a hosting range (default: 100)
-  #hosting: 100
+  hosting: 1
 
   # percentage of reward per share if IP is in a proxy range (default: 100)
-  #proxy: 100
+  proxy: 1
 
   # percentage of reward per share if IP is from given country code (DE/US/...)
   #US: 100
 
 # ip info pattern based restrictions
-#ipInfoMatchRestrictedReward:
-  #"^.*Tencent Cloud.*$": 1
+ipInfoMatchRestrictedReward:
+  "^.*Tencent Cloud.*$": 1
+  "^.*UCLOUD.*$": 1
+  "^.*Server Hosting.*$": 1
+  "^.*SCloud.*$": 1
 
 
 
 ### Fund Management
 
 # minimum balance to keep in the faucet wallet (in wei)
-spareFundsAmount: 10000000000000000  # 0.01 ETH
+spareFundsAmount: 1000000000000000000  # 1 ETH
 
 # minimum balance to show the low funds warning
-lowFundsBalance: 50000000000000000000  # 50 ETH
+lowFundsBalance: 10000000000000000000  # 10 ETH
 
 # low faucet balance warning message / false to disable the warning
 lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
@@ -239,8 +249,16 @@ noFundsError: "Sorry, the faucet is out of funds :("
 
 # reward restriction based on faucet wallet balance. lowest value applies
 faucetBalanceRestrictedReward:
-  100: 50  # 50% if lower than 100 ETH
-
+  1000: 90 # 90% if lower than 1000 ETH
+  900: 80  # 80% if lower than 900 ETH
+  800: 70  # 70% if lower than 800 ETH
+  700: 60  # 60% if lower than 700 ETH
+  600: 50  # 50% if lower than 600 ETH
+  500: 40  # 40% if lower than 500 ETH
+  400: 30  # 30% if lower than 400 ETH
+  300: 20  # 20% if lower than 300 ETH
+  200: 10  # 10% if lower than 200 ETH
+  100: 5   # 5% if lower than 100 ETH
 
 
 ### Automatic wallet refill
@@ -254,12 +272,12 @@ ethRefillContract:
   #abi: '[{"inputs":[{"internalType":"address","name":"addr","type":"address"}],"name":"getAllowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
   #allowanceFn: "getAllowance"
   #withdrawFn: "withdraw"
-  #withdrawGasLimit: 200000
+  #withdrawGasLimit: 300000
   #checkContractBalance: true
   #contractDustBalance: 1000000000000000000  # 1 ETH
-  #triggerBalance: 4500000000000000000000  # 4500 ETH
-  #cooldownTime: 3600
-  #requestAmount: 500000000000000000000 # 500 ETH
+  #triggerBalance: 1100000000000000000000  # 1100 ETH
+  #cooldownTime: 5430 # 1.5h + 30sec
+  #requestAmount: 125000000000000000000 # 125 ETH
 
 
 
