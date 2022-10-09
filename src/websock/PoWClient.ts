@@ -430,8 +430,14 @@ export class PoWClient {
       this.session.reportHashRate(shareData.hashrate);
     this.session.resetMissedVerifications();
     
+    if(faucetConfig.powHashrateLimit > 0) {
+      let sessionAge = Math.floor(((new Date()).getTime() - this.session.getStartTime().getTime()) / 1000);
+      let nonceLimit = (sessionAge + 30) * faucetConfig.powHashrateLimit;
+      if(lastNonce > nonceLimit)
+        return this.sendErrorResponse("HASHRATE_LIMIT", "Nonce too high (did you evade the hashrate limit?)", message);
+    }
+
     let shareVerification = new PoWShareVerification(this.session, shareData.nonces);
-    let sessionId = this.session.getSessionId();
     shareVerification.startVerification().then((result) => {
       if(!result.isValid)
         this.sendErrorResponse("WRONG_SHARE", "Share verification failed", message);
@@ -446,7 +452,8 @@ export class PoWClient {
         faucetStats.statVerifyMisses += shareVerification.getMinerVerifyMisses();
       }
     }, () => {
-      this.sendErrorResponse("VERIFY_FAILED", "Share verification error", message);
+      if(this.session.getSessionStatus() === PoWSessionStatus.MINING)
+        this.sendErrorResponse("VERIFY_FAILED", "Share verification error", message);
     });
   }
   
