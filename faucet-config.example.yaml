@@ -125,7 +125,8 @@ claimAddrDenyContract: true
 concurrentSessions: 1
 
 # maximum allowed mining hashrate (will be throttled to this rate when faster)
-powHashrateLimit: 1000
+powHashrateSoftLimit: 1000 # soft limit (enforced client side)
+powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
 
 # websocket ping interval
 #powPingInterval: 10

@@ -430,9 +430,9 @@ export class PoWClient {
       this.session.reportHashRate(shareData.hashrate);
     this.session.resetMissedVerifications();
     
-    if(faucetConfig.powHashrateLimit > 0) {
+    if(faucetConfig.powHashrateHardLimit > 0) {
       let sessionAge = Math.floor(((new Date()).getTime() - this.session.getStartTime().getTime()) / 1000);
-      let nonceLimit = (sessionAge + 30) * faucetConfig.powHashrateLimit;
+      let nonceLimit = (sessionAge + 30) * faucetConfig.powHashrateHardLimit;
       if(lastNonce > nonceLimit)
         return this.sendErrorResponse("HASHRATE_LIMIT", "Nonce too high (did you evade the hashrate limit?)", message);
     }

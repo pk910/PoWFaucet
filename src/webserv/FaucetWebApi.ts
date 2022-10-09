@@ -141,7 +141,7 @@ export class FaucetWebApi {
         d: faucetConfig.powScryptParams.difficulty,
       },
       powNonceCount: faucetConfig.powNonceCount,
-      powHashrateLimit: faucetConfig.powHashrateLimit,
+      powHashrateLimit: faucetConfig.powHashrateSoftLimit,
       resolveEnsNames: !!faucetConfig.ensResolver,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
     };

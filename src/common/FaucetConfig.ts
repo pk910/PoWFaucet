@@ -40,7 +40,8 @@ export interface IFaucetConfig {
     difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
   };
   powNonceCount: number; // number of scrypt hashs to pack into a share (should be low as that just increases verification load on server side)
-  powHashrateLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
+  powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
+  powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceet the limit)
 
   /* PoW-share verification
   Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
@@ -169,7 +170,8 @@ let defaultConfig: IFaucetConfig = {
     difficulty: 9
   },
   powNonceCount: 1,
-  powHashrateLimit: 0,
+  powHashrateSoftLimit: 0,
+  powHashrateHardLimit: 0,
   verifyLocalPercent: 10,
   verifyLocalMaxQueue: 100,
   verifyMinerPeerCount: 2,
