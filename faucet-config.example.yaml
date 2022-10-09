@@ -117,6 +117,9 @@ claimAddrDenyContract: true
 # number of concurrent mining sessions allowed per IP (0 = unlimited)
 concurrentSessions: 1
 
+# maximum allowed mining hashrate (will be throttled to this rate when faster)
+powHashrateLimit: 1000
+
 # websocket ping interval
 #powPingInterval: 10
 

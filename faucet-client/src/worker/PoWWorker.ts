@@ -185,9 +185,7 @@ export class PoWWorker {
     let nonce = this.workNonce++;
     if(nonce >= this.nonceRanges[0].last) {
       this.nonceRanges.splice(0, 1);
-      if(rangeCount === 1) {
-        console.log("[PoWMiner] Ran out of nonce ranges!");
-      } else {
+      if(rangeCount !== 1) {
         this.workNonce = this.nonceRanges[0].first;
       }
     }

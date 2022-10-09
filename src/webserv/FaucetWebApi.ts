@@ -40,6 +40,7 @@ export interface IClientFaucetConfig {
     d: number;
   },
   powNonceCount: number;
+  powHashrateLimit: number;
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
 }
@@ -140,6 +141,7 @@ export class FaucetWebApi {
         d: faucetConfig.powScryptParams.difficulty,
       },
       powNonceCount: faucetConfig.powNonceCount,
+      powHashrateLimit: faucetConfig.powHashrateLimit,
       resolveEnsNames: !!faucetConfig.ensResolver,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
     };

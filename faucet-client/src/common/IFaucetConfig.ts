@@ -16,6 +16,7 @@ export interface IFaucetConfig {
   claimTimeout: number;
   powParams: IPoWParams;
   powNonceCount: number;
+  powHashrateLimit: number;
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
 }

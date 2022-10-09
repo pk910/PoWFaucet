@@ -8,6 +8,7 @@ export interface IPoWMinerOptions {
   workerSrc: string;
   powParams: IPoWParams;
   nonceCount: number;
+  hashrateLimit: number;
 }
 
 interface IPoWMinerSettings {
@@ -221,7 +222,10 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     }
     else {
       let sessionInfo = this.options.session.getSessionInfo();
-      let nonceRange = this.options.session.getNonceRange(this.targetNoncePrefill);
+      let refillCount = this.getLimitedNonceRefillCount(this.targetNoncePrefill);
+      if(refillCount === 0)
+        refillCount = 1;
+      let nonceRange = this.options.session.getNonceRange(refillCount);
       worker.lastNonce = nonceRange;
       
       worker.worker.postMessage({
@@ -291,6 +295,26 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     }
   }
 
+  private getLimitedNonceRefillCount(requestedRefill: number): number {
+    if(this.options.hashrateLimit <= 0)
+      return requestedRefill;
+
+    let sessionInfo = this.options.session.getSessionInfo();
+    let now = Math.floor((new Date()).getTime() / 1000);
+    let sessionAge = now - sessionInfo.startTime;
+    if(sessionAge <= 1)
+      return requestedRefill;
+
+    sessionAge += 4; // add 4 seconds as this limits the number of nonces that will be processed in the next 4 sec
+    
+    let nonceLimit =  sessionAge * this.options.hashrateLimit;
+    let nonceCount = nonceLimit - sessionInfo.noncePos
+    if(requestedRefill > nonceCount)
+      requestedRefill = nonceCount;
+    
+    return requestedRefill;
+  }
+
   private onWorkerStats(worker: IPoWMinerWorker, stats: any) {
     worker.stats.push({
       shares: stats.shares,
@@ -301,14 +325,16 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
 
     worker.lastNonce = stats.last;
     if(stats.nonces < this.targetNoncePrefill) {
-      let refill = this.targetNoncePrefill - stats.nonces;
-      worker.worker.postMessage({
-        action: "addRange",
-        data: {
-          start: this.options.session.getNonceRange(refill),
-          count: refill,
-        }
-      });
+      let refill = this.getLimitedNonceRefillCount(this.targetNoncePrefill - stats.nonces);
+      if(refill > 0) {
+        worker.worker.postMessage({
+          action: "addRange",
+          data: {
+            start: this.options.session.getNonceRange(refill),
+            count: refill,
+          }
+        });
+      }
     }
 
     this.processNonceQueue();

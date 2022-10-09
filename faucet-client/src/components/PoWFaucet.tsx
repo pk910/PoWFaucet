@@ -226,6 +226,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           workerSrc: this.props.minerSrc,
           powParams: this.state.faucetConfig.powParams,
           nonceCount: this.state.faucetConfig.powNonceCount,
+          hashrateLimit: this.state.faucetConfig.powHashrateLimit,
         }));
       }
       if(this.miningConnKeper)
@@ -474,6 +475,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         workerSrc: this.props.minerSrc,
         powParams: this.state.faucetConfig.powParams,
         nonceCount: this.state.faucetConfig.powNonceCount,
+        hashrateLimit: this.state.faucetConfig.powHashrateLimit,
       }));
       this.setState({
         miningStatus: PoWFaucetMiningStatus.RUNNING,
