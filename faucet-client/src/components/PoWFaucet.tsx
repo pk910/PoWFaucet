@@ -642,7 +642,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
 
       this.notifications.splice(notificationIdx, 1);
       this.setState({
-        notifications: this.notifications
+        notifications: this.notifications.slice()
       });
     }
   }

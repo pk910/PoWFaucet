@@ -111,7 +111,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
             sessionInfo = null;
             return;
           default:
-            this.options.showNotification("error", "Resume session error: [" + err.code + "] " + err.message, true);
+            this.options.showNotification("error", "Resume session error: [" + err.code + "] " + err.message, true, 20 * 1000);
             break;
         }
       }
@@ -147,7 +147,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   private _submitShare(share: IPoWMinerShare) {
     this.options.client.sendRequest("foundShare", share).catch((err) => {
-      this.options.showNotification("error", "Submission error: [" + err.code + "] " + err.message, true, 10 * 1000);
+      this.options.showNotification("error", "Submission error: [" + err.code + "] " + err.message, true, 20 * 1000);
     });
   }
 
@@ -166,7 +166,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   private _submitVerifyResult(result) {
     this.options.client.sendRequest("verifyResult", result).catch((err) => {
-      this.options.showNotification("error", "Verification error: [" + err.code + "] " + err.message, true, 10 * 1000);
+      this.options.showNotification("error", "Verification error: [" + err.code + "] " + err.message, true, 20 * 1000);
     });
   }
 
