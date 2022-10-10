@@ -30,6 +30,7 @@ export interface IPoWClaimDialogState {
   refreshIndex: number;
   claimStatus: PoWClaimStatus;
   claimProcessing: boolean;
+  pendingTime: number;
   claimError: string;
   txHash: string;
   txBlock: number;
@@ -38,6 +39,7 @@ export interface IPoWClaimDialogState {
 
 export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IPoWClaimDialogState> {
   private powClientClaimTxListener: ((res: any) => void);
+  private powClientOpenListener: (() => void);
   private updateTimer: NodeJS.Timeout;
   private captchaControl: PoWFaucetCaptcha;
   private isTimedOut: boolean;
@@ -50,6 +52,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       refreshIndex: 0,
       claimStatus: PoWClaimStatus.PREPARE,
       claimProcessing: false,
+      pendingTime: 0,
       claimError: null,
       txHash: null,
       txBlock: 0,
@@ -59,29 +62,12 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
 
   public componentDidMount() {
     if(!this.powClientClaimTxListener) {
-      this.powClientClaimTxListener = (res: any) => {
-        if(res.session !== this.props.reward.session)
-          return;
-
-        if(res.error) {
-          this.setState({
-            claimStatus: PoWClaimStatus.FAILED,
-            txError: res.error,
-          });
-        }
-        else {
-          this.setState({
-            claimStatus: PoWClaimStatus.CONFIRMED,
-            txHash: res.txHash,
-            txBlock: res.txBlock,
-          });
-        }
-        if(this.claimConnKeeper) {
-          this.claimConnKeeper.close();
-          this.claimConnKeeper = null;
-        }
-      };
+      this.powClientClaimTxListener = (res: any) => this.onClaimStatusChange(res);
       this.props.powClient.on("claimTx", this.powClientClaimTxListener);
+    }
+    if(!this.powClientOpenListener) {
+      this.powClientOpenListener = () => this.onPoWClientOpen();
+      this.props.powClient.on("open", this.powClientOpenListener);
     }
     if(!this.updateTimer) {
       this.setUpdateTimer();
@@ -93,10 +79,50 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       this.props.powClient.off("claimTx", this.powClientClaimTxListener);
       this.powClientClaimTxListener = null;
     }
+    if(this.powClientOpenListener) {
+      this.props.powClient.off("open", this.powClientOpenListener);
+      this.powClientOpenListener = null;
+    }
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);
       this.updateTimer = null;
     }
+  }
+
+  private onClaimStatusChange(res: any) {
+    if(res.session !== this.props.reward.session)
+      return;
+
+    if(res.error) {
+      this.setState({
+        claimStatus: PoWClaimStatus.FAILED,
+        txError: res.error,
+      });
+    }
+    else {
+      this.setState({
+        claimStatus: PoWClaimStatus.CONFIRMED,
+        txHash: res.txHash,
+        txBlock: res.txBlock,
+      });
+    }
+    if(this.claimConnKeeper) {
+      this.claimConnKeeper.close();
+      this.claimConnKeeper = null;
+    }
+  }
+
+  private onPoWClientOpen() {
+    if(this.state.claimStatus !== PoWClaimStatus.PENDING)
+      return;
+    this.props.powClient.sendRequest("", {
+      sessionId: this.props.reward.session
+    }).catch((err) => {
+      this.setState({
+        claimStatus: PoWClaimStatus.FAILED,
+        txError: "[" + err.code + "] " + err.message,
+      });
+    });
   }
 
   private setUpdateTimer() {
@@ -191,6 +217,9 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                   <span className="visually-hidden">Loading...</span>
                 </Spinner>
                 <span className="spinner-text">The faucet is now processing your claim...</span>
+                {this.state.pendingTime > 0 && (now - this.state.pendingTime) > 60 ? 
+                  <span className="spinner-text"><br />This seems to take longer than usual... <br />You can close this page now. Your claim is queued and will be processed as soon as possible.</span> : 
+                  null}
               </div>
              : null}
              {this.state.claimStatus == PoWClaimStatus.CONFIRMED ?
@@ -237,6 +266,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       this.props.powSession.storeClaimInfo(null);
       this.setState({
         claimStatus: PoWClaimStatus.PENDING,
+        pendingTime: Math.floor((new Date()).getTime() / 1000),
       });
     }, (err) => {
       let stateChange: any = {

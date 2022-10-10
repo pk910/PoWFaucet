@@ -5,7 +5,7 @@ import { PoWSession, PoWSessionStatus } from './PoWSession';
 import { AddressMark, FaucetStore, SessionMark } from '../services/FaucetStore';
 import { renderTimespan } from '../utils/DateUtils';
 import { isValidGuid } from '../utils/GuidUtils';
-import { EthWeb3Manager } from '../services/EthWeb3Manager';
+import { ClaimTx, EthWeb3Manager } from '../services/EthWeb3Manager';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWShareVerification } from './PoWShareVerification';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
@@ -209,6 +209,9 @@ export class PoWClient {
         break;
       case "claimRewards":
         this.onCliClaimRewards(message);
+        break;
+      case "watchClaimTx":
+        this.onCliWatchClaimTx(message);
         break;
       default:
         this.sendMessage("error", {
@@ -452,7 +455,7 @@ export class PoWClient {
         faucetStats.statVerifyMisses += shareVerification.getMinerVerifyMisses();
       }
     }, () => {
-      if(this.session.getSessionStatus() === PoWSessionStatus.MINING)
+      if(this.session)
         this.sendErrorResponse("VERIFY_FAILED", "Share verification error", message);
     });
   }
@@ -544,23 +547,39 @@ export class PoWClient {
       closedSession.setSessionStatus(PoWSessionStatus.CLAIMED);
 
     let claimTx = ServiceManager.GetService(EthWeb3Manager).addClaimTransaction(sessionInfo.targetAddr, sessionInfo.balance, sessionInfo.id);
-    this.sendMessage("ok", null, reqId);
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Claimed reward for session " + sessionInfo.id + " to " + sessionInfo.targetAddr + " (" + (Math.round(weiToEth(sessionInfo.balance)*1000)/1000) + " ETH)");
-
     claimTx.once("confirmed", () => {
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
       faucetStats.statClaimCount++;
       faucetStats.statClaimRewards += sessionInfo.balance;
+    });
+    this.bindClaimTxEvents(claimTx);
+    this.sendMessage("ok", null, reqId);
+  }
 
+  private onCliWatchClaimTx(message: any) {
+    let reqId = message.id || undefined;
+    if(typeof message.data !== "object" || !message.data || !message.data.sessionId)
+      return this.sendErrorResponse("INVALID_WATCHCLAIM", "Invalid watch claim request", message);
+
+    let claimTx = ServiceManager.GetService(EthWeb3Manager).getClaimTransaction(message.data.sessionId);
+    if(!claimTx)
+      return this.sendErrorResponse("CLAIM_NOT_FOUND", "Claim transaction not found in queue", message);
+    
+    this.bindClaimTxEvents(claimTx);
+    this.sendMessage("ok", null, reqId);
+  }
+
+  private bindClaimTxEvents(claimTx: ClaimTx) {
+    claimTx.once("confirmed", () => {
       this.sendMessage("claimTx", {
-        session: sessionInfo.id,
+        session: claimTx.session,
         txHash: claimTx.txhash,
         txBlock: claimTx.txblock
       });
     });
     claimTx.once("failed", () => {
       this.sendMessage("claimTx", {
-        session: sessionInfo.id,
+        session: claimTx.session,
         error: claimTx.failReason
       });
     });

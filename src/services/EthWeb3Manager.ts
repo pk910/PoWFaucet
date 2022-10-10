@@ -229,6 +229,27 @@ export class EthWeb3Manager {
     return claimTx;
   }
 
+  public getClaimTransaction(sessId: string): ClaimTx {
+    for(let i = 0; i < this.claimTxQueue.length; i++) {
+      if(this.claimTxQueue[i].session === sessId)
+        return this.claimTxQueue[i];
+    }
+    
+    let pendingTxs = Object.values(this.pendingTxQueue);
+    for(let i = 0; i < pendingTxs.length; i++) {
+      if(pendingTxs[i].session === sessId)
+        return pendingTxs[i];
+    }
+
+    let historyTxs = Object.values(this.historyTxDict);
+    for(let i = 0; i < historyTxs.length; i++) {
+      if(historyTxs[i].session === sessId)
+        return historyTxs[i];
+    }
+
+    return null;
+  }
+
   private buildEthTx(target: string, amount: number, nonce: number): string {
     let txAmount: number|string = amount;
     if(txAmount > 10000000000000000)
