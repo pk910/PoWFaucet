@@ -20,13 +20,15 @@
     "@ethereumjs/common": "^2.6.2",
     "@ethereumjs/tx": "^3.5.0",
     "@types/node": "^17.0.21",
+    "bignumber.js": "^9.1.0",
     "ethereum-ens": "^0.8.0",
     "ethereumjs-util": "^7.1.4",
     "hcaptcha": "^0.1.1",
     "html-entities": "^2.3.3",
     "node-fetch": "^2.6.7",
     "tiny-typed-emitter": "^2.1.0",
-    "web3": "^1.7.1",
-    "ws": "^8.5.0"
+    "web3": "^1.7.5",
+    "ws": "^8.5.0",
+    "yaml": "^2.1.1"
   }
 }

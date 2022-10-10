@@ -4,6 +4,8 @@ export interface IFaucetConfig {
   faucetStatus: IFaucetStatus[];
   faucetImage: string;
   faucetHtml: string;
+  faucetCoinSymbol: string;
+  hcapProvider: string;
   hcapSiteKey: string | null;
   hcapSession: boolean;
   hcapClaim: boolean;
@@ -14,8 +16,10 @@ export interface IFaucetConfig {
   claimTimeout: number;
   powParams: PoWParams;
   powNonceCount: number;
+  powHashrateLimit: number;
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
+  time: number;
 }
 
 export enum PoWHashAlgo {

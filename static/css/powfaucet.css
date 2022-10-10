@@ -92,6 +92,10 @@ html, body {
   margin-top: 8px;
 }
 
+.pow-faucet .faucet-captcha > div {
+  display: inline-block;
+}
+
 .pow-faucet .faucet-title {
   position: relative;
 }
@@ -167,6 +171,26 @@ html, body {
   margin-top: 8px;
 }
 
+.pow-faucet .faucet-notifications {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+}
+
+.pow-faucet .faucet-notifications .pow-notification .alert {
+  padding: 8px;
+  min-width: 300px;
+}
+
+.pow-faucet .faucet-footer {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  padding: 4px;
+  font-size: 12px;
+  color: #343a40;
+  pointer-events: none;
+}
 
 
 @media (max-width: 576px) {
@@ -186,6 +210,10 @@ html, body {
 #ipinfo-tooltip .ipaddr-info {
   min-width: 200px;
   text-align: left;
+}
+
+#ipinfo-tooltip .ipaddr-info.claim-error {
+  max-width: 500px;
 }
 
 #ipinfo-tooltip .ipaddr-info > table {

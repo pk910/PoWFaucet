@@ -94,13 +94,10 @@ export class PoWWorker {
 
     let isValid = (share.nonces.length > 0);
     for(var i = 0; i < share.nonces.length && isValid; i++) {
-      let nonceHex = share.nonces[i].toString(16);
-      if((nonceHex.length % 2) == 1) {
-        nonceHex = `0${nonceHex}`;
-      }
-
-      if(!this.checkHash(nonceHex, preimg))
+      if(!this.checkHash(share.nonces[i], preimg)) {
         isValid = false;
+        break;
+      }
     }
 
     postMessage({
@@ -188,9 +185,7 @@ export class PoWWorker {
     let nonce = this.workNonce++;
     if(nonce >= this.nonceRanges[0].last) {
       this.nonceRanges.splice(0, 1);
-      if(rangeCount === 1) {
-        console.log("[PoWMiner] Ran out of nonce ranges!");
-      } else {
+      if(rangeCount !== 1) {
         this.workNonce = this.nonceRanges[0].first;
       }
     }
@@ -210,8 +205,9 @@ export class PoWWorker {
 
   private checkHash(nonce: number, preimg: string): string {
     let nonceHex = nonce.toString(16);
-    if((nonceHex.length % 2) == 1) {
-      nonceHex = `0${nonceHex}`;
+    // pad hex to 64bit (16 hex characters) to prevent re-hashing the same nonce multiple times
+    if(nonceHex.length < 16) {
+      nonceHex = "0000000000000000".substring(0, 16 - nonceHex.length) + nonceHex;
     }
     
     this.statsCount++;

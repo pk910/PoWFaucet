@@ -1,5 +1,8 @@
 import * as fs from 'fs'
 import { faucetConfig } from '../common/FaucetConfig';
+import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { ServiceManager } from '../common/ServiceManager';
+import { IQueuedClaimTx } from './EthWeb3Manager';
 import { IIPInfo } from './IPInfoResolver';
 
 export enum SessionMark {
@@ -16,6 +19,7 @@ interface IFaucetStore {
   sessionMarks: {[sessionId: string]: IFaucetStoreMarks<SessionMark>};
   addressMarks: {[sessionId: string]: IFaucetStoreMarks<AddressMark>};
   ipInfoCache: {[ip: string]: IFaucetStoreEntry<IIPInfo>};
+  claimTxQueue: IQueuedClaimTx[];
 }
 
 interface IFaucetStoreMarks<T> {
@@ -48,10 +52,13 @@ export class FaucetStore {
         sessionMarks: {},
         addressMarks: {},
         ipInfoCache: {},
+        claimTxQueue: [],
       };
     }
     if(!this.store.ipInfoCache)
       this.store.ipInfoCache = {};
+    if(!this.store.claimTxQueue)
+      this.store.claimTxQueue = [];
 
     this.dirty = false;
   }
@@ -209,6 +216,33 @@ export class FaucetStore {
 
     this.dirty = true;
     this.saveStore();
+  }
+
+  public getClaimTxQueue(): IQueuedClaimTx[] {
+    return this.store.claimTxQueue.slice();
+  }
+
+  public addQueuedClaimTx(claimTx: IQueuedClaimTx) {
+    this.store.claimTxQueue.push(claimTx);
+    this.dirty = true;
+    this.saveStore();
+  }
+
+  public removeQueuedClaimTx(sessionId: string) {
+    let found = false;
+    for(let i = 0; i < this.store.claimTxQueue.length; i++) {
+      if(this.store.claimTxQueue[i].session === sessionId) {
+        if(i !== 0)
+          ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Out of order claim tx removal from persistent queue! Idx: " + i);
+        this.store.claimTxQueue.splice(i, 1);
+        found = true;
+        break;
+      }
+    }
+    if(found) {
+      this.dirty = true;
+      this.saveStore();
+    }
   }
 
 }

@@ -5,10 +5,13 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const TerserPlugin = require("terser-webpack-plugin");
 const Visualizer = require('webpack-visualizer-plugin2');
 var cliArgs = require('./utils/CliArgs');
+var pkgJson = require('./package.json');
 
 var debug = false;
 if(cliArgs['dev'])
   debug = true;
+
+var buildTime = (new Date()).getTime();
 
 var webpackModuleConfigs = [
   {
@@ -91,7 +94,12 @@ var webpackBaseConfig = {
     minimizer: [
       new TerserPlugin({
         parallel: true,
-        extractComments: true,
+        extractComments: {
+          banner: '@pow-faucet-client: ' + JSON.stringify({
+            version: pkgJson.version,
+            build: buildTime,
+          }) + "\n",
+        },
         terserOptions: {
           compress: true,
           keep_fnames: false,
@@ -105,9 +113,8 @@ var webpackBaseConfig = {
 
   plugins: [
     new webpack.DefinePlugin({
-        'process.env': {
-            
-        }
+      FAUCET_CLIENT_VERSION: JSON.stringify(pkgJson.version),
+      FAUCET_CLIENT_BUILDTIME: buildTime,
     }),
     new Visualizer({
       filename: 'webpack-stats.html'

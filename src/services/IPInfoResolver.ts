@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { faucetConfig } from '../common/FaucetConfig';
 import { ServiceManager } from '../common/ServiceManager';
 import { FaucetStore } from './FaucetStore';
 
@@ -37,7 +38,7 @@ export class IPInfoResolver {
     if(this.ipInfoCache.hasOwnProperty(ipAddr))
       return this.ipInfoCache[ipAddr][1];
 
-    let ipApiUrl = "http://ip-api.com/json/" + ipAddr + "?fields=21155839";
+    let ipApiUrl = faucetConfig.ipInfoApi.replace(/{ip}/, ipAddr);
     let promise = fetch(ipApiUrl)
     .then((rsp) => rsp.json())
     .then((rsp: any) => {

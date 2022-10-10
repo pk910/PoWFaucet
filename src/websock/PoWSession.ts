@@ -133,11 +133,28 @@ export class PoWSession {
 
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionAge = now - Math.floor(this.startTime.getTime() / 1000);
-    let cleanupTime = faucetConfig.powSessionTimeout - sessionAge + 20;
+    let cleanupTime = faucetConfig.powSessionTimeout - sessionAge;
     if(cleanupTime > 0) {
       this.cleanupTimer = setTimeout(() => {
-        this.closeSession();
+        this.timeoutSession();
       }, cleanupTime * 1000);
+    }
+    else {
+      setTimeout(() => {
+        this.timeoutSession();
+      }, 0);
+    }
+  }
+
+  private timeoutSession() {
+    let activeClient = this.activeClient;
+    this.closeSession(false, true);
+    if(activeClient) {
+      activeClient.sendMessage("sessionKill", {
+        level: "timeout",
+        message: "Session timed out.",
+        token: this.isClaimable() ? this.getSignedSession() : null,
+      });
     }
   }
 
@@ -301,20 +318,15 @@ export class PoWSession {
   }
 
   public slashBadSession(reason: PoWSessionSlashReason) {
-    let penalty: string = null;
     switch(reason) {
       case PoWSessionSlashReason.MISSED_VERIFICATION:
-        let balancePenalty = this.applyBalancePenalty(faucetConfig.verifyMinerMissPenalty);
-        penalty = "-" + (Math.round(weiToEth(balancePenalty)*1000)/1000) + "eth";
+        this.applyBalancePenalty(faucetConfig.verifyMinerMissPenalty);
         break;
       case PoWSessionSlashReason.INVALID_SHARE:
       case PoWSessionSlashReason.INVALID_VERIFICATION:
         this.applyKillPenalty(reason);
-        penalty = "killed";
         break;
     }
-
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Slashed session " + this.sessionId + " (reason: " + reason + ", penalty: " + penalty + ")");
   }
 
   private applyBalancePenalty(penalty: number): number {
@@ -333,6 +345,9 @@ export class PoWSession {
       })
     }
 
+    ServiceManager.GetService(FaucetStatsLog).statVerifyPenalty += penalty;
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + (Math.round(weiToEth(penalty)*1000)/1000) + "ETH)");
+
     return penalty;
   }
 
@@ -342,9 +357,13 @@ export class PoWSession {
     if(this.activeClient)
       this.activeClient.sendMessage("sessionKill", {
         level: "session",
-        message: reason
+        message: reason,
+        token: null
       });
     this.closeSession();
+
+    ServiceManager.GetService(FaucetStatsLog).statSlashCount++;
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Slashed session " + this.sessionId + " (reason: " + reason + ", penalty: killed)");
   }
 
   public getSignedSession(): string {
@@ -360,7 +379,7 @@ export class PoWSession {
     let sessionStr = Buffer.from(JSON.stringify(sessionDict)).toString('base64');
 
     let sessionHash = crypto.createHash("sha256");
-    sessionHash.update(faucetConfig.powSessionSecret + "\r\n");
+    sessionHash.update(faucetConfig.faucetSecret + "\r\n");
     sessionHash.update(sessionStr);
 
     return sessionStr + "|" + sessionHash.digest('base64');

@@ -77,8 +77,8 @@ export class PoWValidatorWorker {
     let isValid = (req.nonces.length > 0);
     for(var i = 0; i < req.nonces.length && isValid; i++) {
       let nonceHex = req.nonces[i].toString(16);
-      if((nonceHex.length % 2) == 1) {
-        nonceHex = `0${nonceHex}`;
+      if(nonceHex.length < 16) {
+        nonceHex = "0000000000000000".substring(0, 16 - nonceHex.length) + nonceHex;
       }
 
       let hashHex = this.hashFn(

@@ -1,6 +1,6 @@
 {
   "name": "pow-faucet-client",
-  "version": "1.0.0",
+  "version": "1.0.17",
   "description": "PoW Faucet Client",
   "scripts": {
     "bundle": "webpack",
@@ -19,6 +19,7 @@
     "@babel/preset-flow": "^7.16.7",
     "@babel/preset-react": "^7.16.7",
     "@babel/preset-typescript": "^7.16.7",
+    "@types/react-google-recaptcha": "^2.1.5",
     "babel-loader": "^8.2.3",
     "clean-webpack-plugin": "^4.0.0",
     "css-loader": "^6.5.1",
@@ -38,6 +39,7 @@
     "react": "^17.0.2",
     "react-bootstrap": "^2.2.1",
     "react-dom": "^17.0.2",
+    "react-google-recaptcha": "^2.1.0",
     "tiny-typed-emitter": "^2.1.0"
   }
 }

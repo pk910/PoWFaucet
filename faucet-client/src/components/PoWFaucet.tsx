@@ -1,22 +1,23 @@
+import React from 'react';
 import { IFaucetConfig, IFaucetStatus } from '../common/IFaucetConfig';
-import { PoWClient } from '../common/PoWClient';
-import React, { ReactElement } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import HCaptcha from "@hcaptcha/react-hcaptcha";
-
-import './PoWFaucet.css'
-import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
+import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
+import { IPoWClaimInfo, IPoWSessionInfo, PoWSession } from '../common/PoWSession';
 import { PoWMinerStatus } from './PoWMinerStatus';
 import { PoWMiner, PoWMinerWorkerSrc } from '../common/PoWMiner';
-import { renderDate } from '../utils/DateUtils';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWClaimDialog } from './PoWClaimDialog';
 import { PoWFaucetStatus } from './PoWFaucetStatus';
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { IPoWStatusDialogProps, PoWStatusDialog } from './PoWStatusDialog';
 import { PoWRestoreSessionDialog } from './PoWRestoreSessionDialog';
+import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
+import { PoWApi } from '../common/PoWApi';
+import { PoWFaucetNotification } from './PoWFaucetNotification';
+import { PoWTime } from '../common/PoWTime';
+import './PoWFaucet.css'
 
 export interface IPoWFaucetProps {
+  powWebsockUrl: string;
   powApiUrl: string;
   minerSrc: PoWMinerWorkerSrc;
 }
@@ -33,9 +34,9 @@ export interface IPoWFaucetState {
   initializing: boolean;
   faucetConfig: IFaucetConfig;
   faucetStatus: IFaucetStatus[];
+  isConnected: boolean;
   targetAddr: string;
   requestCaptcha: boolean;
-  captchaToken: string;
   miningStatus: PoWFaucetMiningStatus;
   isClaimable: boolean;
   statusDialog: IPoWStatusDialogProps;
@@ -43,12 +44,25 @@ export interface IPoWFaucetState {
   showRestoreSessionDialog: boolean;
   showClaimRewardDialog: IPoWClaimInfo;
   showFaucetStatus: boolean;
+  notifications: IPoWFaucetNotification[];
+}
+
+export interface IPoWFaucetNotification {
+  id: number;
+  type: string;
+  message: string;
+  time?: number;
+  timeout?: number;
+  timerId?: NodeJS.Timeout;
 }
 
 export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetState> {
+  private powApi: PoWApi;
   private powClient: PoWClient;
   private powSession: PoWSession;
-  private hcapControl: HCaptcha;
+  private miningConnKeper: IPoWClientConnectionKeeper;
+  private powTime: PoWTime;
+  private captchaControl: PoWFaucetCaptcha;
   private eventListeners: {[key: string]: {
     emmiter: TypedEmitter;
     event: string;
@@ -57,39 +71,52 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
   }} = {};
   private faucetStatucClickCount = 0;
   private restoredPersistedState = false;
+  private configRefreshInterval: NodeJS.Timer;
+  private lastConfigRefresh = 0;
+  private notificationIdCounter = 1;
+  private notifications: IPoWFaucetNotification[] = [];
 
   constructor(props: IPoWFaucetProps, state: IPoWFaucetState) {
     super(props);
 
+    this.powTime = new PoWTime();
+    this.powApi = new PoWApi(props.powApiUrl);
     this.powClient = new PoWClient({
-      powApiUrl: props.powApiUrl,
+      powApiUrl: props.powWebsockUrl,
     });
     this.powClient.on("open", () => {
       let faucetConfig = this.powClient.getFaucetConfig();
+      this.lastConfigRefresh = (new Date()).getTime();
+      this.powTime.syncTimeOffset(faucetConfig.time);
       this.setState({
         initializing: false,
         faucetConfig: faucetConfig,
         faucetStatus: faucetConfig.faucetStatus,
+        isConnected: true,
       });
-
-      if(!this.restoredPersistedState)
-        this.restorePersistedState();
-
+    });
+    this.powClient.on("close", () => {
+      this.lastConfigRefresh = (new Date()).getTime();
+      this.setState({
+        isConnected: false,
+      });
     });
 
     this.powSession = new PoWSession({
       client: this.powClient,
+      powTime: this.powTime,
       getInputs: () => {
-        var capToken = this.state.captchaToken;
-        if(this.hcapControl) {
-          this.hcapControl.resetCaptcha();
-          this.setState({ captchaToken: null, })
+        var capToken = "";
+        if(this.captchaControl) {
+          capToken = this.captchaControl.getToken();
+          this.captchaControl.resetToken();
         }
         return {
           addr: this.state.targetAddr,
           token: capToken
         };
       },
+      showNotification: (type, message, time, timeout) => this.showNotification(type, message, time, timeout),
     });
 
     this.eventListeners = {
@@ -108,15 +135,25 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         event: "killed",
         listener: (killInfo) => this.onPoWSessionKilled(killInfo),
       },
+      "sessionError": {
+        emmiter: this.powSession,
+        event: "error",
+        listener: (error) => this.onPoWSessionError(error),
+      },
+      "sessionClaimable": {
+        emmiter: this.powSession,
+        event: "claimable",
+        listener: (claimInfo) => this.onPoWSessionClaimable(claimInfo),
+      },
     };
 
     this.state = {
       initializing: true,
       faucetConfig: null,
       faucetStatus: [],
+      isConnected: false,
       targetAddr: "",
       requestCaptcha: false,
-      captchaToken: null,
       miningStatus: PoWFaucetMiningStatus.IDLE,
       isClaimable: false,
       statusDialog: null,
@@ -124,10 +161,12 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       showRestoreSessionDialog: false,
       showClaimRewardDialog: null,
       showFaucetStatus: false,
+      notifications: [],
 		};
   }
 
   public componentDidMount() {
+    this.loadFaucetConfig();
     Object.keys(this.eventListeners).forEach((listenerKey) => {
       let eventListener = this.eventListeners[listenerKey];
       if(eventListener.bound)
@@ -135,6 +174,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       eventListener.emmiter.on(eventListener.event, eventListener.listener as any);
       eventListener.bound = true;
     });
+    this.startConfigRefreshInterval();  
   }
 
   public componentWillUnmount() {
@@ -145,12 +185,41 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       eventListener.emmiter.off(eventListener.event, eventListener.listener as any);
       eventListener.bound = false;
     });
+    if(this.configRefreshInterval) {
+      clearInterval(this.configRefreshInterval);
+      this.configRefreshInterval = null;
+    }
   }
 
-  private restorePersistedState() {
+  private startConfigRefreshInterval() {
+    if(this.configRefreshInterval)
+      clearInterval(this.configRefreshInterval);
+    this.configRefreshInterval = setInterval(() => {
+      let now = (new Date()).getTime();
+      if(this.lastConfigRefresh < now - (10 * 60 * 1000) && !this.state.isConnected) {
+        this.loadFaucetConfig();
+      }
+    }, 30 * 1000);
+  }
+
+  private loadFaucetConfig() {
+    this.powApi.getFaucetConfig().then((faucetConfig) => {
+      this.lastConfigRefresh = (new Date()).getTime();
+      this.powTime.syncTimeOffset(faucetConfig.time);
+      this.setState({
+        initializing: false,
+        faucetConfig: faucetConfig,
+        faucetStatus: faucetConfig.faucetStatus,
+      });
+      if(!this.restoredPersistedState)
+        this.restorePersistedState(faucetConfig);
+    });
+  }
+
+  private restorePersistedState(faucetConfig: IFaucetConfig) {
     this.restoredPersistedState = true;
-    let persistedSession = this.powSession.getStoredSessionInfo();
-    let persistedClaim = this.powSession.getStoredClaimInfo();
+    let persistedSession = this.powSession.getStoredSessionInfo(faucetConfig);
+    let persistedClaim = this.powSession.getStoredClaimInfo(faucetConfig);
 
     this.setState({
       showRestoreSessionDialog: !!persistedSession,
@@ -174,8 +243,13 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           workerSrc: this.props.minerSrc,
           powParams: this.state.faucetConfig.powParams,
           nonceCount: this.state.faucetConfig.powNonceCount,
+          hashrateLimit: this.state.faucetConfig.powHashrateLimit,
+          powTime: this.powTime,
         }));
       }
+      if(this.miningConnKeper)
+        this.miningConnKeper.close();
+      this.miningConnKeper = this.powClient.newConnectionKeeper();
       this.setState({
         miningStatus: PoWFaucetMiningStatus.RUNNING,
         targetAddr: sessionInfo.targetAddr,
@@ -187,6 +261,10 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       if(this.powSession.getMiner()) {
         this.powSession.getMiner().stopMiner();
         this.powSession.setMiner(null);
+      }
+      if(this.miningConnKeper) {
+        this.miningConnKeper.close();
+        this.miningConnKeper = null;
       }
       this.setState({
         miningStatus: PoWFaucetMiningStatus.IDLE,
@@ -219,6 +297,26 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     });
   }
 
+  private onPoWSessionError(err: any) {
+    this.setState({
+      statusDialog: {
+        title: "Session Error",
+        body: (
+          <div className='alert alert-danger'>{err && err.message ? err.message : err ? err.toString() : ""}</div>
+        ),
+        closeButton: {
+          caption: "Close",
+        }
+      },
+    });
+  }
+
+  private onPoWSessionClaimable(claimInfo: IPoWClaimInfo) {
+    this.setState({
+      showClaimRewardDialog: claimInfo
+    });
+  }
+
 	public render(): React.ReactElement<IPoWFaucetProps> {
     let renderControl: React.ReactElement;
     if(this.state.initializing) {
@@ -232,7 +330,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       );
     }
     else if(this.state.showFaucetStatus) {
-      return <PoWFaucetStatus powClient={this.powClient} faucetConfig={this.state.faucetConfig} />;
+      return <PoWFaucetStatus powApi={this.powApi} faucetConfig={this.state.faucetConfig} />;
     }
 
     let actionButtonControl: React.ReactElement;
@@ -241,8 +339,8 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
 
     switch(this.state.miningStatus) {
       case PoWFaucetMiningStatus.IDLE:
-        requestCaptcha = enableCaptcha && this.state.faucetConfig.hcapSession;
       case PoWFaucetMiningStatus.STARTING:
+        requestCaptcha = enableCaptcha && this.state.faucetConfig.hcapSession;
         actionButtonControl = (
           <button 
             className="btn btn-success start-action" 
@@ -258,8 +356,8 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         actionButtonControl = (
           <button 
             className="btn btn-danger stop-action" 
-            onClick={(evt) => this.onStopMiningClick()} 
-            disabled={this.state.miningStatus !== PoWFaucetMiningStatus.RUNNING}>
+            onClick={(evt) => this.onStopMiningClick(false)} 
+            disabled={!this.state.isConnected || this.state.miningStatus !== PoWFaucetMiningStatus.RUNNING}>
               {this.state.statusMessage ? this.state.statusMessage : (this.state.isClaimable ? "Stop Mining & Claim Rewards" : "Stop Mining")}
           </button>
         );
@@ -299,10 +397,21 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
         </div>
         {faucetStatusEls}
+        {this.state.miningStatus !== PoWFaucetMiningStatus.IDLE && !this.state.isConnected ? 
+          <div className="faucet-status-alert alert alert-danger" role="alert">
+            <span>Connection to faucet server lost. Reconnecting...</span>
+          </div>
+        : null}
         <div className="pow-header center">
           <div className="pow-status-container">
             {this.powSession.getMiner() ? 
-              <PoWMinerStatus powMiner={this.powSession.getMiner()} powSession={this.powSession} faucetConfig={this.state.faucetConfig} stopMinerFn={() => this.onStopMiningClick()} /> :
+              <PoWMinerStatus 
+                powMiner={this.powSession.getMiner()} 
+                powSession={this.powSession} 
+                powTime={this.powTime} 
+                faucetConfig={this.state.faucetConfig} 
+                stopMinerFn={(force) => this.onStopMiningClick(force)} 
+              /> :
               <div className='pow-faucet-home'>
                 {this.state.faucetConfig.faucetImage ?
                   <img src={this.state.faucetConfig.faucetImage} className="image" />
@@ -314,13 +423,17 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         {this.state.showRestoreSessionDialog ? 
           <PoWRestoreSessionDialog 
             powSession={this.powSession} 
+            faucetConfig={this.state.faucetConfig} 
             closeFn={() => this.setState({ showRestoreSessionDialog: false })}
+            restoreFn={(sessionInfo) => this.onRestoreSession(sessionInfo)}
+            setDialog={(dialog) => this.setState({ statusDialog: dialog })}
           /> 
         : null}
         {this.state.showClaimRewardDialog ? 
           <PoWClaimDialog 
             powClient={this.powClient}
             powSession={this.powSession}
+            powTime={this.powTime}
             reward={this.state.showClaimRewardDialog}
             faucetConfig={this.state.faucetConfig}
             onClose={(clearClaim) => {
@@ -328,15 +441,9 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
                 this.powSession.storeClaimInfo(null);
               this.setState({
                 showClaimRewardDialog: null,
-                miningStatus: PoWFaucetMiningStatus.IDLE,
-                statusMessage: null,
               });
             }}
-            setDialog={(dialog) => {
-              this.setState({
-                statusDialog: dialog
-              });
-            }} 
+            setDialog={(dialog) => this.setState({ statusDialog: dialog })}
           />
         : null}
         {this.state.statusDialog ? 
@@ -355,10 +462,9 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           />
           {requestCaptcha ? 
             <div className='faucet-captcha'>
-              <HCaptcha 
-                sitekey={this.state.faucetConfig.hcapSiteKey} 
-                onVerify={(token) => this.setState({ captchaToken: token })}
-                ref={(cap) => this.hcapControl = cap} 
+              <PoWFaucetCaptcha 
+                faucetConfig={this.state.faucetConfig} 
+                ref={(cap) => this.captchaControl = cap} 
               />
             </div>
           : null}
@@ -372,6 +478,20 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
             <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.state.faucetConfig.faucetHtml}} />
           : null}
         </div>
+        <div className='faucet-notifications'>
+          {this.state.notifications.map((notification) => (
+            <PoWFaucetNotification 
+              key={notification.id} 
+              type={notification.type} 
+              message={notification.message} 
+              time={notification.time} 
+              hideFn={() => this.hideNotification(notification.id)} 
+            />
+          ))}
+        </div>
+        <div className='faucet-footer'>
+          <div className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</div>
+        </div>
       </div>
     );
 	}
@@ -381,12 +501,18 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       miningStatus: PoWFaucetMiningStatus.STARTING,
       statusMessage: "Starting mining..."
     });
+    if(this.miningConnKeper)
+      this.miningConnKeper.close();
+    this.miningConnKeper = this.powClient.newConnectionKeeper();
+
     this.powSession.startSession().then(() => {
       this.powSession.setMiner(new PoWMiner({
         session: this.powSession,
         workerSrc: this.props.minerSrc,
         powParams: this.state.faucetConfig.powParams,
         nonceCount: this.state.faucetConfig.powNonceCount,
+        hashrateLimit: this.state.faucetConfig.powHashrateLimit,
+        powTime: this.powTime,
       }));
       this.setState({
         miningStatus: PoWFaucetMiningStatus.RUNNING,
@@ -394,6 +520,10 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         statusMessage: null,
       });
     }, (err) => {
+      if(this.miningConnKeper) {
+        this.miningConnKeper.close();
+        this.miningConnKeper = null;
+      }
       this.setState({
         miningStatus: PoWFaucetMiningStatus.IDLE,
         statusDialog: {
@@ -408,36 +538,62 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     });
   }
 
-  private onStopMiningClick() {
+  private onRestoreSession(sessionInfo: IPoWSessionInfo): Promise<void> {
+    if(this.miningConnKeper)
+      this.miningConnKeper.close();
+    this.miningConnKeper = this.powClient.newConnectionKeeper();
+
+    return this.powSession.resumeSession(sessionInfo).catch((ex) => {
+      if(this.miningConnKeper) {
+        this.miningConnKeper.close();
+        this.miningConnKeper = null;
+      }
+    });
+  }
+
+  private onStopMiningClick(force: boolean) {
+    let sessionInfo = this.powSession.getSessionInfo();
+    if(!this.state.isClaimable && sessionInfo.balance > 0 && !force) {
+      this.setState({
+        statusDialog: {
+          title: "Mining balance too low",
+          body: (
+            <div className='alert alert-warning'>
+              Your mining balance of {Math.round(weiToEth(sessionInfo.balance) * 1000) / 1000} {this.state.faucetConfig.faucetCoinSymbol} is too low to be claimed.<br />
+              The minimum allowed amount is {Math.round(weiToEth(this.state.faucetConfig.minClaim) * 1000) / 1000} {this.state.faucetConfig.faucetCoinSymbol}.<br />
+              Do you want to stop mining and loose the rewards you've already collected?
+              </div>
+          ),
+          closeButton: {
+            caption: "Continue mining",
+          },
+          applyButton: {
+            caption: "Stop mining",
+            applyFn: () => {
+              this.onStopMiningClick(true);
+            }
+          }
+        },
+      });
+      return;
+    }
+
     this.setState({
       miningStatus: PoWFaucetMiningStatus.STOPPING,
       statusMessage: "Claiming rewards..."
     });
     this.powSession.getMiner().stopMiner();
 
-    let sessionInfo = this.powSession.getSessionInfo();
-    this.powSession.closeSession().then((claimToken) => {
+    this.powSession.closeSession().then(() => {
       this.powSession.setMiner(null);
-
-      if(claimToken) {
-        let claimInfo: IPoWClaimInfo = {
-          session: sessionInfo.sessionId,
-          startTime: sessionInfo.startTime,
-          target: sessionInfo.targetAddr,
-          balance: sessionInfo.balance,
-          token: claimToken
-        };
-        this.powSession.storeClaimInfo(claimInfo);
-        this.setState({
-          showClaimRewardDialog: claimInfo
-        });
+      if(this.miningConnKeper) {
+        this.miningConnKeper.close();
+        this.miningConnKeper = null;
       }
-      else {
-        this.setState({
-          miningStatus: PoWFaucetMiningStatus.IDLE,
-          statusMessage: null,
-        });
-      }
+      this.setState({
+        miningStatus: PoWFaucetMiningStatus.IDLE,
+        statusMessage: null,
+      });
     });
   }
 
@@ -447,6 +603,57 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       this.faucetStatucClickCount = 0;
       this.setState({
         showFaucetStatus: true
+      });
+    }
+  }
+
+  private showNotification(type: string, message: string, time?: number|boolean, timeout?: number): number {
+    let notificationId = this.notificationIdCounter++;
+    let notification: IPoWFaucetNotification = {
+      id: notificationId,
+      type: type,
+      message: message,
+      time: typeof time == "number" ? time : time ? (new Date()).getTime() : null,
+      timeout: timeout ? (new Date()).getTime() + timeout : 0,
+      timerId: timeout ? setTimeout(() => {
+        notification.timerId = null;
+        this.hideNotification(notification.id);
+      }, timeout) : null,
+    }
+    if(this.notifications.length > 10) {
+      this.notifications.splice(0, this.notifications.length - 10).forEach((n) => {
+        if(n.timerId) {
+          clearTimeout(n.timerId);
+          n.timerId = null;
+        }
+      });
+    }
+    this.notifications.push(notification);
+    this.setState({
+      notifications: this.notifications.slice()
+    })
+    return notificationId;
+  }
+
+  private hideNotification(notificationId: number): void {
+    let notificationIdx = -1;
+    let notification: IPoWFaucetNotification;
+    for(let idx = 0; idx < this.state.notifications.length; idx++) {
+      if(this.notifications[idx].id === notificationId) {
+        notificationIdx = idx;
+        notification = this.state.notifications[idx];
+        break;
+      }
+    }
+    if(notificationIdx !== -1) {
+      if(notification.timerId) {
+        clearTimeout(notification.timerId);
+        notification.timerId = null;
+      }
+
+      this.notifications.splice(notificationIdx, 1);
+      this.setState({
+        notifications: this.notifications.slice()
       });
     }
   }

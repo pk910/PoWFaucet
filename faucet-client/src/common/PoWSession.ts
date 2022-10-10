@@ -1,10 +1,14 @@
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { PoWClient } from "./PoWClient";
+import { IFaucetConfig } from './IFaucetConfig';
+import { IPoWClientConnectionKeeper, PoWClient } from "./PoWClient";
 import { IPoWMinerShare, IPoWMinerVerification, PoWMiner } from "./PoWMiner";
+import { PoWTime } from './PoWTime';
 
 export interface IPoWSessionOptions {
   client: PoWClient;
+  powTime: PoWTime;
   getInputs: () => object;
+  showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => number;
 }
 
 export interface IPoWSessionInfo {
@@ -35,7 +39,9 @@ export interface IPoWClaimInfo {
 
 interface PoWSessionEvents {
   'update': () => void;
-  'killed': (reason: string) => void;
+  'killed': (killInfo: any) => void;
+  'error': (message: string) => void;
+  'claimable': (claimInfo: IPoWClaimInfo) => void;
 }
 
 export class PoWSession extends TypedEmitter<PoWSessionEvents> {
@@ -74,41 +80,58 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     });
   }
 
-  public resumeSession(): Promise<void> {
-    if(!this.sessionInfo)
-      return;
+  public resumeSession(sessionInfo?: IPoWSessionInfo): Promise<void> {
+    if(!sessionInfo) {
+      if(!this.sessionInfo)
+        return Promise.resolve();
+      sessionInfo = this.sessionInfo;
+    }
     if(this.miner) {
       let faucetConfig = this.options.client.getFaucetConfig();
       this.miner.setPoWParams(faucetConfig.powParams, faucetConfig.powNonceCount);
     }
     this.options.client.setCurrentSession(this);
     return this.options.client.sendRequest("resumeSession", {
-      sessionId: this.sessionInfo.sessionId
+      sessionId: sessionInfo.sessionId
     }).then((res) => {
-      if(res.lastNonce > this.sessionInfo.noncePos)
-        this.sessionInfo.noncePos = res.lastNonce + 1;
-    }, () => {
-      return this.options.client.sendRequest("recoverSession", this.sessionInfo.recovery);
+      if(res.lastNonce > sessionInfo.noncePos)
+        sessionInfo.noncePos = res.lastNonce + 1;
+    }, (err) => {
+      if(err && err.code) {
+        switch(err.code) {
+          case "INVALID_SESSIONID":
+            // server doesn't know about this session id anymore - try recover
+            return this.options.client.sendRequest("recoverSession", sessionInfo.recovery);
+          case "SESSION_CLOSED":
+            if(!err.data || !err.data.token)
+              break;
+            // session was closed, but we've got a claim token
+            let claimInfo = this.getClaimInfo(err.data.token, sessionInfo);
+            this.storeClaimInfo(claimInfo);
+            this.emit("claimable", claimInfo);
+            this.closedSession();
+            sessionInfo = null;
+            return;
+          default:
+            this.options.showNotification("error", "Resume session error: [" + err.code + "] " + err.message, true, 20 * 1000);
+            break;
+        }
+      }
+      throw err;
     }).then(() => {
+      if(!sessionInfo)
+        return;
+      this.sessionInfo = sessionInfo;
+
       // resumed session
       if(this.shareQueue.length) {
-        this.shareQueue.forEach((share) => {
-          this.options.client.sendRequest("foundShare", share);
-        });
+        this.shareQueue.forEach((share) => this._submitShare(share));
         this.shareQueue = [];
       }
       if(this.verifyResultQueue.length) {
-        this.verifyResultQueue.forEach((verifyResult) => {
-          this.options.client.sendRequest("verifyResult", verifyResult);
-        });
+        this.verifyResultQueue.forEach((verifyResult) => this._submitVerifyResult(verifyResult));
         this.verifyResultQueue = [];
       }
-    }, () => {
-      // clear sessiop
-      this.sessionInfo = null;
-      this.storeSessionStatus();
-      
-    }).then(() => {
       this.emit("update");
     });
   }
@@ -119,9 +142,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   public submitShare(share: IPoWMinerShare) {
     if(this.options.client.isReady() && this.shareQueue.length === 0)
-      this.options.client.sendRequest("foundShare", share);
+      this._submitShare(share);
     else
       this.shareQueue.push(share);
+  }
+
+  private _submitShare(share: IPoWMinerShare) {
+    this.options.client.sendRequest("foundShare", share).catch((err) => {
+      this.options.showNotification("error", "Submission error: [" + err.code + "] " + err.message, true, 20 * 1000);
+    });
   }
 
   public processVerification(verification: IPoWMinerVerification) {
@@ -132,9 +161,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   public submitVerifyResult(result) {
     if(this.options.client.isReady() && this.verifyResultQueue.length === 0)
-      this.options.client.sendRequest("verifyResult", result);
+      this._submitVerifyResult(result);
     else
       this.verifyResultQueue.push(result);
+  }
+
+  private _submitVerifyResult(result) {
+    this.options.client.sendRequest("verifyResult", result).catch((err) => {
+      this.options.showNotification("error", "Verification error: [" + err.code + "] " + err.message, true, 20 * 1000);
+    });
   }
 
   public updateBalance(balanceUpdate: IPoWSessionBalanceUpdate) {
@@ -155,21 +190,38 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     return noncePos;
   }
 
-  public closeSession(): Promise<string> {
+  public closeSession(): Promise<void> {
     return this.options.client.sendRequest("closeSession").then((rsp) => {
-      this.sessionInfo = null;
-      this.storeSessionStatus();
-      this.emit("update");
 
-      return rsp.claimable ? rsp.token : null;
+      if(rsp.claimable) {
+        let claimInfo = this.getClaimInfo(rsp.token);
+        this.storeClaimInfo(claimInfo);
+        this.emit("claimable", claimInfo);
+      }
+
+      this.closedSession();
     });
   }
 
-  public processSessionKill(killInfo: any) {
+  public closedSession(): void {
     this.sessionInfo = null;
-    if(killInfo.level === "session")
+    this.storeSessionStatus();
+    this.emit("update");
+  }
+
+  public processSessionKill(killInfo: any) {
+    let claimable = false;
+    if(killInfo.level === "timeout" && killInfo.token) {
+      let claimInfo = this.getClaimInfo(killInfo.token);
+      this.storeClaimInfo(claimInfo);
+      this.emit("claimable", claimInfo);
+      claimable = true;
+    }
+    this.sessionInfo = null;
+    if(killInfo.level === "session" || killInfo.level === "timeout")
       this.storeSessionStatus();
-    this.emit("killed", killInfo);
+    if(!claimable)
+      this.emit("killed", killInfo);
     this.emit("update");
   }
 
@@ -184,7 +236,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       localStorage.removeItem('powSessionStatus');
   }
 
-  public getStoredSessionInfo(): IPoWSessionInfo {
+  public getStoredSessionInfo(faucetConfig: IFaucetConfig): IPoWSessionInfo {
     let sessionStr = localStorage.getItem('powSessionStatus');
     let session: IPoWSessionInfo = null;
     if(sessionStr) {
@@ -195,25 +247,26 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     if(!session)
       return null;
 
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let sessionAge = now - session.startTime;
-    let faucetConfig = this.options.client.getFaucetConfig();
+    let sessionAge = this.options.powTime.getSyncedTime() - session.startTime;
     if(sessionAge >= faucetConfig.powTimeout)
       return null;
     
     return session;
   }
 
-  public restoreStoredSession() {
-    if(this.sessionInfo)
-      return;
-    if(!(this.sessionInfo = this.getStoredSessionInfo()))
-      return;
-
-    this.resumeSession();
+  public getClaimInfo(claimToken: string, sessionInfo?: IPoWSessionInfo): IPoWClaimInfo {
+    if(!sessionInfo)
+    sessionInfo = this.sessionInfo;
+    return {
+      session: sessionInfo.sessionId,
+      startTime: sessionInfo.startTime,
+      target: sessionInfo.targetAddr,
+      balance: sessionInfo.balance,
+      token: claimToken
+    };
   }
 
-  public getStoredClaimInfo(): IPoWClaimInfo {
+  public getStoredClaimInfo(faucetConfig: IFaucetConfig): IPoWClaimInfo {
     let claimStr = localStorage.getItem('powClaimStatus');
     let claimInfo: IPoWClaimInfo = null;
     if(claimStr) {
@@ -224,9 +277,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     if(!claimInfo)
       return null;
 
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let claimAge = now - claimInfo.startTime;
-    let faucetConfig = this.options.client.getFaucetConfig();
+    let claimAge = this.options.powTime.getSyncedTime() - claimInfo.startTime;
     if(claimAge >= faucetConfig.claimTimeout)
       return null;
     

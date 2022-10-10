@@ -4,12 +4,14 @@ import React from 'react';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderTimespan } from '../utils/DateUtils';
+import { PoWTime } from '../common/PoWTime';
 
 export interface IPoWMinerStatusProps {
   powMiner: PoWMiner;
   powSession: PoWSession;
+  powTime: PoWTime;
   faucetConfig: IFaucetConfig;
-  stopMinerFn: () => void;
+  stopMinerFn: (force: boolean) => void;
 }
 
 export interface IPoWMinerStatusState {
@@ -108,14 +110,14 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
   }
 
 	public render(): React.ReactElement<IPoWMinerStatusProps> {
-    let now = Math.floor((new Date()).getTime() / 1000);
+    let now = this.props.powTime.getSyncedTime();
     let sessionLifetime = 0;
     if(this.state.startTime) {
       sessionLifetime = (this.state.startTime + this.props.faucetConfig.powTimeout) - now;
       if(sessionLifetime < 5 && !this.stoppedMiner) {
         this.stoppedMiner = true;
         setTimeout(() => {
-          this.props.stopMinerFn();
+          this.props.stopMinerFn(true);
         }, 100);
       }
     }
@@ -123,7 +125,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
     if(this.state.balance >= this.props.faucetConfig.maxClaim && !this.stoppedMiner) {
       this.stoppedMiner = true;
       setTimeout(() => {
-        this.props.stopMinerFn();
+        this.props.stopMinerFn(true);
       }, 100);
     }
 
@@ -141,7 +143,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
         <div className='row pow-status-top'>
           <div className='col-6'>
             <div className='status-title'>Your Mining Reward:</div>
-            <div className='status-value'>{Math.round(weiToEth(this.state.balance) * 1000) / 1000} ETH</div>
+            <div className='status-value'>{Math.round(weiToEth(this.state.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</div>
           </div>
           <div className='col-6'>
             <div className='status-title'>Current Hashrate:</div>
@@ -167,7 +169,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='status-title'>Minimum Claim Reward:</div>
           </div>
           <div className='col-6'>
-            <div className='status-value'>{Math.round(weiToEth(this.props.faucetConfig.minClaim) * 100) / 100} ETH</div>
+            <div className='status-value'>{Math.round(weiToEth(this.props.faucetConfig.minClaim) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</div>
           </div>
         </div>
         <div className='row pow-status-other'>
@@ -175,7 +177,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='status-title'>Maximum Claim Reward:</div>
           </div>
           <div className='col-6'>
-            <div className='status-value'>{Math.round(weiToEth(this.props.faucetConfig.maxClaim) * 100) / 100} ETH</div>
+            <div className='status-value'>{Math.round(weiToEth(this.props.faucetConfig.maxClaim) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</div>
           </div>
         </div>
         <div className='row pow-status-other'>
@@ -199,7 +201,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='status-title'>Avg. Reward per Hour:</div>
           </div>
           <div className='col-6'>
-            <div className='status-value'>{Math.round(weiToEth(this.state.balance / (miningTime / 3600)) * 1000) / 1000} ETH/h</div>
+            <div className='status-value'>{Math.round(weiToEth(this.state.balance / (miningTime / 3600)) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}/h</div>
           </div>
         </div>
 

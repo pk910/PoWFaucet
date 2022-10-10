@@ -1,0 +1,323 @@
+# PoWFaucet config (example)
+
+### General Settings
+
+# Path to faucet db file (defaults to faucet-store.json)
+faucetStore: "faucet-store.json"
+
+# logfile for faucet events (comment out for no logging)
+faucetLogFile: "faucet-events.log"
+
+# path to file to write the process pid to (comment out to disable)
+#faucetPidFile: "faucet-pid.txt"
+
+# faucet http/ws server port
+serverPort: 8080
+
+# title of the faucet
+faucetTitle: "Goerli PoW Faucet"
+
+# url to image displayed on the startpage
+faucetImage: "/images/fauceth_420.jpg"
+
+# symbol (short name) of the coin that can be mined
+faucetCoinSymbol: "GöETH"
+
+# some additional html to show on the startpage
+faucetHomeHtml: |
+  <div class='pow-info'>
+    <h5>What is a PoW Faucet?</h5>
+    This is a Ethereum Faucet running on the Goerli Testnet.<br>
+    To prevent malicious actors from exhausting all available funds or 
+    accumulating enough Ether to mount long running spam attacks, 
+    this faucet requires some mining work to be done in exchange for 
+    free testnet funds.
+  </div>
+  <div class='pow-info'>
+    <h5>How does this work?</h5>
+    Just enter your ETH Address and start mining. 
+    When you've collected enough ETH, stop mining and claim your rewards.
+  </div>
+  <div class='pow-info'>
+    <h5>How to help the faucet?</h5>
+    Replenish the faucet by sending funds you don't need anymore to:<br>
+    0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb
+  </div>
+
+# random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
+# use a random string and do not share / reuse it anywhere. Everyone knowing this secret is theoretically able to claim rewards from the faucet without mining.
+faucetSecret: "RandomStringThatShouldBeVerySecret!"
+
+# ETH execution layer RPC host
+#ethRpcHost: "http://127.0.0.1:8545/"
+ethRpcHost: "https://rpc.goerli.mudit.blog"
+
+# faucet wallet private key (hex, without 0x prefix)
+ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
+
+# EVM chain id
+ethChainId: 5
+
+# transaction gas limit
+# use 21000 to prevent transactions to contracts
+ethTxGasLimit: 21000
+
+# max transaction gas fee (in wei)
+ethTxMaxFee: 10000000000  # 10 gwei
+
+# max transaction priority fee (in wei)
+ethTxPrioFee: 2000000000  # 2 gwei
+
+# max number of unconfirmed transactions to create simultaneously
+ethMaxPending: 12
+
+# queue transactions and wait for funding when faucet is out of funds (show "No Funds" error when false)
+ethQueueNoFunds: true
+
+# link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
+ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
+
+
+
+### Mining & Verification Options
+#  Avg. Mining Reward:
+#    reward_per_sec = 1/(2**powScryptParams.difficulty) * hashrate * powShareReward
+
+# reward amount per egliable hash (in wei)
+#powShareReward: 12500000000000000  # 0.0125
+powShareReward:   2000000000000000  # 0.002 ETH
+
+# minimum balance to payout (in wei)
+#claimMinAmount: 100000000000000000  # 0.1 ETH
+claimMinAmount:   25000000000000000  # 0.025 ETH
+
+# maximum balance to payout (in wei)
+#claimMaxAmount: 17000000000000000000  # 17 ETH
+claimMaxAmount:   6010000000000000000  # 6.01 ETH
+
+# penalty for not responding to a verification request (in wei)
+# shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so
+#verifyMinerMissPenalty: 5000000000000000  # 0.005 ETH
+verifyMinerMissPenalty: 1250000000000000  # 0.00125 ETH
+
+# reward for responding to a verification request in time (in wei)
+# some extra reward for slow miners - should be much lower than powShareReward
+# comment out to disable rewards for verification requests
+verifyMinerReward:   300000000000000  # 0.0003 ETH  (~1/6th of powShareReward)
+
+# maximum mining session time (in seconds)
+powSessionTimeout: 18000   # 5h
+
+# how long sessions can be payed out (in seconds)
+# should be higher than powSessionTimeout
+claimSessionTimeout: 43200  # 12h
+
+# number of seconds to wait before allow to reuse the same address to start another mining session
+claimAddrCooldown: 600  # 10min
+
+# check balance and deny mining if balance exceeds the limit (in wei)
+claimAddrMaxBalance: 50000000000000000000 # 50 ETH
+
+# check and prevent mining if target address is a contract
+claimAddrDenyContract: true
+
+# number of concurrent mining sessions allowed per IP (0 = unlimited)
+concurrentSessions: 1
+
+# maximum allowed mining hashrate (will be throttled to this rate when faster)
+powHashrateSoftLimit: 1000 # soft limit (enforced client side)
+powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
+
+# websocket ping interval
+#powPingInterval: 10
+
+# kill websocket if no ping/pong for that number of seconds
+#powPingTimeout: 30
+
+
+# mining algorithm to use
+powHashAlgo: "sc"  # sc = SCrype, cn = CryptoNight
+
+# scrypt mining parameters
+powScryptParams:
+  # N - iterations count: affects memory and CPU usage, must be a power of 2
+  cpuAndMemory: 4096
+  # r - block size: affects memory and CPU usage
+  blockSize: 8
+  # p - parallelism factor: threads to run in parallel, affects the memory & CPU usage, should be 1 as webworker is single threaded
+  paralellization: 1
+  # klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
+  keyLength: 16
+  # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+  difficulty: 11
+
+# cryptonight mining parameters
+powCryptoNightParams:
+  # crypto night hash algo & variant
+  algo: 0
+  variant: 0
+  height: 0
+  # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+  difficulty: 11
+
+# number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)
+#powNonceCount: 1
+
+# Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
+# As that can lead to a huge verification work load on the server, this faucet can redistribute shares back to other miners for verification.
+# These randomly selected miners need to check the share and return its validity to the server within 10 seconds or they're penalized.
+# If theres a missmatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
+# Bad shares always result in a slashing (termination of session and loss of all collected mining balance)
+
+# percentage of shares validated locally (0 - 100)
+verifyLocalPercent: 10
+
+# max number of shares in local validation queue
+verifyLocalMaxQueue: 100
+
+# min number of mining sessions for verification redistribution
+# only local verification if not enough active sessions (should be higher than verifyMinerIndividuals)
+verifyMinerPeerCount: 4
+
+# percentage of shares validated locally if there are not enough sessions for verification redistribution (0 - 100)
+verifyLocalLowPeerPercent: 80
+
+# percentage of shares to redistribute to miners for verification (0 - 100)
+verifyMinerPercent: 75
+
+# number of other mining sessions to redistribute a share to for verification
+verifyMinerIndividuals: 2
+
+# max number of pending verifications per miner before not sending any more verification requests
+verifyMinerMaxPending: 5
+
+# max number of missed verifications before not sending any more verification requests
+verifyMinerMaxMissed: 10
+
+# timeout for verification requests 
+# client gets penalized if not responding within this timespan
+verifyMinerTimeout: 40
+
+
+
+### Captcha Options
+# comment out to disable all hcaptchas
+captchas:
+  # captcha provider:
+  # hcaptcha:  HCaptcha (https://hcaptcha.com)
+  # recaptcha: ReCAPTCHA (https://developers.google.com/recaptcha)
+  provider: "hcaptcha"
+
+  # captcha site key
+  siteKey: "00000000-0000-0000-0000-000000000000"
+
+  # captcha secret key
+  secret: "0xCensoredHCaptchaSecretKey"
+
+  # require captcha to start a new mining session (default: false)
+  checkSessionStart: true
+
+  # require captcha to claim mining rewards (default: false)
+  checkBalanceClaim: true
+
+
+
+### IP-based Restrictions
+
+# ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
+ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
+
+# ip info based restrictions
+ipRestrictedRewardShare:
+  # percentage of reward per share if IP is in a hosting range (default: 100)
+  hosting: 1
+
+  # percentage of reward per share if IP is in a proxy range (default: 100)
+  proxy: 1
+
+  # percentage of reward per share if IP is from given country code (DE/US/...)
+  #US: 100
+
+# ip info pattern based restrictions
+ipInfoMatchRestrictedReward:
+  "^.*Tencent Cloud.*$": 1
+  "^.*UCLOUD.*$": 1
+  "^.*Server Hosting.*$": 1
+  "^.*SCloud.*$": 1
+
+
+
+### Fund Management
+
+# minimum balance to keep in the faucet wallet (in wei)
+spareFundsAmount: 1000000000000000000  # 1 ETH
+
+# minimum balance to show the low funds warning
+lowFundsBalance: 10000000000000000000  # 10 ETH
+
+# low faucet balance warning message / false to disable the warning
+lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
+
+# empty faucet error message / false to disable the error
+noFundsError: "Sorry, the faucet is out of funds :("
+
+# reward restriction based on faucet wallet balance. lowest value applies
+faucetBalanceRestrictedReward:
+  1000: 90 # 90% if lower than 1000 ETH
+  900: 80  # 80% if lower than 900 ETH
+  800: 70  # 70% if lower than 800 ETH
+  700: 60  # 60% if lower than 700 ETH
+  600: 50  # 50% if lower than 600 ETH
+  500: 40  # 40% if lower than 500 ETH
+  400: 30  # 30% if lower than 400 ETH
+  300: 20  # 20% if lower than 300 ETH
+  200: 10  # 10% if lower than 200 ETH
+  100: 5   # 5% if lower than 100 ETH
+
+
+### Automatic wallet refill
+
+# refill contract options
+# advanced configuration to limit the amount of funds that can be mined on the faucet via a separate vault contract
+# the faucet tries to refill its wallet balance from the vault contract when it gets empty
+# see contract code in docs folder
+ethRefillContract:
+  #contract: "0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb"
+  #abi: '[{"inputs":[{"internalType":"address","name":"addr","type":"address"}],"name":"getAllowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+  #allowanceFn: "getAllowance"
+  #withdrawFn: "withdraw"
+  #withdrawGasLimit: 300000
+  #checkContractBalance: true
+  #contractDustBalance: 1000000000000000000  # 1 ETH
+  #triggerBalance: 1100000000000000000000  # 1100 ETH
+  #cooldownTime: 5430 # 1.5h + 30sec
+  #requestAmount: 125000000000000000000 # 125 ETH
+
+
+
+### ENS Resolver
+# comment out to disable ENS names
+ensResolver:
+  # RPC Host for ENS name resolver (mainnet)
+  rpcHost: "https://main-light.eth.linkpool.io/"
+  # Custom ENS Resolver contract address
+  #ensAddr: "0x"
+
+
+### Other Settings
+
+# print faucet stats to log interval (10min default)
+#faucetLogStatsInterval: 600
+
+# faucet stats config (comment out to disable stats)
+faucetStats:
+  # faucet stats file
+  logfile: "faucet-stats.log"
+
+# build SEO optimized index.seo.html and deliver as index page
+# the blank loader page just looks bad when parsed by search engines
+buildSeoIndex: true
+
+# some additional meta tags to add to the SEO optimized page
+buildSeoMeta:
+  keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow"

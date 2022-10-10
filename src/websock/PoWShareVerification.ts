@@ -1,10 +1,10 @@
 import { faucetConfig } from "../common/FaucetConfig";
 import { ServiceManager } from "../common/ServiceManager";
-import { IIPInfo } from "../services/IPInfoResolver";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PromiseDfd } from "../utils/PromiseDfd";
 import { PoWValidator } from "../validator/PoWValidator";
 import { PoWSessionSlashReason, PoWSession } from "./PoWSession";
+import { PoWRewardLimiter } from "../services/PoWRewardLimiter";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -13,11 +13,12 @@ export interface IPoWShareVerificationResult {
 
 export class PoWShareVerification {
   private static verifyingShares: {[id: string]: PoWShareVerification} = {};
+  
 
-  public static processVerificationResult(shareId: string, verifier: string, isValid: boolean) {
+  public static processVerificationResult(shareId: string, verifier: string, isValid: boolean): boolean {
     if(!this.verifyingShares[shareId])
-      return;
-    this.verifyingShares[shareId].processVerificationResult(verifier, isValid);
+      return false;
+    return this.verifyingShares[shareId].processVerificationResult(verifier, isValid);
   }
 
   private shareId: string;
@@ -109,16 +110,20 @@ export class PoWShareVerification {
     return this.resultDfd.promise;
   }
 
-  public processVerificationResult(verifier: string, isValid: boolean) {
+  public processVerificationResult(verifier: string, isValid: boolean): boolean {
     let validatorIdx = this.verifyMinerSessions.indexOf(verifier);
     if(validatorIdx === -1)
-      return;
+      return false;
     
     this.verifyMinerSessions.splice(validatorIdx, 1);
     this.verifyMinerResults[verifier] = isValid;
+    if(!isValid)
+      this.isInvalid = true;
     
     if(this.verifyMinerSessions.length === 0)
       this.completeVerification();
+    
+    return true;
   }
 
   private completeVerification() {
@@ -174,22 +179,9 @@ export class PoWShareVerification {
     }
     else {
       // valid share - add rewards
-      shareReward = faucetConfig.powShareReward;
-
-      let sessionIpInfo: IIPInfo;
-      if(faucetConfig.ipRestrictedRewardShare && (sessionIpInfo = session.getLastIpInfo())) {
-        let restrictedReward = 100;
-        if(sessionIpInfo.hosting && typeof faucetConfig.ipRestrictedRewardShare.hosting === "number" && faucetConfig.ipRestrictedRewardShare.hosting < restrictedReward)
-          restrictedReward = faucetConfig.ipRestrictedRewardShare.hosting;
-        if(sessionIpInfo.proxy && typeof faucetConfig.ipRestrictedRewardShare.proxy === "number" && faucetConfig.ipRestrictedRewardShare.proxy < restrictedReward)
-          restrictedReward = faucetConfig.ipRestrictedRewardShare.proxy;
-        if(sessionIpInfo.countryCode && typeof faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] === "number" && faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode] < restrictedReward)
-          restrictedReward = faucetConfig.ipRestrictedRewardShare[sessionIpInfo.countryCode];
-        if(restrictedReward < 100)
-          shareReward = Math.floor(shareReward / 100 * restrictedReward);
-      }
-
+      shareReward = ServiceManager.GetService(PoWRewardLimiter).getShareReward(session);
       session.addBalance(shareReward);
+      
       if(session.getActiveClient()) {
         session.getActiveClient().sendMessage("updateBalance", {
           balance: session.getBalance(),
