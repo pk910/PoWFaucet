@@ -17,6 +17,7 @@ import { IPoWStatusDialogProps, PoWStatusDialog } from './PoWStatusDialog';
 import { PoWRestoreSessionDialog } from './PoWRestoreSessionDialog';
 import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
 import { PoWApi } from '../common/PoWApi';
+import { PoWFaucetNotification } from './PoWFaucetNotification';
 
 export interface IPoWFaucetProps {
   powWebsockUrl: string;
@@ -46,6 +47,16 @@ export interface IPoWFaucetState {
   showRestoreSessionDialog: boolean;
   showClaimRewardDialog: IPoWClaimInfo;
   showFaucetStatus: boolean;
+  notifications: IPoWFaucetNotification[];
+}
+
+export interface IPoWFaucetNotification {
+  id: number;
+  type: string;
+  message: string;
+  time?: number;
+  timeout?: number;
+  timerId?: NodeJS.Timeout;
 }
 
 export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetState> {
@@ -64,6 +75,8 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
   private restoredPersistedState = false;
   private configRefreshInterval: NodeJS.Timer;
   private lastConfigRefresh = 0;
+  private notificationIdCounter = 1;
+  private notifications: IPoWFaucetNotification[] = [];
 
   constructor(props: IPoWFaucetProps, state: IPoWFaucetState) {
     super(props);
@@ -102,6 +115,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           token: capToken
         };
       },
+      showNotification: (type, message, time, timeout) => this.showNotification(type, message, time, timeout),
     });
 
     this.eventListeners = {
@@ -146,6 +160,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       showRestoreSessionDialog: false,
       showClaimRewardDialog: null,
       showFaucetStatus: false,
+      notifications: [],
 		};
   }
 
@@ -453,6 +468,17 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
             <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.state.faucetConfig.faucetHtml}} />
           : null}
         </div>
+        <div className='faucet-notifications'>
+          {this.state.notifications.map((notification) => (
+            <PoWFaucetNotification 
+              key={notification.id} 
+              type={notification.type} 
+              message={notification.message} 
+              time={notification.time} 
+              hideFn={() => this.hideNotification(notification.id)} 
+            />
+          ))}
+        </div>
         <div className='faucet-footer'>
           <div className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</div>
         </div>
@@ -566,6 +592,57 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       this.faucetStatucClickCount = 0;
       this.setState({
         showFaucetStatus: true
+      });
+    }
+  }
+
+  private showNotification(type: string, message: string, time?: number|boolean, timeout?: number): number {
+    let notificationId = this.notificationIdCounter++;
+    let notification: IPoWFaucetNotification = {
+      id: notificationId,
+      type: type,
+      message: message,
+      time: typeof time == "number" ? time : time ? (new Date()).getTime() : null,
+      timeout: timeout ? (new Date()).getTime() + timeout : 0,
+      timerId: timeout ? setTimeout(() => {
+        notification.timerId = null;
+        this.hideNotification(notification.id);
+      }, timeout) : null,
+    }
+    if(this.notifications.length > 10) {
+      this.notifications.splice(0, this.notifications.length - 10).forEach((n) => {
+        if(n.timerId) {
+          clearTimeout(n.timerId);
+          n.timerId = null;
+        }
+      });
+    }
+    this.notifications.push(notification);
+    this.setState({
+      notifications: this.notifications.slice()
+    })
+    return notificationId;
+  }
+
+  private hideNotification(notificationId: number): void {
+    let notificationIdx = -1;
+    let notification: IPoWFaucetNotification;
+    for(let idx = 0; idx < this.state.notifications.length; idx++) {
+      if(this.notifications[idx].id === notificationId) {
+        notificationIdx = idx;
+        notification = this.state.notifications[idx];
+        break;
+      }
+    }
+    if(notificationIdx !== -1) {
+      if(notification.timerId) {
+        clearTimeout(notification.timerId);
+        notification.timerId = null;
+      }
+
+      this.notifications.splice(notificationIdx, 1);
+      this.setState({
+        notifications: this.notifications
       });
     }
   }

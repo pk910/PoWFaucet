@@ -6,6 +6,7 @@ import { IPoWMinerShare, IPoWMinerVerification, PoWMiner } from "./PoWMiner";
 export interface IPoWSessionOptions {
   client: PoWClient;
   getInputs: () => object;
+  showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => number;
 }
 
 export interface IPoWSessionInfo {
@@ -109,6 +110,9 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
             this.closedSession();
             sessionInfo = null;
             return;
+          default:
+            this.options.showNotification("error", "Resume session error: [" + err.code + "] " + err.message, true);
+            break;
         }
       }
       throw err;
@@ -119,15 +123,11 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
       // resumed session
       if(this.shareQueue.length) {
-        this.shareQueue.forEach((share) => {
-          this.options.client.sendRequest("foundShare", share);
-        });
+        this.shareQueue.forEach((share) => this._submitShare(share));
         this.shareQueue = [];
       }
       if(this.verifyResultQueue.length) {
-        this.verifyResultQueue.forEach((verifyResult) => {
-          this.options.client.sendRequest("verifyResult", verifyResult);
-        });
+        this.verifyResultQueue.forEach((verifyResult) => this._submitVerifyResult(verifyResult));
         this.verifyResultQueue = [];
       }
       this.emit("update");
@@ -140,9 +140,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   public submitShare(share: IPoWMinerShare) {
     if(this.options.client.isReady() && this.shareQueue.length === 0)
-      this.options.client.sendRequest("foundShare", share);
+      this._submitShare(share);
     else
       this.shareQueue.push(share);
+  }
+
+  private _submitShare(share: IPoWMinerShare) {
+    this.options.client.sendRequest("foundShare", share).catch((err) => {
+      this.options.showNotification("error", "Submission error: [" + err.code + "] " + err.message, true, 10 * 1000);
+    });
   }
 
   public processVerification(verification: IPoWMinerVerification) {
@@ -153,9 +159,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   public submitVerifyResult(result) {
     if(this.options.client.isReady() && this.verifyResultQueue.length === 0)
-      this.options.client.sendRequest("verifyResult", result);
+      this._submitVerifyResult(result);
     else
       this.verifyResultQueue.push(result);
+  }
+
+  private _submitVerifyResult(result) {
+    this.options.client.sendRequest("verifyResult", result).catch((err) => {
+      this.options.showNotification("error", "Verification error: [" + err.code + "] " + err.message, true, 10 * 1000);
+    });
   }
 
   public updateBalance(balanceUpdate: IPoWSessionBalanceUpdate) {

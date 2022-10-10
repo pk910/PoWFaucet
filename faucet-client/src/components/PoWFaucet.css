@@ -171,6 +171,17 @@ html, body {
   margin-top: 8px;
 }
 
+.pow-faucet .faucet-notifications {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+}
+
+.pow-faucet .faucet-notifications .pow-notification .alert {
+  padding: 8px;
+  min-width: 300px;
+}
+
 .pow-faucet .faucet-footer {
   position: fixed;
   bottom: 0;
