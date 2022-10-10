@@ -2,9 +2,11 @@ import { TypedEmitter } from 'tiny-typed-emitter';
 import { IFaucetConfig } from './IFaucetConfig';
 import { IPoWClientConnectionKeeper, PoWClient } from "./PoWClient";
 import { IPoWMinerShare, IPoWMinerVerification, PoWMiner } from "./PoWMiner";
+import { PoWTime } from './PoWTime';
 
 export interface IPoWSessionOptions {
   client: PoWClient;
+  powTime: PoWTime;
   getInputs: () => object;
   showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => number;
 }
@@ -245,8 +247,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     if(!session)
       return null;
 
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let sessionAge = now - session.startTime;
+    let sessionAge = this.options.powTime.getSyncedTime() - session.startTime;
     if(sessionAge >= faucetConfig.powTimeout)
       return null;
     
@@ -276,8 +277,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     if(!claimInfo)
       return null;
 
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let claimAge = now - claimInfo.startTime;
+    let claimAge = this.options.powTime.getSyncedTime() - claimInfo.startTime;
     if(claimAge >= faucetConfig.claimTimeout)
       return null;
     

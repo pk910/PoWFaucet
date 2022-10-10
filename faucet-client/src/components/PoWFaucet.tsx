@@ -1,14 +1,9 @@
+import React from 'react';
 import { IFaucetConfig, IFaucetStatus } from '../common/IFaucetConfig';
 import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
-import React, { ReactElement } from 'react';
-import { Button, Modal } from 'react-bootstrap';
-import HCaptcha from "@hcaptcha/react-hcaptcha";
-
-import './PoWFaucet.css'
 import { IPoWClaimInfo, IPoWSessionInfo, PoWSession } from '../common/PoWSession';
 import { PoWMinerStatus } from './PoWMinerStatus';
 import { PoWMiner } from '../common/PoWMiner';
-import { renderDate } from '../utils/DateUtils';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWClaimDialog } from './PoWClaimDialog';
 import { PoWFaucetStatus } from './PoWFaucetStatus';
@@ -18,6 +13,8 @@ import { PoWRestoreSessionDialog } from './PoWRestoreSessionDialog';
 import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
 import { PoWApi } from '../common/PoWApi';
 import { PoWFaucetNotification } from './PoWFaucetNotification';
+import { PoWTime } from '../common/PoWTime';
+import './PoWFaucet.css'
 
 export interface IPoWFaucetProps {
   powWebsockUrl: string;
@@ -64,6 +61,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
   private powClient: PoWClient;
   private powSession: PoWSession;
   private miningConnKeper: IPoWClientConnectionKeeper;
+  private powTime: PoWTime;
   private captchaControl: PoWFaucetCaptcha;
   private eventListeners: {[key: string]: {
     emmiter: TypedEmitter;
@@ -81,6 +79,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
   constructor(props: IPoWFaucetProps, state: IPoWFaucetState) {
     super(props);
 
+    this.powTime = new PoWTime();
     this.powApi = new PoWApi(props.powApiUrl);
     this.powClient = new PoWClient({
       powApiUrl: props.powWebsockUrl,
@@ -88,6 +87,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
     this.powClient.on("open", () => {
       let faucetConfig = this.powClient.getFaucetConfig();
       this.lastConfigRefresh = (new Date()).getTime();
+      this.powTime.syncTimeOffset(faucetConfig.time);
       this.setState({
         initializing: false,
         faucetConfig: faucetConfig,
@@ -104,6 +104,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
 
     this.powSession = new PoWSession({
       client: this.powClient,
+      powTime: this.powTime,
       getInputs: () => {
         var capToken = "";
         if(this.captchaControl) {
@@ -204,6 +205,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
   private loadFaucetConfig() {
     this.powApi.getFaucetConfig().then((faucetConfig) => {
       this.lastConfigRefresh = (new Date()).getTime();
+      this.powTime.syncTimeOffset(faucetConfig.time);
       this.setState({
         initializing: false,
         faucetConfig: faucetConfig,
@@ -242,6 +244,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           powParams: this.state.faucetConfig.powParams,
           nonceCount: this.state.faucetConfig.powNonceCount,
           hashrateLimit: this.state.faucetConfig.powHashrateLimit,
+          powTime: this.powTime,
         }));
       }
       if(this.miningConnKeper)
@@ -402,7 +405,13 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         <div className="pow-header center">
           <div className="pow-status-container">
             {this.powSession.getMiner() ? 
-              <PoWMinerStatus powMiner={this.powSession.getMiner()} powSession={this.powSession} faucetConfig={this.state.faucetConfig} stopMinerFn={(force) => this.onStopMiningClick(force)} /> :
+              <PoWMinerStatus 
+                powMiner={this.powSession.getMiner()} 
+                powSession={this.powSession} 
+                powTime={this.powTime} 
+                faucetConfig={this.state.faucetConfig} 
+                stopMinerFn={(force) => this.onStopMiningClick(force)} 
+              /> :
               <div className='pow-faucet-home'>
                 {this.state.faucetConfig.faucetImage ?
                   <img src={this.state.faucetConfig.faucetImage} className="image" />
@@ -424,6 +433,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           <PoWClaimDialog 
             powClient={this.powClient}
             powSession={this.powSession}
+            powTime={this.powTime}
             reward={this.state.showClaimRewardDialog}
             faucetConfig={this.state.faucetConfig}
             onClose={(clearClaim) => {
@@ -502,6 +512,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
         powParams: this.state.faucetConfig.powParams,
         nonceCount: this.state.faucetConfig.powNonceCount,
         hashrateLimit: this.state.faucetConfig.powHashrateLimit,
+        powTime: this.powTime,
       }));
       this.setState({
         miningStatus: PoWFaucetMiningStatus.RUNNING,

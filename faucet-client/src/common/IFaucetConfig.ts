@@ -19,6 +19,7 @@ export interface IFaucetConfig {
   powHashrateLimit: number;
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
+  time: number;
 }
 
 export interface IPoWParams {

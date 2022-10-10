@@ -9,11 +9,13 @@ import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { IPoWStatusDialogProps } from './PoWStatusDialog';
 import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
+import { PoWTime } from 'common/PoWTime';
 
 export interface IPoWClaimDialogProps {
   powClient: PoWClient;
   powSession: PoWSession;
   faucetConfig: IFaucetConfig;
+  powTime: PoWTime;
   reward: IPoWClaimInfo;
   onClose: (clearClaim: boolean) => void;
   setDialog: (dialog: IPoWStatusDialogProps) => void;
@@ -127,7 +129,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
 
   private setUpdateTimer() {
     let exactNow = (new Date()).getTime();
-    let now = Math.floor(exactNow / 1000);
+    let now = this.props.powTime.getSyncedTime();
 
     let claimTimeout = (this.props.reward.startTime + this.props.faucetConfig.claimTimeout) - now;
     if(claimTimeout < 0) {
@@ -160,7 +162,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   }
 
 	public render(): React.ReactElement<IPoWClaimDialogProps> {
-    let now = Math.floor((new Date()).getTime() / 1000);
+    let now = this.props.powTime.getSyncedTime();
     let claimTimeout = (this.props.reward.startTime + this.props.faucetConfig.claimTimeout) - now;
 
     return (
@@ -266,7 +268,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       this.props.powSession.storeClaimInfo(null);
       this.setState({
         claimStatus: PoWClaimStatus.PENDING,
-        pendingTime: Math.floor((new Date()).getTime() / 1000),
+        pendingTime: this.props.powTime.getSyncedTime(),
       });
     }, (err) => {
       let stateChange: any = {

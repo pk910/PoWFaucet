@@ -4,10 +4,12 @@ import React from 'react';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderTimespan } from '../utils/DateUtils';
+import { PoWTime } from '../common/PoWTime';
 
 export interface IPoWMinerStatusProps {
   powMiner: PoWMiner;
   powSession: PoWSession;
+  powTime: PoWTime;
   faucetConfig: IFaucetConfig;
   stopMinerFn: (force: boolean) => void;
 }
@@ -108,7 +110,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
   }
 
 	public render(): React.ReactElement<IPoWMinerStatusProps> {
-    let now = Math.floor((new Date()).getTime() / 1000);
+    let now = this.props.powTime.getSyncedTime();
     let sessionLifetime = 0;
     if(this.state.startTime) {
       sessionLifetime = (this.state.startTime + this.props.faucetConfig.powTimeout) - now;

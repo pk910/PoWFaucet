@@ -43,6 +43,7 @@ export interface IClientFaucetConfig {
   powHashrateLimit: number;
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
+  time: number;
 }
 
 export interface IClientFaucetStatus {
@@ -144,6 +145,7 @@ export class FaucetWebApi {
       powHashrateLimit: faucetConfig.powHashrateSoftLimit,
       resolveEnsNames: !!faucetConfig.ensResolver,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
+      time: Math.floor((new Date()).getTime() / 1000),
     };
   }
 

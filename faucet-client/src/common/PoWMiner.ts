@@ -1,7 +1,7 @@
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { IPoWParams } from "./IFaucetConfig";
-import { PoWClient } from "./PoWClient";
 import { PoWSession } from "./PoWSession";
+import { PoWTime } from './PoWTime';
 
 export interface IPoWMinerOptions {
   session: PoWSession;
@@ -9,6 +9,7 @@ export interface IPoWMinerOptions {
   powParams: IPoWParams;
   nonceCount: number;
   hashrateLimit: number;
+  powTime: PoWTime;
 }
 
 interface IPoWMinerSettings {
@@ -289,7 +290,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       };
       
       this.totalShares++;
-      this.lastShareTime = new Date();
+      this.lastShareTime = this.options.powTime.getSyncedDate();
       saveNonces -= this.options.nonceCount;
       this.options.session.submitShare(share);
     }
@@ -300,8 +301,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       return requestedRefill;
 
     let sessionInfo = this.options.session.getSessionInfo();
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let sessionAge = now - sessionInfo.startTime;
+    let sessionAge = this.options.powTime.getSyncedTime() - sessionInfo.startTime;
     if(sessionAge <= 1)
       return requestedRefill;
 
