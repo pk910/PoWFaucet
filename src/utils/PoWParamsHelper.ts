@@ -14,6 +14,6 @@ export function getPoWParamsStr(): string {
       "|" + faucetConfig.powCryptoNightParams.algo +
       "|" + faucetConfig.powCryptoNightParams.variant +
       "|" + faucetConfig.powCryptoNightParams.height +
-      "|" + faucetConfig.powScryptParams.difficulty;
+      "|" + faucetConfig.powCryptoNightParams.difficulty;
   }
 }

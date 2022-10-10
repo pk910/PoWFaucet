@@ -130,7 +130,7 @@ export class FaucetWebApi {
           c: faucetConfig.powCryptoNightParams.algo,
           v: faucetConfig.powCryptoNightParams.variant,
           h: faucetConfig.powCryptoNightParams.height,
-          d: faucetConfig.powScryptParams.difficulty,
+          d: faucetConfig.powCryptoNightParams.difficulty,
         };
         break;
     }
