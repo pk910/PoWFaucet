@@ -131,8 +131,33 @@ export interface IFaucetStatsConfig {
   logfile: string;
 }
 
+let cliArgs = (function() {
+  let args = {};
+  let arg, key;
+  for(let i = 0; i < process.argv.length; i++) {
+      if((arg = /^--([^=]+)(?:=(.+))?$/.exec(process.argv[i]))) {
+          key = arg[1];
+          args[arg[1]] = arg[2] || true;
+      }
+      else if(key) {
+          args[key] = process.argv[i];
+          key = null;
+      }
+  }
+  return args;
+})();
+
 let packageJson = require('../../package.json');
 let basePath = path.join(__dirname, "..", "..");
+let configFile: string;
+if(cliArgs['config']) {
+  if(cliArgs['config'].match(/^\//))
+    configFile = cliArgs['config'];
+  else
+    configFile = path.join(basePath, cliArgs['config']);
+}
+else
+  configFile = path.join(basePath, "faucet-config.yaml");
 let defaultConfig: IFaucetConfig = {
   appBasePath: basePath,
   faucetVersion: packageJson.version,
@@ -213,19 +238,11 @@ export let faucetConfig: IFaucetConfig = null;
 export function loadFaucetConfig() {
   let config: IFaucetConfig;
 
-  let yamlConfigFile = path.join(defaultConfig.appBasePath, "faucet-config.yaml");
-  let jsonConfigFile = path.join(defaultConfig.appBasePath, "faucet-config.json");
-  if(fs.existsSync(yamlConfigFile)) {
-    console.log("Loading yaml faucet config from " + yamlConfigFile);
-    let yamlSrc = fs.readFileSync(yamlConfigFile, "utf8");
+  if(fs.existsSync(configFile)) {
+    console.log("Loading yaml faucet config from " + configFile);
+    let yamlSrc = fs.readFileSync(configFile, "utf8");
     let yamlObj = YAML.parse(yamlSrc);
     config = yamlObj;
-  }
-  else if(fs.existsSync(jsonConfigFile)) {
-    console.log("Loading legacy json faucet config from " + jsonConfigFile);
-    let jsonSrc = fs.readFileSync(jsonConfigFile, "utf8");
-    let jsonObj = JSON.parse(jsonSrc);
-    config = jsonObj;
   }
   else {
     throw "faucet configuration not found";

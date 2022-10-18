@@ -4,6 +4,7 @@
   "description": "PoW Faucet Server",
   "main": "dist/app.js",
   "scripts": {
+    "build": "tsc",
     "start": "tsc && node dist/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
