@@ -164,7 +164,16 @@ export class EthWeb3Manager {
     return Promise.all([
       this.web3.eth.getBalance(this.walletAddr, "pending"),
       this.web3.eth.getTransactionCount(this.walletAddr, "pending"),
-    ]).then((res) => {
+    ]).catch((ex) => {
+      if(ex.toString().match(/"pending" is not yet supported/)) {
+        return Promise.all([
+          this.web3.eth.getBalance(this.walletAddr),
+          this.web3.eth.getTransactionCount(this.walletAddr),
+        ]);
+      }
+      else
+        throw ex;
+    }).then((res) => {
       this.walletState = {
         balance: parseInt(res[0]),
         nonce: res[1],
