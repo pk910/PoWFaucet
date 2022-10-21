@@ -34,6 +34,30 @@ For productive setups I'd suggest using a more complex webserver that supports S
 
 See [docs/apache-config.md](https://github.com/pk910/PoWFaucet/blob/master/docs/apache-config.md) for more.
 
+# Run with docker
+
+create a data directory
+
+create a copy of [faucet-config.example.yaml](https://github.com/pk910/PoWFaucet/blob/master/faucet-config.example.yaml) and save as `faucet-config.yaml`
+
+edit `faucet-config.yaml` and prepend /config/ to faucetStore & faucetLogFile (ensure they're not lost on updates)
+```
+faucetStore: "/config/faucet-store.json"
+faucetLogFile: "/config/faucet-events.log"
+```
+
+start the container: (change `/gome/powfaucet` to your datadir)
+
+`docker run -d --restart unless-stopped --name=powfaucet -v /home/powfacuet:/config -p 8080:8080 -it pk910/powfacuet:latest --config=/config/faucet-config.yaml`
+
+read logs:
+
+`docker logs powfaucet --follow`
+
+stop container:
+
+`docker rm -f powfaucet`
+
 # Bugs & Features
 
 Please feel free to report bugs and add new features via PRs if you like.
