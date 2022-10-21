@@ -236,7 +236,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
           preimage: sessionInfo.preimage,
           params: this.options.powParams,
           nonceStart: nonceRange,
-          nonceCount: this.targetNoncePrefill,
+          nonceCount: refillCount,
         }
       });
     }
