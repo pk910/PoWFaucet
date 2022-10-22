@@ -112,6 +112,9 @@ powSessionTimeout: 18000   # 5h
 # should be higher than powSessionTimeout
 claimSessionTimeout: 43200  # 12h
 
+# maximum number of seconds a session can idle until it gets closed
+powIdleTimeout: 1800 # 30min
+
 # number of seconds to wait before allow to reuse the same address to start another mining session
 claimAddrCooldown: 600  # 10min
 

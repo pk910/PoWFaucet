@@ -27,6 +27,7 @@ export interface IFaucetConfig {
   claimMaxAmount: number; // maximum balance to payout (in wei)
   powSessionTimeout: number; // maximum mining session time in seconds
   claimSessionTimeout: number; // how long sessions can be payed out in seconds (should be higher than powSessionTimeout)
+  powIdleTimeout: number; // maximum number of seconds a session can idle until it gets closed
   claimAddrCooldown: number; // number of seconds to wait before allow to reuse the same address to start another mining session
   claimAddrMaxBalance: null | number; // check balance and deny mining if balance exceeds the limit
   claimAddrDenyContract: boolean; // check and prevent mining if target address is a contract
@@ -184,6 +185,7 @@ let defaultConfig: IFaucetConfig = {
   claimMaxAmount:  10000000000000000000, // 10 ETH
   powSessionTimeout: 3600,
   claimSessionTimeout: 7200,
+  powIdleTimeout: 1800,
   claimAddrCooldown: 7200,
   claimAddrMaxBalance: null,
   claimAddrDenyContract: false,

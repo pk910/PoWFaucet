@@ -89,6 +89,7 @@ export class PoWSession {
   private reportedHashRate: number[];
   private activeClient: PoWClient;
   private cleanupTimer: NodeJS.Timeout;
+  private idleCloseTimer: NodeJS.Timeout;
   private sessionStatus: PoWSessionStatus;
   private lastRemoteIp: string;
   private lastIpInfo: IIPInfo;
@@ -242,11 +243,20 @@ export class PoWSession {
       this.setSessionStatus(PoWSessionStatus.MINING);
       this.updateRemoteIp();
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
+      if(this.idleCloseTimer) {
+        clearTimeout(this.idleCloseTimer);
+        this.idleCloseTimer = null;
+      }
     }
     else {
       this.idleTime = new Date();
       this.setSessionStatus(PoWSessionStatus.IDLE);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Paused session: " + this.sessionId);
+      if(faucetConfig.powIdleTimeout > 0) {
+        this.idleCloseTimer = setTimeout(() => {
+          this.closeSession(true, true);
+        }, faucetConfig.powIdleTimeout * 1000);
+      }
     }
   }
 

@@ -103,12 +103,13 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
             // server doesn't know about this session id anymore - try recover
             return this.options.client.sendRequest("recoverSession", sessionInfo.recovery);
           case "SESSION_CLOSED":
-            if(!err.data || !err.data.token)
-              break;
-            // session was closed, but we've got a claim token
-            let claimInfo = this.getClaimInfo(err.data.token, sessionInfo);
-            this.storeClaimInfo(claimInfo);
-            this.emit("claimable", claimInfo);
+            // session was closed
+            if(err.data && err.data.token) {
+              // we've got a claim token
+              let claimInfo = this.getClaimInfo(err.data.token, sessionInfo);
+              this.storeClaimInfo(claimInfo);
+              this.emit("claimable", claimInfo);
+            }
             this.closedSession();
             sessionInfo = null;
             return;
