@@ -118,12 +118,16 @@ export class FaucetWebApi {
 
   public getFaucetConfig(client?: PoWClient, clientVersion?: string): IClientFaucetConfig {
     let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(client?.getClientVersion() || clientVersion, client?.getSession());
+    let faucetHtml = faucetConfig.faucetHomeHtml || "";
+    faucetHtml = faucetHtml.replace(/{faucetWallet}/, () => {
+      return ServiceManager.GetService(EthWeb3Manager).getFaucetAddress();
+    });
     return {
       faucetTitle: faucetConfig.faucetTitle,
       faucetStatus: faucetStatus.status,
       faucetStatusHash: faucetStatus.hash,
       faucetImage: faucetConfig.faucetImage,
-      faucetHtml: faucetConfig.faucetHomeHtml,
+      faucetHtml: faucetHtml,
       faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
       hcapProvider: faucetConfig.captchas ? faucetConfig.captchas.provider : null,
       hcapSiteKey: faucetConfig.captchas ? faucetConfig.captchas.siteKey : null,

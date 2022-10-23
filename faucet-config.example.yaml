@@ -41,7 +41,7 @@ faucetHomeHtml: |
   <div class='pow-info'>
     <h5>How to help the faucet?</h5>
     Replenish the faucet by sending funds you don't need anymore to:<br>
-    0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb
+    {faucetWallet}
   </div>
 
 # random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
@@ -205,10 +205,10 @@ captchas:
   secret: "0xCensoredHCaptchaSecretKey"
 
   # require captcha to start a new mining session (default: false)
-  checkSessionStart: true
+  checkSessionStart: false
 
   # require captcha to claim mining rewards (default: false)
-  checkBalanceClaim: true
+  checkBalanceClaim: false
 
 
 
@@ -289,7 +289,7 @@ ethRefillContract:
 # comment out to disable ENS names
 ensResolver:
   # RPC Host for ENS name resolver (mainnet)
-  rpcHost: "https://main-light.eth.linkpool.io/"
+  rpcHost: "https://rpc.flashbots.net/"
   # Custom ENS Resolver contract address
   #ensAddr: "0x"
 

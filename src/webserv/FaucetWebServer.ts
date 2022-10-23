@@ -147,7 +147,7 @@ export class FaucetHttpServer {
     indexHtml = indexHtml.replace(/<title>.*?<\/title>/, '<title>' + encode(faucetConfig.faucetTitle) + '</title>');
     indexHtml = indexHtml.replace(/<!-- pow-faucet-content -->/, seoHtml);
     indexHtml = indexHtml.replace(/<!-- pow-faucet-header -->/, seoMeta);
-    indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, faucetConfig.faucetHomeHtml ? faucetConfig.faucetHomeHtml : '');
+    indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, ServiceManager.GetService(FaucetWebApi).getFaucetConfig().faucetHtml);
     
     if(clientVersion) {
       indexHtml = indexHtml.replace(/"\/js\/powfaucet\.js"/, '"/js/powfaucet.js?' + clientVersion.build + '"');

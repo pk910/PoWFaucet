@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import YAML from 'yaml'
+import randomBytes from 'randombytes'
 
 export interface IFaucetConfig {
   appBasePath: string; // base path (set automatically)
@@ -240,15 +241,23 @@ export let faucetConfig: IFaucetConfig = null;
 export function loadFaucetConfig() {
   let config: IFaucetConfig;
 
-  if(fs.existsSync(configFile)) {
-    console.log("Loading yaml faucet config from " + configFile);
-    let yamlSrc = fs.readFileSync(configFile, "utf8");
-    let yamlObj = YAML.parse(yamlSrc);
-    config = yamlObj;
+  if(!fs.existsSync(configFile)) {
+    // create copy of faucet-config.example.yml
+    let exampleConfigFile = path.join(basePath, "faucet-config.example.yaml")
+    if(!fs.existsSync(exampleConfigFile))
+      throw exampleConfigFile + " not found";
+
+    let exampleYamlSrc = fs.readFileSync(exampleConfigFile, "utf8");
+    exampleYamlSrc = exampleYamlSrc.replace(/^ethWalletKey:.*$/m, 'ethWalletKey: "' + randomBytes(32).toString("hex") + '"');
+    exampleYamlSrc = exampleYamlSrc.replace(/^faucetSecret:.*$/m, 'faucetSecret: "' + randomBytes(40).toString("hex") + '"');
+
+    fs.writeFileSync(configFile, exampleYamlSrc);
   }
-  else {
-    throw "faucet configuration not found";
-  }
+
+  console.log("Loading yaml faucet config from " + configFile);
+  let yamlSrc = fs.readFileSync(configFile, "utf8");
+  let yamlObj = YAML.parse(yamlSrc);
+  config = yamlObj;
 
   if(!config.faucetSecret) {
     if((config as any).powSessionSecret)

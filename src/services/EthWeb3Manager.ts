@@ -219,6 +219,10 @@ export class EthWeb3Manager {
     ServiceManager.GetService(FaucetStatus).setFaucetStatus("wallet", statusMessage, statusLevel);
   }
 
+  public getFaucetAddress(): string {
+    return this.walletAddr;
+  }
+
   public getWalletBalance(addr: string): Promise<number> {
     return this.web3.eth.getBalance(addr).then((res) => parseInt(res));
   }
