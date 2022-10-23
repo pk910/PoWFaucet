@@ -122,8 +122,12 @@ export class FaucetStatus {
       if(status.filter.proxy !== undefined && (!ipinfo || !!ipinfo.proxy !== status.filter.proxy))
         return false;
       
-      if(status.filter.lt_version !== undefined && clientVersion && !isVersionLower(clientVersion, status.filter.lt_version))
-        return false;
+      if(status.filter.lt_version !== undefined) {
+        if(!clientVersion)
+          return false;
+        if(!isVersionLower(clientVersion, status.filter.lt_version))
+          return false;
+      }
       return true;
     };
 
