@@ -256,7 +256,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             overlay={(props) => this.renderSessionIpInfo(session, props)}
           >
             <span className='ipaddr'>
-              {session.ipInfo.countryCode ? <span className='ipaddr-icon'>{getCountryIcon(session.ipInfo.countryCode)}</span> : null}
+              {session.ipInfo && session.ipInfo.countryCode ? <span className='ipaddr-icon'>{getCountryIcon(session.ipInfo.countryCode)}</span> : null}
               {session.ip}
             </span>
           </OverlayTrigger>
