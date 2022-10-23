@@ -82,6 +82,7 @@ export interface IFaucetConfig {
   faucetBalanceRestrictedReward: null | { // reward restriction based on faucet wallet balance. lowest value applies
     [limit: number]: number; // limit: min balance in wei, value: percent of normal reward (eg. 50 = half rewards)
   };
+  faucetBalanceRestriction: IFaucetBalanceRestrictionConfig;
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   lowFundsBalance: number; // minimum balance to show the low funds warning
@@ -122,6 +123,11 @@ export interface IFaucetCaptchaConfig {
   secret: string; // secret key
   checkSessionStart: boolean; // require captcha to start a new mining session
   checkBalanceClaim: boolean; // require captcha to claim mining rewards
+}
+
+export interface IFaucetBalanceRestrictionConfig {
+  enabled: boolean;
+  targetBalance: number;
 }
 
 export interface IFaucetEnsResolverConfig {
@@ -218,6 +224,7 @@ let defaultConfig: IFaucetConfig = {
   ipInfoMatchRestrictedReward: null,
   ipInfoMatchRestrictedRewardFile: null,
   faucetBalanceRestrictedReward: null,
+  faucetBalanceRestriction: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,

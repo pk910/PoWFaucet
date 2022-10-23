@@ -15,13 +15,22 @@ export interface IPoWFaucetStatusProps {
 
 export interface IPoWFaucetStatusState {
   refreshing: boolean;
+  status: IPoWFaucetGeneralStatus;
   activeSessions: IPoWFaucetStatusSession[];
   activeClaims: IPoWFaucetStatusClaim[];
 }
 
 export interface IPoWFaucetStatus {
+  status: IPoWFaucetGeneralStatus;
   sessions: IPoWFaucetStatusSession[];
   claims: IPoWFaucetStatusClaim[];
+}
+
+export interface IPoWFaucetGeneralStatus {
+  walletBalance: number;
+  unclaimedBalance: number;
+  refillBalance: number;
+  balanceRestriction: number;
 }
 
 export interface IPoWFaucetStatusSession {
@@ -75,6 +84,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
 
     this.state = {
       refreshing: false,
+      status: null,
       activeSessions: [],
       activeClaims: [],
 		};
@@ -110,6 +120,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
 
       this.setState({
         refreshing: false,
+        status: faucetStatus.status,
         activeSessions: activeSessions,
         activeClaims: activeClaims,
       });
@@ -130,17 +141,21 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           </div>
         </div>
         <div className='row'>
+        <div className='col-12 card status-panel'>
+            <div className="card-body">
+              <h5 className="card-title">Faucet Status</h5>
+              {this.renderFaucetStatus()}
+            </div>
+          </div>
           <div className='col-12 card status-panel'>
             <div className="card-body">
               <h5 className="card-title">Active mining sessions</h5>
-
               {this.renderActiveSessions()}
             </div>
           </div>
           <div className='col-12 card status-panel'>
             <div className="card-body">
               <h5 className="card-title">Reward claim transactions</h5>
-
               {this.renderActiveClaims()}
             </div>
           </div>
@@ -148,6 +163,33 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       </div>
     );
 	}
+
+  private renderFaucetStatus(): React.ReactElement {
+    if(!this.state.status)
+      return null;
+    return (
+      <div className="status-general">
+        {this.state.status.refillBalance !== null ? 
+          <div className="status-walletbalance">
+            <span className="status-title">Refill Contract Balance:</span>
+            <span className="status-value">{Math.round(weiToEth(this.state.status.refillBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+          </div>
+        : null}
+        <div className="status-walletbalance">
+          <span className="status-title">Faucet Wallet Balance:</span>
+          <span className="status-value">{Math.round(weiToEth(this.state.status.walletBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+        </div>
+        <div className="status-unclaimedbalance">
+          <span className="status-title">Unclaimed Balance:</span>
+          <span className="status-value">{Math.round(weiToEth(this.state.status.unclaimedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+        </div>
+        <div className="status-unclaimedbalance">
+          <span className="status-title">Reward Restriction:</span>
+          <span className="status-value">{Math.round(this.state.status.balanceRestriction * 1000) / 1000} %</span>
+        </div>
+      </div>
+    );
+  }
 
   private renderActiveSessions(): React.ReactElement {
     return (

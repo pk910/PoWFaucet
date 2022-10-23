@@ -264,6 +264,13 @@ faucetBalanceRestrictedReward:
   200: 10  # 10% if lower than 200 ETH
   100: 5   # 5% if lower than 100 ETH
 
+# dynamic reward restriction based on faucet balance
+# alternative to static faucetBalanceRestrictedReward
+# limits the rewards lineary according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
+faucetBalanceRestriction:
+  enabled: false
+  targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
+
 
 ### Automatic wallet refill
 

@@ -228,5 +228,13 @@ html, body {
   min-width: 50px;
 }
 
+.pow-faucet .status-sessions td, .pow-faucet .status-sessions th {
+  padding: 0;
+}
+
+.pow-faucet .status-general .status-title {
+  display: inline-block;
+  width: 200px;
+}
 
 /*# sourceMappingURL=powfaucet.css.map*/

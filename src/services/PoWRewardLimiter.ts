@@ -3,13 +3,15 @@ import * as fs from 'fs';
 import { faucetConfig } from "../common/FaucetConfig";
 import { ServiceManager } from '../common/ServiceManager';
 import { weiToEth } from '../utils/ConvertHelpers';
-import { PoWSession } from '../websock/PoWSession';
+import { PoWSession, PoWSessionStatus } from '../websock/PoWSession';
 import { EthWeb3Manager } from './EthWeb3Manager';
 import { IIPInfo } from "./IPInfoResolver";
 
 export class PoWRewardLimiter {
   private ipInfoMatchRestrictions: {}
   private ipInfoMatchRestrictionsRefresh: number;
+  private balanceRestriction: number;
+  private balanceRestrictionsRefresh: number;
 
   private refreshIpInfoMatchRestrictions() {
     let now = Math.floor((new Date()).getTime() / 1000);
@@ -50,13 +52,48 @@ export class PoWRewardLimiter {
     return infoStr.join("\n");
   }
 
-  public getBalanceRestriction(): number {
+  private refreshBalanceRestriction() {
+    let now = Math.floor((new Date()).getTime() / 1000);
+    if(this.balanceRestrictionsRefresh > now - 30)
+      return;
+      
+    let faucetBalance = ServiceManager.GetService(EthWeb3Manager).getFaucetBalance();
+    if(isNaN(faucetBalance)) {
+      this.balanceRestriction = 100;
+      return;
+    }
+    
+    this.balanceRestrictionsRefresh = now;
+    faucetBalance -= this.getUnclaimedBalance(); // subtract mined balance from active & claimable sessions
+    
+    this.balanceRestriction = Math.min(
+      this.getStaticBalanceRestriction(faucetBalance),
+      this.getDynamicBalanceRestriction(faucetBalance)
+    );
+  }
+
+  public getUnclaimedBalance(): number {
+    let unclaimedBalance = 0;
+    PoWSession.getAllSessions().forEach((session) => {
+      let sessionStatus = session.getSessionStatus();
+      if(sessionStatus == PoWSessionStatus.CLAIMED)
+        return;
+      if(sessionStatus == PoWSessionStatus.SLASHED)
+        return;
+      if(sessionStatus == PoWSessionStatus.CLOSED && !session.isClaimable())
+        return;
+        unclaimedBalance += session.getBalance();
+    });
+    return unclaimedBalance;
+  }
+
+  private getStaticBalanceRestriction(balance: number): number {
     if(!faucetConfig.faucetBalanceRestrictedReward)
       return 100;
 
     let restrictedReward = 100;
     let minbalances = Object.keys(faucetConfig.faucetBalanceRestrictedReward).map((v) => parseInt(v)).sort((a, b) => a - b);
-    let faucetBalance = weiToEth(ServiceManager.GetService(EthWeb3Manager).getFaucetBalance());
+    let faucetBalance = weiToEth(balance);
     if(faucetBalance <= minbalances[minbalances.length - 1]) {
       for(let i = 0; i < minbalances.length; i++) {
         if(faucetBalance <= minbalances[i]) {
@@ -68,6 +105,25 @@ export class PoWRewardLimiter {
     }
 
     return restrictedReward;
+  }
+
+  private getDynamicBalanceRestriction(balance: number): number {
+    if(!faucetConfig.faucetBalanceRestriction || !faucetConfig.faucetBalanceRestriction.enabled)
+      return 100;
+    let targetBalance = faucetConfig.faucetBalanceRestriction.targetBalance * 1000000000000000000;
+    if(balance >= targetBalance)
+      return 100;
+    if(balance <= faucetConfig.spareFundsAmount)
+      return 0;
+
+    let mineableBalance = balance - faucetConfig.spareFundsAmount;
+    let balanceRestriction = 100 * mineableBalance / targetBalance;
+    return balanceRestriction;
+  }
+
+  public getBalanceRestriction(): number {
+    this.refreshBalanceRestriction();
+    return this.balanceRestriction;
   }
 
   public getSessionRestriction(session: PoWSession): number {

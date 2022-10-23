@@ -28,6 +28,7 @@ export interface IClientFaucetConfig {
   hcapSession: boolean;
   hcapClaim: boolean;
   shareReward: number;
+  rewardFactor: number;
   minClaim: number;
   maxClaim: number;
   powTimeout: number;
@@ -47,6 +48,12 @@ export interface IClientFaucetConfig {
 }
 
 export interface IClientFaucetStatus {
+  status: {
+    walletBalance: number;
+    unclaimedBalance: number;
+    refillBalance: number;
+    balanceRestriction: number;
+  };
   sessions: {
     id: string;
     start: number;
@@ -76,7 +83,7 @@ export interface IClientFaucetStatus {
 export class FaucetWebApi {
 
   public onApiRequest(req: IncomingMessage): Promise<any> {
-    return Promise.resolve().then(() => {
+    return Promise.resolve().then(async () => {
       let apiUrl = this.parseApiUrl(req.url);
       if(!apiUrl || apiUrl.path.length === 0)
         return new FaucetHttpResponse(404, "Not Found");
@@ -88,7 +95,7 @@ export class FaucetWebApi {
         case "getFaucetConfig".toLowerCase(): 
           return this.onGetFaucetConfig(apiUrl.query['cliver'] as string);
         case "getFaucetStatus".toLowerCase(): 
-          return this.onGetFaucetStatus((req.headers['x-forwarded-for'] as string || req.socket.remoteAddress).split(", ")[0]);
+          return await this.onGetFaucetStatus((req.headers['x-forwarded-for'] as string || req.socket.remoteAddress).split(", ")[0]);
       }
 
       return new FaucetHttpResponse(404, "Not Found");
@@ -134,6 +141,7 @@ export class FaucetWebApi {
       hcapSession: faucetConfig.captchas && faucetConfig.captchas.checkSessionStart,
       hcapClaim: faucetConfig.captchas && faucetConfig.captchas.checkBalanceClaim,
       shareReward: faucetConfig.powShareReward,
+      rewardFactor: ServiceManager.GetService(PoWRewardLimiter).getBalanceRestriction(),
       minClaim: faucetConfig.claimMinAmount,
       maxClaim: faucetConfig.claimMaxAmount,
       powTimeout: faucetConfig.powSessionTimeout,
@@ -206,14 +214,26 @@ export class FaucetWebApi {
     return hashParts.join(hashGlue);
   }
 
-  public getFaucetStatus(): IClientFaucetStatus {
+  public async getFaucetStatus(): Promise<IClientFaucetStatus> {
+    let rewardLimiter = ServiceManager.GetService(PoWRewardLimiter);
+    let ethWeb3Manager = ServiceManager.GetService(EthWeb3Manager);
+
+    let refillBalance: number = null;
+    if(faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract)
+      refillBalance = await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract);
+
     let statusRsp: IClientFaucetStatus = {
+      status: {
+        walletBalance: ethWeb3Manager.getFaucetBalance(),
+        unclaimedBalance: rewardLimiter.getUnclaimedBalance(),
+        refillBalance: refillBalance,
+        balanceRestriction: rewardLimiter.getBalanceRestriction(),
+      },
       sessions: null,
       claims: null,
     };
 
     let sessions = PoWSession.getAllSessions();
-    let rewardLimiter = ServiceManager.GetService(PoWRewardLimiter);
     statusRsp.sessions = sessions.map((session) => {
       let sessionIdHash = crypto.createHash("sha256");
       sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
@@ -242,7 +262,7 @@ export class FaucetWebApi {
       }
     });
 
-    let claims = ServiceManager.GetService(EthWeb3Manager).getTransactionQueue();
+    let claims = ethWeb3Manager.getTransactionQueue();
     statusRsp.claims = claims.map((claimTx) => {
       let sessionIdHash = crypto.createHash("sha256");
       sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
@@ -262,7 +282,7 @@ export class FaucetWebApi {
     return statusRsp;
   }
 
-  private onGetFaucetStatus(remoteIp: string): IClientFaucetStatus {
+  private onGetFaucetStatus(remoteIp: string): Promise<IClientFaucetStatus> {
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Client requested faucet status (IP: " + remoteIp + ")");
     return this.getFaucetStatus();
   }
