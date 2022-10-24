@@ -192,7 +192,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     return (
       <div className="container status-general">
         <div className="row">
-          <div className="col-3">
+          <div className="col-xl-3 col-lg-4 col-6">
             <div className="status-block">
               <div className="status-prop">
                 <span className="status-title">Total Sessions:</span>
@@ -208,7 +208,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
               </div>
             </div>
           </div>
-          <div className="col-3">
+          <div className="col-xl-3 col-lg-4 col-6">
             <div className="status-block">
               <div className="status-prop">
                 <span className="status-title">Faucet Wallet Balance:</span>
@@ -225,7 +225,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             </div>
           </div>
           {this.state.refillStatus ?
-          <div className="col-3">
+          <div className="col-xl-3 col-lg-4 col-6">
             <div className="status-block">
               <div className="status-prop">
                 <span className="status-title">Refill Contract Balance:</span>

@@ -232,9 +232,13 @@ html, body {
   padding: 0;
 }
 
+.pow-faucet .status-general {
+  max-width: none;
+}
+
 .pow-faucet .status-general .status-title {
   display: inline-block;
-  width: 200px;
+  width: 180px;
 }
 
 /*# sourceMappingURL=powfaucet.css.map*/
