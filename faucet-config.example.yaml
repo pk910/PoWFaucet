@@ -251,6 +251,9 @@ lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
 # empty faucet error message / false to disable the error
 noFundsError: "Sorry, the faucet is out of funds :("
 
+# prevent creation of new sessions (used for maintenance)
+#denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
+
 # reward restriction based on faucet wallet balance. lowest value applies
 faucetBalanceRestrictedReward:
   1000: 90 # 90% if lower than 1000 ETH

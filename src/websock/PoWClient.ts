@@ -241,6 +241,11 @@ export class PoWClient {
     if(typeof message.data !== "object" || !message.data)
       return this.sendErrorResponse("INVALID_REQUEST", "Invalid request", message);
 
+    if(faucetConfig.denyNewSessions) {
+      let denyMessage = typeof faucetConfig.denyNewSessions === "string" ? faucetConfig.denyNewSessions : "The faucet is currently not allowing new sessions";
+      return this.sendErrorResponse("FAUCET_DISABLED", denyMessage, message, PoWStatusLogLevel.INFO);
+    }
+
     if(faucetConfig.captchas && faucetConfig.captchas.checkSessionStart) {
       if(!message.data.token)
         return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha check required to start new session", message, PoWStatusLogLevel.INFO);
