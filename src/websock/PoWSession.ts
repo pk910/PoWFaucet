@@ -254,7 +254,7 @@ export class PoWSession {
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Paused session: " + this.sessionId);
       if(faucetConfig.powIdleTimeout > 0) {
         this.idleCloseTimer = setTimeout(() => {
-          this.closeSession(true, true);
+          this.closeSession(false, true);
         }, faucetConfig.powIdleTimeout * 1000);
       }
     }
