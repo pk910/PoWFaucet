@@ -51,8 +51,13 @@ export interface IClientFaucetStatus {
   status: {
     walletBalance: number;
     unclaimedBalance: number;
-    refillBalance: number;
     balanceRestriction: number;
+  };
+  refill: {
+    balance: number;
+    trigger: number;
+    amount: number;
+    cooldown: number;
   };
   sessions: {
     id: string;
@@ -218,17 +223,18 @@ export class FaucetWebApi {
     let rewardLimiter = ServiceManager.GetService(PoWRewardLimiter);
     let ethWeb3Manager = ServiceManager.GetService(EthWeb3Manager);
 
-    let refillBalance: number = null;
-    if(faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract)
-      refillBalance = await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract);
-
     let statusRsp: IClientFaucetStatus = {
       status: {
         walletBalance: ethWeb3Manager.getFaucetBalance(),
         unclaimedBalance: rewardLimiter.getUnclaimedBalance(),
-        refillBalance: refillBalance,
         balanceRestriction: rewardLimiter.getBalanceRestriction(),
       },
+      refill: faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract ? {
+        balance: await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract),
+        trigger: faucetConfig.ethRefillContract.triggerBalance,
+        amount: faucetConfig.ethRefillContract.requestAmount,
+        cooldown: ethWeb3Manager.getFaucetRefillCooldown(),
+      } : null,
       sessions: null,
       claims: null,
     };

@@ -16,12 +16,14 @@ export interface IPoWFaucetStatusProps {
 export interface IPoWFaucetStatusState {
   refreshing: boolean;
   status: IPoWFaucetGeneralStatus;
+  refillStatus: IPoWFaucetRefillStatus;
   activeSessions: IPoWFaucetStatusSession[];
   activeClaims: IPoWFaucetStatusClaim[];
 }
 
 export interface IPoWFaucetStatus {
   status: IPoWFaucetGeneralStatus;
+  refill: IPoWFaucetRefillStatus;
   sessions: IPoWFaucetStatusSession[];
   claims: IPoWFaucetStatusClaim[];
 }
@@ -29,8 +31,14 @@ export interface IPoWFaucetStatus {
 export interface IPoWFaucetGeneralStatus {
   walletBalance: number;
   unclaimedBalance: number;
-  refillBalance: number;
   balanceRestriction: number;
+}
+
+export interface IPoWFaucetRefillStatus {
+  balance: number;
+  trigger: number;
+  amount: number;
+  cooldown: number;
 }
 
 export interface IPoWFaucetStatusSession {
@@ -85,6 +93,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     this.state = {
       refreshing: false,
       status: null,
+      refillStatus: null,
       activeSessions: [],
       activeClaims: [],
 		};
@@ -121,6 +130,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       this.setState({
         refreshing: false,
         status: faucetStatus.status,
+        refillStatus: faucetStatus.refill,
         activeSessions: activeSessions,
         activeClaims: activeClaims,
       });
@@ -167,25 +177,75 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
   private renderFaucetStatus(): React.ReactElement {
     if(!this.state.status)
       return null;
+
+    let sessionStatus = {
+      mining: 0,
+      hashrate: 0,
+    };
+    this.state.activeSessions.forEach((session) => {
+      if(session.status === "mining") {
+        sessionStatus.mining++;
+        sessionStatus.hashrate += session.hashrate;
+      }
+    });
+    
     return (
-      <div className="status-general">
-        {this.state.status.refillBalance !== null ? 
-          <div className="status-walletbalance">
-            <span className="status-title">Refill Contract Balance:</span>
-            <span className="status-value">{Math.round(weiToEth(this.state.status.refillBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+      <div className="container status-general">
+        <div className="row">
+          <div className="col-3">
+            <div className="status-block">
+              <div className="status-prop">
+                <span className="status-title">Total Sessions:</span>
+                <span className="status-value">{this.state.activeSessions.length}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Mining Sessions:</span>
+                <span className="status-value">{sessionStatus.mining}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Total Hashrate:</span>
+                <span className="status-value">{Math.round(sessionStatus.hashrate * 100) / 100} H/s</span>
+              </div>
+            </div>
           </div>
-        : null}
-        <div className="status-walletbalance">
-          <span className="status-title">Faucet Wallet Balance:</span>
-          <span className="status-value">{Math.round(weiToEth(this.state.status.walletBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
-        </div>
-        <div className="status-unclaimedbalance">
-          <span className="status-title">Unclaimed Balance:</span>
-          <span className="status-value">{Math.round(weiToEth(this.state.status.unclaimedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
-        </div>
-        <div className="status-unclaimedbalance">
-          <span className="status-title">Reward Restriction:</span>
-          <span className="status-value">{Math.round(this.state.status.balanceRestriction * 1000) / 1000} %</span>
+          <div className="col-3">
+            <div className="status-block">
+              <div className="status-prop">
+                <span className="status-title">Faucet Wallet Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.status.walletBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Unclaimed Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.status.unclaimedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Reward Restriction:</span>
+                <span className="status-value">{Math.round(this.state.status.balanceRestriction * 1000) / 1000} %</span>
+              </div>
+            </div>
+          </div>
+          {this.state.refillStatus ?
+          <div className="col-3">
+            <div className="status-block">
+              <div className="status-prop">
+                <span className="status-title">Refill Contract Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Refill Trigger Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.trigger) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Refill Amount:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Refill Cooldown:</span>
+                <span className="status-value">{renderTimespan(this.state.refillStatus.cooldown, 3)}</span>
+              </div>
+            </div>
+          </div>
+          : null}
         </div>
       </div>
     );

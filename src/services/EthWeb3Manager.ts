@@ -514,4 +514,16 @@ export class EthWeb3Manager {
     return txResult;
   }
 
+  public getFaucetRefillCooldown(): number {
+    let now = Math.floor(new Date().getTime() / 1000);
+    if(!faucetConfig.ethRefillContract || !faucetConfig.ethRefillContract.cooldownTime)
+      return 0;
+    if(!this.lastWalletRefill)
+      return 0;
+    let cooldown = faucetConfig.ethRefillContract.cooldownTime - (now - this.lastWalletRefill);
+    if(cooldown < 0)
+      return 0;
+    return cooldown;
+  }
+
 }
