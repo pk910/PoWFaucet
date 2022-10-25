@@ -6,6 +6,10 @@ Proof of Work Faucet for EVM chains
 
 Faucets for ETH Testnets are spammed by bots. This faucet tries to reduce the efficiency of these automated requests by requiring some mining work to be done in exchange for ETH.
 
+For clarification: This faucet does NOT generate new coins with the "mining" process.
+It's just a protection method to prevent anyone from requesting big amount of funds and draining the faucet wallet.
+If you want to run your own instance you need to transfer the mineable funds to the faucet wallet yourself!
+
 # Instances
 
 Goerli Testnet: [https://goerli-faucet.pk910.de](https://goerli-faucet.pk910.de)
