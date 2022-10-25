@@ -381,7 +381,6 @@ export class EthWeb3Manager {
 
       // await transaction receipt
       txPromise.then((receipt) => {
-        console.log(receipt);
         delete this.pendingTxQueue[claimTx.nonce];
         claimTx.txhash = receipt.hash;
         claimTx.status = ClaimTxStatus.CONFIRMED;
