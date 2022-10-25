@@ -1,6 +1,7 @@
 
 import Web3 from 'web3';
 import net from 'net';
+import * as zksync from "zksync-web3";
 import { TransactionReceipt } from 'web3-core';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
@@ -85,6 +86,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
 }
 
 export class EthWeb3Manager {
+  private zksyncWallet: zksync.Wallet;
   private web3: Web3;
   private web3ReadyPromise: Promise<void>;
   private chainCommon: EthCom.default;
@@ -101,13 +103,14 @@ export class EthWeb3Manager {
   private walletRefilling: boolean;
 
   public constructor() {
-    this.startWeb3();
     this.chainCommon = EthCom.default.forCustomChain('mainnet', {
       networkId: faucetConfig.ethChainId,
       chainId: faucetConfig.ethChainId,
     }, 'london');
     this.walletKey = Buffer.from(faucetConfig.ethWalletKey, "hex");
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
+
+    this.startWeb3();
 
     // restore saved claimTx queue
     ServiceManager.GetService(FaucetStore).getClaimTxQueue().forEach((claimTx) => {
@@ -133,6 +136,9 @@ export class EthWeb3Manager {
       provider = new Web3.providers.HttpProvider(faucetConfig.ethRpcHost);
     
     this.web3 = new Web3(provider);
+
+    let zksyncProvider = new zksync.Provider(faucetConfig.ethRpcHost);
+    this.zksyncWallet = new zksync.Wallet(this.walletKey.toString("hex"), zksyncProvider);
 
     if(provider.on) {
       provider.on('error', e => {
@@ -338,19 +344,19 @@ export class EthWeb3Manager {
       claimTx.emit("processing");
 
       // send transaction
-      let txPromise: Promise<TransactionReceipt>;
+      let txPromise: Promise<zksync.types.TransactionResponse>;
       let retryCount = 0;
       let txError: Error;
-      let buildTx = () => {
-        claimTx.nonce = this.walletState.nonce;
-        return this.buildEthTx(claimTx.target, claimTx.amount, claimTx.nonce);
-      };
+      claimTx.nonce = this.walletState.nonce;
 
       do {
         try {
-          let txResult = await this.sendTransaction(buildTx());
-          claimTx.txhash = txResult[0];
-          txPromise = txResult[1];
+          let zksyncTx = this.zksyncWallet.transfer({
+            to: claimTx.target,
+            amount: "0x" + BigInt(claimTx.amount).toString(16),
+          });
+
+          txPromise = zksyncTx;
         } catch(ex) {
           if(!txError)
             txError = ex;
@@ -366,7 +372,7 @@ export class EthWeb3Manager {
       this.walletState.balance -= claimTx.amount;
       this.updateFaucetStatus();
 
-      this.pendingTxQueue[claimTx.txhash] = claimTx;
+      this.pendingTxQueue[claimTx.nonce] = claimTx;
       ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + (Math.round(weiToEth(claimTx.amount)*1000)/1000) + " ETH] to: " + claimTx.target + ": " + claimTx.txhash);
 
@@ -375,14 +381,15 @@ export class EthWeb3Manager {
 
       // await transaction receipt
       txPromise.then((receipt) => {
-        delete this.pendingTxQueue[claimTx.txhash];
-        claimTx.txblock = receipt.blockNumber;
+        console.log(receipt);
+        delete this.pendingTxQueue[claimTx.nonce];
+        claimTx.txhash = receipt.hash;
         claimTx.status = ClaimTxStatus.CONFIRMED;
         claimTx.emit("confirmed");
         ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
       }, (error) => {
         ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
-        delete this.pendingTxQueue[claimTx.txhash];
+        delete this.pendingTxQueue[claimTx.nonce];
         claimTx.failReason = "Transaction Error: " + error.toString();
         claimTx.status = ClaimTxStatus.FAILED;
         claimTx.emit("failed");
