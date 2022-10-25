@@ -117,7 +117,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   private onPoWClientOpen() {
     if(this.state.claimStatus !== PoWClaimStatus.PENDING)
       return;
-    this.props.powClient.sendRequest("", {
+    this.props.powClient.sendRequest("watchClaimTx", {
       sessionId: this.props.reward.session
     }).catch((err) => {
       this.setState({
