@@ -48,6 +48,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   private options: IPoWSessionOptions;
   private sessionInfo: IPoWSessionInfo;
   private shareQueue: IPoWMinerShare[];
+  private shareQueueProcessing: boolean;
   private verifyResultQueue: any[];
   private miner: PoWMiner;
 
@@ -126,8 +127,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
       // resumed session
       if(this.shareQueue.length) {
-        this.shareQueue.forEach((share) => this._submitShare(share));
-        this.shareQueue = [];
+        this.processShareQueue();
       }
       if(this.verifyResultQueue.length) {
         this.verifyResultQueue.forEach((verifyResult) => this._submitVerifyResult(verifyResult));
@@ -146,6 +146,35 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       this._submitShare(share);
     else
       this.shareQueue.push(share);
+  }
+
+  private processShareQueue() {
+    if(this.shareQueueProcessing)
+      return;
+    this.shareQueueProcessing = true;
+
+    let queueLoop = () => {
+      if(!this.sessionInfo) {
+        this.shareQueue = [];
+        this.shareQueueProcessing = false;
+        return;
+      }
+
+      let queueLen = this.shareQueue.length;
+      if(!this.options.client.isReady())
+        queueLen = 0;
+      
+      if(queueLen > 0) {
+        this._submitShare(this.shareQueue.shift());
+        queueLen--;
+      }
+
+      if(queueLen > 0)
+        setTimeout(() => queueLoop(), 2000);
+      else
+        this.shareQueueProcessing = false;
+    }
+    queueLoop();
   }
 
   private _submitShare(share: IPoWMinerShare) {
