@@ -92,7 +92,7 @@ export interface IFaucetConfig {
 
   ethRpcHost: string; // ETH execution layer RPC host
   ethWalletKey: string; // faucet wallet private key
-  ethChainId: number; // ETH chain id
+  ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
@@ -233,7 +233,7 @@ let defaultConfig: IFaucetConfig = {
   denyNewSessions: false,
   ethRpcHost: "http://127.0.0.1:8545/",
   ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
-  ethChainId: 1337802,
+  ethChainId: null,
   ethTxGasLimit: 21000,
   ethTxMaxFee: 1800000000,
   ethTxPrioFee: 800000000,

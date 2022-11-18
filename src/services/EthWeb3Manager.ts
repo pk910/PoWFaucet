@@ -102,10 +102,9 @@ export class EthWeb3Manager {
 
   public constructor() {
     this.startWeb3();
-    this.chainCommon = EthCom.default.forCustomChain('mainnet', {
-      networkId: faucetConfig.ethChainId,
-      chainId: faucetConfig.ethChainId,
-    }, 'london');
+    if(typeof faucetConfig.ethChainId === "number")
+      this.initChainCommon(faucetConfig.ethChainId);
+    
     this.walletKey = Buffer.from(faucetConfig.ethWalletKey, "hex");
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
 
@@ -121,6 +120,15 @@ export class EthWeb3Manager {
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Error loading wallet state for " + this.walletAddr + ": " + err.toString());
       process.exit(0);
     });
+  }
+
+  private initChainCommon(chainId: number) {
+    if(this.chainCommon && this.chainCommon.chainIdBN().toNumber() === chainId)
+      return;
+    this.chainCommon = EthCom.default.forCustomChain('mainnet', {
+      networkId: chainId,
+      chainId: chainId,
+    }, 'london');
   }
 
   private startWeb3() {
@@ -161,19 +169,23 @@ export class EthWeb3Manager {
 
   private loadWalletState(): Promise<void> {
     this.lastWalletRefresh = Math.floor(new Date().getTime() / 1000);
+    let chainIdPromise = typeof faucetConfig.ethChainId === "number" ? Promise.resolve(faucetConfig.ethChainId) : this.web3.eth.getChainId();
     return Promise.all([
       this.web3.eth.getBalance(this.walletAddr, "pending"),
       this.web3.eth.getTransactionCount(this.walletAddr, "pending"),
+      chainIdPromise,
     ]).catch((ex) => {
       if(ex.toString().match(/"pending" is not yet supported/)) {
         return Promise.all([
           this.web3.eth.getBalance(this.walletAddr),
           this.web3.eth.getTransactionCount(this.walletAddr),
+          chainIdPromise,
         ]);
       }
       else
         throw ex;
     }).then((res) => {
+      this.initChainCommon(res[2]);
       this.walletState = {
         balance: parseInt(res[0]),
         nonce: res[1],
