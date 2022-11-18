@@ -125,6 +125,7 @@ export class EthWeb3Manager {
   private initChainCommon(chainId: number) {
     if(this.chainCommon && this.chainCommon.chainIdBN().toNumber() === chainId)
       return;
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Web3 ChainCommon initialized with chainId " + chainId);
     this.chainCommon = EthCom.default.forCustomChain('mainnet', {
       networkId: chainId,
       chainId: chainId,
