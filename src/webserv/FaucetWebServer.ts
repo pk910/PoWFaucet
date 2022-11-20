@@ -106,7 +106,14 @@ export class FaucetHttpServer {
     }
     
     this.wssServer.handleUpgrade(req, socket, head, (ws) => {
-      new PoWClient(ws, (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress).split(", ")[0]);
+      let remoteAddr: string = null;
+      if(req.headers['x-forwarded-for']) {
+        let proxyChain = (req.headers['x-forwarded-for'] as string).split(", ");
+        remoteAddr = proxyChain.pop();
+      }
+      if(!remoteAddr)
+        remoteAddr = req.socket.remoteAddress;
+      new PoWClient(ws, remoteAddr);
     });
   }
 
