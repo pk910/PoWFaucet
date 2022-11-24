@@ -52,7 +52,7 @@ faucetLogFile: "/config/faucet-events.log"
 
 start the container: (change `/gome/powfaucet` to your datadir)
 
-`docker run -d --restart unless-stopped --name=powfaucet -v /home/powfacuet:/config -p 8080:8080 -it pk910/powfacuet:latest --config=/config/faucet-config.yaml`
+`docker run -d --restart unless-stopped --name=powfaucet -v /home/powfaucet:/config -p 8080:8080 -it pk910/powfaucet:latest --config=/config/faucet-config.yaml`
 
 read logs:
 
