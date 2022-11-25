@@ -11,7 +11,7 @@ import { encode } from 'html-entities';
 import { OutgoingHttpHeaders } from 'http2';
 import { FaucetWebApi } from './FaucetWebApi';
 import { ServiceManager } from '../common/ServiceManager';
-import { PoWStatusLog } from '../common/PoWStatusLog';
+import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 
 export class FaucetHttpResponse {
   public readonly code: number;
@@ -30,6 +30,7 @@ export class FaucetHttpResponse {
 export class FaucetHttpServer {
   private wssServer: WebSocketServer;
   private staticServer: StaticServer;
+  private cachedSeoIndex: string;
 
   public constructor() {
     let server = createServer();
@@ -83,8 +84,10 @@ export class FaucetHttpServer {
           switch(req.url) {
             case "/":
             case "/index.html":
-              if(faucetConfig.buildSeoIndex)
-                this.staticServer.serveFile("/index.seo.html", 200, {}, req, rsp);
+              if(faucetConfig.buildSeoIndex && this.cachedSeoIndex) {
+                rsp.writeHead(200, {'Content-Type': 'text/html'});
+                rsp.end(this.cachedSeoIndex);
+              }
               else
                 this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
               break;
@@ -161,7 +164,12 @@ export class FaucetHttpServer {
       indexHtml = indexHtml.replace(/"\/css\/powfaucet\.css"/, '"/css/powfaucet.css?' + clientVersion.build + '"');
     }
 
-    let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
-    fs.writeFileSync(seoFile, indexHtml);
+    this.cachedSeoIndex = indexHtml;
+    try {
+      let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
+      fs.writeFileSync(seoFile, indexHtml);
+    } catch(ex) {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Could not write seo index to disk: " + ex.toString());
+    }
   }
 }
