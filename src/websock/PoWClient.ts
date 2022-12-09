@@ -1,7 +1,7 @@
 import { WebSocket, RawData } from 'ws';
 import * as crypto from "crypto";
 import { faucetConfig } from '../common/FaucetConfig';
-import { PoWSession, PoWSessionStatus } from './PoWSession';
+import { IPoWSessionRecoveryInfo, PoWSession, PoWSessionStatus } from './PoWSession';
 import { AddressMark, FaucetStore, SessionMark } from '../services/FaucetStore';
 import { renderTimespan } from '../utils/DateUtils';
 import { isValidGuid } from '../utils/GuidUtils';
@@ -329,7 +329,7 @@ export class PoWClient {
         // check if closed session is claimable and return claim token if so
         if(session.isClaimable() && ServiceManager.GetService(FaucetStore).getSessionMarks(session.getSessionId(), []).indexOf(SessionMark.CLAIMED) === -1) {
           sessClaim = {
-            balance: session.getBalance(),
+            balance: session.getBalance().toString(),
             token: session.getSignedSession(),
           };
         }
@@ -378,23 +378,24 @@ export class PoWClient {
     if(!sessionStr || sessionSplit[1] !== sessionHash.digest('base64'))
       return this.sendErrorResponse("INVALID_DATA", "Invalid recovery data", message);
 
-    let sessionInfo = JSON.parse(Buffer.from(sessionStr, 'base64').toString("utf8"));
+    let sessionInfo: IPoWSessionRecoveryInfo = JSON.parse(Buffer.from(sessionStr, 'base64').toString("utf8"));
     if(PoWSession.getSession(sessionInfo.id))
       return this.sendErrorResponse("DUPLICATE_SESSION", "Session does already exist and cannot be recovered", message);
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
       return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
 
-    let startTime = new Date(sessionInfo.startTime * 1000);
-    if(faucetConfig.claimSessionTimeout && ((new Date()).getTime() - startTime.getTime()) / 1000 > faucetConfig.claimSessionTimeout)
+    let now = Math.floor((new Date()).getTime() / 1000);
+    if(faucetConfig.claimSessionTimeout && (now - sessionInfo.startTime) > faucetConfig.claimSessionTimeout)
       return this.sendErrorResponse("SESSION_TIMEOUT", "Session is too old to recover (timeout)", message);
     let sessionMarks = ServiceManager.GetService(FaucetStore).getSessionMarks(sessionInfo.id, []);
     if(sessionMarks.length > 0)
       return this.sendErrorResponse("INVALID_SESSION", "Session cannot be recovered (" + sessionMarks.join(",") + ")", message);
 
-    let session = new PoWSession(this, sessionInfo.targetAddr, {
+    new PoWSession(this, {
       id: sessionInfo.id,
-      startTime: startTime,
+      startTime: sessionInfo.startTime,
+      targetAddr: sessionInfo.targetAddr,
       preimage: sessionInfo.preimage,
       balance: sessionInfo.balance,
       nonce: sessionInfo.nonce,
@@ -478,7 +479,7 @@ export class PoWClient {
     } = message.data;
 
     let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
-    let verifyReward: number;
+    let verifyReward: bigint;
     if(verifyValid && this.session && (verifyReward = ServiceManager.GetService(PoWRewardLimiter).getVerificationReward(this.session)) > 0) {
       this.session.addBalance(verifyReward);
 
@@ -486,7 +487,7 @@ export class PoWClient {
       faucetStats.statVerifyReward += verifyReward;
 
       this.sendMessage("updateBalance", {
-        balance: this.session.getBalance(),
+        balance: this.session.getBalance().toString(),
         recovery: this.session.getSignedSession(),
         reason: "valid verification"
       });
@@ -533,7 +534,7 @@ export class PoWClient {
     if(!sessionStr || sessionSplit[1] !== sessionHash.digest('base64')) 
       return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (verification failed)", message);
 
-    let sessionInfo = JSON.parse(Buffer.from(sessionStr, 'base64').toString("utf8"));
+    let sessionInfo: IPoWSessionRecoveryInfo = JSON.parse(Buffer.from(sessionStr, 'base64').toString("utf8"));
     if(!sessionInfo.claimable)
       return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (not claimable)", message);
 
@@ -551,11 +552,11 @@ export class PoWClient {
     if(closedSession)
       closedSession.setSessionStatus(PoWSessionStatus.CLAIMED);
 
-    let claimTx = ServiceManager.GetService(EthWeb3Manager).addClaimTransaction(sessionInfo.targetAddr, sessionInfo.balance, sessionInfo.id);
+    let claimTx = ServiceManager.GetService(EthWeb3Manager).addClaimTransaction(sessionInfo.targetAddr, BigInt(sessionInfo.balance), sessionInfo.id);
     claimTx.once("confirmed", () => {
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
       faucetStats.statClaimCount++;
-      faucetStats.statClaimRewards += sessionInfo.balance;
+      faucetStats.statClaimRewards += BigInt(sessionInfo.balance);
     });
     this.bindClaimTxEvents(claimTx);
     this.sendMessage("ok", null, reqId);

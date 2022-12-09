@@ -49,8 +49,8 @@ export interface IClientFaucetConfig {
 
 export interface IClientFaucetStatus {
   status: {
-    walletBalance: number;
-    unclaimedBalance: number;
+    walletBalance: string;
+    unclaimedBalance: string;
     balanceRestriction: number;
   };
   refill: {
@@ -66,7 +66,7 @@ export interface IClientFaucetStatus {
     target: string;
     ip: string;
     ipInfo: IIPInfo;
-    balance: number;
+    balance: string;
     nonce: number;
     hashrate: number;
     status: PoWSessionStatus;
@@ -78,7 +78,7 @@ export interface IClientFaucetStatus {
     time: number;
     session: string;
     target: string;
-    amount: number;
+    amount: string;
     status: ClaimTxStatus;
     error: string;
     nonce: number;
@@ -225,8 +225,8 @@ export class FaucetWebApi {
 
     let statusRsp: IClientFaucetStatus = {
       status: {
-        walletBalance: ethWeb3Manager.getFaucetBalance(),
-        unclaimedBalance: rewardLimiter.getUnclaimedBalance(),
+        walletBalance: ethWeb3Manager.getFaucetBalance()?.toString(),
+        unclaimedBalance: rewardLimiter.getUnclaimedBalance().toString(),
         balanceRestriction: rewardLimiter.getBalanceRestriction(),
       },
       refill: faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract ? {
@@ -258,7 +258,7 @@ export class FaucetWebApi {
         target: session.getTargetAddr(),
         ip: this.getHashedIp(session.getLastRemoteIp()),
         ipInfo: session.getLastIpInfo(),
-        balance: session.getBalance(),
+        balance: session.getBalance().toString(),
         nonce: session.getLastNonce(),
         hashrate: session.getReportedHashRate(),
         status: session.getSessionStatus(),
@@ -278,7 +278,7 @@ export class FaucetWebApi {
         time: Math.floor(claimTx.time.getTime() / 1000),
         session: sessionIdHash.digest("hex").substring(0, 20),
         target: claimTx.target,
-        amount: claimTx.amount,
+        amount: claimTx.amount.toString(),
         status: claimTx.status,
         error: claimTx.failReason,
         nonce: claimTx.nonce || null,

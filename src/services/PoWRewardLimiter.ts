@@ -58,10 +58,8 @@ export class PoWRewardLimiter {
       return;
       
     let faucetBalance = ServiceManager.GetService(EthWeb3Manager).getFaucetBalance();
-    if(isNaN(faucetBalance)) {
-      this.balanceRestriction = 100;
+    if(faucetBalance === null)
       return;
-    }
     
     this.balanceRestrictionsRefresh = now;
     faucetBalance -= this.getUnclaimedBalance(); // subtract mined balance from active & claimable sessions
@@ -72,8 +70,8 @@ export class PoWRewardLimiter {
     );
   }
 
-  public getUnclaimedBalance(): number {
-    let unclaimedBalance = 0;
+  public getUnclaimedBalance(): bigint {
+    let unclaimedBalance = 0n;
     PoWSession.getAllSessions().forEach((session) => {
       let sessionStatus = session.getSessionStatus();
       if(sessionStatus == PoWSessionStatus.CLAIMED)
@@ -87,7 +85,7 @@ export class PoWRewardLimiter {
     return unclaimedBalance;
   }
 
-  private getStaticBalanceRestriction(balance: number): number {
+  private getStaticBalanceRestriction(balance: bigint): number {
     if(!faucetConfig.faucetBalanceRestrictedReward)
       return 100;
 
@@ -107,17 +105,17 @@ export class PoWRewardLimiter {
     return restrictedReward;
   }
 
-  private getDynamicBalanceRestriction(balance: number): number {
+  private getDynamicBalanceRestriction(balance: bigint): number {
     if(!faucetConfig.faucetBalanceRestriction || !faucetConfig.faucetBalanceRestriction.enabled)
       return 100;
-    let targetBalance = faucetConfig.faucetBalanceRestriction.targetBalance * 1000000000000000000;
+    let targetBalance = BigInt(faucetConfig.faucetBalanceRestriction.targetBalance) * 1000000000000000000n;
     if(balance >= targetBalance)
       return 100;
     if(balance <= faucetConfig.spareFundsAmount)
       return 0;
 
-    let mineableBalance = balance - faucetConfig.spareFundsAmount;
-    let balanceRestriction = 100 * mineableBalance / targetBalance;
+    let mineableBalance = balance - BigInt(faucetConfig.spareFundsAmount);
+    let balanceRestriction = parseInt((mineableBalance * 100000n / targetBalance).toString()) / 1000;
     return balanceRestriction;
   }
 
@@ -151,36 +149,36 @@ export class PoWRewardLimiter {
     return restrictedReward;
   }
 
-  public getShareReward(session: PoWSession): number {
-    let shareReward = faucetConfig.powShareReward;
+  public getShareReward(session: PoWSession): bigint {
+    let shareReward = BigInt(faucetConfig.powShareReward);
 
     if(faucetConfig.faucetBalanceRestrictedReward) {
       // apply balance restriction if faucet wallet is low on funds
       let balanceRestriction = this.getBalanceRestriction();
       if(balanceRestriction < 100)
-        shareReward = Math.floor(shareReward / 100 * balanceRestriction);
+        shareReward = shareReward * BigInt(balanceRestriction * 1000) / 100000n;
     }
 
     let restrictedReward = this.getSessionRestriction(session);
     if(restrictedReward < 100)
-      shareReward = Math.floor(shareReward / 100 * restrictedReward);
+      shareReward = shareReward * BigInt(restrictedReward * 1000) / 100000n;
 
     return shareReward;
   }
 
-  public getVerificationReward(session: PoWSession): number {
-    let shareReward = faucetConfig.verifyMinerReward;
+  public getVerificationReward(session: PoWSession): bigint {
+    let shareReward = BigInt(faucetConfig.verifyMinerReward);
 
     if(faucetConfig.faucetBalanceRestrictedReward) {
       // apply balance restriction if faucet wallet is low on funds
       let balanceRestriction = this.getBalanceRestriction();
       if(balanceRestriction < 100)
-        shareReward = Math.floor(shareReward / 100 * balanceRestriction);
+        shareReward = shareReward * BigInt(balanceRestriction * 1000) / 100000n;
     }
 
     let restrictedReward = this.getSessionRestriction(session);
     if(restrictedReward < 100)
-      shareReward = Math.floor(shareReward / 100 * restrictedReward);
+      shareReward = shareReward * BigInt(restrictedReward * 1000) / 100000n;
 
     return shareReward;
   }

@@ -29,10 +29,12 @@ export enum PoWSessionStatus {
 
 export interface IPoWSessionRecoveryInfo {
   id: string;
-  startTime: Date
+  startTime: number;
+  targetAddr: string;
   preimage: string;
-  balance: number;
+  balance: string;
   nonce: number;
+  claimable?: boolean;
 }
 
 export class PoWSession {
@@ -83,7 +85,7 @@ export class PoWSession {
   private idleTime: Date | null;
   private targetAddr: string;
   private preimage: string;
-  private balance: number;
+  private balance: bigint;
   private claimable: boolean;
   private lastNonce: number;
   private reportedHashRate: number[];
@@ -96,27 +98,28 @@ export class PoWSession {
   private missedVerifications: number;
   private pendingVerifications: number;
 
-  public constructor(client: PoWClient, targetAddr: string, recoveryInfo?: IPoWSessionRecoveryInfo) {
+  public constructor(client: PoWClient, target: string | IPoWSessionRecoveryInfo) {
     this.idleTime = null;
-    this.targetAddr = targetAddr;
     this.claimable = false;
     this.reportedHashRate = [];
     this.sessionStatus = PoWSessionStatus.MINING;
     this.missedVerifications = 0;
     this.pendingVerifications = 0;
-    
-    if(recoveryInfo) {
-      this.sessionId = recoveryInfo.id;
-      this.startTime = recoveryInfo.startTime;
-      this.preimage = recoveryInfo.preimage;
-      this.balance = recoveryInfo.balance;
-      this.lastNonce = recoveryInfo.nonce;
+
+    if(typeof target === "object") {
+      this.sessionId = target.id;
+      this.startTime = new Date(target.startTime * 1000);
+      this.targetAddr = target.targetAddr;
+      this.preimage = target.preimage;
+      this.balance = BigInt(target.balance);
+      this.lastNonce = target.nonce;
     }
     else {
       this.sessionId = getNewGuid();
+      this.targetAddr = target;
       this.startTime = new Date();
       this.preimage = crypto.randomBytes(8).toString('base64');
-      this.balance = 0;
+      this.balance = 0n;
       this.lastNonce = 0;
     }
 
@@ -128,7 +131,10 @@ export class PoWSession {
     ServiceManager.GetService(PoWStatusLog).emitLog(
       PoWStatusLogLevel.INFO, 
       "Created new session: " + this.sessionId + 
-      (recoveryInfo ? " [Recovered: " + (Math.round(weiToEth(this.balance)*1000)/1000) + " ETH, start: " + renderDate(recoveryInfo.startTime, true) + "]" : "") + 
+      (typeof target === "object" ? 
+        " [Recovered: " + (Math.round(weiToEth(this.balance)*1000)/1000) + " ETH, start: " + renderDate(this.startTime, true) + "]" :
+        ""
+      ) +
       " (Remote IP: " + this.activeClient.getRemoteIP() + ")"
     );
 
@@ -170,7 +176,7 @@ export class PoWSession {
     if(makeClaimable && this.balance >= faucetConfig.claimMinAmount) {
       this.claimable = true;
       if(this.balance > faucetConfig.claimMaxAmount)
-        this.balance = faucetConfig.claimMaxAmount;
+        this.balance = BigInt(faucetConfig.claimMaxAmount);
     }
 
     if(this.cleanupTimer) {
@@ -223,7 +229,7 @@ export class PoWSession {
     this.lastNonce = lastNonce;
   }
 
-  public getBalance(): number {
+  public getBalance(): bigint {
     return this.balance;
   }
 
@@ -284,7 +290,7 @@ export class PoWSession {
     return this.lastIpInfo;
   }
 
-  public addBalance(value: number) {
+  public addBalance(value: bigint) {
     this.balance += value;
   }
 
@@ -339,13 +345,13 @@ export class PoWSession {
     }
   }
 
-  private applyBalancePenalty(penalty: number): number {
+  private applyBalancePenalty(penalty: number | bigint) {
     if(this.balance < penalty) {
       penalty = this.balance;
-      this.balance = 0;
+      this.balance = 0n;
     }
     else
-      this.balance -= penalty;
+      this.balance -= BigInt(penalty);
     
     if(this.activeClient) {
       this.activeClient.sendMessage("updateBalance", {
@@ -355,10 +361,8 @@ export class PoWSession {
       })
     }
 
-    ServiceManager.GetService(FaucetStatsLog).statVerifyPenalty += penalty;
+    ServiceManager.GetService(FaucetStatsLog).statVerifyPenalty += BigInt(penalty);
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + (Math.round(weiToEth(penalty)*1000)/1000) + "ETH)");
-
-    return penalty;
   }
 
   private applyKillPenalty(reason: PoWSessionSlashReason) {
@@ -377,12 +381,12 @@ export class PoWSession {
   }
 
   public getSignedSession(): string {
-    let sessionDict = {
+    let sessionDict: IPoWSessionRecoveryInfo = {
       id: this.sessionId,
       startTime: Math.floor(this.startTime.getTime() / 1000),
       targetAddr: this.targetAddr,
       preimage: this.preimage,
-      balance: this.balance,
+      balance: this.balance.toString(),
       claimable: this.claimable,
       nonce: this.lastNonce,
     };

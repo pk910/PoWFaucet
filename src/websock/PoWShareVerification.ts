@@ -8,7 +8,7 @@ import { PoWRewardLimiter } from "../services/PoWRewardLimiter";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
-  reward: number;
+  reward: bigint;
 }
 
 export class PoWShareVerification {
@@ -172,10 +172,10 @@ export class PoWShareVerification {
       }
     });
 
-    let shareReward: number;
+    let shareReward: bigint;
     if(this.isInvalid) {
       session.slashBadSession(PoWSessionSlashReason.INVALID_SHARE);
-      shareReward = 0;
+      shareReward = 0n;
     }
     else {
       // valid share - add rewards
@@ -184,7 +184,7 @@ export class PoWShareVerification {
       
       if(session.getActiveClient()) {
         session.getActiveClient().sendMessage("updateBalance", {
-          balance: session.getBalance(),
+          balance: session.getBalance().toString(),
           recovery: session.getSignedSession(),
           reason: "valid share"
         });

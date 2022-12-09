@@ -11,13 +11,13 @@ import { ClaimTx } from './EthWeb3Manager';
 
 export class FaucetStatsLog {
   public statShareCount: number = 0;
-  public statShareRewards: number = 0;
+  public statShareRewards: bigint = 0n;
   public statVerifyCount: number = 0;
   public statVerifyMisses: number = 0;
-  public statVerifyReward: number = 0;
-  public statVerifyPenalty: number = 0;
+  public statVerifyReward: bigint = 0n;
+  public statVerifyPenalty: bigint = 0n;
   public statClaimCount: number = 0;
-  public statClaimRewards: number = 0;
+  public statClaimRewards: bigint = 0n;
   public statSlashCount: number = 0;
 
   private enabled: boolean;
@@ -66,7 +66,7 @@ export class FaucetStatsLog {
       st: Math.floor(session.getStartTime().getTime() / 1000),
       ip: session.getLastRemoteIp(),
       to: session.getTargetAddr(),
-      val: session.getBalance(),
+      val: session.getBalance().toString(),
       hr: Math.round(session.getReportedHashRate()),
       no: session.getLastNonce(),
       loc: ipinfo ? {
@@ -82,7 +82,7 @@ export class FaucetStatsLog {
   public addClaimStats(claim: ClaimTx) {
     this.addStatsEntry("CLAIM", {
       to: claim.target,
-      val: claim.amount,
+      val: claim.amount.toString(),
       sess: claim.session,
     });
   }
@@ -112,24 +112,24 @@ export class FaucetStatsLog {
       sessIdl: idleSessCount,
       hashRate: hashRate,
       shareCnt: this.statShareCount,
-      shareVal: this.statShareRewards,
+      shareVal: this.statShareRewards.toString(),
       vrfyCnt: this.statVerifyCount,
       vrfyMisa: this.statVerifyMisses,
-      vrfyVal: this.statVerifyReward,
-      vrfyPen: this.statVerifyPenalty,
+      vrfyVal: this.statVerifyReward.toString(),
+      vrfyPen: this.statVerifyPenalty.toString(),
       claimCnt: this.statClaimCount,
-      claimVal: this.statClaimRewards,
+      claimVal: this.statClaimRewards.toString(),
       slashCnt: this.statSlashCount,
     });
 
     this.statShareCount = 0;
-    this.statShareRewards = 0;
+    this.statShareRewards = 0n;
     this.statVerifyCount = 0;
     this.statVerifyMisses = 0;
-    this.statVerifyReward = 0;
-    this.statVerifyPenalty = 0;
+    this.statVerifyReward = 0n;
+    this.statVerifyPenalty = 0n;
     this.statClaimCount = 0;
-    this.statClaimRewards = 0;
+    this.statClaimRewards = 0n;
     this.statSlashCount = 0;
   }
 
