@@ -376,7 +376,7 @@ export class PoWSession {
     
     if(this.activeClient) {
       this.activeClient.sendMessage("updateBalance", {
-        balance: this.balance,
+        balance: this.balance.toString(),
         recovery: this.getSignedSession(),
         reason: "verify miss (penalty: " + penalty + ")"
       })
