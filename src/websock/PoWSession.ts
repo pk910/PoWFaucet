@@ -11,6 +11,7 @@ import { PoWClient } from "./PoWClient";
 import { renderDate } from "../utils/DateUtils";
 import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
 import { FaucetStatsLog } from "../services/FaucetStatsLog";
+import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
 
 
 export enum PoWSessionSlashReason {
@@ -97,6 +98,10 @@ export class PoWSession {
   private lastIpInfo: IIPInfo;
   private missedVerifications: number;
   private pendingVerifications: number;
+
+  // cache
+  private hashedRemoteIp: string;
+  private hashedSessionId: string;
 
   public constructor(client: PoWClient, target: string | IPoWSessionRecoveryInfo) {
     this.idleTime = null;
@@ -201,8 +206,14 @@ export class PoWSession {
   }
 
 
-  public getSessionId(): string {
-    return this.sessionId;
+  public getSessionId(hashed?: boolean): string {
+    if(hashed) {
+      if(!this.hashedSessionId)
+        this.hashedSessionId = getHashedSessionId(this.sessionId, faucetConfig.faucetSecret);
+      return this.hashedSessionId;
+    }
+    else
+      return this.sessionId;
   }
 
   public getStartTime(): Date {
@@ -266,8 +277,14 @@ export class PoWSession {
     }
   }
 
-  public getLastRemoteIp(): string {
-    return this.lastRemoteIp;
+  public getLastRemoteIp(hashed?: boolean): string {
+    if(hashed) {
+      if(!this.hashedRemoteIp)
+        this.hashedRemoteIp = getHashedIp(this.lastRemoteIp, faucetConfig.faucetSecret);
+      return this.hashedRemoteIp;
+    }
+    else
+      return this.lastRemoteIp;
   }
 
   private updateRemoteIp() {
@@ -278,7 +295,11 @@ export class PoWSession {
     if(remoteAddr.match(/^::ffff:/))
       remoteAddr = remoteAddr.substring(7);
     
+    if(this.lastRemoteIp === remoteAddr)
+      return;
+
     this.lastRemoteIp = remoteAddr;
+    this.hashedRemoteIp = null;
     ServiceManager.GetService(IPInfoResolver).getIpInfo(remoteAddr).then((ipInfo) => {
       this.lastIpInfo = ipInfo;
       if(this.activeClient)
