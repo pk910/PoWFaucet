@@ -15,6 +15,7 @@ import { strFormatPlaceholder } from '../utils/StringUtils';
 import { FaucetStatsLog } from './FaucetStatsLog';
 import { PromiseDfd } from '../utils/PromiseDfd';
 import { FaucetStore } from './FaucetStore';
+import { PoWRewardLimiter } from './PoWRewardLimiter';
 
 interface WalletState {
   nonce: number;
@@ -314,7 +315,7 @@ export class EthWeb3Manager {
         await this.loadWalletState();
       }
 
-      if(faucetConfig.ethRefillContract && this.walletState.balance <= faucetConfig.ethRefillContract.triggerBalance)
+      if(faucetConfig.ethRefillContract)
         await this.tryRefillWallet();
     } catch(ex) {
       let stack;
@@ -437,21 +438,19 @@ export class EthWeb3Manager {
   private async tryRefillWallet() {
     if(!faucetConfig.ethRefillContract)
       return;
-
-    if(this.walletState.balance > faucetConfig.ethRefillContract.triggerBalance)
-      return;
     if(this.walletRefilling)
       return;
-    
     let now = Math.floor(new Date().getTime() / 1000);
     if(this.lastWalletRefillTry && now - this.lastWalletRefillTry < 60)
       return;
     if(this.lastWalletRefill && faucetConfig.ethRefillContract.cooldownTime && now - this.lastWalletRefill < faucetConfig.ethRefillContract.cooldownTime)
       return;
+    this.lastWalletRefillTry = now;
+
+    if(this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance() > faucetConfig.ethRefillContract.triggerBalance)
+      return;
     
     this.walletRefilling = true;
-    this.lastWalletRefillTry = now;
-    
     try {
       let txResult = await this.refillWallet();
       this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
