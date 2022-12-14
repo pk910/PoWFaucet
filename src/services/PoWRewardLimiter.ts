@@ -155,11 +155,11 @@ export class PoWRewardLimiter {
     // apply balance restriction if faucet wallet is low on funds
     let balanceRestriction = this.getBalanceRestriction();
     if(balanceRestriction < 100)
-      shareReward = shareReward * BigInt(balanceRestriction * 1000) / 100000n;
+      shareReward = shareReward * BigInt(Math.floor(balanceRestriction * 1000)) / 100000n;
 
     let restrictedReward = this.getSessionRestriction(session);
     if(restrictedReward < 100)
-      shareReward = shareReward * BigInt(restrictedReward * 1000) / 100000n;
+      shareReward = shareReward * BigInt(Math.floor(restrictedReward * 1000)) / 100000n;
 
     return shareReward;
   }
@@ -170,11 +170,11 @@ export class PoWRewardLimiter {
     // apply balance restriction if faucet wallet is low on funds
     let balanceRestriction = this.getBalanceRestriction();
     if(balanceRestriction < 100)
-      shareReward = shareReward * BigInt(balanceRestriction * 1000) / 100000n;
+      shareReward = shareReward * BigInt(Math.floor(balanceRestriction * 1000)) / 100000n;
 
     let restrictedReward = this.getSessionRestriction(session);
     if(restrictedReward < 100)
-      shareReward = shareReward * BigInt(restrictedReward * 1000) / 100000n;
+      shareReward = shareReward * BigInt(Math.floor(restrictedReward * 1000)) / 100000n;
 
     return shareReward;
   }
