@@ -116,6 +116,7 @@ export interface IFaucetConfig {
 
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
+  resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
 }
 
 export interface IFaucetCaptchaConfig {
@@ -138,6 +139,10 @@ export interface IFaucetEnsResolverConfig {
 
 export interface IFaucetStatsConfig {
   logfile: string;
+}
+
+export interface IFaucetResultSharingConfig {
+  [provider: string]: string;
 }
 
 let cliArgs = (function() {
@@ -243,6 +248,7 @@ let defaultConfig: IFaucetConfig = {
   ethRefillContract: null,
   ensResolver: null,
   faucetStats: null,
+  resultSharing: null,
 };
 
 export let faucetConfig: IFaucetConfig = null;

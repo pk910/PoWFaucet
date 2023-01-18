@@ -230,6 +230,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 TX: {this.props.faucetConfig.ethTxExplorerLink ? 
                 <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank'>{this.state.txHash}</a> :
                 <span>{this.state.txHash}</span>}
+                {this.renderResultSharing()}
               </div>
              : null}
              {this.state.claimStatus == PoWClaimStatus.FAILED ?
@@ -252,6 +253,39 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       </Modal>
     );
 	}
+
+  private renderResultSharing(): React.ReactElement<IPoWClaimDialogProps> {
+    let twitterEl: React.ReactElement = null;
+
+    if(this.props.faucetConfig.resultSharing?.twitter) {
+      let tweetMsg = this.props.faucetConfig.resultSharing.twitter;
+      // Boom! Just got {amount} ETH from {url} (Mining for {duration} with {hashrate} H/s)
+      tweetMsg = tweetMsg.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 100) / 100).toString());
+      tweetMsg = tweetMsg.replace(/{url}/ig, location.href);
+
+      let duration = (this.props.reward.tokenTime || (new Date()).getTime() / 1000) - this.props.reward.startTime;
+      tweetMsg = tweetMsg.replace(/{duration}/ig, renderTimespan(duration));
+
+      let hashrate = this.props.reward.nonce / duration;
+      tweetMsg = tweetMsg.replace(/{hashrate}/ig, (Math.round(hashrate * 100) / 100).toString());
+
+      let tweetUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
+      twitterEl = (
+        <div className='share-opt share-tw'>
+          <span className='share-label'>Support this faucet with a </span>
+          <span className='share-link'>
+            <a href={tweetUrl} target='_blank'><i /><span>Tweet</span></a>
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <div className='result-sharing' >
+        {twitterEl}
+      </div>
+    )
+  }
 
   private onClaimRewardClick() {
     this.setState({

@@ -1,5 +1,5 @@
 import { IncomingMessage } from "http";
-import { faucetConfig } from "../common/FaucetConfig";
+import { faucetConfig, IFaucetResultSharingConfig } from "../common/FaucetConfig";
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from "../common/ServiceManager";
 import { ClaimTxStatus, EthWeb3Manager } from "../services/EthWeb3Manager";
@@ -45,6 +45,7 @@ export interface IClientFaucetConfig {
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
   time: number;
+  resultSharing: IFaucetResultSharingConfig;
 }
 
 export interface IClientFaucetStatus {
@@ -162,6 +163,7 @@ export class FaucetWebApi {
       resolveEnsNames: !!faucetConfig.ensResolver,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
       time: Math.floor((new Date()).getTime() / 1000),
+      resultSharing: faucetConfig.resultSharing,
     };
   }
 

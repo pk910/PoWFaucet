@@ -29,12 +29,25 @@ export interface IPoWSessionBalanceUpdate {
 
 export interface IPoWClaimInfo {
   session: string;
+  tokenTime: number;
   startTime: number;
   target: string;
   balance: number;
+  nonce: number;
   token: string;
   claiming?: boolean;
   error?: string;
+}
+
+interface IPoWSessionTokenInfo {
+  id: string;
+  startTime: number;
+  targetAddr: string;
+  preimage: string;
+  balance: string;
+  nonce: number;
+  tokenTime?: number;
+  claimable?: boolean;
 }
 
 interface PoWSessionEvents {
@@ -107,7 +120,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
             // session was closed
             if(err.data && err.data.token) {
               // we've got a claim token
-              let claimInfo = this.getClaimInfo(err.data.token, sessionInfo);
+              let claimInfo = this.getClaimInfo(err.data.token);
               this.storeClaimInfo(claimInfo);
               this.emit("claimable", claimInfo);
             }
@@ -284,14 +297,25 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     return session;
   }
 
-  public getClaimInfo(claimToken: string, sessionInfo?: IPoWSessionInfo): IPoWClaimInfo {
-    if(!sessionInfo)
-    sessionInfo = this.sessionInfo;
+  private getClaimInfo(claimToken: string): IPoWClaimInfo {
+    // parse claim token
+    if(!claimToken || typeof claimToken !== "string")
+      return null;
+    let sigPos = claimToken.indexOf("|");
+    if(sigPos === -1)
+      return null;
+    
+    let claimObj = JSON.parse(atob(claimToken.substring(0, sigPos))) as IPoWSessionTokenInfo;
+    if(!claimObj)
+      return null;
+    
     return {
-      session: sessionInfo.sessionId,
-      startTime: sessionInfo.startTime,
-      target: sessionInfo.targetAddr,
-      balance: sessionInfo.balance,
+      session: claimObj.id,
+      tokenTime: claimObj.tokenTime,
+      startTime: claimObj.startTime,
+      target: claimObj.targetAddr,
+      balance: parseInt(claimObj.balance),
+      nonce: claimObj.nonce,
       token: claimToken
     };
   }

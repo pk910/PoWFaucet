@@ -35,6 +35,7 @@ export interface IPoWSessionRecoveryInfo {
   preimage: string;
   balance: string;
   nonce: number;
+  tokenTime?: number;
   claimable?: boolean;
 }
 
@@ -405,6 +406,7 @@ export class PoWSession {
     let sessionDict: IPoWSessionRecoveryInfo = {
       id: this.sessionId,
       startTime: Math.floor(this.startTime.getTime() / 1000),
+      tokenTime: Math.floor((new Date().getTime()) / 1000),
       targetAddr: this.targetAddr,
       preimage: this.preimage,
       balance: this.balance.toString(),
