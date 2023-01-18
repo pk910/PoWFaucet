@@ -237,8 +237,8 @@ export class EthWeb3Manager {
     return this.walletAddr;
   }
 
-  public getWalletBalance(addr: string): Promise<number> {
-    return this.web3.eth.getBalance(addr).then((res) => parseInt(res));
+  public getWalletBalance(addr: string): Promise<bigint> {
+    return this.web3.eth.getBalance(addr).then((res) => BigInt(res));
   }
 
   public checkIsContract(addr: string): Promise<boolean> {

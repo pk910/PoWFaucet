@@ -276,7 +276,7 @@ export class PoWClient {
       return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (" + addressMarks.join(",") + ")", message, PoWStatusLogLevel.INFO);
     
     if(typeof faucetConfig.claimAddrMaxBalance === "number") {
-      let walletBalance: number;
+      let walletBalance: bigint;
       try {
         walletBalance = await ServiceManager.GetService(EthWeb3Manager).getWalletBalance(targetAddr);
       } catch(ex) {

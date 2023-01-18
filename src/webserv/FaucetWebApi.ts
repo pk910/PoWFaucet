@@ -54,7 +54,7 @@ export interface IClientFaucetStatus {
     balanceRestriction: number;
   };
   refill: {
-    balance: number;
+    balance: string;
     trigger: number;
     amount: number;
     cooldown: number;
@@ -180,7 +180,7 @@ export class FaucetWebApi {
         balanceRestriction: rewardLimiter.getBalanceRestriction(),
       },
       refill: faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract ? {
-        balance: await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract),
+        balance: (await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract)).toString(),
         trigger: faucetConfig.ethRefillContract.triggerBalance,
         amount: faucetConfig.ethRefillContract.requestAmount,
         cooldown: ethWeb3Manager.getFaucetRefillCooldown(),
