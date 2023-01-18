@@ -271,10 +271,17 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
 
       let tweetUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
       twitterEl = (
-        <div className='share-opt share-tw'>
-          <span className='share-label'>Support this faucet with a </span>
-          <span className='share-link'>
-            <a href={tweetUrl} target='_blank'><i /><span>Tweet</span></a>
+        <div className='sh-opt sh-tw'>
+          <span className='sh-label'>Support this faucet with a </span>
+          <span className='sh-link'>
+            <a href='#' target='_blank' data-url={tweetUrl} onClick={function(evt) {
+              let a = document.createElement('a');
+              a.target = '_blank';
+              a.href = tweetUrl;
+              a.click();
+
+              evt.preventDefault();
+            }}><i /><span>Tweet</span></a>
           </span>
         </div>
       );

@@ -323,4 +323,4 @@ buildSeoMeta:
   keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow"
 
 resultSharing:
-  twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s)"
+  twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s) #goerli #faucet"
