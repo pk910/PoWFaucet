@@ -1,4 +1,3 @@
-import { IPoWMinerStats, PoWMiner } from '../common/PoWMiner';
 import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import React from 'react';
 import { Button, Modal, Spinner } from 'react-bootstrap';
@@ -6,7 +5,6 @@ import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTimespan } from '../utils/DateUtils';
 import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
-import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { IPoWStatusDialogProps } from './PoWStatusDialog';
 import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
 import { PoWTime } from 'common/PoWTime';
@@ -255,43 +253,68 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
 	}
 
   private renderResultSharing(): React.ReactElement<IPoWClaimDialogProps> {
-    let twitterEl: React.ReactElement = null;
+    let shareEls: React.ReactElement[] = [];
 
     if(this.props.faucetConfig.resultSharing?.twitter) {
-      let tweetMsg = this.props.faucetConfig.resultSharing.twitter;
-      // Boom! Just got {amount} ETH from {url} (Mining for {duration} with {hashrate} H/s)
-      tweetMsg = tweetMsg.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 100) / 100).toString());
-      tweetMsg = tweetMsg.replace(/{url}/ig, location.href);
-
-      let duration = (this.props.reward.tokenTime || (new Date()).getTime() / 1000) - this.props.reward.startTime;
-      tweetMsg = tweetMsg.replace(/{duration}/ig, renderTimespan(duration));
-
-      let hashrate = this.props.reward.nonce / duration;
-      tweetMsg = tweetMsg.replace(/{hashrate}/ig, (Math.round(hashrate * 100) / 100).toString());
-
+      let tweetMsg = this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.twitter);
       let tweetUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
-      twitterEl = (
-        <div className='sh-opt sh-tw'>
-          <span className='sh-label'>Support this faucet with a </span>
-          <span className='sh-link'>
-            <a href='#' target='_blank' data-url={tweetUrl} onClick={function(evt) {
-              let a = document.createElement('a');
-              a.target = '_blank';
-              a.href = tweetUrl;
-              a.click();
+      shareEls.push(
+        <span className='sh-link sh-tw'>
+          <a href='#' target='_blank' data-url={tweetUrl} onClick={function(evt) {
+            let a = document.createElement('a');
+            a.target = '_blank';
+            a.href = tweetUrl;
+            a.click();
 
+            evt.preventDefault();
+          }}><i /><span>Tweet</span></a>
+        </span>
+      );
+    }
+    if(this.props.faucetConfig.resultSharing?.mastodon) {
+      let tweetMsg = this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.mastodon);
+
+      let tweetUrl = "/share?text=" + encodeURIComponent(tweetMsg);
+      shareEls.push(
+        <span className='sh-link sh-md'>
+          <a href={'https://mastodon.social' + tweetUrl} target='_blank' data-url={tweetUrl} onClick={function(evt) {
+
+            var mastodonUrl = evt.currentTarget.getAttribute("data-instance");
+            if(!mastodonUrl)
+              mastodonUrl = prompt("Please enter the URL of the mastodon instance you'd like to share to:", "https://mastodon.social");
+            if(mastodonUrl) {
+              evt.currentTarget.setAttribute("href", mastodonUrl.replace(/\/$/, "") + tweetUrl);
+              evt.currentTarget.setAttribute("data-instance", mastodonUrl);
+            }
+            else
               evt.preventDefault();
-            }}><i /><span>Tweet</span></a>
-          </span>
-        </div>
+          }}><i /><span>Post</span></a>
+        </span>
       );
     }
 
     return (
-      <div className='result-sharing' >
-        {twitterEl}
+      <div className='result-sharing'>
+        <div className='sh-opt'>
+          <span className='sh-label'>Support this faucet with a </span>
+          {shareEls}
+        </div>
       </div>
     )
+  }
+
+  private replaceShareMessagePlaceholders(message: string): string {
+    // Boom! Just got {amount} ETH from {url} (Mining for {duration} with {hashrate} H/s)
+    message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 100) / 100).toString());
+    message = message.replace(/{url}/ig, location.href);
+
+    let duration = (this.props.reward.tokenTime || (new Date()).getTime() / 1000) - this.props.reward.startTime;
+    message = message.replace(/{duration}/ig, renderTimespan(duration));
+
+    let hashrate = this.props.reward.nonce / duration;
+    message = message.replace(/{hashrate}/ig, (Math.round(hashrate * 100) / 100).toString());
+
+    return message;
   }
 
   private onClaimRewardClick() {

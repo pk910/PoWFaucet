@@ -324,3 +324,4 @@ buildSeoMeta:
 
 resultSharing:
   twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s) #goerli #faucet"
+  mastodon: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s)"
