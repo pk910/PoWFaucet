@@ -341,6 +341,10 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       if(this.captchaControl) {
         this.captchaControl.resetToken();
       }
+      if(err.code === "INVALID_CLAIM") {
+        stateChange.claimStatus = PoWClaimStatus.FAILED;
+        stateChange.txError = err.message;
+      }
       this.setState(stateChange);
 
       if(this.claimConnKeeper) {
