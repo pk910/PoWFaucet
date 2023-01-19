@@ -138,7 +138,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
           title: "Claim expired",
           body: (
             <div className='altert alert-danger'>
-              Sorry, your reward ({Math.round(weiToEth(this.props.reward.balance) * 100) / 100} {this.props.faucetConfig.faucetCoinSymbol}) has not been claimed in time.
+              Sorry, your reward ({Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}) has not been claimed in time.
             </div>
           ),
           closeButton: {
@@ -187,7 +187,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 Claimable Reward:
               </div>
               <div className='col'>
-                {Math.round(weiToEth(this.props.reward.balance) * 100) / 100} {this.props.faucetConfig.faucetCoinSymbol}
+                {Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}
               </div>
             </div>
             <div className='row'>
@@ -305,7 +305,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
 
   private replaceShareMessagePlaceholders(message: string): string {
     // Boom! Just got {amount} ETH from {url} (Mining for {duration} with {hashrate} H/s)
-    message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 100) / 100).toString());
+    message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000).toString());
     message = message.replace(/{url}/ig, location.href);
 
     let duration = (this.props.reward.tokenTime || (new Date()).getTime() / 1000) - this.props.reward.startTime;
