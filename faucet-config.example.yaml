@@ -251,6 +251,9 @@ lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
 # empty faucet error message / false to disable the error
 noFundsError: "Sorry, the faucet is out of funds :("
 
+# RPC unreachable error message / true to show the generic message / false to disable the error
+rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
+
 # prevent creation of new sessions (used for maintenance)
 #denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
 

@@ -88,6 +88,7 @@ export interface IFaucetConfig {
   lowFundsBalance: number; // minimum balance to show the low funds warning
   lowFundsWarning: string | boolean; // low faucet balance warning message / true to show the generic message / false to disable the warning
   noFundsError: string | boolean; // empty faucet error message / true to show the generic message / false to disable the error
+  rpcConnectionError: string | boolean; // RPC unreachable error message / true to show the generic message / false to disable the error
   denyNewSessions: string | boolean; // prevent creation of new sessions (used for maintenance)
 
   ethRpcHost: string; // ETH execution layer RPC host
@@ -235,6 +236,7 @@ let defaultConfig: IFaucetConfig = {
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,
   noFundsError: true,
+  rpcConnectionError: true,
   denyNewSessions: false,
   ethRpcHost: "http://127.0.0.1:8545/",
   ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
