@@ -16,7 +16,7 @@ Goerli Testnet: [https://goerli-faucet.pk910.de](https://goerli-faucet.pk910.de)
 
 Sepolia Testnet: [https://sepolia-faucet.pk910.de](https://sepolia-faucet.pk910.de)
 
-Shandong Testnet: [https://shandong-faucet.pk910.de](https://shandong-faucet.pk910.de)
+Zhejiang Testnet: [https://zhejiang-faucet.pk910.de](https://zhejiang-faucet.pk910.de)
 
 # Run Yourself
 
