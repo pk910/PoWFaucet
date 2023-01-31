@@ -360,12 +360,14 @@ export class EthWeb3Manager {
       claimTx.failReason = "Network RPC is currently unreachable.";
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
+      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
       return;
     }
     if(!this.walletState.ready || this.walletState.balance - BigInt(faucetConfig.spareFundsAmount) < claimTx.amount) {
       claimTx.failReason = "Faucet wallet is out of funds.";
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
+      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
       return;
     }
 
