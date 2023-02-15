@@ -507,7 +507,9 @@ export class EthWeb3Manager {
 
   private async refillWallet(): Promise<[string, Promise<TransactionReceipt>]> {
     let refillContractAbi = JSON.parse(faucetConfig.ethRefillContract.abi);
-    let refillContract = new this.web3.eth.Contract(refillContractAbi, faucetConfig.ethRefillContract.contract);
+    let refillContract = new this.web3.eth.Contract(refillContractAbi, faucetConfig.ethRefillContract.contract, {
+      from: this.walletAddr,
+    });
     let refillAmount = faucetConfig.ethRefillContract.requestAmount || 0;
     let refillAllowance: number = null;
 
