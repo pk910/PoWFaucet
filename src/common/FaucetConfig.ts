@@ -105,7 +105,9 @@ export interface IFaucetConfig {
     contract: string; // vault contract address
     abi: string; // vault contract abi
     allowanceFn: string; // vault contract getAllowance function name
+    allowanceFnArgs: string[]; // vault contract getAllowance function args
     withdrawFn: string; // vault contract withdraw function name
+    withdrawFnArgs: string[]; // vault contract withdraw function args
     withdrawGasLimit: number; // gas limit for withdraw transaction (in wei)
     checkContractBalance: boolean | string; // check balance of contract before withdrawing
     contractDustBalance: number; // don't request funds if contract balance is lower than this

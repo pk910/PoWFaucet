@@ -508,13 +508,27 @@ export class EthWeb3Manager {
   private async refillWallet(): Promise<[string, Promise<TransactionReceipt>]> {
     let refillContractAbi = JSON.parse(faucetConfig.ethRefillContract.abi);
     let refillContract = new this.web3.eth.Contract(refillContractAbi, faucetConfig.ethRefillContract.contract);
-
     let refillAmount = faucetConfig.ethRefillContract.requestAmount || 0;
     let refillAllowance: number = null;
 
+    let getCallArgs = (args) => {
+      return args.map((arg) => {
+        switch(arg) {
+          case "{walletAddr}":
+            arg = this.walletAddr;
+            break;
+          case "{amount}":
+            arg = BigInt(refillAmount);
+            break;
+        }
+        return arg;
+      })
+    };
+
     if(faucetConfig.ethRefillContract.allowanceFn) {
       // check allowance
-      refillAllowance = await refillContract.methods[faucetConfig.ethRefillContract.allowanceFn](this.walletAddr).call();
+      let callArgs = getCallArgs(faucetConfig.ethRefillContract.allowanceFnArgs || ["{walletAddr}"]);
+      refillAllowance = await refillContract.methods[faucetConfig.ethRefillContract.allowanceFn].apply(this, callArgs).call();
       if(refillAllowance == 0)
         throw "no withdrawable funds from refill contract";
       if(refillAmount > refillAllowance)
@@ -530,6 +544,7 @@ export class EthWeb3Manager {
         refillAmount = contractBalance;
     }
 
+    let callArgs = getCallArgs(faucetConfig.ethRefillContract.withdrawFnArgs || ["{amount}"]);
     var rawTx = {
       nonce: this.walletState.nonce,
       gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit || faucetConfig.ethTxGasLimit,
@@ -538,7 +553,7 @@ export class EthWeb3Manager {
       from: this.walletAddr,
       to: faucetConfig.ethRefillContract.contract,
       value: 0,
-      data: refillContract.methods[faucetConfig.ethRefillContract.withdrawFn](BigInt(refillAmount)).encodeABI()
+      data: refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI()
     };
     var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
     tx = tx.sign(this.walletKey);
