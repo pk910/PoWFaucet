@@ -1,15 +1,15 @@
 import { IncomingMessage } from "http";
-import { faucetConfig } from "../common/FaucetConfig";
+import { faucetConfig, IFaucetResultSharingConfig } from "../common/FaucetConfig";
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from "../common/ServiceManager";
 import { ClaimTxStatus, EthWeb3Manager } from "../services/EthWeb3Manager";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
 import { IIPInfo } from "../services/IPInfoResolver";
 import { PoWRewardLimiter } from "../services/PoWRewardLimiter";
+import { getHashedSessionId } from "../utils/HashedInfo";
 import { PoWClient } from "../websock/PoWClient";
 import { PoWSession, PoWSessionStatus } from "../websock/PoWSession";
 import { FaucetHttpResponse } from "./FaucetWebServer";
-import * as crypto from "crypto";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -45,16 +45,17 @@ export interface IClientFaucetConfig {
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
   time: number;
+  resultSharing: IFaucetResultSharingConfig;
 }
 
 export interface IClientFaucetStatus {
   status: {
-    walletBalance: number;
-    unclaimedBalance: number;
+    walletBalance: string;
+    unclaimedBalance: string;
     balanceRestriction: number;
   };
   refill: {
-    balance: number;
+    balance: string;
     trigger: number;
     amount: number;
     cooldown: number;
@@ -66,7 +67,7 @@ export interface IClientFaucetStatus {
     target: string;
     ip: string;
     ipInfo: IIPInfo;
-    balance: number;
+    balance: string;
     nonce: number;
     hashrate: number;
     status: PoWSessionStatus;
@@ -78,33 +79,32 @@ export interface IClientFaucetStatus {
     time: number;
     session: string;
     target: string;
-    amount: number;
+    amount: string;
     status: ClaimTxStatus;
     error: string;
     nonce: number;
   }[];
 }
 
+const FAUCETSTATUS_CACHE_TIME = 10;
+
 export class FaucetWebApi {
+  private cachedFaucetStatus: {time: number, data: IClientFaucetStatus};
+  private faucetStatusPromise: Promise<IClientFaucetStatus>;
 
-  public onApiRequest(req: IncomingMessage): Promise<any> {
-    return Promise.resolve().then(async () => {
-      let apiUrl = this.parseApiUrl(req.url);
-      if(!apiUrl || apiUrl.path.length === 0)
-        return new FaucetHttpResponse(404, "Not Found");
-
-      let res: any | Promise<any> = null;
-      switch(apiUrl.path[0].toLowerCase()) {
-        case "getMaxReward".toLowerCase(): 
-          return this.onGetMaxReward();
-        case "getFaucetConfig".toLowerCase(): 
-          return this.onGetFaucetConfig(apiUrl.query['cliver'] as string);
-        case "getFaucetStatus".toLowerCase(): 
-          return await this.onGetFaucetStatus((req.headers['x-forwarded-for'] as string || req.socket.remoteAddress).split(", ")[0]);
-      }
-
+  public async onApiRequest(req: IncomingMessage): Promise<any> {
+    let apiUrl = this.parseApiUrl(req.url);
+    if (!apiUrl || apiUrl.path.length === 0)
       return new FaucetHttpResponse(404, "Not Found");
-    });
+    switch (apiUrl.path[0].toLowerCase()) {
+      case "getMaxReward".toLowerCase():
+        return this.onGetMaxReward();
+      case "getFaucetConfig".toLowerCase():
+        return this.onGetFaucetConfig(apiUrl.query['cliver'] as string);
+      case "getFaucetStatus".toLowerCase():
+        return await this.onGetFaucetStatus((req.headers['x-forwarded-for'] as string || req.socket.remoteAddress).split(", ")[0]);
+    }
+    return new FaucetHttpResponse(404, "Not Found");
   }
 
   private parseApiUrl(url: string): IFaucetApiUrl {
@@ -163,6 +163,7 @@ export class FaucetWebApi {
       resolveEnsNames: !!faucetConfig.ensResolver,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
       time: Math.floor((new Date()).getTime() / 1000),
+      resultSharing: faucetConfig.resultSharing,
     };
   }
 
@@ -170,67 +171,18 @@ export class FaucetWebApi {
     return this.getFaucetConfig(null, clientVersion);
   }
 
-  private getHashedIp(remoteAddr: string) {
-    let ipMatch: RegExpExecArray;
-    let hashParts: string[] = [];
-    let hashGlue: string;
-    let getHash = (input: string, len?: number) => {
-      let hash = crypto.createHash("sha256");
-      hash.update(faucetConfig.faucetSecret + "\r\n");
-      hash.update("iphash\r\n");
-      hash.update(input);
-      let hashStr = hash.digest("hex");
-      if(len)
-        hashStr = hashStr.substring(0, len);
-      return hashStr;
-    };
-
-    let hashBase = "";
-    if((ipMatch = /^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/.exec(remoteAddr))) {
-      // IPv4
-      hashGlue = ".";
-
-      for(let i = 0; i < 4; i++) {
-        hashParts.push(getHash(hashBase + ipMatch[i+1], 3));
-        hashBase += (hashBase ? "." : "") + ipMatch[i+1];
-      }
-    }
-    else {
-      // IPv6
-      hashGlue = ":";
-
-      let ipSplit = remoteAddr.split(":");
-      let ipParts: string[] = [];
-      for(let i = 0; i < ipSplit.length; i++) {
-        if(ipSplit[i] === "") {
-          let skipLen = 8 - ipSplit.length + 1;
-          for(let j = 0; j < skipLen; j++)
-            ipParts.push("0");
-          break;
-        }
-        ipParts.push(ipSplit[i]);
-      }
-      for(let i = 0; i < 8; i++) {
-        hashParts.push(ipParts[i] === "0" ? "0" : getHash(hashBase + ipParts[i], 3));
-        hashBase += (hashBase ? "." : "") + ipParts[i];
-      }
-    }
-
-    return hashParts.join(hashGlue);
-  }
-
-  public async getFaucetStatus(): Promise<IClientFaucetStatus> {
+  private async buildFaucetStatus(): Promise<IClientFaucetStatus> {
     let rewardLimiter = ServiceManager.GetService(PoWRewardLimiter);
     let ethWeb3Manager = ServiceManager.GetService(EthWeb3Manager);
 
     let statusRsp: IClientFaucetStatus = {
       status: {
-        walletBalance: ethWeb3Manager.getFaucetBalance(),
-        unclaimedBalance: rewardLimiter.getUnclaimedBalance(),
+        walletBalance: ethWeb3Manager.getFaucetBalance()?.toString(),
+        unclaimedBalance: rewardLimiter.getUnclaimedBalance().toString(),
         balanceRestriction: rewardLimiter.getBalanceRestriction(),
       },
       refill: faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract ? {
-        balance: await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract),
+        balance: (await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract)).toString(),
         trigger: faucetConfig.ethRefillContract.triggerBalance,
         amount: faucetConfig.ethRefillContract.requestAmount,
         cooldown: ethWeb3Manager.getFaucetRefillCooldown(),
@@ -241,10 +193,6 @@ export class FaucetWebApi {
 
     let sessions = PoWSession.getAllSessions();
     statusRsp.sessions = sessions.map((session) => {
-      let sessionIdHash = crypto.createHash("sha256");
-      sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
-      sessionIdHash.update(session.getSessionId());
-
       let activeClient = session.getActiveClient();
       let clientVersion = null;
       if(activeClient) {
@@ -252,13 +200,13 @@ export class FaucetWebApi {
       }
 
       return {
-        id: sessionIdHash.digest("hex").substring(0, 20),
+        id: session.getSessionId(true),
         start: Math.floor(session.getStartTime().getTime() / 1000),
         idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
         target: session.getTargetAddr(),
-        ip: this.getHashedIp(session.getLastRemoteIp()),
+        ip: session.getLastRemoteIp(true),
         ipInfo: session.getLastIpInfo(),
-        balance: session.getBalance(),
+        balance: session.getBalance().toString(),
         nonce: session.getLastNonce(),
         hashrate: session.getReportedHashRate(),
         status: session.getSessionStatus(),
@@ -270,15 +218,11 @@ export class FaucetWebApi {
 
     let claims = ethWeb3Manager.getTransactionQueue();
     statusRsp.claims = claims.map((claimTx) => {
-      let sessionIdHash = crypto.createHash("sha256");
-      sessionIdHash.update(faucetConfig.faucetSecret + "\r\n");
-      sessionIdHash.update(claimTx.session);
-
       return {
         time: Math.floor(claimTx.time.getTime() / 1000),
-        session: sessionIdHash.digest("hex").substring(0, 20),
+        session: getHashedSessionId(claimTx.session, faucetConfig.faucetSecret),
         target: claimTx.target,
-        amount: claimTx.amount,
+        amount: claimTx.amount.toString(),
         status: claimTx.status,
         error: claimTx.failReason,
         nonce: claimTx.nonce || null,
@@ -286,6 +230,22 @@ export class FaucetWebApi {
     });
 
     return statusRsp;
+  }
+
+  public getFaucetStatus(): Promise<IClientFaucetStatus> {
+    if(this.faucetStatusPromise)
+      return this.faucetStatusPromise;
+    
+    let now = Math.floor((new Date()).getTime() / 1000);
+    if(this.cachedFaucetStatus && now - this.cachedFaucetStatus.time <= FAUCETSTATUS_CACHE_TIME)
+      return Promise.resolve(this.cachedFaucetStatus.data);
+    
+    this.faucetStatusPromise = this.buildFaucetStatus();
+    this.faucetStatusPromise.then((data) => {
+      this.cachedFaucetStatus = {time: now, data: data};
+      this.faucetStatusPromise = null;
+    });
+    return this.faucetStatusPromise;
   }
 
   private onGetFaucetStatus(remoteIp: string): Promise<IClientFaucetStatus> {

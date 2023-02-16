@@ -73,7 +73,7 @@ export class FaucetStore {
         clearTimeout(this.saveTimer);
         this.saveTimer = null;
       }
-      fs.writeFileSync(faucetConfig.faucetStore, JSON.stringify(this.store, null, 2));
+      fs.writeFileSync(faucetConfig.faucetStore, JSON.stringify(this.store));
     }
     else {
       this.saveTimer = setTimeout(() => {

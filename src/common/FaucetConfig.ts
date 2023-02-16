@@ -88,11 +88,12 @@ export interface IFaucetConfig {
   lowFundsBalance: number; // minimum balance to show the low funds warning
   lowFundsWarning: string | boolean; // low faucet balance warning message / true to show the generic message / false to disable the warning
   noFundsError: string | boolean; // empty faucet error message / true to show the generic message / false to disable the error
+  rpcConnectionError: string | boolean; // RPC unreachable error message / true to show the generic message / false to disable the error
   denyNewSessions: string | boolean; // prevent creation of new sessions (used for maintenance)
 
   ethRpcHost: string; // ETH execution layer RPC host
   ethWalletKey: string; // faucet wallet private key
-  ethChainId: number; // ETH chain id
+  ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
@@ -104,7 +105,9 @@ export interface IFaucetConfig {
     contract: string; // vault contract address
     abi: string; // vault contract abi
     allowanceFn: string; // vault contract getAllowance function name
+    allowanceFnArgs: string[]; // vault contract getAllowance function args
     withdrawFn: string; // vault contract withdraw function name
+    withdrawFnArgs: string[]; // vault contract withdraw function args
     withdrawGasLimit: number; // gas limit for withdraw transaction (in wei)
     checkContractBalance: boolean | string; // check balance of contract before withdrawing
     contractDustBalance: number; // don't request funds if contract balance is lower than this
@@ -116,6 +119,7 @@ export interface IFaucetConfig {
 
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
+  resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
 }
 
 export interface IFaucetCaptchaConfig {
@@ -138,6 +142,10 @@ export interface IFaucetEnsResolverConfig {
 
 export interface IFaucetStatsConfig {
   logfile: string;
+}
+
+export interface IFaucetResultSharingConfig {
+  [provider: string]: string;
 }
 
 let cliArgs = (function() {
@@ -230,10 +238,11 @@ let defaultConfig: IFaucetConfig = {
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,
   noFundsError: true,
+  rpcConnectionError: true,
   denyNewSessions: false,
   ethRpcHost: "http://127.0.0.1:8545/",
   ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
-  ethChainId: 1337802,
+  ethChainId: null,
   ethTxGasLimit: 21000,
   ethTxMaxFee: 1800000000,
   ethTxPrioFee: 800000000,
@@ -243,6 +252,7 @@ let defaultConfig: IFaucetConfig = {
   ethRefillContract: null,
   ensResolver: null,
   faucetStats: null,
+  resultSharing: null,
 };
 
 export let faucetConfig: IFaucetConfig = null;

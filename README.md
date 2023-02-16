@@ -16,7 +16,7 @@ Goerli Testnet: [https://goerli-faucet.pk910.de](https://goerli-faucet.pk910.de)
 
 Sepolia Testnet: [https://sepolia-faucet.pk910.de](https://sepolia-faucet.pk910.de)
 
-Shandong Testnet: [https://shandong-faucet.pk910.de](https://shandong-faucet.pk910.de)
+Zhejiang Testnet: [https://zhejiang-faucet.pk910.de](https://zhejiang-faucet.pk910.de)
 
 # Run Yourself
 
@@ -52,7 +52,7 @@ faucetLogFile: "/config/faucet-events.log"
 
 start the container: (change `/gome/powfaucet` to your datadir)
 
-`docker run -d --restart unless-stopped --name=powfaucet -v /home/powfacuet:/config -p 8080:8080 -it pk910/powfacuet:latest --config=/config/faucet-config.yaml`
+`docker run -d --restart unless-stopped --name=powfaucet -v /home/powfaucet:/config -p 8080:8080 -it pk910/powfaucet:latest --config=/config/faucet-config.yaml`
 
 read logs:
 

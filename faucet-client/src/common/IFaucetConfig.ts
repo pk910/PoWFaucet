@@ -20,6 +20,9 @@ export interface IFaucetConfig {
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
   time: number;
+  resultSharing: {
+    [provider: string]: string;
+  };
 }
 
 export interface IPoWParams {

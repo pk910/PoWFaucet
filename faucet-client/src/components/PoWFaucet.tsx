@@ -160,7 +160,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       statusMessage: null,
       showRestoreSessionDialog: false,
       showClaimRewardDialog: null,
-      showFaucetStatus: false,
+      showFaucetStatus: !!(location.hash && location.hash.match(/faucet\-status/)),
       notifications: [],
 		};
   }
