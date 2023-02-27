@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import { faucetConfig } from '../common/FaucetConfig';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { ServiceManager } from '../common/ServiceManager';
+import { IPoWSessionStoreData } from '../websock/PoWSession';
 import { IQueuedClaimTx } from './EthWeb3Manager';
 import { IIPInfo } from './IPInfoResolver';
 
@@ -20,6 +21,7 @@ interface IFaucetStore {
   addressMarks: {[sessionId: string]: IFaucetStoreMarks<AddressMark>};
   ipInfoCache: {[ip: string]: IFaucetStoreEntry<IIPInfo>};
   claimTxQueue: IQueuedClaimTx[];
+  sessionStore?: IPoWSessionStoreData[];
 }
 
 interface IFaucetStoreMarks<T> {
@@ -53,6 +55,7 @@ export class FaucetStore {
         addressMarks: {},
         ipInfoCache: {},
         claimTxQueue: [],
+        sessionStore: null,
       };
     }
     if(!this.store.ipInfoCache)
@@ -243,6 +246,16 @@ export class FaucetStore {
       this.dirty = true;
       this.saveStore();
     }
+  }
+
+  public getSessionStore(): IPoWSessionStoreData[] {
+    return this.store.sessionStore;
+  }
+
+  public setSessionStore(sessionStore: IPoWSessionStoreData[]) {
+    this.store.sessionStore = sessionStore;
+    this.dirty = true;
+    this.saveStore();
   }
 
 }
