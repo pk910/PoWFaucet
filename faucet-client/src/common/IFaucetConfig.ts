@@ -21,6 +21,9 @@ export interface IFaucetConfig {
   ethTxExplorerLink: string;
   time: number;
   resultSharing: {
+    preHtml?: string;
+    postHtml?: string;
+    caption?: string;
     [provider: string]: string;
   };
 }

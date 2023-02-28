@@ -326,5 +326,16 @@ buildSeoMeta:
   keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow"
 
 resultSharing:
+  preHtml: |
+    <div class="sh-opt">
+      Did you like the faucet? Give that project a 
+      <iframe src="https://ghbtns.com/github-btn.html?user=pk910&repo=PoWFaucet&type=star&count=true" frameborder="0" scrolling="0" width="150" height="20" title="GitHub"></iframe>
+    </div>
+  #postHtml: |
+  #  <div class="sh-opt">
+  #  </div>
+  caption: "Or support this faucet by sharing your result with a "
+
+  # result sharing buttons
   twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s) #goerli #faucet"
   mastodon: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s)"
