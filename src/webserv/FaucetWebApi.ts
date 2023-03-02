@@ -46,6 +46,11 @@ export interface IClientFaucetConfig {
   ethTxExplorerLink: string;
   time: number;
   resultSharing: IFaucetResultSharingConfig;
+  passportBoost: {
+    refreshTimeout: number;
+    stampScoring: {[stamp: string]: number};
+    boostFactor: {[score: number]: number};
+  };
 }
 
 export interface IClientFaucetStatus {
@@ -164,6 +169,11 @@ export class FaucetWebApi {
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
       time: Math.floor((new Date()).getTime() / 1000),
       resultSharing: faucetConfig.resultSharing,
+      passportBoost: faucetConfig.passportBoost ? {
+        refreshTimeout: faucetConfig.passportBoost.refreshCooldown,
+        stampScoring: faucetConfig.passportBoost.stampScoring,
+        boostFactor: faucetConfig.passportBoost.boostFactor,
+      } : null,
     };
   }
 

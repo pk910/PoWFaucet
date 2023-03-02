@@ -120,6 +120,7 @@ export interface IFaucetConfig {
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
   resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
+  passportBoost: IPassportBoostConfig | null; // passport boost options or null to disable
 }
 
 export interface IFaucetCaptchaConfig {
@@ -149,6 +150,13 @@ export interface IFaucetResultSharingConfig {
   postHtml: string;
   caption: string;
   [provider: string]: string;
+}
+
+export interface IPassportBoostConfig {
+  refreshCooldown: number;
+  cacheTime: number;
+  stampScoring: {[stamp: string]: number};
+  boostFactor: {[score: number]: number};
 }
 
 let cliArgs = (function() {
@@ -256,6 +264,7 @@ let defaultConfig: IFaucetConfig = {
   ensResolver: null,
   faucetStats: null,
   resultSharing: null,
+  passportBoost: null,
 };
 
 export let faucetConfig: IFaucetConfig = null;

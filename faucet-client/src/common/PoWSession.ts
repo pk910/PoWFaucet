@@ -21,6 +21,12 @@ export interface IPoWSessionInfo {
   noncePos: number;
 }
 
+export interface IPoWSessionBoostInfo {
+  stamps: string[];
+  score: number;
+  factor: number;
+}
+
 export interface IPoWSessionBalanceUpdate {
   balance: number;
   recovery: string;
@@ -52,6 +58,7 @@ interface IPoWSessionTokenInfo {
 
 interface PoWSessionEvents {
   'update': () => void;
+  'update-boost': (boostInfo: IPoWSessionBoostInfo) => void;
   'killed': (killInfo: any) => void;
   'error': (message: string) => void;
   'claimable': (claimInfo: IPoWClaimInfo) => void;
@@ -64,6 +71,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   private shareQueueProcessing: boolean;
   private verifyResultQueue: any[];
   private miner: PoWMiner;
+  private boostInfo: IPoWSessionBoostInfo;
 
   public constructor(options: IPoWSessionOptions) {
     super();
@@ -220,6 +228,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     this.sessionInfo.recovery = balanceUpdate.recovery;
     this.storeSessionStatus();
     this.emit("update");
+  }
+
+  public updateBoostInfo(boostInfo: IPoWSessionBoostInfo) {
+    this.boostInfo = boostInfo;
+    this.emit("update-boost", boostInfo);
+  }
+
+  public getBoostInfo(): IPoWSessionBoostInfo {
+    return this.boostInfo;
   }
 
   public getNonceRange(count: number): number {

@@ -161,6 +161,12 @@ export class PoWRewardLimiter {
     if(restrictedReward < 100)
       shareReward = shareReward * BigInt(Math.floor(restrictedReward * 1000)) / 100000n;
 
+    // apply boost factor
+    let boostInfo = session.getBoostInfo();
+    if(boostInfo) {
+      shareReward = shareReward * BigInt(Math.floor(boostInfo.factor * 100000)) / 100000n
+    }
+
     return shareReward;
   }
 
@@ -175,6 +181,12 @@ export class PoWRewardLimiter {
     let restrictedReward = this.getSessionRestriction(session);
     if(restrictedReward < 100)
       shareReward = shareReward * BigInt(Math.floor(restrictedReward * 1000)) / 100000n;
+
+    // apply boost factor
+    let boostInfo = session.getBoostInfo();
+    if(boostInfo) {
+      shareReward = shareReward * BigInt(Math.floor(boostInfo.factor * 100000)) / 100000n
+    }
 
     return shareReward;
   }

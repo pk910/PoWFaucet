@@ -1,17 +1,22 @@
 import { IPoWMinerStats, PoWMiner } from '../common/PoWMiner';
-import { PoWSession } from '../common/PoWSession';
+import { IPoWSessionBoostInfo, PoWSession } from '../common/PoWSession';
 import React from 'react';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderTimespan } from '../utils/DateUtils';
 import { PoWTime } from '../common/PoWTime';
+import { PoWClient } from 'common/PoWClient';
+import { IPoWStatusDialogProps } from './PoWStatusDialog';
+import { PoWBoostInfo } from './PoWBoostInfo';
 
 export interface IPoWMinerStatusProps {
+  powClient: PoWClient;
   powMiner: PoWMiner;
   powSession: PoWSession;
   powTime: PoWTime;
   faucetConfig: IFaucetConfig;
   stopMinerFn: (force: boolean) => void;
+  setDialog: (dialog: IPoWStatusDialogProps) => void;
 }
 
 export interface IPoWMinerStatusState {
@@ -23,11 +28,14 @@ export interface IPoWMinerStatusState {
   balance: number;
   startTime: number;
   lastShareTime: number;
+  boostInfo: IPoWSessionBoostInfo;
+  showBoostInfoDialog: boolean;
 }
 
 export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IPoWMinerStatusState> {
   private powMinerStatsListener: ((stats: IPoWMinerStats) => void);
   private powSessionUpdateListener: (() => void);
+  private powBoostUpdateListener: ((boostInfo: IPoWSessionBoostInfo) => void);
   private updateTimer: NodeJS.Timer;
   private stoppedMiner: boolean = false;
 
@@ -44,6 +52,8 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       balance: sessionInfo ? sessionInfo.balance : 0,
       startTime: sessionInfo ? sessionInfo.startTime : 0,
       lastShareTime: 0,
+      boostInfo: this.props.powSession.getBoostInfo(),
+      showBoostInfoDialog: false,
 		};
   }
 
@@ -76,6 +86,17 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       };
       this.props.powSession.on("update", this.powSessionUpdateListener);
     }
+    if(!this.powBoostUpdateListener) {
+      this.powBoostUpdateListener = (boostInfo: IPoWSessionBoostInfo) => {
+        this.setState({
+          boostInfo: boostInfo,
+        });
+        if(this.state.showBoostInfoDialog) {
+          this.showBoostInfoDialog();
+        }
+      };
+      this.props.powSession.on("update-boost", this.powBoostUpdateListener);
+    }
 
     if(!this.updateTimer) {
       this.setUpdateTimer();
@@ -90,6 +111,10 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
     if(this.powSessionUpdateListener) {
       this.props.powSession.off("update", this.powSessionUpdateListener);
       this.powSessionUpdateListener = null;
+    }
+    if(this.powBoostUpdateListener) {
+      this.props.powSession.off("update-boost", this.powBoostUpdateListener);
+      this.powBoostUpdateListener = null;
     }
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);
@@ -204,7 +229,23 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='status-value'>{Math.round(weiToEth(this.state.balance / (miningTime / 3600)) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}/h</div>
           </div>
         </div>
-
+        {this.props.faucetConfig.passportBoost ?
+          <div className='row pow-status-other'>
+            <div className='col-6'>
+              <div className='status-title'>Reward Boost:</div>
+            </div>
+            <div className='col-3'>
+              <div className='status-value'>
+                {this.state.boostInfo ? 
+                  <span className='boost-value'>+ {Math.round((this.state.boostInfo.factor - 1) * 100)}%</span>
+                : <span className='boost-none'>+ 0%</span>}
+              </div>
+            </div>
+            <div className='col-3 pow-passport-controls'>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => this.showBoostInfoDialog()}>Boost</button>
+            </div>
+          </div>
+        : null}
       </div>
     );
 	}
@@ -215,6 +256,43 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       workerCountInput: value,
     });
     this.props.powMiner.setWorkerCount(value);
+  }
+
+  private showBoostInfoDialog() {
+    let sessionInfo = this.props.powSession.getSessionInfo();
+    this.setState({
+      showBoostInfoDialog: true,
+    });
+    this.props.setDialog({
+      title: "Boost Info",
+      body: (
+        <PoWBoostInfo 
+          refreshFn={() => this.refreshPassport()} 
+          targetAddr={sessionInfo.targetAddr}
+          boostInfo={this.state.boostInfo}
+          faucetConfig={this.props.faucetConfig}
+          powTime={this.props.powTime}
+        />
+      ),
+      size: "lg",
+      closeFn: () => {
+        this.setState({
+          showBoostInfoDialog: false,
+        });
+      },
+    })
+  }
+
+  private refreshPassport(): Promise<any> {
+    return this.props.powClient.sendRequest("refreshBoost").then((res) => {
+      if(res.boostInfo) {
+        this.props.powSession.updateBoostInfo(res.boostInfo);
+      }
+      if(this.state.showBoostInfoDialog) {
+        this.showBoostInfoDialog();
+      }
+      return res;
+    });
   }
 
 }

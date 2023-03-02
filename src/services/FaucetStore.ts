@@ -5,6 +5,7 @@ import { ServiceManager } from '../common/ServiceManager';
 import { IPoWSessionStoreData } from '../websock/PoWSession';
 import { IQueuedClaimTx } from './EthWeb3Manager';
 import { IIPInfo } from './IPInfoResolver';
+import { IPassportInfo } from './PassportVerifier';
 
 export enum SessionMark {
   KILLED = "killed",
@@ -20,6 +21,7 @@ interface IFaucetStore {
   sessionMarks: {[sessionId: string]: IFaucetStoreMarks<SessionMark>};
   addressMarks: {[sessionId: string]: IFaucetStoreMarks<AddressMark>};
   ipInfoCache: {[ip: string]: IFaucetStoreEntry<IIPInfo>};
+  passportCache: {[addr: string]: IFaucetStoreEntry<IPassportInfo>};
   claimTxQueue: IQueuedClaimTx[];
   sessionStore?: IPoWSessionStoreData[];
 }
@@ -54,12 +56,15 @@ export class FaucetStore {
         sessionMarks: {},
         addressMarks: {},
         ipInfoCache: {},
+        passportCache: {},
         claimTxQueue: [],
         sessionStore: null,
       };
     }
     if(!this.store.ipInfoCache)
       this.store.ipInfoCache = {};
+    if(!this.store.passportCache)
+      this.store.passportCache = {};
     if(!this.store.claimTxQueue)
       this.store.claimTxQueue = [];
 
@@ -213,6 +218,28 @@ export class FaucetStore {
     let now = Math.floor((new Date()).getTime() / 1000);
 
     let ipinfoEntry = this.store.ipInfoCache[ip] = {
+      m: info,
+      t: now
+    };
+
+    this.dirty = true;
+    this.saveStore();
+  }
+
+  public getPassportInfo(addr: string): IPassportInfo {
+    addr = addr.toLowerCase();
+    let passportEntry = this.store.passportCache[addr];
+    
+    if(!passportEntry)
+      return null;
+    return passportEntry.m;
+  }
+
+  public setPassportInfo(addr: string, info: IPassportInfo) {
+    addr = addr.toLowerCase();
+    let now = Math.floor((new Date()).getTime() / 1000);
+
+    let passportEntry = this.store.passportCache[addr] = {
       m: info,
       t: now
     };

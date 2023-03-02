@@ -339,3 +339,75 @@ resultSharing:
   # result sharing buttons
   twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s) #goerli #faucet"
   mastodon: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s)"
+
+
+# allow reward boosting by gitcoin passport verification
+passportBoost:
+  refreshCooldown: 10
+  cacheTime: 86400
+  boostFactor:
+    1: 1.1 # x1.1 if score >= 1
+    5: 1.5 # x1.5 if score >= 5
+    10: 2 # x2 if score >= 10
+  stampScoring:
+    "Google": 1
+    "Twitter": 1
+    "Ens": 2
+    "Poh": 4
+    "POAP": 1
+    "Facebook": 1
+    "FacebookFriends": 1
+    "FacebookProfilePicture": 1
+    "Brightid": 10
+    "Github": 1
+    "FiveOrMoreGithubRepos": 1
+    "TenOrMoreGithubFollowers": 2
+    "FiftyOrMoreGithubFollowers": 4
+    "ForkedGithubRepoProvider": 1
+    "StarredGithubRepoProvider": 1
+    "Linkedin": 1
+    "Discord": 1
+    "TwitterTweetGT10": 1
+    "TwitterFollowerGT100": 1
+    "TwitterFollowerGT500": 2
+    "TwitterFollowerGTE1000": 3
+    "TwitterFollowerGT5000": 5
+    "SelfStakingBronze": 1
+    "SelfStakingSilver": 1
+    "SelfStakingGold": 1
+    "CommunityStakingBronze": 1
+    "CommunityStakingSilver": 1
+    "CommunityStakingGold": 1
+    "ClearTextSimple": 1
+    "ClearTextTwitter": 1
+    "ClearTextGithubOrg": 1
+    "SnapshotProposalsProvider": 1
+    "SnapshotVotesProvider": 1
+    "EthGasProvider": 1
+    "FirstEthTxnProvider": 1
+    "EthGTEOneTxnProvider": 1
+    "GitcoinContributorStatistics#numGrantsContributeToGte#1": 1
+    "GitcoinContributorStatistics#numGrantsContributeToGte#10": 1
+    "GitcoinContributorStatistics#numGrantsContributeToGte#25": 2
+    "GitcoinContributorStatistics#numGrantsContributeToGte#100": 2
+    "GitcoinContributorStatistics#totalContributionAmountGte#10": 1
+    "GitcoinContributorStatistics#totalContributionAmountGte#100": 2
+    "GitcoinContributorStatistics#totalContributionAmountGte#1000": 2
+    "GitcoinContributorStatistics#numRoundsContributedToGte#1": 1
+    "GitcoinContributorStatistics#numGr14ContributionsGte#1": 1
+    "GitcoinGranteeStatistics#numOwnedGrants#1": 1
+    "GitcoinGranteeStatistics#numGrantContributors#10": 1
+    "GitcoinGranteeStatistics#numGrantContributors#25": 1
+    "GitcoinGranteeStatistics#numGrantContributors#100": 2
+    "GitcoinGranteeStatistics#totalContributionAmount#100": 1
+    "GitcoinGranteeStatistics#totalContributionAmount#1000": 2
+    "GitcoinGranteeStatistics#totalContributionAmount#10000": 4
+    "GitcoinGranteeStatistics#numGrantsInEcoAndCauseRound#1": 1
+    "gtcPossessionsGte#100": 2
+    "gtcPossessionsGte#10": 1
+    "ethPossessionsGte#32": 1
+    "ethPossessionsGte#10": 1
+    "ethPossessionsGte#1": 1
+    "NFT": 1
+    "Lens": 1
+    "ZkSync": 1

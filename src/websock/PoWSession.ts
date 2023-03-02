@@ -12,6 +12,7 @@ import { renderDate } from "../utils/DateUtils";
 import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
 import { FaucetStatsLog } from "../services/FaucetStatsLog";
 import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
+import { PassportVerifier } from "../services/PassportVerifier";
 
 
 export enum PoWSessionSlashReason {
@@ -51,6 +52,12 @@ export interface IPoWSessionStoreData {
   status: PoWSessionStatus;
   remoteIp: string;
   remoteIpInfo: IIPInfo;
+}
+
+export interface IPoWSessionBoostInfo {
+  stamps: string[];
+  score: number;
+  factor: number;
 }
 
 export class PoWSession {
@@ -127,6 +134,8 @@ export class PoWSession {
   private lastIpInfo: IIPInfo;
   private missedVerifications: number;
   private pendingVerifications: number;
+  private lastBoostRefresh: number;
+  private boostInfo: IPoWSessionBoostInfo;
 
   // cache
   private hashedRemoteIp: string;
@@ -182,6 +191,7 @@ export class PoWSession {
     );
 
     this.resetSessionTimer();
+    this.refreshBoostInfo();
   }
 
   private timeoutSession() {
@@ -275,6 +285,7 @@ export class PoWSession {
     }
     if(this.sessionStatus === PoWSessionStatus.IDLE) {
       this.resetIdleTimeout();
+      this.refreshBoostInfo();
     }
   }
 
@@ -516,6 +527,41 @@ export class PoWSession {
     sessionHash.update(sessionStr);
 
     return sessionStr + "|" + sessionHash.digest('base64');
+  }
+
+  public getBoostInfo(): IPoWSessionBoostInfo {
+    return this.boostInfo;
+  }
+
+  public async refreshBoostInfo(refresh?: boolean): Promise<IPoWSessionBoostInfo> {
+    if(refresh) {
+      let now = Math.floor((new Date()).getTime() / 1000);
+      if(this.lastBoostRefresh && now - this.lastBoostRefresh < faucetConfig.passportBoost.refreshCooldown) {
+        throw "Passport has been refreshed recently, please retry in a few minutes.";
+      }
+      this.lastBoostRefresh = now;
+    }
+
+    let passportVerifier = ServiceManager.GetService(PassportVerifier);
+    let passport = await passportVerifier.getPassport(this.targetAddr, refresh);
+    let score = passportVerifier.getPassportScore(passport);
+    if(score) {
+      this.boostInfo = {
+        stamps: passport.stamps,
+        score: score.score,
+        factor: score.factor
+      };
+    }
+    else {
+      this.boostInfo = null;
+    }
+    return this.boostInfo;
+  }
+
+  public getBoostRefreshCooldown(): number {
+    let now = Math.floor((new Date()).getTime() / 1000);
+    let cooldownUntil = (this.lastBoostRefresh || 0) + faucetConfig.passportBoost.refreshCooldown;
+    return cooldownUntil > now ? cooldownUntil : 0;
   }
 
 

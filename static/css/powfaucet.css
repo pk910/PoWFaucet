@@ -144,6 +144,14 @@ html, body {
   padding: 0;
 }
 
+.pow-faucet .pow-status .pow-passport-controls button {
+  width: 75px;
+  margin-right: 6px;
+  border-radius: 15px;
+  height: 20px;
+  padding: 0;
+}
+
 .spinner-alert .spinner-text {
   vertical-align: top;
   margin-left: 12px;
@@ -300,6 +308,51 @@ html, body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 216.4 232%27%3E%3Cpath fill=%27%232b90d9%27 d=%27M212 139c-3 16-29 34-58 38-15 2-30 3-46 3-26-2-46-7-46-7v8c4 25 26 27 47 28 21 0 39-6 39-6l1 19s-14 8-41 10c-14 1-32-1-53-6C9 214 1 165 0 116V76c0-50 33-65 33-65C50 3 78 0 108 0h1c29 0 58 3 74 11 0 0 33 15 33 65 0 0 1 37-4 63%27 /%3E%3Cpath fill=%27%23fff%27 d=%27M178 80v61h-25V82c0-13-5-19-15-19-12 0-18 8-18 22v33H96V85c0-14-6-22-17-22s-16 6-16 19v59H39V80c0-12 3-22 9-30 7-7 16-11 26-11 13 0 22 5 28 15l6 10 6-10c6-10 16-15 28-15 11 0 19 4 26 11 6 8 10 18 10 30%27 /%3E%3C/svg%3E");
 }
 
+.pow-boost-info .boost-descr {
+  font-weight: bold;
+}
+
+.pow-boost-info .boost-passport {
+  margin-top: 16px;
+}
+
+.pow-boost-info .passport-factor {
+  margin-left: 16px;
+}
+
+.pow-boost-info .passport-details {
+  margin-top: 16px;
+}
+
+.pow-boost-info .passport-factor-info {
+  display: inline-block;
+  margin-left: 4px;
+}
+
+.pow-boost-info .passport-refresh {
+  margin: 8px 16px;
+}
+
+.pow-boost-info .passport-refresh button {
+  width: 100%;
+}
+
+.pow-boost-info .passport-refresh .alert {
+  background-color: transparent;
+  border-color: transparent;
+  padding: 0;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.pow-boost-info .passport-details .row.details-header > div {
+  padding: 0;
+  font-weight: 600;
+}
+
+.passport-factor-info .header-row > div {
+  white-space: nowrap;
+}
 
 
 /*# sourceMappingURL=powfaucet.css.map*/

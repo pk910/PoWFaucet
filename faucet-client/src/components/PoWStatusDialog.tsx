@@ -4,6 +4,7 @@ import { Button, Modal } from 'react-bootstrap';
 export interface IPoWStatusDialogProps {
   title: string;
   body: ReactElement;
+  size?: string;
   closeButton?: {
     caption: string;
   },
@@ -27,7 +28,7 @@ export class PoWStatusDialog extends React.PureComponent<IPoWStatusDialogProps, 
 
 	public render(): React.ReactElement<IPoWStatusDialogProps> {
     return (
-      <Modal show centered className="pow-captcha-modal" onHide={() => {
+      <Modal show centered className="pow-captcha-modal" size={(this.props.size || undefined) as any} onHide={() => {
         if(this.props.closeFn)
           this.props.closeFn();
       }}>

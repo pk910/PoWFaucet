@@ -213,6 +213,9 @@ export class PoWClient {
       case "watchClaimTx":
         this.onCliWatchClaimTx(message);
         break;
+      case "refreshBoost":
+        this.onCliRefreshBoost(message);
+        break;
       default:
         this.sendMessage("error", {
           code: "INVALID_ACTION",
@@ -308,6 +311,8 @@ export class PoWClient {
       targetAddr: targetAddr,
       recovery: session.getSignedSession(),
     }, reqId);
+
+    this.refreshBoostInfoAndNotify();
   }
 
   private onCliResumeSession(message: any) {
@@ -358,6 +363,8 @@ export class PoWClient {
     this.sendMessage("ok", {
       lastNonce: session.getLastNonce(),
     }, reqId);
+
+    this.refreshBoostInfoAndNotify();
   }
 
   private onCliRecoverSession(message: any) {
@@ -401,6 +408,8 @@ export class PoWClient {
       nonce: sessionInfo.nonce,
     });
     this.sendMessage("ok", null, reqId);
+
+    this.refreshBoostInfoAndNotify();
   }
 
   private onCliFoundShare(message: any) {
@@ -588,6 +597,27 @@ export class PoWClient {
         session: claimTx.session,
         error: claimTx.failReason
       });
+    });
+  }
+
+  private onCliRefreshBoost(message: any) {
+    let reqId = message.id || undefined;
+    if(!this.session)
+      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found");
+    
+    this.session.refreshBoostInfo(true).then((boostInfo) => {
+      this.sendMessage("ok", {
+        boostInfo: boostInfo,
+        cooldown: this.session.getBoostRefreshCooldown(),
+      }, reqId);
+    }, (err) => {
+      this.sendErrorResponse("BOOST_REFRESH_FAILED", "Refresh failed: " + err.toString(), message);
+    });
+  }
+
+  private refreshBoostInfoAndNotify() {
+    this.session.refreshBoostInfo().then((boostInfo) => {
+      this.sendMessage("boostInfo", boostInfo);
     });
   }
 

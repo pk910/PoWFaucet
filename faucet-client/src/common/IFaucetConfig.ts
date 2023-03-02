@@ -26,6 +26,11 @@ export interface IFaucetConfig {
     caption?: string;
     [provider: string]: string;
   };
+  passportBoost?: {
+    refreshTimeout: number;
+    stampScoring: {[stamp: string]: number};
+    boostFactor: {[score: number]: number};
+  };
 }
 
 export interface IPoWParams {
