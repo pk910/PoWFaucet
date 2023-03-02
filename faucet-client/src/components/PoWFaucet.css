@@ -329,6 +329,10 @@ html, body {
   margin-left: 4px;
 }
 
+.pow-boost-info .summary-val {
+  padding-left: 24px;
+}
+
 .pow-boost-info .passport-refresh {
   margin: 8px 16px;
 }

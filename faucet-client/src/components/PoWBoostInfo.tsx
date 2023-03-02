@@ -38,22 +38,22 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
     let stamps = this.props.boostInfo?.stamps || [];
     return (
       <div className="pow-boost-info">
-        <div className="boost-descr">Reward too low? Boost your rewards by fulfilling your <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Gitcoin Passport</a>.</div>
+        <div className="boost-descr">Reward too low? <br/>Boost your rewards by verifying stamps on your <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Gitcoin Passport</a>.</div>
         <div className="boost-passport">
           <div className="passport-summary container">
             <div className="row">
-              <div className="col-4">
+              <div className="col-12 col-lg-4">
                 Passport Address:
               </div>
-              <div className="col-8">
+              <div className="col-12 col-lg-8 summary-val">
                 {this.props.targetAddr}
               </div>
             </div>
             <div className="row">
-              <div className="col-4">
+              <div className="col-12 col-lg-4">
                 Passport Score:
               </div>
-              <div className="col-8">
+              <div className="col-12 col-lg-8 summary-val">
                 <span className="passport-score">{this.props.boostInfo?.score || 0}</span>
                 <span className="passport-factor">
                   (Reward Factor: {this.props.boostInfo?.factor || 1} 
