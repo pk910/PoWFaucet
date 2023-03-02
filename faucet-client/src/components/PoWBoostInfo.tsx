@@ -182,6 +182,9 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
         refreshError: true,
         refreshStatus: err.message ? err.message : err.toString(),
       });
+      if(err.data && err.data.cooldown) {
+        this.setPassportRefreshCooldown(err.data.cooldown);
+      }
     })
   }
 

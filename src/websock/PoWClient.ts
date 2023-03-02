@@ -611,7 +611,9 @@ export class PoWClient {
         cooldown: this.session.getBoostRefreshCooldown(),
       }, reqId);
     }, (err) => {
-      this.sendErrorResponse("BOOST_REFRESH_FAILED", "Refresh failed: " + err.toString(), message);
+      this.sendErrorResponse("BOOST_REFRESH_FAILED", "Refresh failed: " + err.toString(), message, null, {
+        cooldown: this.session.getBoostRefreshCooldown(),
+      });
     });
   }
 
