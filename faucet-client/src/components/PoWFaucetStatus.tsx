@@ -55,6 +55,8 @@ export interface IPoWFaucetStatusSession {
   claimable: boolean;
   limit: number;
   cliver?: string;
+  boostF: number;
+  boostS: number;
 }
 
 export interface IPoWFaucetStatusIPInfo {
@@ -264,6 +266,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <th scope="col">Balance</th>
             <th scope="col">Nonce</th>
             <th scope="col">CliVer</th>
+            <th scope="col">Boost</th>
             <th scope="col">Status</th>
           </tr>
         </thead>
@@ -327,6 +330,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{Math.round(weiToEth(session.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{session.nonce}</td>
         <td>{session.cliver}</td>
+        <td>{session.boostF} ({session.boostS})</td>
         <td>{sessionStatus}</td>
       </tr>
     );

@@ -79,6 +79,8 @@ export interface IClientFaucetStatus {
     claimable: boolean;
     limit: number;
     cliver: string;
+    boostF: number;
+    boostS: number;
   }[];
   claims: {
     time: number;
@@ -209,6 +211,7 @@ export class FaucetWebApi {
         clientVersion = activeClient.getClientVersion();
       }
 
+      let boostInfo = session.getBoostInfo();
       return {
         id: session.getSessionId(true),
         start: Math.floor(session.getStartTime().getTime() / 1000),
@@ -223,6 +226,8 @@ export class FaucetWebApi {
         claimable: session.isClaimable(),
         limit: rewardLimiter.getSessionRestriction(session),
         cliver: clientVersion,
+        boostF: boostInfo?.factor || 1,
+        boostS: boostInfo?.score || 0,
       }
     });
 
