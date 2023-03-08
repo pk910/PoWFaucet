@@ -153,6 +153,8 @@ export interface IFaucetResultSharingConfig {
 }
 
 export interface IPassportBoostConfig {
+  passportCachePath: string;
+  trustedIssuers: string[];
   refreshCooldown: number;
   cacheTime: number;
   stampScoring: {[stamp: string]: number};

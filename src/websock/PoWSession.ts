@@ -12,7 +12,7 @@ import { renderDate } from "../utils/DateUtils";
 import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
 import { FaucetStatsLog } from "../services/FaucetStatsLog";
 import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
-import { PassportVerifier } from "../services/PassportVerifier";
+import { IPassportInfo, PassportVerifier } from "../services/PassportVerifier";
 
 
 export enum PoWSessionSlashReason {
@@ -533,8 +533,17 @@ export class PoWSession {
     return this.boostInfo;
   }
 
-  public async refreshBoostInfo(refresh?: boolean): Promise<IPoWSessionBoostInfo> {
-    if(refresh) {
+  public async refreshBoostInfo(refresh?: boolean, passportJson?: string): Promise<IPoWSessionBoostInfo> {
+    let passportVerifier = ServiceManager.GetService(PassportVerifier);
+    let passport: IPassportInfo;
+    if(refresh && passportJson) {
+      let verifyResult = await passportVerifier.verifyUserPassport(this.targetAddr, JSON.parse(passportJson));
+      if(!verifyResult.valid) {
+        throw verifyResult.errors.join("\n");
+      }
+      passport = verifyResult.info;
+    }
+    else if(refresh) {
       let now = Math.floor((new Date()).getTime() / 1000);
       if(this.lastBoostRefresh && now - this.lastBoostRefresh < faucetConfig.passportBoost.refreshCooldown) {
         throw "Passport has been refreshed recently, please retry in a few minutes.";
@@ -542,12 +551,13 @@ export class PoWSession {
       this.lastBoostRefresh = now;
     }
 
-    let passportVerifier = ServiceManager.GetService(PassportVerifier);
-    let passport = await passportVerifier.getPassport(this.targetAddr, refresh);
+    if(!passport)
+      passport = await passportVerifier.getPassport(this.targetAddr, refresh);
+    
     let score = passportVerifier.getPassportScore(passport);
     if(score) {
       this.boostInfo = {
-        stamps: passport.stamps,
+        stamps: passport.stamps?.map((stamp) => stamp.provider) || [],
         score: score.score,
         factor: score.factor
       };

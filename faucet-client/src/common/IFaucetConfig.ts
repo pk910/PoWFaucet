@@ -28,6 +28,7 @@ export interface IFaucetConfig {
   };
   passportBoost?: {
     refreshTimeout: number;
+    manualVerification: boolean;
     stampScoring: {[stamp: string]: number};
     boostFactor: {[score: number]: number};
   };

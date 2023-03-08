@@ -603,18 +603,30 @@ export class PoWClient {
   private onCliRefreshBoost(message: any) {
     let reqId = message.id || undefined;
     if(!this.session)
-      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found");
+      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found", message);
     
-    this.session.refreshBoostInfo(true).then((boostInfo) => {
-      this.sendMessage("ok", {
-        boostInfo: boostInfo,
-        cooldown: this.session.getBoostRefreshCooldown(),
-      }, reqId);
-    }, (err) => {
-      this.sendErrorResponse("BOOST_REFRESH_FAILED", "Refresh failed: " + err.toString(), message, null, {
-        cooldown: this.session.getBoostRefreshCooldown(),
+    if(message.data && message.data.passport) {
+      this.session.refreshBoostInfo(true, message.data.passport).then((boostInfo) => {
+        this.sendMessage("ok", {
+          boostInfo: boostInfo,
+        }, reqId);
+      }, (err) => {
+        console.error(err);
+        this.sendErrorResponse("BOOST_PASSPORT_INVALID", "Invalid Passport:\n" + err.toString(), message, PoWStatusLogLevel.HIDDEN);
       });
-    });
+    }
+    else {
+      this.session.refreshBoostInfo(true).then((boostInfo) => {
+        this.sendMessage("ok", {
+          boostInfo: boostInfo,
+          cooldown: this.session.getBoostRefreshCooldown(),
+        }, reqId);
+      }, (err) => {
+        this.sendErrorResponse("BOOST_REFRESH_FAILED", "Refresh failed: " + err.toString(), message, null, {
+          cooldown: this.session.getBoostRefreshCooldown(),
+        });
+      });
+    }
   }
 
   private refreshBoostInfoAndNotify() {

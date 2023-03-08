@@ -267,7 +267,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       title: "Boost Info",
       body: (
         <PoWBoostInfo 
-          refreshFn={() => this.refreshPassport()} 
+          refreshFn={(passportJson) => this.refreshPassport(passportJson)} 
           targetAddr={sessionInfo.targetAddr}
           boostInfo={this.state.boostInfo}
           faucetConfig={this.props.faucetConfig}
@@ -283,8 +283,13 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
     })
   }
 
-  private refreshPassport(): Promise<any> {
-    return this.props.powClient.sendRequest("refreshBoost").then((res) => {
+  private refreshPassport(passportJson?: string): Promise<any> {
+    let reqArgs: any = {};
+    if(passportJson) {
+      reqArgs.passport = passportJson;
+    }
+
+    return this.props.powClient.sendRequest("refreshBoost", reqArgs).then((res) => {
       if(res.boostInfo) {
         this.props.powSession.updateBoostInfo(res.boostInfo);
       }

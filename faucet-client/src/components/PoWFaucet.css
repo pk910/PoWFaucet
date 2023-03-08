@@ -334,19 +334,24 @@ html, body {
 }
 
 .pow-boost-info .passport-refresh {
-  margin: 8px 16px;
+  margin-top: 16px;
 }
 
-.pow-boost-info .passport-refresh button {
+.pow-boost-info .passport-refresh .refresh-auto button {
   width: 100%;
 }
 
-.pow-boost-info .passport-refresh .alert {
+.pow-boost-info .passport-refresh .refresh-btndv {
+  padding-right: 24px;
+}
+
+.pow-boost-info .passport-refresh-status .alert {
   background-color: transparent;
   border-color: transparent;
   padding: 0;
   margin-top: 4px;
   margin-bottom: 0;
+  white-space: pre;
 }
 
 .pow-boost-info .passport-details .row.details-header > div {
@@ -356,4 +361,17 @@ html, body {
 
 .passport-factor-info .header-row > div {
   white-space: nowrap;
+}
+
+.pow-boost-info .passport-manual-refresh {
+  margin-top: 16px;
+}
+
+.pow-boost-info .passport-manual-refresh .form-header {
+  font-weight: bold;
+}
+
+.pow-boost-info .passport-manual-refresh .passport-json {
+  width: 100%;
+  min-height: 150px;
 }

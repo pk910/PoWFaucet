@@ -9,7 +9,7 @@ export interface IPoWBoostInfoProps {
   boostInfo: IPoWSessionBoostInfo;
   faucetConfig: IFaucetConfig;
   powTime: PoWTime;
-  refreshFn: () => Promise<any>;
+  refreshFn: (passportJson?: string) => Promise<any>;
 }
 
 export interface IPoWBoostInfoState {
@@ -18,6 +18,9 @@ export interface IPoWBoostInfoState {
   refreshProcessing: boolean;
   refreshError: boolean;
   refreshStatus: string;
+  showRefreshForm: boolean;
+  passportJson: string;
+  manualRefreshRunning: boolean;
 }
 
 export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBoostInfoState> {
@@ -31,11 +34,13 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
       refreshProcessing: false,
       refreshError: false,
       refreshStatus: null,
+      showRefreshForm: false,
+      passportJson: "",
+      manualRefreshRunning: false,
     };
   }
 
 	public render(): React.ReactElement<IPoWBoostInfoProps> {
-    let stamps = this.props.boostInfo?.stamps || [];
     return (
       <div className="pow-boost-info">
         <div className="boost-descr">Reward too low? <br/>Boost your rewards by verifying stamps on your <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Gitcoin Passport</a>.</div>
@@ -76,40 +81,49 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
                 </span>
               </div>
             </div>
-          </div>
-          <div className="passport-refresh">
-            <button 
-              className="btn btn-primary conn-wallet-btn" 
-              onClick={(evt) => this.onRefreshPassportClick()} 
-              disabled={this.state.refreshCooldownSec > 0 || this.state.refreshProcessing}
-              >
-                Refresh Passport{this.state.refreshCooldownSec > 0 ? " (" + this.state.refreshCooldownSec + ")" : ""}
-            </button>
-            {this.state.refreshStatus ?
-              <div className={["alert", this.state.refreshError ? "alert-danger" : "alert-success"].join(" ")} role="alert">
-                {this.state.refreshStatus}
+            <div className="row passport-refresh">
+              <div className={[
+                "refresh-auto",
+                "col-12",
+                this.props.faucetConfig.passportBoost.manualVerification ? "col-lg-8" : "col-lg-12"
+                ].join(" ")}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={(evt) => this.onRefreshPassportClick()} 
+                  disabled={this.state.refreshCooldownSec > 0 || this.state.refreshProcessing || this.state.manualRefreshRunning}
+                  >
+                    Refresh Passport Automatically{this.state.refreshCooldownSec > 0 ? " (" + this.state.refreshCooldownSec + ")" : ""}
+                </button>
               </div>
-            : null}
-          </div>
-          <div className="passport-details container">
-            <div className="row details-header">
-              <div className="col">
-                Passport Score Details:
-              </div>
+              {this.props.faucetConfig.passportBoost.manualVerification ?
+                <div className="col-12 col-lg-4 refresh-manual">
+                  <span className="refresh-btndv">or</span>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={(evt) => this.onManualRefreshPassportClick()} 
+                    disabled={this.state.showRefreshForm}
+                    >
+                      Verify Manually
+                  </button>
+                </div>
+              : null}
             </div>
-            {stamps.map((stamp) => {
-              return (
-                <div key={"stamp-" + stamp} className="row passport-stamp">
-                  <div className="col-8">
-                    {stamp}
-                  </div>
-                  <div className="col-4">
-                    + {this.props.faucetConfig.passportBoost.stampScoring[stamp]}
+            {this.state.refreshStatus ?
+              <div className="row passport-refresh-status">
+                <div className="col-12">
+                  <div className={["alert", this.state.refreshError ? "alert-danger" : "alert-success"].join(" ")} role="alert">
+                    {this.state.refreshStatus}
                   </div>
                 </div>
-              )
-            })}
+              </div>
+            : null}
+
           </div>
+          
+          {this.state.showRefreshForm ?
+            this.renderPassportRefreshForm() :
+            this.renderPassportDetails()
+          }
         </div>
       </div>
     );
@@ -143,6 +157,66 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
     )
   }
 
+  private renderPassportDetails(): React.ReactElement {
+    let stamps = this.props.boostInfo?.stamps || [];
+    return (
+      <div className="passport-details container">
+        <div className="row details-header">
+          <div className="col">
+            Passport Score Details:
+          </div>
+        </div>
+        {stamps.map((stamp) => {
+          return (
+            <div key={"stamp-" + stamp} className="row passport-stamp">
+              <div className="col-8">
+                {stamp}
+              </div>
+              <div className="col-4">
+                + {this.props.faucetConfig.passportBoost.stampScoring[stamp]}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  private renderPassportRefreshForm(): React.ReactElement {
+    return (
+      <div className="passport-manual-refresh container">
+        <div className="row form-header">
+          <div className="col">
+            Upload Gitcoin Passport JSON for verification:
+          </div>
+        </div>
+        <div className="row">
+          <div className="col">
+            <textarea 
+              className="passport-json"
+              value={this.state.passportJson} 
+              placeholder="Please paste your Gitcoin Passport JSON here"
+              onChange={(evt) => this.setState({ passportJson: evt.target.value })} 
+              disabled={this.state.manualRefreshRunning}
+            >
+            </textarea>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col">
+            <button 
+              className="btn btn-primary passport-json-submit" 
+              onClick={(evt) => this.onUploadPassportJsonClick()} 
+              disabled={this.state.manualRefreshRunning || this.state.passportJson.length < 100}
+              >
+                Upload &amp; Verify passport JSON
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   private setPassportRefreshCooldown(cooldownTime?: number) {
     if(typeof cooldownTime !== "number") {
       cooldownTime = this.state.refreshCooldown;
@@ -165,6 +239,7 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
     this.setState({
       refreshProcessing: true,
       refreshStatus: null,
+      showRefreshForm: false,
     });
     this.props.refreshFn().then((res) => {
       this.setState({
@@ -186,6 +261,39 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
         this.setPassportRefreshCooldown(err.data.cooldown);
       }
     })
+  }
+
+  private onManualRefreshPassportClick() {
+    this.setState({
+      showRefreshForm: true,
+    });
+  }
+
+  private onUploadPassportJsonClick() {
+    this.setState({
+      manualRefreshRunning: true,
+    });
+
+    console.log(this.state.passportJson);
+    this.props.refreshFn(this.state.passportJson).then((res) => {
+      this.setState({
+        manualRefreshRunning: false,
+        showRefreshForm: false,
+        refreshError: false,
+        refreshStatus: "Gitcoin Passport verified successfully",
+      });
+    }, (err) => {
+      console.log(err);
+      this.setState({
+        manualRefreshRunning: false,
+        refreshError: true,
+        refreshStatus: err.message ? err.message : err.toString(),
+      });
+      if(err.data && err.data.cooldown) {
+        this.setPassportRefreshCooldown(err.data.cooldown);
+      }
+    })
+    
   }
 
 }

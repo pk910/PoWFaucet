@@ -48,6 +48,7 @@ export interface IClientFaucetConfig {
   resultSharing: IFaucetResultSharingConfig;
   passportBoost: {
     refreshTimeout: number;
+    manualVerification: boolean;
     stampScoring: {[stamp: string]: number};
     boostFactor: {[score: number]: number};
   };
@@ -173,6 +174,7 @@ export class FaucetWebApi {
       resultSharing: faucetConfig.resultSharing,
       passportBoost: faucetConfig.passportBoost ? {
         refreshTimeout: faucetConfig.passportBoost.refreshCooldown,
+        manualVerification: (faucetConfig.passportBoost.trustedIssuers && faucetConfig.passportBoost.trustedIssuers.length > 0),
         stampScoring: faucetConfig.passportBoost.stampScoring,
         boostFactor: faucetConfig.passportBoost.boostFactor,
       } : null,
