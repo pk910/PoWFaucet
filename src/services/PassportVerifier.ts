@@ -169,6 +169,7 @@ export class PassportVerifier {
       newest: 0,
     }
     var DIDKit = this.passportVerifier._DIDKit;
+    var providerMap = {};
     
     // verify passport
     let now = Math.floor((new Date()).getTime() / 1000);
@@ -183,6 +184,13 @@ export class PassportVerifier {
         verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: credentialSubject.provider missmatch");
         return;
       }
+
+      // verify provider uniqueness
+      if(providerMap.hasOwnProperty(stamp.provider.toLowerCase())) {
+        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: duplicate provider");
+        return;
+      }
+      providerMap[stamp.provider.toLowerCase()] = true;
 
       // verify the stamp subject address
       let stampAddress = stamp.credential.credentialSubject.id.replace("did:pkh:eip155:1:", "").toLowerCase();
