@@ -54,14 +54,18 @@ export class PassportVerifier {
       return this.passportCache[addr];
     
     let now = Math.floor((new Date()).getTime() / 1000);
-    let cachedPassportInfo = ServiceManager.GetService(FaucetStore).getPassportInfo(addr);
+    let faucetStore = ServiceManager.GetService(FaucetStore);
+    let cachedPassportInfo = faucetStore.getPassportInfo(addr);
     let passportPromise: Promise<IPassportInfo>;
 
-    if(cachedPassportInfo && !refresh && now - cachedPassportInfo.parsed < (faucetConfig.passportBoost.cacheTime || 60)) {
+    if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (faucetConfig.passportBoost.cacheTime || 60)) {
       passportPromise = Promise.resolve(cachedPassportInfo);
     }
     else {
       passportPromise = this.passportCache[addr] = this.refreshPassport(addr);
+      passportPromise.then((passportInfo) => {
+        faucetStore.setPassportInfo(addr, passportInfo);
+      });
       passportPromise.finally(() => {
         delete this.passportCache[addr];
       });
