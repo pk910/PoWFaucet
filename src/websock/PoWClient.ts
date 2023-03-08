@@ -238,6 +238,7 @@ export class PoWClient {
 
   private async onCliStartSession(message: any) {
     let reqId = message.id || undefined;
+    let sessionIdent = "";
 
     if(this.session)
       return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
@@ -255,6 +256,8 @@ export class PoWClient {
       let tokenValidity = await ServiceManager.GetService(CaptchaVerifier).verifyToken(message.data.token, this.remoteIp);
       if(!tokenValidity)
         return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha verification failed", message, PoWStatusLogLevel.INFO);
+      if(typeof tokenValidity === "string")
+        sessionIdent = tokenValidity;
     }
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
@@ -303,6 +306,8 @@ export class PoWClient {
 
     // create new session
     let session = new PoWSession(this, targetAddr);
+    if(sessionIdent)
+      session.setIdent(sessionIdent);
 
     this.sendMessage("ok", {
       sessionId: session.getSessionId(),
@@ -406,6 +411,7 @@ export class PoWClient {
       preimage: sessionInfo.preimage,
       balance: sessionInfo.balance,
       nonce: sessionInfo.nonce,
+      ident: sessionInfo.ident,
     });
     this.sendMessage("ok", null, reqId);
 

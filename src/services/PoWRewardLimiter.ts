@@ -32,10 +32,11 @@ export class PoWRewardLimiter {
     }
   }
 
-  private getIPInfoString(ipaddr: string, ipinfo: IIPInfo, ethaddr: string) {
+  private getIPInfoString(session: PoWSession, ipinfo: IIPInfo) {
     let infoStr = [
-      "ETH: " + ethaddr,
-      "IP: " + ipaddr
+      "ETH: " + session.getTargetAddr(),
+      "IP: " + session.getLastRemoteIp(),
+      "Ident: " + session.getIdent(),
     ];
     if(ipinfo) {
       infoStr.push(
@@ -139,7 +140,7 @@ export class PoWRewardLimiter {
 
     if(faucetConfig.ipInfoMatchRestrictedReward || faucetConfig.ipInfoMatchRestrictedRewardFile) {
       this.refreshIpInfoMatchRestrictions();
-      let infoStr = this.getIPInfoString(session.getLastRemoteIp(), sessionIpInfo, session.getTargetAddr());
+      let infoStr = this.getIPInfoString(session, sessionIpInfo);
       Object.keys(this.ipInfoMatchRestrictions).forEach((pattern) => {
         if(infoStr.match(new RegExp(pattern, "mi")) && this.ipInfoMatchRestrictions[pattern] < restrictedReward)
           restrictedReward = this.ipInfoMatchRestrictions[pattern];

@@ -75,6 +75,7 @@ export class FaucetStatsLog {
         h: ipinfo.hosting ? 1 : undefined,
         p: ipinfo.proxy ? 1 : undefined,
       } : null,
+      in: session.getIdent(),
       id: session.getSessionId(),
     });
   }

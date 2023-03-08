@@ -36,6 +36,7 @@ export interface IPoWSessionRecoveryInfo {
   preimage: string;
   balance: string;
   nonce: number;
+  ident: string;
   tokenTime?: number;
   claimable?: boolean;
 }
@@ -49,6 +50,7 @@ export interface IPoWSessionStoreData {
   balance: string;
   claimable: boolean;
   lastNonce: number;
+  ident: string;
   status: PoWSessionStatus;
   remoteIp: string;
   remoteIpInfo: IIPInfo;
@@ -125,6 +127,7 @@ export class PoWSession {
   private balance: bigint;
   private claimable: boolean;
   private lastNonce: number;
+  private ident: string;
   private reportedHashRate: number[];
   private activeClient: PoWClient;
   private cleanupTimer: NodeJS.Timeout;
@@ -166,6 +169,7 @@ export class PoWSession {
       this.preimage = target.preimage;
       this.balance = BigInt(target.balance);
       this.lastNonce = target.nonce;
+      this.ident = target.ident;
     }
     else {
       this.sessionId = getNewGuid();
@@ -272,6 +276,7 @@ export class PoWSession {
     this.balance = BigInt(data.balance);
     this.claimable = data.claimable;
     this.lastNonce = data.lastNonce;
+    this.ident = data.ident;
     this.sessionStatus = data.status;
     this.lastRemoteIp = data.remoteIp;
     this.lastIpInfo = data.remoteIpInfo;
@@ -299,6 +304,7 @@ export class PoWSession {
       balance: this.balance.toString(),
       claimable: this.claimable,
       lastNonce: this.lastNonce,
+      ident: this.ident,
       status: this.sessionStatus,
       remoteIp: this.lastRemoteIp,
       remoteIpInfo: this.lastIpInfo
@@ -435,6 +441,14 @@ export class PoWSession {
     return this.reportedHashRate.length > 0 ? hashRateSum / this.reportedHashRate.length : 0;
   }
 
+  public getIdent(): string {
+    return this.ident;
+  }
+
+  public setIdent(ident: string) {
+    this.ident = ident;
+  }
+
   public getSessionStatus(): PoWSessionStatus {
     return this.sessionStatus;
   }
@@ -519,6 +533,7 @@ export class PoWSession {
       balance: this.balance.toString(),
       claimable: this.claimable,
       nonce: this.lastNonce,
+      ident: this.ident,
     };
     let sessionStr = Buffer.from(JSON.stringify(sessionDict)).toString('base64');
 
