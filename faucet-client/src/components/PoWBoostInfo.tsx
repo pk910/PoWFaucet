@@ -274,7 +274,6 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
       manualRefreshRunning: true,
     });
 
-    console.log(this.state.passportJson);
     this.props.refreshFn(this.state.passportJson).then((res) => {
       this.setState({
         manualRefreshRunning: false,

@@ -235,7 +235,7 @@ export class PassportVerifier {
     if(verifyResult.valid) {
       // save to cache
       let cacheFile = this.getPassportCacheFile(addr);
-      let haveNewer = false;;
+      let haveNewer = false;
       if(cacheFile && fs.existsSync(cacheFile)) {
         let cachedPassport = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
         let cachedPassportInfo = this.parsePassportInfo(cachedPassport);
@@ -245,7 +245,7 @@ export class PassportVerifier {
         // prevent reverting to an older passport!
         verifyResult.valid = false;
         verifyResult.errors.push("Cannot update to an older passport");
-      } else {
+      } else if(cacheFile) {
         fs.writeFileSync(cacheFile, JSON.stringify(passport));
       }
     }
