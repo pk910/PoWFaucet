@@ -392,6 +392,9 @@ export class EthWeb3Manager {
           let zksyncTx = this.zksyncWallet.transfer({
             to: claimTx.target,
             amount: "0x" + BigInt(claimTx.amount).toString(16),
+            overrides: {
+              nonce: BigInt(claimTx.nonce),
+            }
           });
 
           txPromise = zksyncTx;
