@@ -106,15 +106,21 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       client: this.powClient,
       powTime: this.powTime,
       getInputs: () => {
-        var capToken = "";
+        let capPromise: Promise<string>;
         if(this.captchaControl) {
-          capToken = this.captchaControl.getToken();
-          this.captchaControl.resetToken();
+          capPromise = this.captchaControl.getToken();
+          capPromise.then(() => {
+            this.captchaControl.resetToken();
+          });
         }
-        return {
-          addr: this.state.targetAddr,
-          token: capToken
-        };
+        else
+          capPromise = Promise.resolve("");
+        return capPromise.then((capToken) => {
+          return {
+            addr: this.state.targetAddr,
+            token: capToken
+          }
+        });
       },
       showNotification: (type, message, time, timeout) => this.showNotification(type, message, time, timeout),
     });

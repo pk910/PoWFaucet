@@ -336,9 +336,21 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       this.claimConnKeeper.close();
     this.claimConnKeeper = this.props.powClient.newConnectionKeeper();
 
-    this.props.powClient.sendRequest("claimRewards", {
-      captcha: this.props.faucetConfig.hcapClaim ? this.captchaControl.getToken() : null,
-      token: this.props.reward.token
+    let capPromise: Promise<string>;
+    if(this.props.faucetConfig.hcapClaim && this.captchaControl) {
+      capPromise = this.captchaControl.getToken();
+      capPromise.then(() => {
+        this.captchaControl.resetToken();
+      });
+    }
+    else
+      capPromise = Promise.resolve(null);
+    
+    capPromise.then((capToken) => {
+      return this.props.powClient.sendRequest("claimRewards", {
+        captcha: capToken,
+        token: this.props.reward.token
+      });
     }).then(() => {
       this.props.powSession.storeClaimInfo(null);
       this.setState({

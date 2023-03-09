@@ -7,7 +7,7 @@ import { PoWTime } from './PoWTime';
 export interface IPoWSessionOptions {
   client: PoWClient;
   powTime: PoWTime;
-  getInputs: () => object;
+  getInputs: () => Promise<object>;
   showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => number;
 }
 
@@ -89,8 +89,9 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public startSession() {
-    let sessionInputs = this.options.getInputs();
-    return this.options.client.sendRequest("startSession", sessionInputs).then((session) => {
+    return this.options.getInputs().then((sessionInputs) => {
+      return this.options.client.sendRequest("startSession", sessionInputs)
+    }).then((session) => {
       this.options.client.setCurrentSession(this);
       this.sessionInfo = Object.assign({
         balance: 0,
