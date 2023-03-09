@@ -213,6 +213,9 @@ export class PoWClient {
       case "watchClaimTx":
         this.onCliWatchClaimTx(message);
         break;
+      case "refreshBoost":
+        this.onCliRefreshBoost(message);
+        break;
       default:
         this.sendMessage("error", {
           code: "INVALID_ACTION",
@@ -235,6 +238,7 @@ export class PoWClient {
 
   private async onCliStartSession(message: any) {
     let reqId = message.id || undefined;
+    let sessionIdent = "";
 
     if(this.session)
       return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
@@ -252,6 +256,8 @@ export class PoWClient {
       let tokenValidity = await ServiceManager.GetService(CaptchaVerifier).verifyToken(message.data.token, this.remoteIp);
       if(!tokenValidity)
         return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha verification failed", message, PoWStatusLogLevel.INFO);
+      if(typeof tokenValidity === "string")
+        sessionIdent = tokenValidity;
     }
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
@@ -300,6 +306,8 @@ export class PoWClient {
 
     // create new session
     let session = new PoWSession(this, targetAddr);
+    if(sessionIdent)
+      session.setIdent(sessionIdent);
 
     this.sendMessage("ok", {
       sessionId: session.getSessionId(),
@@ -308,6 +316,8 @@ export class PoWClient {
       targetAddr: targetAddr,
       recovery: session.getSignedSession(),
     }, reqId);
+
+    this.refreshBoostInfoAndNotify();
   }
 
   private onCliResumeSession(message: any) {
@@ -358,6 +368,8 @@ export class PoWClient {
     this.sendMessage("ok", {
       lastNonce: session.getLastNonce(),
     }, reqId);
+
+    this.refreshBoostInfoAndNotify();
   }
 
   private onCliRecoverSession(message: any) {
@@ -399,8 +411,11 @@ export class PoWClient {
       preimage: sessionInfo.preimage,
       balance: sessionInfo.balance,
       nonce: sessionInfo.nonce,
+      ident: sessionInfo.ident,
     });
     this.sendMessage("ok", null, reqId);
+
+    this.refreshBoostInfoAndNotify();
   }
 
   private onCliFoundShare(message: any) {
@@ -588,6 +603,41 @@ export class PoWClient {
         session: claimTx.session,
         error: claimTx.failReason
       });
+    });
+  }
+
+  private onCliRefreshBoost(message: any) {
+    let reqId = message.id || undefined;
+    if(!this.session)
+      return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found", message);
+    
+    if(message.data && message.data.passport) {
+      this.session.refreshBoostInfo(true, message.data.passport).then((boostInfo) => {
+        this.sendMessage("ok", {
+          boostInfo: boostInfo,
+        }, reqId);
+      }, (err) => {
+        console.error(err);
+        this.sendErrorResponse("BOOST_PASSPORT_INVALID", "Invalid Passport:\n" + err.toString(), message, PoWStatusLogLevel.HIDDEN);
+      });
+    }
+    else {
+      this.session.refreshBoostInfo(true).then((boostInfo) => {
+        this.sendMessage("ok", {
+          boostInfo: boostInfo,
+          cooldown: this.session.getBoostRefreshCooldown(),
+        }, reqId);
+      }, (err) => {
+        this.sendErrorResponse("BOOST_REFRESH_FAILED", "Refresh failed: " + err.toString(), message, null, {
+          cooldown: this.session.getBoostRefreshCooldown(),
+        });
+      });
+    }
+  }
+
+  private refreshBoostInfoAndNotify() {
+    this.session.refreshBoostInfo().then((boostInfo) => {
+      this.sendMessage("boostInfo", boostInfo);
     });
   }
 

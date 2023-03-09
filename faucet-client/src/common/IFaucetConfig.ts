@@ -21,7 +21,16 @@ export interface IFaucetConfig {
   ethTxExplorerLink: string;
   time: number;
   resultSharing: {
+    preHtml?: string;
+    postHtml?: string;
+    caption?: string;
     [provider: string]: string;
+  };
+  passportBoost?: {
+    refreshTimeout: number;
+    manualVerification: boolean;
+    stampScoring: {[stamp: string]: number};
+    boostFactor: {[score: number]: number};
   };
 }
 

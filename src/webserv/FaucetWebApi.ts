@@ -46,6 +46,12 @@ export interface IClientFaucetConfig {
   ethTxExplorerLink: string;
   time: number;
   resultSharing: IFaucetResultSharingConfig;
+  passportBoost: {
+    refreshTimeout: number;
+    manualVerification: boolean;
+    stampScoring: {[stamp: string]: number};
+    boostFactor: {[score: number]: number};
+  };
 }
 
 export interface IClientFaucetStatus {
@@ -74,6 +80,8 @@ export interface IClientFaucetStatus {
     claimable: boolean;
     limit: number;
     cliver: string;
+    boostF: number;
+    boostS: number;
   }[];
   claims: {
     time: number;
@@ -164,6 +172,12 @@ export class FaucetWebApi {
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
       time: Math.floor((new Date()).getTime() / 1000),
       resultSharing: faucetConfig.resultSharing,
+      passportBoost: faucetConfig.passportBoost ? {
+        refreshTimeout: faucetConfig.passportBoost.refreshCooldown,
+        manualVerification: (faucetConfig.passportBoost.trustedIssuers && faucetConfig.passportBoost.trustedIssuers.length > 0),
+        stampScoring: faucetConfig.passportBoost.stampScoring,
+        boostFactor: faucetConfig.passportBoost.boostFactor,
+      } : null,
     };
   }
 
@@ -199,6 +213,7 @@ export class FaucetWebApi {
         clientVersion = activeClient.getClientVersion();
       }
 
+      let boostInfo = session.getBoostInfo();
       return {
         id: session.getSessionId(true),
         start: Math.floor(session.getStartTime().getTime() / 1000),
@@ -213,6 +228,8 @@ export class FaucetWebApi {
         claimable: session.isClaimable(),
         limit: rewardLimiter.getSessionRestriction(session),
         cliver: clientVersion,
+        boostF: boostInfo?.factor || 1,
+        boostS: boostInfo?.score || 0,
       }
     });
 

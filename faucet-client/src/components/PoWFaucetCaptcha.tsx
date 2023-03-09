@@ -37,10 +37,13 @@ export class PoWFaucetCaptcha extends React.PureComponent<IPoWFaucetCaptchaProps
     this.state = {};
   }
 
-  public getToken(): string {
-    if(this.customControl)
-      this.lastToken = this.customControl.getToken();
-    return this.lastToken;
+  public getToken(): Promise<string> {
+    if(this.customControl) {
+      return Promise.resolve().then(() => {
+        return this.customControl.getToken();
+      });
+    }
+    return Promise.resolve(this.lastToken);
   }
 
   public resetToken() {

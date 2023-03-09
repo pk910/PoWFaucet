@@ -4,7 +4,7 @@ import { faucetConfig } from "../common/FaucetConfig";
 
 export class CaptchaVerifier {
 
-  public async verifyToken(token: string, remoteIp: string): Promise<boolean> {
+  public async verifyToken(token: string, remoteIp: string): Promise<boolean|string> {
     if(!faucetConfig.captchas)
       return true;
     
@@ -42,7 +42,7 @@ export class CaptchaVerifier {
     return true;
   }
 
-  private async verifyCustomToken(token: string, remoteIp: string): Promise<boolean> {
+  private async verifyCustomToken(token: string, remoteIp: string): Promise<boolean|string> {
     let verifyData = new URLSearchParams();
     verifyData.append("response", token);
     verifyData.append("remoteip", remoteIp);
@@ -55,7 +55,7 @@ export class CaptchaVerifier {
 
     if(!verifyRsp || !verifyRsp.success)
       return false;
-    return true;
+    return verifyRsp.ident || true;
   }
 
 }

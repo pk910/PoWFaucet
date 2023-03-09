@@ -293,18 +293,29 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       );
     }
 
+    let resultSharingCaption = this.props.faucetConfig.resultSharing.caption || "Support this faucet with a ";
     return (
       <div className='result-sharing'>
-        <div className='sh-opt'>
-          <span className='sh-label'>Support this faucet with a </span>
-          {shareEls}
-        </div>
+        {this.props.faucetConfig.resultSharing.preHtml ?
+          <div className="sh-html" dangerouslySetInnerHTML={{__html: this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.preHtml)}} />
+        : null}
+        {shareEls.length > 0 ? 
+          <div className='sh-opt'>
+            <span className='sh-label'>{resultSharingCaption}</span>
+            {shareEls}
+          </div>
+        : null}
+        {this.props.faucetConfig.resultSharing.postHtml ?
+          <div className="sh-html" dangerouslySetInnerHTML={{__html: this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.postHtml)}} />
+        : null}
       </div>
     )
   }
 
   private replaceShareMessagePlaceholders(message: string): string {
-    // Boom! Just got {amount} ETH from {url} (Mining for {duration} with {hashrate} H/s)
+    message = message.replace(/{sessionid}/ig, this.props.reward.session);
+    message = message.replace(/{target}/ig, this.props.reward.target);
+
     message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000).toString());
     message = message.replace(/{url}/ig, location.href);
 
@@ -325,9 +336,21 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       this.claimConnKeeper.close();
     this.claimConnKeeper = this.props.powClient.newConnectionKeeper();
 
-    this.props.powClient.sendRequest("claimRewards", {
-      captcha: this.props.faucetConfig.hcapClaim ? this.captchaControl.getToken() : null,
-      token: this.props.reward.token
+    let capPromise: Promise<string>;
+    if(this.props.faucetConfig.hcapClaim && this.captchaControl) {
+      capPromise = this.captchaControl.getToken();
+      capPromise.then(() => {
+        this.captchaControl.resetToken();
+      });
+    }
+    else
+      capPromise = Promise.resolve(null);
+    
+    capPromise.then((capToken) => {
+      return this.props.powClient.sendRequest("claimRewards", {
+        captcha: capToken,
+        token: this.props.reward.token
+      });
     }).then(() => {
       this.props.powSession.storeClaimInfo(null);
       this.setState({

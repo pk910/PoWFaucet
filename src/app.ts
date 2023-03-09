@@ -7,6 +7,7 @@ import { ServiceManager } from "./common/ServiceManager";
 import { PoWValidator } from "./validator/PoWValidator";
 import { FaucetStatsLog } from "./services/FaucetStatsLog";
 import { FaucetWebApi } from "./webserv/FaucetWebApi";
+import { PoWSession } from "./websock/PoWSession";
 
 (() => {
 
@@ -18,6 +19,7 @@ import { FaucetWebApi } from "./webserv/FaucetWebApi";
   ServiceManager.InitService(FaucetStatsLog);
   ServiceManager.InitService(FaucetWebApi);
   ServiceManager.InitService(FaucetHttpServer);
+  PoWSession.loadSessionData();
 
 })();
 
