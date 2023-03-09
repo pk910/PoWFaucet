@@ -105,7 +105,7 @@ export class PassportVerifier {
         }
         if(cacheFile) {
           // save to cache
-          fs.writeFileSync(cacheFile, JSON.stringify(passport));
+          this.savePassportToCache(passport, cacheFile);
         }
       }
     } catch(ex) {
@@ -246,11 +246,25 @@ export class PassportVerifier {
         verifyResult.valid = false;
         verifyResult.errors.push("Cannot update to an older passport");
       } else if(cacheFile) {
-        fs.writeFileSync(cacheFile, JSON.stringify(passport));
+        this.savePassportToCache(passport, cacheFile);
       }
     }
     
     return verifyResult;
+  }
+
+  private savePassportToCache(passport: Passport, cacheFile: string) {
+    let trimmedPassport: Passport = {
+      issuanceDate: passport.issuanceDate,
+      expiryDate: passport.expiryDate,
+      stamps: passport.stamps.map((stamp) => {
+        return {
+          provider: stamp.provider,
+          credential: stamp.credential
+        }
+      })
+    };
+    fs.writeFileSync(cacheFile, JSON.stringify(trimmedPassport));
   }
 
   public getPassportScore(passportInfo: IPassportInfo): IPassportScore {
