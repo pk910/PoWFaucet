@@ -552,7 +552,7 @@ export class PoWSession {
     let passportVerifier = ServiceManager.GetService(PassportVerifier);
     let passport: IPassportInfo;
     if(refresh && passportJson) {
-      let verifyResult = await passportVerifier.verifyUserPassport(this.targetAddr, JSON.parse(passportJson));
+      let verifyResult = await passportVerifier.verifyUserPassport(this.targetAddr, passportJson);
       if(!verifyResult.valid) {
         throw verifyResult.errors.join("\n");
       }
