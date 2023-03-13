@@ -68,15 +68,16 @@ export interface IFaucetConfig {
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
   ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
   ipRestrictedRewardShare: null | { // ip based restrictions
-    hosting?: number; // percentage of reward per share if IP is in a hosting range
-    proxy?: number; // percentage of reward per share if IP is in a proxy range
-    [country: string]: number; // percentage of reward per share if IP is from given country code (DE/US/...)
+    hosting?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a hosting range
+    proxy?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a proxy range
+    [country: string]: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is from given country code (DE/US/...)
   };
   ipInfoMatchRestrictedReward: null | { // ip info pattern based restrictions
-    [pattern: string]: number; // percentage of reward per share if IP info matches regex pattern
+    [pattern: string]: number | IFacuetRestrictionConfig; // percentage of reward per share if IP info matches regex pattern
   };
   ipInfoMatchRestrictedRewardFile: null | { // ip info pattern based restrictions from file
-    file: string; // path to file
+    file?: string; // path to file
+    yaml?: string; // path to yaml file (for more actions/kill messages/etc.)
     refresh: number; // refresh interval
   };
   faucetBalanceRestrictedReward: null | { // reward restriction based on faucet wallet balance. lowest value applies
@@ -121,6 +122,13 @@ export interface IFaucetConfig {
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
   resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
   passportBoost: IPassportBoostConfig | null; // passport boost options or null to disable
+}
+
+export interface IFacuetRestrictionConfig {
+  reward: number;
+  message?: string;
+  notify?: boolean|string;
+  blocked?: boolean|"close"|"kill";
 }
 
 export interface IFaucetCaptchaConfig {

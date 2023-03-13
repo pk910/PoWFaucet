@@ -131,7 +131,6 @@ export class FaucetStatus {
       return true;
     };
 
-
     let statusKeys = Object.keys(this.currentStatus);
     for(let i = 0; i < statusKeys.length; i++) {
       let status = this.currentStatus[statusKeys[i]];
@@ -152,6 +151,19 @@ export class FaucetStatus {
     Object.values(localStatusDict).sort((a, b) => ((a.prio || 0) - (b.prio || 0))).forEach((status) => {
       addStatus(status);
     });
+
+    if(session) {
+      let restriction = session.getRewardRestriction();
+      restriction.messages.forEach((message) => {
+        if(!message.notify)
+          return;
+        
+        addStatus({
+          level: (typeof message.notify === "string" ? message.notify as FaucetStatusLevel : FaucetStatusLevel.WARNING),
+          text: message.text,
+        });
+      });
+    }
 
     return {
       status: statusList,
