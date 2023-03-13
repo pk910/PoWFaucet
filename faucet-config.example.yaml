@@ -357,8 +357,10 @@ passportBoost:
     "Google": 1
     "Twitter": 1
     "Ens": 2
+    "GnosisSafe": 2
     "Poh": 4
     "POAP": 1
+    "GitPOAP": 1
     "Facebook": 1
     "FacebookFriends": 1
     "FacebookProfilePicture": 1
