@@ -194,7 +194,7 @@ export class PoWSession {
         " [Recovered: " + (Math.round(weiToEth(this.balance)*1000)/1000) + " ETH, start: " + renderDate(this.startTime, true) + "]" :
         ""
       ) +
-      " (Remote IP: " + this.activeClient.getRemoteIP() + ")"
+      " (Remote IP: " + client.getRemoteIP() + ")"
     );
 
     this.resetSessionTimer();
@@ -395,7 +395,7 @@ export class PoWSession {
   }
 
   public getLastRemoteIp(hashed?: boolean): string {
-    if(hashed) {
+    if(this.lastRemoteIp && hashed) {
       if(!this.hashedRemoteIp)
         this.hashedRemoteIp = getHashedIp(this.lastRemoteIp, faucetConfig.faucetSecret);
       return this.hashedRemoteIp;
