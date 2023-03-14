@@ -419,7 +419,8 @@ export class PoWSession {
     this.hashedRemoteIp = null;
     ServiceManager.GetService(IPInfoResolver).getIpInfo(remoteAddr).then((ipInfo) => {
       this.lastIpInfo = ipInfo;
-      this.updateRewardRestriction();
+
+      setTimeout(() => this.updateRewardRestriction(), 10);
     });
   }
 
