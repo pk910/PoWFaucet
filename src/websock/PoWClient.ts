@@ -80,7 +80,7 @@ export class PoWClient {
 
   public setSession(session: PoWSession) {
     this.session = session;
-    this.refreshFaucetStatus();
+    setTimeout(() => this.refreshFaucetStatus(), 100);
   }
 
   public getRemoteIP(): string {
@@ -302,6 +302,8 @@ export class PoWClient {
       }
     }
     
+    if(this.session)
+      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
     ServiceManager.GetService(FaucetStore).setAddressMark(targetAddr, AddressMark.USED);
 
     // create new session
