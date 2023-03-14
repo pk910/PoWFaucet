@@ -636,6 +636,8 @@ export class PoWClient {
   }
 
   private refreshBoostInfoAndNotify() {
+    if(!this.session)
+      return;
     this.session.refreshBoostInfo().then((boostInfo) => {
       this.sendMessage("boostInfo", boostInfo);
     });
