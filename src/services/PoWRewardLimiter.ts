@@ -12,6 +12,7 @@ import { IIPInfo } from "./IPInfoResolver";
 export interface IPoWRewardRestriction {
   reward: number;
   messages: {
+    key: string;
     text: string;
     notify: boolean|string;
   }[];
@@ -168,6 +169,7 @@ export class PoWRewardLimiter {
       messages: [],
       blocked: false,
     };
+    let msgKeyDict = {};
     let sessionIpInfo = session.getLastIpInfo();
 
     let applyRestriction = (restr: number | IFacuetRestrictionConfig) => {
@@ -182,10 +184,13 @@ export class PoWRewardLimiter {
         else if(restr.blocked === true && !restriction.blocked)
           restriction.blocked = "close";
       }
-      if(restr.message) {
+      if(restr.message && (!restr.msgkey || !msgKeyDict.hasOwnProperty(restr.msgkey))) {
+        if(restr.msgkey)
+          msgKeyDict[restr.msgkey] = true;
         restriction.messages.push({
           text: restr.message,
           notify: restr.notify,
+          key: restr.msgkey,
         });
       }
     };

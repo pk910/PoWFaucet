@@ -126,6 +126,7 @@ export interface IFaucetConfig {
 
 export interface IFacuetRestrictionConfig {
   reward: number;
+  msgkey?: string;
   message?: string;
   notify?: boolean|string;
   blocked?: boolean|"close"|"kill";
