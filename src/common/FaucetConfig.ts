@@ -77,7 +77,7 @@ export interface IFaucetConfig {
   };
   ipInfoMatchRestrictedRewardFile: null | { // ip info pattern based restrictions from file
     file?: string; // path to file
-    yaml?: string; // path to yaml file (for more actions/kill messages/etc.)
+    yaml?: string|string[]; // path to yaml file (for more actions/kill messages/etc.)
     refresh: number; // refresh interval
   };
   faucetBalanceRestrictedReward: null | { // reward restriction based on faucet wallet balance. lowest value applies

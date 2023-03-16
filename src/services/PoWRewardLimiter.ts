@@ -46,18 +46,28 @@ export class PoWRewardLimiter {
         this.ipInfoMatchRestrictions.push([match[2], parseInt(match[1])]);
       });
     }
-    if(faucetConfig.ipInfoMatchRestrictedRewardFile && faucetConfig.ipInfoMatchRestrictedRewardFile.yaml && fs.existsSync(faucetConfig.ipInfoMatchRestrictedRewardFile.yaml)) {
+    if(faucetConfig.ipInfoMatchRestrictedRewardFile && faucetConfig.ipInfoMatchRestrictedRewardFile.yaml) {
       // load yaml file
-      let yamlSrc = fs.readFileSync(faucetConfig.ipInfoMatchRestrictedRewardFile.yaml, "utf8");
-      let yamlObj = YAML.parse(yamlSrc);
+      if(Array.isArray(faucetConfig.ipInfoMatchRestrictedRewardFile.yaml))
+        faucetConfig.ipInfoMatchRestrictedRewardFile.yaml.forEach((file) => this.refreshIpInfoMatchRestrictionsFromYaml(file));
+      else
+        this.refreshIpInfoMatchRestrictionsFromYaml(faucetConfig.ipInfoMatchRestrictedRewardFile.yaml);
+    }
+  }
 
-      if(Array.isArray(yamlObj.restrictions)) {
-        yamlObj.restrictions.forEach((entry) => {
-          let pattern = entry.pattern;
-          delete entry.pattern;
-          this.ipInfoMatchRestrictions.push([pattern, entry]);
-        })
-      }
+  private refreshIpInfoMatchRestrictionsFromYaml(yamlFile: string) {
+    if(!fs.existsSync(yamlFile))
+      return;
+    
+    let yamlSrc = fs.readFileSync(yamlFile, "utf8");
+    let yamlObj = YAML.parse(yamlSrc);
+
+    if(Array.isArray(yamlObj.restrictions)) {
+      yamlObj.restrictions.forEach((entry) => {
+        let pattern = entry.pattern;
+        delete entry.pattern;
+        this.ipInfoMatchRestrictions.push([pattern, entry]);
+      })
     }
   }
 
