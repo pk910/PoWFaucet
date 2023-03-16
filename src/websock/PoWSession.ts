@@ -13,6 +13,7 @@ import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
 import { FaucetStatsLog } from "../services/FaucetStatsLog";
 import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
 import { IPassportInfo, PassportVerifier } from "../services/PassportVerifier";
+import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 
 
 export enum PoWSessionSlashReason {
@@ -137,6 +138,8 @@ export class PoWSession {
   private lastIpInfo: IIPInfo;
   private missedVerifications: number;
   private pendingVerifications: number;
+  private rewardRestriction: IPoWRewardRestriction;
+  private rewardRestrictionRefresh: number;
   private lastBoostRefresh: number;
   private boostInfo: IPoWSessionBoostInfo;
 
@@ -191,7 +194,7 @@ export class PoWSession {
         " [Recovered: " + (Math.round(weiToEth(this.balance)*1000)/1000) + " ETH, start: " + renderDate(this.startTime, true) + "]" :
         ""
       ) +
-      " (Remote IP: " + this.activeClient.getRemoteIP() + ")"
+      " (Remote IP: " + client.getRemoteIP() + ")"
     );
 
     this.resetSessionTimer();
@@ -392,7 +395,7 @@ export class PoWSession {
   }
 
   public getLastRemoteIp(hashed?: boolean): string {
-    if(hashed) {
+    if(this.lastRemoteIp && hashed) {
       if(!this.hashedRemoteIp)
         this.hashedRemoteIp = getHashedIp(this.lastRemoteIp, faucetConfig.faucetSecret);
       return this.hashedRemoteIp;
@@ -416,8 +419,8 @@ export class PoWSession {
     this.hashedRemoteIp = null;
     ServiceManager.GetService(IPInfoResolver).getIpInfo(remoteAddr).then((ipInfo) => {
       this.lastIpInfo = ipInfo;
-      if(this.activeClient)
-        this.activeClient.refreshFaucetStatus();
+
+      setTimeout(() => this.updateRewardRestriction(), 10);
     });
   }
 
@@ -544,6 +547,35 @@ export class PoWSession {
     return sessionStr + "|" + sessionHash.digest('base64');
   }
 
+  private updateRewardRestriction() {
+    this.rewardRestriction = ServiceManager.GetService(PoWRewardLimiter).getSessionRestriction(this);
+    this.rewardRestrictionRefresh = Math.floor((new Date()).getTime() / 1000);
+
+    if(this.rewardRestriction.blocked) {
+      let activeClient = this.activeClient;
+      this.closeSession(true, this.rewardRestriction.blocked === "close");
+      if(activeClient) {
+        activeClient.sendMessage("sessionKill", {
+          level: "restriction",
+          message: "Session closed due to restrictions: " + this.rewardRestriction.messages.map((msg) => msg.text).join(", "),
+          token: this.isClaimable() ? this.getSignedSession() : null,
+        });
+      }
+      return;
+    }
+
+    if(this.activeClient)
+      this.activeClient.refreshFaucetStatus();
+  }
+
+  public getRewardRestriction(): IPoWRewardRestriction {
+    let now = Math.floor((new Date()).getTime() / 1000);
+    if(!this.rewardRestriction || this.rewardRestrictionRefresh < now - 60)
+      this.updateRewardRestriction();
+    
+    return this.rewardRestriction;
+  }
+
   public getBoostInfo(): IPoWSessionBoostInfo {
     return this.boostInfo;
   }
@@ -552,7 +584,7 @@ export class PoWSession {
     let passportVerifier = ServiceManager.GetService(PassportVerifier);
     let passport: IPassportInfo;
     if(refresh && passportJson) {
-      let verifyResult = await passportVerifier.verifyUserPassport(this.targetAddr, JSON.parse(passportJson));
+      let verifyResult = await passportVerifier.verifyUserPassport(this.targetAddr, passportJson);
       if(!verifyResult.valid) {
         throw verifyResult.errors.join("\n");
       }

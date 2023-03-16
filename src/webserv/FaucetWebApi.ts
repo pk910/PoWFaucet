@@ -5,7 +5,7 @@ import { ServiceManager } from "../common/ServiceManager";
 import { ClaimTxStatus, EthWeb3Manager } from "../services/EthWeb3Manager";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
 import { IIPInfo } from "../services/IPInfoResolver";
-import { PoWRewardLimiter } from "../services/PoWRewardLimiter";
+import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 import { getHashedSessionId } from "../utils/HashedInfo";
 import { PoWClient } from "../websock/PoWClient";
 import { PoWSession, PoWSessionStatus } from "../websock/PoWSession";
@@ -78,7 +78,7 @@ export interface IClientFaucetStatus {
     hashrate: number;
     status: PoWSessionStatus;
     claimable: boolean;
-    limit: number;
+    restr: IPoWRewardRestriction;
     cliver: string;
     boostF: number;
     boostS: number;
@@ -226,7 +226,7 @@ export class FaucetWebApi {
         hashrate: session.getReportedHashRate(),
         status: session.getSessionStatus(),
         claimable: session.isClaimable(),
-        limit: rewardLimiter.getSessionRestriction(session),
+        restr: rewardLimiter.getSessionRestriction(session),
         cliver: clientVersion,
         boostF: boostInfo?.factor || 1,
         boostS: boostInfo?.score || 0,

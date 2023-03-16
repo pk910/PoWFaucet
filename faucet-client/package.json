@@ -1,6 +1,6 @@
 {
   "name": "pow-faucet-client",
-  "version": "1.0.30",
+  "version": "1.0.31",
   "description": "PoW Faucet Client",
   "scripts": {
     "bundle": "webpack",

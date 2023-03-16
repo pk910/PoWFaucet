@@ -240,7 +240,10 @@ ipInfoMatchRestrictedReward:
 ### Fund Management
 
 # minimum balance to keep in the faucet wallet (in wei)
-spareFundsAmount: 1000000000000000000  # 1 ETH
+spareFundsAmount: 100000000000000000  # 0.1 ETH
+
+# minimum balance to show the empty faucet error message
+noFundsBalance:   1000000000000000000  # 1 ETH
 
 # minimum balance to show the low funds warning
 lowFundsBalance: 10000000000000000000  # 10 ETH
@@ -357,8 +360,10 @@ passportBoost:
     "Google": 1
     "Twitter": 1
     "Ens": 2
+    "GnosisSafe": 2
     "Poh": 4
     "POAP": 1
+    "GitPOAP": 1
     "Facebook": 1
     "FacebookFriends": 1
     "FacebookProfilePicture": 1

@@ -155,7 +155,7 @@ export class PassportVerifier {
     };
   }
 
-  public async verifyUserPassport(addr: string, passport: Passport): Promise<IPassportVerification> {
+  public async verifyUserPassport(addr: string, passportJson: string): Promise<IPassportVerification> {
     if(!faucetConfig.passportBoost)
       return {valid: false, errors: ["Passport Boost disabled"]};
     if(!faucetConfig.passportBoost.trustedIssuers || faucetConfig.passportBoost.trustedIssuers.length == 0)
@@ -168,10 +168,21 @@ export class PassportVerifier {
       errors: [],
       newest: 0,
     }
-    var DIDKit = this.passportVerifier._DIDKit;
-    var providerMap = {};
+    let DIDKit = this.passportVerifier._DIDKit;
+    let providerMap = {};
+    
+    let passport: Passport;
+    try {
+      passport = JSON.parse(passportJson);
+    } catch(ex) {
+      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://passport.gitcoin.co"]};
+    }
+
+    if(!passport || typeof passport !== "object" || !passport.stamps || !Array.isArray(passport.stamps))
+      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://passport.gitcoin.co"]};
     
     // verify passport
+
     let now = Math.floor((new Date()).getTime() / 1000);
     await Promise.all(passport.stamps.map(async (stamp) => {
       let issuanceTime = Math.floor((new Date(stamp.credential.issuanceDate)).getTime() / 1000);
@@ -181,13 +192,13 @@ export class PassportVerifier {
 
       // verify stamp provider
       if(stamp.provider !== stamp.credential.credentialSubject.provider) {
-        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: credentialSubject.provider missmatch");
+        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: stamp provider doesn't match credentialSubject.provider (don't play around with the JSON!!!)");
         return;
       }
 
       // verify provider uniqueness
       if(providerMap.hasOwnProperty(stamp.provider.toLowerCase())) {
-        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: duplicate provider");
+        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: duplicate provider (don't play around with the JSON!!!)");
         return;
       }
       providerMap[stamp.provider.toLowerCase()] = true;
@@ -195,7 +206,7 @@ export class PassportVerifier {
       // verify the stamp subject address
       let stampAddress = stamp.credential.credentialSubject.id.replace("did:pkh:eip155:1:", "").toLowerCase();
       if(stampAddress !== addr.toLowerCase()) {
-        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: credentialSubject.id missmatch");
+        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: not signed for expected wallet (signed for " + stampAddress + ")");
         return;
       }
 

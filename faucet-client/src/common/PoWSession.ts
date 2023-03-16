@@ -271,17 +271,17 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public processSessionKill(killInfo: any) {
-    let claimable = false;
-    if(killInfo.level === "timeout" && killInfo.token) {
+    let skipMessage = false;
+    if(killInfo.token) {
       let claimInfo = this.getClaimInfo(killInfo.token);
       this.storeClaimInfo(claimInfo);
       this.emit("claimable", claimInfo);
-      claimable = true;
+      skipMessage = (killInfo.level === "timeout");
     }
     this.sessionInfo = null;
-    if(killInfo.level === "session" || killInfo.level === "timeout")
+    if(killInfo.level === "restriction" || killInfo.level === "session" || killInfo.level === "timeout")
       this.storeSessionStatus();
-    if(!claimable)
+    if(!skipMessage)
       this.emit("killed", killInfo);
     this.emit("update");
   }

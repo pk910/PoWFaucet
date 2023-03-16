@@ -68,15 +68,16 @@ export interface IFaucetConfig {
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
   ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
   ipRestrictedRewardShare: null | { // ip based restrictions
-    hosting?: number; // percentage of reward per share if IP is in a hosting range
-    proxy?: number; // percentage of reward per share if IP is in a proxy range
-    [country: string]: number; // percentage of reward per share if IP is from given country code (DE/US/...)
+    hosting?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a hosting range
+    proxy?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a proxy range
+    [country: string]: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is from given country code (DE/US/...)
   };
   ipInfoMatchRestrictedReward: null | { // ip info pattern based restrictions
-    [pattern: string]: number; // percentage of reward per share if IP info matches regex pattern
+    [pattern: string]: number | IFacuetRestrictionConfig; // percentage of reward per share if IP info matches regex pattern
   };
   ipInfoMatchRestrictedRewardFile: null | { // ip info pattern based restrictions from file
-    file: string; // path to file
+    file?: string; // path to file
+    yaml?: string; // path to yaml file (for more actions/kill messages/etc.)
     refresh: number; // refresh interval
   };
   faucetBalanceRestrictedReward: null | { // reward restriction based on faucet wallet balance. lowest value applies
@@ -85,6 +86,7 @@ export interface IFaucetConfig {
   faucetBalanceRestriction: IFaucetBalanceRestrictionConfig;
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
+  noFundsBalance: number; // minimum balance to show the empty faucet error message
   lowFundsBalance: number; // minimum balance to show the low funds warning
   lowFundsWarning: string | boolean; // low faucet balance warning message / true to show the generic message / false to disable the warning
   noFundsError: string | boolean; // empty faucet error message / true to show the generic message / false to disable the error
@@ -121,6 +123,14 @@ export interface IFaucetConfig {
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
   resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
   passportBoost: IPassportBoostConfig | null; // passport boost options or null to disable
+}
+
+export interface IFacuetRestrictionConfig {
+  reward: number;
+  msgkey?: string;
+  message?: string;
+  notify?: boolean|string;
+  blocked?: boolean|"close"|"kill";
 }
 
 export interface IFaucetCaptchaConfig {
@@ -248,6 +258,7 @@ let defaultConfig: IFaucetConfig = {
   faucetBalanceRestrictedReward: null,
   faucetBalanceRestriction: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
+  noFundsBalance:    100000000000000000, // 0,1 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,
   noFundsError: true,

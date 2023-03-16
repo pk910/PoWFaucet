@@ -80,7 +80,7 @@ export class PoWClient {
 
   public setSession(session: PoWSession) {
     this.session = session;
-    this.refreshFaucetStatus();
+    setTimeout(() => this.refreshFaucetStatus(), 100);
   }
 
   public getRemoteIP(): string {
@@ -302,6 +302,8 @@ export class PoWClient {
       }
     }
     
+    if(this.session)
+      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
     ServiceManager.GetService(FaucetStore).setAddressMark(targetAddr, AddressMark.USED);
 
     // create new session
@@ -495,7 +497,7 @@ export class PoWClient {
 
     let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
     let verifyReward: bigint;
-    if(verifyValid && this.session && (verifyReward = ServiceManager.GetService(PoWRewardLimiter).getVerificationReward(this.session)) > 0) {
+    if(verifyValid && this.session && (verifyReward = ServiceManager.GetService(PoWRewardLimiter).getVerificationReward(this.session)) > 0 && this.session) {
       this.session.addBalance(verifyReward);
 
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
@@ -636,6 +638,8 @@ export class PoWClient {
   }
 
   private refreshBoostInfoAndNotify() {
+    if(!this.session)
+      return;
     this.session.refreshBoostInfo().then((boostInfo) => {
       this.sendMessage("boostInfo", boostInfo);
     });
