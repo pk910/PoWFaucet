@@ -210,7 +210,7 @@ export class EthWeb3Manager {
       newStatus = FucetWalletState.NORMAL;
       if(!this.walletState.ready)
         newStatus = FucetWalletState.OFFLINE;
-      else if(this.walletState.balance <= faucetConfig.spareFundsAmount)
+      else if(this.walletState.balance <= faucetConfig.noFundsBalance)
         newStatus = FucetWalletState.NOFUNDS;
       else if(this.walletState.balance <= faucetConfig.lowFundsBalance)
         newStatus = FucetWalletState.LOWFUNDS;

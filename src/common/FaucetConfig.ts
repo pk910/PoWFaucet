@@ -86,6 +86,7 @@ export interface IFaucetConfig {
   faucetBalanceRestriction: IFaucetBalanceRestrictionConfig;
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
+  noFundsBalance: number; // minimum balance to show the empty faucet error message
   lowFundsBalance: number; // minimum balance to show the low funds warning
   lowFundsWarning: string | boolean; // low faucet balance warning message / true to show the generic message / false to disable the warning
   noFundsError: string | boolean; // empty faucet error message / true to show the generic message / false to disable the error
@@ -257,6 +258,7 @@ let defaultConfig: IFaucetConfig = {
   faucetBalanceRestrictedReward: null,
   faucetBalanceRestriction: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
+  noFundsBalance:    100000000000000000, // 0,1 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,
   noFundsError: true,

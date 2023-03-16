@@ -240,7 +240,10 @@ ipInfoMatchRestrictedReward:
 ### Fund Management
 
 # minimum balance to keep in the faucet wallet (in wei)
-spareFundsAmount: 1000000000000000000  # 1 ETH
+spareFundsAmount: 100000000000000000  # 0.1 ETH
+
+# minimum balance to show the empty faucet error message
+noFundsBalance:   1000000000000000000  # 1 ETH
 
 # minimum balance to show the low funds warning
 lowFundsBalance: 10000000000000000000  # 10 ETH
