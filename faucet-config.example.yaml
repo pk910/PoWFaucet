@@ -27,7 +27,7 @@ faucetCoinSymbol: "GöETH"
 faucetHomeHtml: |
   <div class='pow-info'>
     <h5>What is a PoW Faucet?</h5>
-    This is a Ethereum Faucet running on the Goerli Testnet.<br>
+    This is an Ethereum Faucet running on the Goerli Testnet.<br>
     To prevent malicious actors from exhausting all available funds or 
     accumulating enough Ether to mount long running spam attacks, 
     this faucet requires some mining work to be done in exchange for 
@@ -83,7 +83,7 @@ ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
 #  Avg. Mining Reward:
 #    reward_per_sec = 1/(2**powScryptParams.difficulty) * hashrate * powShareReward
 
-# reward amount per egliable hash (in wei)
+# reward amount per eligible hash (in wei)
 #powShareReward: 12500000000000000  # 0.0125
 powShareReward:   2000000000000000  # 0.002 ETH
 
@@ -108,7 +108,7 @@ verifyMinerReward:   300000000000000  # 0.0003 ETH  (~1/6th of powShareReward)
 # maximum mining session time (in seconds)
 powSessionTimeout: 18000   # 5h
 
-# how long sessions can be payed out (in seconds)
+# how long sessions can be paid out (in seconds)
 # should be higher than powSessionTimeout
 claimSessionTimeout: 43200  # 12h
 
@@ -144,19 +144,19 @@ powScryptParams:
   # r - block size: affects memory and CPU usage
   blockSize: 8
   # p - parallelism factor: threads to run in parallel, affects the memory & CPU usage, should be 1 as webworker is single threaded
-  paralellization: 1
+  parallelization: 1
   # klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
   keyLength: 16
-  # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+  # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
   difficulty: 11
 
 # number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)
 #powNonceCount: 1
 
 # Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
-# As that can lead to a huge verification work load on the server, this faucet can redistribute shares back to other miners for verification.
+# As that can lead to a huge verification workload on the server, this faucet can redistribute shares back to other miners for verification.
 # These randomly selected miners need to check the share and return its validity to the server within 10 seconds or they're penalized.
-# If theres a missmatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
+# If there's a mismatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
 # Bad shares always result in a slashing (termination of session and loss of all collected mining balance)
 
 # percentage of shares validated locally (0 - 100)
@@ -275,7 +275,7 @@ faucetBalanceRestrictedReward:
 
 # dynamic reward restriction based on faucet balance
 # alternative to static faucetBalanceRestrictedReward
-# limits the rewards lineary according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
+# limits the rewards linearly according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
 faucetBalanceRestriction:
   enabled: false
   targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
