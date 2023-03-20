@@ -37,7 +37,7 @@ export interface IFaucetConfig {
   powScryptParams: { // scrypt parameters
     cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
     blockSize: number; // r - block size (affects memory and CPU usage)
-    paralellization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+    parallelization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
     keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
     difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
   };
@@ -231,7 +231,7 @@ let defaultConfig: IFaucetConfig = {
   powScryptParams: {
     cpuAndMemory: 4096,
     blockSize: 8,
-    paralellization: 1,
+    parallelization: 1,
     keyLength: 16,
     difficulty: 9
   },
@@ -311,6 +311,8 @@ export function loadFaucetConfig() {
   }
   if(!config.captchas && (config as any).hcaptcha)
     config.captchas = (config as any).hcaptcha;
+  if(config.powScryptParams && typeof config.powScryptParams.parallelization !== "number")
+    config.powScryptParams.parallelization = (config.powScryptParams as any).paralellization || 1;
 
   if(!faucetConfig)
     faucetConfig = {} as any;

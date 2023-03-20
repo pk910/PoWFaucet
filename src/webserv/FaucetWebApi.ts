@@ -162,7 +162,7 @@ export class FaucetWebApi {
       powParams: {
         n: faucetConfig.powScryptParams.cpuAndMemory,
         r: faucetConfig.powScryptParams.blockSize,
-        p: faucetConfig.powScryptParams.paralellization,
+        p: faucetConfig.powScryptParams.parallelization,
         l: faucetConfig.powScryptParams.keyLength,
         d: faucetConfig.powScryptParams.difficulty,
       },
