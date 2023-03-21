@@ -28,6 +28,8 @@ edit faucet-config.yaml
 
 `npm run start`
 
+access the faucet via http://localhost:8080
+
 # Configure
 
 see [faucet-config.example.yaml](https://github.com/pk910/PoWFaucet/blob/master/faucet-config.example.yaml)
@@ -50,9 +52,11 @@ faucetStore: "/config/faucet-store.json"
 faucetLogFile: "/config/faucet-events.log"
 ```
 
-start the container: (change `/gome/powfaucet` to your datadir)
+start the container: (change `/home/powfaucet` to your datadir)
 
 `docker run -d --restart unless-stopped --name=powfaucet -v /home/powfaucet:/config -p 8080:8080 -it pk910/powfaucet:latest --config=/config/faucet-config.yaml`
+
+You should now be able to access the faucet via http://localhost:8080
 
 read logs:
 
