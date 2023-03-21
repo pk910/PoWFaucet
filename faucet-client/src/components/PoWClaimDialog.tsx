@@ -1,4 +1,3 @@
-import { IPoWMinerStats, PoWMiner } from '../common/PoWMiner';
 import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import React from 'react';
 import { Button, Modal, Spinner } from 'react-bootstrap';
@@ -6,7 +5,6 @@ import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTimespan } from '../utils/DateUtils';
 import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
-import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { IPoWStatusDialogProps } from './PoWStatusDialog';
 import { PoWFaucetCaptcha } from './PoWFaucetCaptcha';
 import { PoWTime } from 'common/PoWTime';
@@ -117,7 +115,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   private onPoWClientOpen() {
     if(this.state.claimStatus !== PoWClaimStatus.PENDING)
       return;
-    this.props.powClient.sendRequest("", {
+    this.props.powClient.sendRequest("watchClaimTx", {
       sessionId: this.props.reward.session
     }).catch((err) => {
       this.setState({
@@ -140,7 +138,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
           title: "Claim expired",
           body: (
             <div className='altert alert-danger'>
-              Sorry, your reward ({Math.round(weiToEth(this.props.reward.balance) * 100) / 100} {this.props.faucetConfig.faucetCoinSymbol}) has not been claimed in time.
+              Sorry, your reward ({Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}) has not been claimed in time.
             </div>
           ),
           closeButton: {
@@ -189,7 +187,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 Claimable Reward:
               </div>
               <div className='col'>
-                {Math.round(weiToEth(this.props.reward.balance) * 100) / 100} {this.props.faucetConfig.faucetCoinSymbol}
+                {Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}
               </div>
             </div>
             <div className='row'>
@@ -230,6 +228,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 TX: {this.props.faucetConfig.ethTxExplorerLink ? 
                 <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank'>{this.state.txHash}</a> :
                 <span>{this.state.txHash}</span>}
+                {this.renderResultSharing()}
               </div>
              : null}
              {this.state.claimStatus == PoWClaimStatus.FAILED ?
@@ -253,6 +252,82 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     );
 	}
 
+  private renderResultSharing(): React.ReactElement<IPoWClaimDialogProps> {
+    let shareEls: React.ReactElement[] = [];
+
+    if(this.props.faucetConfig.resultSharing?.twitter) {
+      let tweetMsg = this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.twitter);
+      let tweetUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
+      shareEls.push(
+        <span className='sh-link sh-tw'>
+          <a href='#' target='_blank' data-url={tweetUrl} onClick={function(evt) {
+            let a = document.createElement('a');
+            a.target = '_blank';
+            a.href = tweetUrl;
+            a.click();
+
+            evt.preventDefault();
+          }}><i /><span>Tweet</span></a>
+        </span>
+      );
+    }
+    if(this.props.faucetConfig.resultSharing?.mastodon) {
+      let tweetMsg = this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.mastodon);
+
+      let tweetUrl = "/share?text=" + encodeURIComponent(tweetMsg);
+      shareEls.push(
+        <span className='sh-link sh-md'>
+          <a href={'https://mastodon.social' + tweetUrl} target='_blank' data-url={tweetUrl} onClick={function(evt) {
+
+            var mastodonUrl = evt.currentTarget.getAttribute("data-instance");
+            if(!mastodonUrl)
+              mastodonUrl = prompt("Please enter the URL of the mastodon instance you'd like to share to:", "https://mastodon.social");
+            if(mastodonUrl) {
+              evt.currentTarget.setAttribute("href", mastodonUrl.replace(/\/$/, "") + tweetUrl);
+              evt.currentTarget.setAttribute("data-instance", mastodonUrl);
+            }
+            else
+              evt.preventDefault();
+          }}><i /><span>Post</span></a>
+        </span>
+      );
+    }
+
+    let resultSharingCaption = this.props.faucetConfig.resultSharing.caption || "Support this faucet with a ";
+    return (
+      <div className='result-sharing'>
+        {this.props.faucetConfig.resultSharing.preHtml ?
+          <div className="sh-html" dangerouslySetInnerHTML={{__html: this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.preHtml)}} />
+        : null}
+        {shareEls.length > 0 ? 
+          <div className='sh-opt'>
+            <span className='sh-label'>{resultSharingCaption}</span>
+            {shareEls}
+          </div>
+        : null}
+        {this.props.faucetConfig.resultSharing.postHtml ?
+          <div className="sh-html" dangerouslySetInnerHTML={{__html: this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.postHtml)}} />
+        : null}
+      </div>
+    )
+  }
+
+  private replaceShareMessagePlaceholders(message: string): string {
+    message = message.replace(/{sessionid}/ig, this.props.reward.session);
+    message = message.replace(/{target}/ig, this.props.reward.target);
+
+    message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000).toString());
+    message = message.replace(/{url}/ig, location.href);
+
+    let duration = (this.props.reward.tokenTime || (new Date()).getTime() / 1000) - this.props.reward.startTime;
+    message = message.replace(/{duration}/ig, renderTimespan(duration));
+
+    let hashrate = this.props.reward.nonce / duration;
+    message = message.replace(/{hashrate}/ig, (Math.round(hashrate * 100) / 100).toString());
+
+    return message;
+  }
+
   private onClaimRewardClick() {
     this.setState({
       claimProcessing: true
@@ -261,9 +336,21 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       this.claimConnKeeper.close();
     this.claimConnKeeper = this.props.powClient.newConnectionKeeper();
 
-    this.props.powClient.sendRequest("claimRewards", {
-      captcha: this.props.faucetConfig.hcapClaim ? this.captchaControl.getToken() : null,
-      token: this.props.reward.token
+    let capPromise: Promise<string>;
+    if(this.props.faucetConfig.hcapClaim && this.captchaControl) {
+      capPromise = this.captchaControl.getToken();
+      capPromise.then(() => {
+        this.captchaControl.resetToken();
+      });
+    }
+    else
+      capPromise = Promise.resolve(null);
+    
+    capPromise.then((capToken) => {
+      return this.props.powClient.sendRequest("claimRewards", {
+        captcha: capToken,
+        token: this.props.reward.token
+      });
     }).then(() => {
       this.props.powSession.storeClaimInfo(null);
       this.setState({
@@ -276,6 +363,10 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       };
       if(this.captchaControl) {
         this.captchaControl.resetToken();
+      }
+      if(err.code === "INVALID_CLAIM") {
+        stateChange.claimStatus = PoWClaimStatus.FAILED;
+        stateChange.txError = err.message;
       }
       this.setState(stateChange);
 

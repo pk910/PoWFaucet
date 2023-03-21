@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import YAML from 'yaml'
+import randomBytes from 'randombytes'
 
 export interface IFaucetConfig {
   appBasePath: string; // base path (set automatically)
@@ -27,6 +28,7 @@ export interface IFaucetConfig {
   claimMaxAmount: number; // maximum balance to payout (in wei)
   powSessionTimeout: number; // maximum mining session time in seconds
   claimSessionTimeout: number; // how long sessions can be payed out in seconds (should be higher than powSessionTimeout)
+  powIdleTimeout: number; // maximum number of seconds a session can idle until it gets closed
   claimAddrCooldown: number; // number of seconds to wait before allow to reuse the same address to start another mining session
   claimAddrMaxBalance: null | number; // check balance and deny mining if balance exceeds the limit
   claimAddrDenyContract: boolean; // check and prevent mining if target address is a contract
@@ -62,29 +64,34 @@ export interface IFaucetConfig {
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
   ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
   ipRestrictedRewardShare: null | { // ip based restrictions
-    hosting?: number; // percentage of reward per share if IP is in a hosting range
-    proxy?: number; // percentage of reward per share if IP is in a proxy range
-    [country: string]: number; // percentage of reward per share if IP is from given country code (DE/US/...)
+    hosting?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a hosting range
+    proxy?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a proxy range
+    [country: string]: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is from given country code (DE/US/...)
   };
   ipInfoMatchRestrictedReward: null | { // ip info pattern based restrictions
-    [pattern: string]: number; // percentage of reward per share if IP info matches regex pattern
+    [pattern: string]: number | IFacuetRestrictionConfig; // percentage of reward per share if IP info matches regex pattern
   };
   ipInfoMatchRestrictedRewardFile: null | { // ip info pattern based restrictions from file
-    file: string; // path to file
+    file?: string; // path to file
+    yaml?: string|string[]; // path to yaml file (for more actions/kill messages/etc.)
     refresh: number; // refresh interval
   };
   faucetBalanceRestrictedReward: null | { // reward restriction based on faucet wallet balance. lowest value applies
     [limit: number]: number; // limit: min balance in wei, value: percent of normal reward (eg. 50 = half rewards)
   };
+  faucetBalanceRestriction: IFaucetBalanceRestrictionConfig;
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
+  noFundsBalance: number; // minimum balance to show the empty faucet error message
   lowFundsBalance: number; // minimum balance to show the low funds warning
   lowFundsWarning: string | boolean; // low faucet balance warning message / true to show the generic message / false to disable the warning
   noFundsError: string | boolean; // empty faucet error message / true to show the generic message / false to disable the error
+  rpcConnectionError: string | boolean; // RPC unreachable error message / true to show the generic message / false to disable the error
+  denyNewSessions: string | boolean; // prevent creation of new sessions (used for maintenance)
 
   ethRpcHost: string; // ETH execution layer RPC host
   ethWalletKey: string; // faucet wallet private key
-  ethChainId: number; // ETH chain id
+  ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
@@ -96,7 +103,9 @@ export interface IFaucetConfig {
     contract: string; // vault contract address
     abi: string; // vault contract abi
     allowanceFn: string; // vault contract getAllowance function name
+    allowanceFnArgs: string[]; // vault contract getAllowance function args
     withdrawFn: string; // vault contract withdraw function name
+    withdrawFnArgs: string[]; // vault contract withdraw function args
     withdrawGasLimit: number; // gas limit for withdraw transaction (in wei)
     checkContractBalance: boolean | string; // check balance of contract before withdrawing
     contractDustBalance: number; // don't request funds if contract balance is lower than this
@@ -108,6 +117,16 @@ export interface IFaucetConfig {
 
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
+  resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
+  passportBoost: IPassportBoostConfig | null; // passport boost options or null to disable
+}
+
+export interface IFacuetRestrictionConfig {
+  reward: number;
+  msgkey?: string;
+  message?: string;
+  notify?: boolean|string;
+  blocked?: boolean|"close"|"kill";
 }
 
 export interface IFaucetCaptchaConfig {
@@ -118,6 +137,11 @@ export interface IFaucetCaptchaConfig {
   checkBalanceClaim: boolean; // require captcha to claim mining rewards
 }
 
+export interface IFaucetBalanceRestrictionConfig {
+  enabled: boolean;
+  targetBalance: number;
+}
+
 export enum PoWHashAlgo {
   SCRYPT      = "sc",
   CRYPTONIGHT = "cn",
@@ -126,7 +150,7 @@ export enum PoWHashAlgo {
 export interface IPoWSCryptParams {
   cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
   blockSize: number; // r - block size (affects memory and CPU usage)
-  paralellization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+  parallelization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
   keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
   difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
 }
@@ -150,8 +174,49 @@ export interface IFaucetStatsConfig {
   logfile: string;
 }
 
+export interface IFaucetResultSharingConfig {
+  preHtml: string;
+  postHtml: string;
+  caption: string;
+  [provider: string]: string;
+}
+
+export interface IPassportBoostConfig {
+  passportCachePath: string;
+  trustedIssuers: string[];
+  refreshCooldown: number;
+  cacheTime: number;
+  stampScoring: {[stamp: string]: number};
+  boostFactor: {[score: number]: number};
+}
+
+let cliArgs = (function() {
+  let args = {};
+  let arg, key;
+  for(let i = 0; i < process.argv.length; i++) {
+      if((arg = /^--([^=]+)(?:=(.+))?$/.exec(process.argv[i]))) {
+          key = arg[1];
+          args[arg[1]] = arg[2] || true;
+      }
+      else if(key) {
+          args[key] = process.argv[i];
+          key = null;
+      }
+  }
+  return args;
+})();
+
 let packageJson = require('../../package.json');
 let basePath = path.join(__dirname, "..", "..");
+let configFile: string;
+if(cliArgs['config']) {
+  if(cliArgs['config'].match(/^\//))
+    configFile = cliArgs['config'];
+  else
+    configFile = path.join(basePath, cliArgs['config']);
+}
+else
+  configFile = path.join(basePath, "faucet-config.yaml");
 let defaultConfig: IFaucetConfig = {
   appBasePath: basePath,
   faucetVersion: packageJson.version,
@@ -178,6 +243,7 @@ let defaultConfig: IFaucetConfig = {
   claimMaxAmount:  10000000000000000000, // 10 ETH
   powSessionTimeout: 3600,
   claimSessionTimeout: 7200,
+  powIdleTimeout: 1800,
   claimAddrCooldown: 7200,
   claimAddrMaxBalance: null,
   claimAddrDenyContract: false,
@@ -185,7 +251,7 @@ let defaultConfig: IFaucetConfig = {
   powScryptParams: {
     cpuAndMemory: 4096,
     blockSize: 8,
-    paralellization: 1,
+    parallelization: 1,
     keyLength: 16,
     difficulty: 9
   },
@@ -216,13 +282,17 @@ let defaultConfig: IFaucetConfig = {
   ipInfoMatchRestrictedReward: null,
   ipInfoMatchRestrictedRewardFile: null,
   faucetBalanceRestrictedReward: null,
+  faucetBalanceRestriction: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
+  noFundsBalance:    100000000000000000, // 0,1 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,
   noFundsError: true,
+  rpcConnectionError: true,
+  denyNewSessions: false,
   ethRpcHost: "http://127.0.0.1:8545/",
   ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
-  ethChainId: 1337802,
+  ethChainId: null,
   ethTxGasLimit: 21000,
   ethTxMaxFee: 1800000000,
   ethTxPrioFee: 800000000,
@@ -232,6 +302,8 @@ let defaultConfig: IFaucetConfig = {
   ethRefillContract: null,
   ensResolver: null,
   faucetStats: null,
+  resultSharing: null,
+  passportBoost: null,
 };
 
 export let faucetConfig: IFaucetConfig = null;
@@ -239,23 +311,23 @@ export let faucetConfig: IFaucetConfig = null;
 export function loadFaucetConfig() {
   let config: IFaucetConfig;
 
-  let yamlConfigFile = path.join(defaultConfig.appBasePath, "faucet-config.yaml");
-  let jsonConfigFile = path.join(defaultConfig.appBasePath, "faucet-config.json");
-  if(fs.existsSync(yamlConfigFile)) {
-    console.log("Loading yaml faucet config from " + yamlConfigFile);
-    let yamlSrc = fs.readFileSync(yamlConfigFile, "utf8");
-    let yamlObj = YAML.parse(yamlSrc);
-    config = yamlObj;
+  if(!fs.existsSync(configFile)) {
+    // create copy of faucet-config.example.yml
+    let exampleConfigFile = path.join(basePath, "faucet-config.example.yaml")
+    if(!fs.existsSync(exampleConfigFile))
+      throw exampleConfigFile + " not found";
+
+    let exampleYamlSrc = fs.readFileSync(exampleConfigFile, "utf8");
+    exampleYamlSrc = exampleYamlSrc.replace(/^ethWalletKey:.*$/m, 'ethWalletKey: "' + randomBytes(32).toString("hex") + '"');
+    exampleYamlSrc = exampleYamlSrc.replace(/^faucetSecret:.*$/m, 'faucetSecret: "' + randomBytes(40).toString("hex") + '"');
+
+    fs.writeFileSync(configFile, exampleYamlSrc);
   }
-  else if(fs.existsSync(jsonConfigFile)) {
-    console.log("Loading legacy json faucet config from " + jsonConfigFile);
-    let jsonSrc = fs.readFileSync(jsonConfigFile, "utf8");
-    let jsonObj = JSON.parse(jsonSrc);
-    config = jsonObj;
-  }
-  else {
-    throw "faucet configuration not found";
-  }
+
+  console.log("Loading yaml faucet config from " + configFile);
+  let yamlSrc = fs.readFileSync(configFile, "utf8");
+  let yamlObj = YAML.parse(yamlSrc);
+  config = yamlObj;
 
   if(!config.faucetSecret) {
     if((config as any).powSessionSecret)
@@ -265,6 +337,8 @@ export function loadFaucetConfig() {
   }
   if(!config.captchas && (config as any).hcaptcha)
     config.captchas = (config as any).hcaptcha;
+  if(config.powScryptParams && typeof config.powScryptParams.parallelization !== "number")
+    config.powScryptParams.parallelization = (config.powScryptParams as any).paralellization || 1;
 
   if(!faucetConfig)
     faucetConfig = {} as any;

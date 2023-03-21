@@ -1,0 +1,11 @@
+.git
+dist
+node_modules
+static/index.seo.html
+faucet-config.json
+faucet-config.yaml
+faucet-status.json
+faucet-store.json
+faucet-stats.log
+faucet-events.log
+faucet-pid.txt

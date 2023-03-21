@@ -20,6 +20,18 @@ export interface IFaucetConfig {
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
   time: number;
+  resultSharing: {
+    preHtml?: string;
+    postHtml?: string;
+    caption?: string;
+    [provider: string]: string;
+  };
+  passportBoost?: {
+    refreshTimeout: number;
+    manualVerification: boolean;
+    stampScoring: {[stamp: string]: number};
+    boostFactor: {[score: number]: number};
+  };
 }
 
 export enum PoWHashAlgo {
@@ -31,7 +43,7 @@ export type PoWParams = {
   a: PoWHashAlgo.SCRYPT,
   n: number; // cpu and memory cost
   r: number; // block size
-  p: number; // paralellization
+  p: number; // parallelization
   l: number; // key length
   d: number; // difficulty
 } | {

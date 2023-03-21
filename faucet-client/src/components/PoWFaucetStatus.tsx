@@ -15,13 +15,30 @@ export interface IPoWFaucetStatusProps {
 
 export interface IPoWFaucetStatusState {
   refreshing: boolean;
+  status: IPoWFaucetGeneralStatus;
+  refillStatus: IPoWFaucetRefillStatus;
   activeSessions: IPoWFaucetStatusSession[];
   activeClaims: IPoWFaucetStatusClaim[];
 }
 
 export interface IPoWFaucetStatus {
+  status: IPoWFaucetGeneralStatus;
+  refill: IPoWFaucetRefillStatus;
   sessions: IPoWFaucetStatusSession[];
   claims: IPoWFaucetStatusClaim[];
+}
+
+export interface IPoWFaucetGeneralStatus {
+  walletBalance: number;
+  unclaimedBalance: number;
+  balanceRestriction: number;
+}
+
+export interface IPoWFaucetRefillStatus {
+  balance: number;
+  trigger: number;
+  amount: number;
+  cooldown: number;
 }
 
 export interface IPoWFaucetStatusSession {
@@ -36,8 +53,10 @@ export interface IPoWFaucetStatusSession {
   hashrate: number;
   status: string;
   claimable: boolean;
-  limit: number;
+  restr: IPoWFaucetRestrictionStatus;
   cliver?: string;
+  boostF: number;
+  boostS: number;
 }
 
 export interface IPoWFaucetStatusIPInfo {
@@ -58,6 +77,15 @@ export interface IPoWFaucetStatusIPInfo {
   hosting?: boolean;
 }
 
+export interface IPoWFaucetRestrictionStatus {
+  reward: number;
+  messages: {
+    text: string;
+    notify: boolean|string;
+  }[];
+  blocked: false|"close"|"kill";
+}
+
 export interface IPoWFaucetStatusClaim {
   time: number;
   session: string;
@@ -75,6 +103,8 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
 
     this.state = {
       refreshing: false,
+      status: null,
+      refillStatus: null,
       activeSessions: [],
       activeClaims: [],
 		};
@@ -110,6 +140,8 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
 
       this.setState({
         refreshing: false,
+        status: faucetStatus.status,
+        refillStatus: faucetStatus.refill,
         activeSessions: activeSessions,
         activeClaims: activeClaims,
       });
@@ -130,17 +162,21 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           </div>
         </div>
         <div className='row'>
+        <div className='col-12 card status-panel'>
+            <div className="card-body">
+              <h5 className="card-title">Faucet Status</h5>
+              {this.renderFaucetStatus()}
+            </div>
+          </div>
           <div className='col-12 card status-panel'>
             <div className="card-body">
               <h5 className="card-title">Active mining sessions</h5>
-
               {this.renderActiveSessions()}
             </div>
           </div>
           <div className='col-12 card status-panel'>
             <div className="card-body">
               <h5 className="card-title">Reward claim transactions</h5>
-
               {this.renderActiveClaims()}
             </div>
           </div>
@@ -148,6 +184,83 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       </div>
     );
 	}
+
+  private renderFaucetStatus(): React.ReactElement {
+    if(!this.state.status)
+      return null;
+
+    let sessionStatus = {
+      mining: 0,
+      hashrate: 0,
+    };
+    this.state.activeSessions.forEach((session) => {
+      if(session.status === "mining") {
+        sessionStatus.mining++;
+        sessionStatus.hashrate += session.hashrate;
+      }
+    });
+    
+    return (
+      <div className="container status-general">
+        <div className="row">
+          <div className="col-xl-3 col-lg-4 col-6">
+            <div className="status-block">
+              <div className="status-prop">
+                <span className="status-title">Total Sessions:</span>
+                <span className="status-value">{this.state.activeSessions.length}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Mining Sessions:</span>
+                <span className="status-value">{sessionStatus.mining}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Total Hashrate:</span>
+                <span className="status-value">{Math.round(sessionStatus.hashrate * 100) / 100} H/s</span>
+              </div>
+            </div>
+          </div>
+          <div className="col-xl-3 col-lg-4 col-6">
+            <div className="status-block">
+              <div className="status-prop">
+                <span className="status-title">Faucet Wallet Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.status.walletBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Unclaimed Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.status.unclaimedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Reward Restriction:</span>
+                <span className="status-value">{Math.round(this.state.status.balanceRestriction * 1000) / 1000} %</span>
+              </div>
+            </div>
+          </div>
+          {this.state.refillStatus ?
+          <div className="col-xl-3 col-lg-4 col-6">
+            <div className="status-block">
+              <div className="status-prop">
+                <span className="status-title">Refill Contract Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Refill Trigger Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.trigger) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Refill Amount:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Refill Cooldown:</span>
+                <span className="status-value">{renderTimespan(this.state.refillStatus.cooldown, 3)}</span>
+              </div>
+            </div>
+          </div>
+          : null}
+        </div>
+      </div>
+    );
+  }
 
   private renderActiveSessions(): React.ReactElement {
     return (
@@ -162,6 +275,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <th scope="col">Balance</th>
             <th scope="col">Nonce</th>
             <th scope="col">CliVer</th>
+            <th scope="col">Boost</th>
             <th scope="col">Status</th>
           </tr>
         </thead>
@@ -201,8 +315,25 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       default:
         sessionStatus.push(<span key="status" className="badge bg-light text-dark">{session.status}</span>);
     }
-    if(session.limit < 100)
-      sessionStatus.push(<span key="limit" className="badge bg-warning">{session.limit} %</span>);
+    if(session.restr && (session.restr.reward < 100 || session.restr.blocked || session.restr.messages.length > 0)) {
+      let restrClass: string;
+      if(session.restr.blocked) 
+        restrClass = "bg-danger";
+      else if (session.restr.reward < 100)
+        restrClass = "bg-warning";
+      else
+        restrClass = "bg-info";
+
+      sessionStatus.push(
+        <OverlayTrigger
+          placement="auto"
+          delay={{ show: 250, hide: 400 }}
+          overlay={(props) => this.renderRestrictionInfo(session, props)}
+        >
+          <span key="limit" className={["badge", restrClass].join(" ")}>{session.restr.reward} %</span>
+        </OverlayTrigger>
+      );
+    }
 
     return (
       <tr key={session.id}>
@@ -214,7 +345,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             overlay={(props) => this.renderSessionIpInfo(session, props)}
           >
             <span className='ipaddr'>
-              {session.ipInfo.countryCode ? <span className='ipaddr-icon'>{getCountryIcon(session.ipInfo.countryCode)}</span> : null}
+              {session.ipInfo && session.ipInfo.countryCode ? <span className='ipaddr-icon'>{getCountryIcon(session.ipInfo.countryCode)}</span> : null}
               {session.ip}
             </span>
           </OverlayTrigger>
@@ -225,6 +356,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{Math.round(weiToEth(session.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{session.nonce}</td>
         <td>{session.cliver}</td>
+        <td>{session.boostF} ({session.boostS})</td>
         <td>{sessionStatus}</td>
       </tr>
     );
@@ -275,6 +407,37 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
               <td className='ipinfo-title'>Hosting:</td>
               <td className='ipinfo-value'>{session.ipInfo.hosting ? "yes" : "no"}</td>
             </tr>
+          </table>
+        </div>
+      </Tooltip>
+    );
+  }
+
+  private renderRestrictionInfo(session: IPoWFaucetStatusSession, props: any): React.ReactElement {
+    if(!session.restr)
+      return null;
+    
+    return (
+      <Tooltip id="ipinfo-tooltip" {...props}>
+        <div className='ipaddr-info'>
+          <table>
+            <tr>
+              <td className='ipinfo-title'>Reward:</td>
+              <td className='ipinfo-value'>{session.restr.reward} %</td>
+            </tr>
+            {session.restr.blocked ?
+              <tr>
+                <td className='ipinfo-title'>Blocked:</td>
+                <td className='ipinfo-value'>{session.restr.blocked}</td>
+              </tr>
+            : null}
+            {session.restr.messages.map((message, idx) => {
+              return (
+                <tr>
+                  <td key={idx} colSpan={2} className='ipinfo-value'>{message.text}</td>
+                </tr>
+              );
+            })}
           </table>
         </div>
       </Tooltip>

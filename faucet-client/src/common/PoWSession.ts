@@ -7,7 +7,7 @@ import { PoWTime } from './PoWTime';
 export interface IPoWSessionOptions {
   client: PoWClient;
   powTime: PoWTime;
-  getInputs: () => object;
+  getInputs: () => Promise<object>;
   showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => number;
 }
 
@@ -21,6 +21,12 @@ export interface IPoWSessionInfo {
   noncePos: number;
 }
 
+export interface IPoWSessionBoostInfo {
+  stamps: string[];
+  score: number;
+  factor: number;
+}
+
 export interface IPoWSessionBalanceUpdate {
   balance: number;
   recovery: string;
@@ -29,16 +35,30 @@ export interface IPoWSessionBalanceUpdate {
 
 export interface IPoWClaimInfo {
   session: string;
+  tokenTime: number;
   startTime: number;
   target: string;
   balance: number;
+  nonce: number;
   token: string;
   claiming?: boolean;
   error?: string;
 }
 
+interface IPoWSessionTokenInfo {
+  id: string;
+  startTime: number;
+  targetAddr: string;
+  preimage: string;
+  balance: string;
+  nonce: number;
+  tokenTime?: number;
+  claimable?: boolean;
+}
+
 interface PoWSessionEvents {
   'update': () => void;
+  'update-boost': (boostInfo: IPoWSessionBoostInfo) => void;
   'killed': (killInfo: any) => void;
   'error': (message: string) => void;
   'claimable': (claimInfo: IPoWClaimInfo) => void;
@@ -48,8 +68,10 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   private options: IPoWSessionOptions;
   private sessionInfo: IPoWSessionInfo;
   private shareQueue: IPoWMinerShare[];
+  private shareQueueProcessing: boolean;
   private verifyResultQueue: any[];
   private miner: PoWMiner;
+  private boostInfo: IPoWSessionBoostInfo;
 
   public constructor(options: IPoWSessionOptions) {
     super();
@@ -67,8 +89,9 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public startSession() {
-    let sessionInputs = this.options.getInputs();
-    return this.options.client.sendRequest("startSession", sessionInputs).then((session) => {
+    return this.options.getInputs().then((sessionInputs) => {
+      return this.options.client.sendRequest("startSession", sessionInputs)
+    }).then((session) => {
       this.options.client.setCurrentSession(this);
       this.sessionInfo = Object.assign({
         balance: 0,
@@ -103,12 +126,13 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
             // server doesn't know about this session id anymore - try recover
             return this.options.client.sendRequest("recoverSession", sessionInfo.recovery);
           case "SESSION_CLOSED":
-            if(!err.data || !err.data.token)
-              break;
-            // session was closed, but we've got a claim token
-            let claimInfo = this.getClaimInfo(err.data.token, sessionInfo);
-            this.storeClaimInfo(claimInfo);
-            this.emit("claimable", claimInfo);
+            // session was closed
+            if(err.data && err.data.token) {
+              // we've got a claim token
+              let claimInfo = this.getClaimInfo(err.data.token);
+              this.storeClaimInfo(claimInfo);
+              this.emit("claimable", claimInfo);
+            }
             this.closedSession();
             sessionInfo = null;
             return;
@@ -125,8 +149,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
       // resumed session
       if(this.shareQueue.length) {
-        this.shareQueue.forEach((share) => this._submitShare(share));
-        this.shareQueue = [];
+        this.processShareQueue();
       }
       if(this.verifyResultQueue.length) {
         this.verifyResultQueue.forEach((verifyResult) => this._submitVerifyResult(verifyResult));
@@ -145,6 +168,35 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       this._submitShare(share);
     else
       this.shareQueue.push(share);
+  }
+
+  private processShareQueue() {
+    if(this.shareQueueProcessing)
+      return;
+    this.shareQueueProcessing = true;
+
+    let queueLoop = () => {
+      if(!this.sessionInfo) {
+        this.shareQueue = [];
+        this.shareQueueProcessing = false;
+        return;
+      }
+
+      let queueLen = this.shareQueue.length;
+      if(!this.options.client.isReady())
+        queueLen = 0;
+      
+      if(queueLen > 0) {
+        this._submitShare(this.shareQueue.shift());
+        queueLen--;
+      }
+
+      if(queueLen > 0)
+        setTimeout(() => queueLoop(), 2000);
+      else
+        this.shareQueueProcessing = false;
+    }
+    queueLoop();
   }
 
   private _submitShare(share: IPoWMinerShare) {
@@ -179,6 +231,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     this.emit("update");
   }
 
+  public updateBoostInfo(boostInfo: IPoWSessionBoostInfo) {
+    this.boostInfo = boostInfo;
+    this.emit("update-boost", boostInfo);
+  }
+
+  public getBoostInfo(): IPoWSessionBoostInfo {
+    return this.boostInfo;
+  }
+
   public getNonceRange(count: number): number {
     if(!this.sessionInfo)
       return null;
@@ -210,17 +271,17 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public processSessionKill(killInfo: any) {
-    let claimable = false;
-    if(killInfo.level === "timeout" && killInfo.token) {
+    let skipMessage = false;
+    if(killInfo.token) {
       let claimInfo = this.getClaimInfo(killInfo.token);
       this.storeClaimInfo(claimInfo);
       this.emit("claimable", claimInfo);
-      claimable = true;
+      skipMessage = (killInfo.level === "timeout");
     }
     this.sessionInfo = null;
-    if(killInfo.level === "session" || killInfo.level === "timeout")
+    if(killInfo.level === "restriction" || killInfo.level === "session" || killInfo.level === "timeout")
       this.storeSessionStatus();
-    if(!claimable)
+    if(!skipMessage)
       this.emit("killed", killInfo);
     this.emit("update");
   }
@@ -254,14 +315,25 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     return session;
   }
 
-  public getClaimInfo(claimToken: string, sessionInfo?: IPoWSessionInfo): IPoWClaimInfo {
-    if(!sessionInfo)
-    sessionInfo = this.sessionInfo;
+  private getClaimInfo(claimToken: string): IPoWClaimInfo {
+    // parse claim token
+    if(!claimToken || typeof claimToken !== "string")
+      return null;
+    let sigPos = claimToken.indexOf("|");
+    if(sigPos === -1)
+      return null;
+    
+    let claimObj = JSON.parse(atob(claimToken.substring(0, sigPos))) as IPoWSessionTokenInfo;
+    if(!claimObj)
+      return null;
+    
     return {
-      session: sessionInfo.sessionId,
-      startTime: sessionInfo.startTime,
-      target: sessionInfo.targetAddr,
-      balance: sessionInfo.balance,
+      session: claimObj.id,
+      tokenTime: claimObj.tokenTime,
+      startTime: claimObj.startTime,
+      target: claimObj.targetAddr,
+      balance: parseInt(claimObj.balance),
+      nonce: claimObj.nonce,
       token: claimToken
     };
   }

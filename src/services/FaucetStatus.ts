@@ -122,11 +122,14 @@ export class FaucetStatus {
       if(status.filter.proxy !== undefined && (!ipinfo || !!ipinfo.proxy !== status.filter.proxy))
         return false;
       
-      if(status.filter.lt_version !== undefined && clientVersion && !isVersionLower(clientVersion, status.filter.lt_version))
-        return false;
+      if(status.filter.lt_version !== undefined) {
+        if(!clientVersion)
+          return false;
+        if(!isVersionLower(clientVersion, status.filter.lt_version))
+          return false;
+      }
       return true;
     };
-
 
     let statusKeys = Object.keys(this.currentStatus);
     for(let i = 0; i < statusKeys.length; i++) {
@@ -148,6 +151,19 @@ export class FaucetStatus {
     Object.values(localStatusDict).sort((a, b) => ((a.prio || 0) - (b.prio || 0))).forEach((status) => {
       addStatus(status);
     });
+
+    if(session) {
+      let restriction = session.getRewardRestriction();
+      restriction.messages.forEach((message) => {
+        if(!message.notify)
+          return;
+        
+        addStatus({
+          level: (typeof message.notify === "string" ? message.notify as FaucetStatusLevel : FaucetStatusLevel.WARNING),
+          text: message.text,
+        });
+      });
+    }
 
     return {
       status: statusList,
