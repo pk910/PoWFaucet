@@ -8,9 +8,9 @@ import ReactDOM from 'react-dom';
     powWebsockUrl: location.origin.replace(/^http/, "ws") + "/pow",
     powApiUrl: "/api",
     minerSrc: {
-      [PoWHashAlgo.SCRYPT]: "/js/powfaucet-worker-sc.js",
-      [PoWHashAlgo.CRYPTONIGHT]: "/js/powfaucet-worker-cn.js",
-      [PoWHashAlgo.ARGON2]: "/js/powfaucet-worker-a2.js",
+      [PoWHashAlgo.SCRYPT]: "/js/powfaucet-worker-sc.js?" + FAUCET_CLIENT_BUILDTIME,
+      [PoWHashAlgo.CRYPTONIGHT]: "/js/powfaucet-worker-cn.js?" + FAUCET_CLIENT_BUILDTIME,
+      [PoWHashAlgo.ARGON2]: "/js/powfaucet-worker-a2.js?" + FAUCET_CLIENT_BUILDTIME,
     }
   };
 

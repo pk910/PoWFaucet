@@ -10,7 +10,6 @@ import { PoWHashAlgo } from "../common/IFaucetConfig";
       hashFn: (nonce, preimg, params) => {
         if(params.a !== PoWHashAlgo.ARGON2)
           return null;
-        (self as any).argon2ref = argon2;
         return argon2(nonce, preimg, params.l, params.i, params.m, params.p, params.t, params.v);
       }
     });
