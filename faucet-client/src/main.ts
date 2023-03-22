@@ -10,6 +10,7 @@ import ReactDOM from 'react-dom';
     minerSrc: {
       [PoWHashAlgo.SCRYPT]: "/js/powfaucet-worker-sc.js",
       [PoWHashAlgo.CRYPTONIGHT]: "/js/powfaucet-worker-cn.js",
+      [PoWHashAlgo.ARGON2]: "/js/powfaucet-worker-a2.js",
     }
   };
 

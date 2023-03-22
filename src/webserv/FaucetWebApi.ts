@@ -157,6 +157,18 @@ export class FaucetWebApi {
           d: faucetConfig.powCryptoNightParams.difficulty,
         };
         break;
+      case PoWHashAlgo.ARGON2:
+        powParams = {
+          a: PoWHashAlgo.ARGON2,
+          t: faucetConfig.powArgon2Params.type,
+          v: faucetConfig.powArgon2Params.version,
+          i: faucetConfig.powArgon2Params.timeCost,
+          m: faucetConfig.powArgon2Params.memoryCost,
+          p: faucetConfig.powArgon2Params.parallelization,
+          l: faucetConfig.powArgon2Params.keyLength,
+          d: faucetConfig.powArgon2Params.difficulty,
+        };
+        break;
     }
     return {
       faucetTitle: faucetConfig.faucetTitle,

@@ -35,8 +35,9 @@ export interface IFaucetConfig {
 }
 
 export enum PoWHashAlgo {
-  SCRYPT      = "sc",
-  CRYPTONIGHT = "cn",
+  SCRYPT      = "scrypt",
+  CRYPTONIGHT = "cryptonight",
+  ARGON2      = "argon2",
 }
 
 export type PoWParams = {
@@ -52,7 +53,17 @@ export type PoWParams = {
   v: number; // variant
   h: number; // height
   d: number; // difficulty
+} | {
+  a: PoWHashAlgo.ARGON2;
+  t: number; // type
+  v: number; // version
+  i: number; // timeCost
+  m: number; // memoryCost
+  p: number; // parallelization,
+  l: number; // keyLength
+  d: number; // difficulty
 }
+
 
 export interface IFaucetStatus {
   text: string;

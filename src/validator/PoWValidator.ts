@@ -39,6 +39,8 @@ export class PoWValidator {
             return faucetConfig.powScryptParams;
           case PoWHashAlgo.CRYPTONIGHT: 
             return faucetConfig.powCryptoNightParams;
+          case PoWHashAlgo.ARGON2: 
+            return faucetConfig.powArgon2Params;
         }
       })()
     };

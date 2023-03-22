@@ -62,6 +62,9 @@ function copyIfFoundOrRemove(filename, dstpath, dstname) {
   copyIfFound("powfaucet-worker-cn.js", path.join(staticPath, "js"));
   copyIfFoundOrRemove("powfaucet-worker-cn.js.map", path.join(staticPath, "js"));
 
+  copyIfFound("powfaucet-worker-a2.js", path.join(staticPath, "js"));
+  copyIfFoundOrRemove("powfaucet-worker-a2.js.map", path.join(staticPath, "js"));
+
   console.log("finished");
 });
 

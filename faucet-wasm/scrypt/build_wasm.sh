@@ -47,8 +47,8 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
-node build_scrypt_wasm.js > "../libs/scrypt_wasm.js"
+node build_wasm.js > "../../libs/scrypt_wasm.js"
 
-printf "\n\nbuilt ../libs/scrypt_wasm.js successfully!\n\n"
+printf "\n\nbuilt ../../libs/scrypt_wasm.js successfully!\n\n"
 
 

@@ -4,9 +4,9 @@ if [ ! -f build_wasm.sh ]; then
   printf "Please run this script from the faucet-wasm folder.\n"
 fi
 
-if [ ! -d cryptonight-wasm ]; then
-  printf "Cloning https://github.com/notgiven688/webminerpool... \n"
-  git clone https://github.com/notgiven688/webminerpool.git cryptonight-wasm
+if [ ! -d argon2-wasm ]; then
+  printf "Cloning https://github.com/urbit/argon2.git... \n"
+  git clone https://github.com/urbit/argon2.git argon2-wasm
 fi
 
 emcc_is_installed="$(which emcc | wc -l)"
@@ -20,17 +20,11 @@ if [ "$emcc_is_installed" == "0" ]; then
   cd ..
 fi
 
-cd cryptonight-wasm/hash_cn/webassembly
 if [ ! -f ./cn.wasm ]; then
-  printf "running cryptonight_Makefile for webminerpool/hash_cn/webassembly... \n"
+  printf "compiling argon2 wasm... \n"
   
-  # included Makefile is not working...
-  mv Makefile Makefile.org
-  cp ../../../cryptonight_Makefile ./Makefile
-  make
-  mv Makefile.org Makefile
+  emcc -O3 -s NO_FILESYSTEM=1 -s TOTAL_MEMORY=67108864 -s EXPORTED_FUNCTIONS="['_hash_a2','_argon2_hash']" -s WASM=1 -s ENVIRONMENT=worker -s MODULARIZE=1 -s EXPORT_ES6=1 -s STANDALONE_WASM --no-entry --pre-js ./wasm-pre.js -I./argon2-wasm/include ./hash_a2.c -o hash_a2.js
 fi
-cd ../../..
 
 nodejs_is_installed="$(which node | wc -l)"
 npm_is_installed="$(which npm | wc -l)"
@@ -45,8 +39,8 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
-node build_cryptonight_wasm.js > "../libs/cryptonight_wasm.js"
+node build_wasm.js > "../../libs/argon2_wasm.js"
 
-printf "\n\nbuilt ../libs/cryptonight_wasm.js successfully!\n\n"
+printf "\n\nbuilt ../libs/argon2_wasm.js successfully!\n\n"
 
 

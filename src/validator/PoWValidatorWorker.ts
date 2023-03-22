@@ -1,7 +1,7 @@
 import { parentPort } from "worker_threads";
 import { base64ToHex } from "../utils/ConvertHelpers";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator";
-import { IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from "../common/FaucetConfig";
+import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from "../common/FaucetConfig";
 
 export type PoWHashFn = (nonceHex: string, preimgHex: string, params: PoWCryptoParams) => string;
 
@@ -31,7 +31,7 @@ export class PoWValidatorWorker {
           await module.getScryptReadyPromise();
           let scrypt = module.getScrypt();
           return (nonce, preimg, params: IPoWSCryptParams) => {
-            return scrypt(nonce, preimg, params.cpuAndMemory, params.blockSize, params.paralellization, params.keyLength);
+            return scrypt(nonce, preimg, params.cpuAndMemory, params.blockSize, params.parallelization, params.keyLength);
           };
         })();
         break;
@@ -42,6 +42,16 @@ export class PoWValidatorWorker {
           let cryptonight = module.getCryptoNight();
           return (nonce, preimg, params: IPoWCryptoNightParams) => {
             return cryptonight(preimg + nonce, params.algo, params.variant, params.height);
+          };
+        })();
+        break;
+      case PoWHashAlgo.ARGON2:
+        hashFn = await (async () => {
+          let module = await import("../../libs/argon2_wasm");
+          await module.getArgon2ReadyPromise();
+          let argon2 = module.getArgon2();
+          return (nonce, preimg, params: IPoWArgon2Params) => {
+            return argon2(nonce, preimg, params.keyLength, params.timeCost, params.memoryCost, params.parallelization, params.type, params.version);
           };
         })();
         break;

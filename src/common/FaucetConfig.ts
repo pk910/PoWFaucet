@@ -37,6 +37,7 @@ export interface IFaucetConfig {
   powHashAlgo: PoWHashAlgo; // hash algorithm to use ("sc" = SCrypt, "cn" = CryptoNight), defaults to SCrypt
   powScryptParams: IPoWSCryptParams; // scrypt parameters
   powCryptoNightParams: IPoWCryptoNightParams; // cryptonight parameters
+  powArgon2Params: IPoWArgon2Params; // argon2 parameters
   powNonceCount: number; // number of scrypt hashs to pack into a share (should be low as that just increases verification load on server side)
   powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
   powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceet the limit)
@@ -143,8 +144,9 @@ export interface IFaucetBalanceRestrictionConfig {
 }
 
 export enum PoWHashAlgo {
-  SCRYPT      = "sc",
-  CRYPTONIGHT = "cn",
+  SCRYPT      = "scrypt",
+  CRYPTONIGHT = "cryptonight",
+  ARGON2      = "argon2",
 }
 
 export interface IPoWSCryptParams {
@@ -162,7 +164,17 @@ export interface IPoWCryptoNightParams {
   difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
 }
 
-export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams;
+export interface IPoWArgon2Params {
+  type: number;
+  version: number;
+  timeCost: number; // time cost (iterations), default: 1
+  memoryCost: number; // memory size
+  parallelization: number; // parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+  keyLength: number; // how many bytes to generate as output, e.g. 16 bytes (128 bits)
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params;
 
 
 export interface IFaucetEnsResolverConfig {
@@ -259,6 +271,15 @@ let defaultConfig: IFaucetConfig = {
     algo: 0,
     variant: 0,
     height: 0,
+    difficulty: 9
+  },
+  powArgon2Params: {
+    type: 0,
+    version: 13,
+    timeCost: 1,
+    memoryCost: 1024,
+    parallelization: 1,
+    keyLength: 16,
     difficulty: 9
   },
   powNonceCount: 1,

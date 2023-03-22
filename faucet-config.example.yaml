@@ -139,7 +139,7 @@ powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
 
 
 # mining algorithm to use
-powHashAlgo: "sc"  # sc = SCrype, cn = CryptoNight
+powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
 
 # scrypt mining parameters
 powScryptParams:
@@ -161,6 +161,16 @@ powCryptoNightParams:
   variant: 0
   height: 0
   # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+  difficulty: 11
+
+# argon2 mining parameters
+powArgon2Params:
+  type: 0
+  version: 13
+  timeCost: 4
+  memoryCost: 4096
+  parallelization: 1
+  keyLength: 16
   difficulty: 11
 
 # number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)
