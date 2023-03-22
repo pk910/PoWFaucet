@@ -436,7 +436,7 @@ export class PoWClient {
 
     let powParamsStr = faucetConfig.powScryptParams.cpuAndMemory +
       "|" + faucetConfig.powScryptParams.blockSize +
-      "|" + faucetConfig.powScryptParams.parallelization +
+      "|" + faucetConfig.powScryptParams.paralellization +
       "|" + faucetConfig.powScryptParams.keyLength +
       "|" + faucetConfig.powScryptParams.difficulty;
 

@@ -6,7 +6,7 @@ export interface IPoWValidatorValidateRequest {
   params: {
     n: number; // cpu and memory cost
     r: number; // block size
-    p: number; // parallelization
+    p: number; // paralellization
     l: number; // key length
     d: number; // difficulty
   };

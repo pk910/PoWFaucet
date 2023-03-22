@@ -36,7 +36,7 @@ export class PoWValidator {
       params: {
         n: faucetConfig.powScryptParams.cpuAndMemory,
         r: faucetConfig.powScryptParams.blockSize,
-        p: faucetConfig.powScryptParams.parallelization,
+        p: faucetConfig.powScryptParams.paralellization,
         l: faucetConfig.powScryptParams.keyLength,
         d: faucetConfig.powScryptParams.difficulty,
       }
