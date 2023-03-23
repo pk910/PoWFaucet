@@ -317,7 +317,8 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     message = message.replace(/{target}/ig, this.props.reward.target);
 
     message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000).toString());
-    message = message.replace(/{url}/ig, location.href);
+    let safeUrl = location.protocol + "//" + location.hostname + location.pathname;
+    message = message.replace(/{url}/ig, safeUrl);
 
     let duration = (this.props.reward.tokenTime || (new Date()).getTime() / 1000) - this.props.reward.startTime;
     message = message.replace(/{duration}/ig, renderTimespan(duration));
