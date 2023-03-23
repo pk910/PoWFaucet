@@ -226,7 +226,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
               <div className='alert alert-success'>
                 Claim Transaction has been confirmed in block #{this.state.txBlock}!<br />
                 TX: {this.props.faucetConfig.ethTxExplorerLink ? 
-                <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank'>{this.state.txHash}</a> :
+                <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank' rel='noopener noreferrer'>{this.state.txHash}</a> :
                 <span>{this.state.txHash}</span>}
                 {this.renderResultSharing()}
               </div>
@@ -260,7 +260,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       let tweetUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
       shareEls.push(
         <span className='sh-link sh-tw'>
-          <a href='#' target='_blank' data-url={tweetUrl} onClick={function(evt) {
+          <a href='#' target='_blank' data-url={tweetUrl} rel='noopener noreferrer' onClick={function(evt) {
             let a = document.createElement('a');
             a.target = '_blank';
             a.href = tweetUrl;
@@ -277,7 +277,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       let tweetUrl = "/share?text=" + encodeURIComponent(tweetMsg);
       shareEls.push(
         <span className='sh-link sh-md'>
-          <a href={'https://mastodon.social' + tweetUrl} target='_blank' data-url={tweetUrl} onClick={function(evt) {
+          <a href={'https://mastodon.social' + tweetUrl} target='_blank' data-url={tweetUrl} rel='noopener noreferrer' onClick={function(evt) {
 
             var mastodonUrl = evt.currentTarget.getAttribute("data-instance");
             if(!mastodonUrl)
