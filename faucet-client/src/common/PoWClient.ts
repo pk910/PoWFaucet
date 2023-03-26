@@ -243,6 +243,11 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
       case "claimTx":
         this.emit("claimTx", message.data);
         break;
+      case "boostInfo":
+        if(this.currentSession) {
+          this.currentSession.updateBoostInfo(message.data);
+        }
+        break;
     }
   }
 

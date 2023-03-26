@@ -1,0 +1,4 @@
+argon2-wasm/
+node_modules/
+hash_a2.wasm
+hash_a2.js

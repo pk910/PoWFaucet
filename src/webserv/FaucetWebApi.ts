@@ -1,11 +1,11 @@
 import { IncomingMessage } from "http";
-import { faucetConfig, IFaucetResultSharingConfig } from "../common/FaucetConfig";
+import { faucetConfig, PoWHashAlgo, IFaucetResultSharingConfig } from "../common/FaucetConfig";
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from "../common/ServiceManager";
 import { ClaimTxStatus, EthWeb3Manager } from "../services/EthWeb3Manager";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
 import { IIPInfo } from "../services/IPInfoResolver";
-import { PoWRewardLimiter } from "../services/PoWRewardLimiter";
+import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 import { getHashedSessionId } from "../utils/HashedInfo";
 import { PoWClient } from "../websock/PoWClient";
 import { PoWSession, PoWSessionStatus } from "../websock/PoWSession";
@@ -33,19 +33,19 @@ export interface IClientFaucetConfig {
   maxClaim: number;
   powTimeout: number;
   claimTimeout: number;
-  powParams: {
-    n: number;
-    r: number;
-    p: number;
-    l: number;
-    d: number;
-  },
+  powParams: any,
   powNonceCount: number;
   powHashrateLimit: number;
   resolveEnsNames: boolean;
   ethTxExplorerLink: string;
   time: number;
   resultSharing: IFaucetResultSharingConfig;
+  passportBoost: {
+    refreshTimeout: number;
+    manualVerification: boolean;
+    stampScoring: {[stamp: string]: number};
+    boostFactor: {[score: number]: number};
+  };
 }
 
 export interface IClientFaucetStatus {
@@ -72,8 +72,10 @@ export interface IClientFaucetStatus {
     hashrate: number;
     status: PoWSessionStatus;
     claimable: boolean;
-    limit: number;
+    restr: IPoWRewardRestriction;
     cliver: string;
+    boostF: number;
+    boostS: number;
   }[];
   claims: {
     time: number;
@@ -134,6 +136,40 @@ export class FaucetWebApi {
     faucetHtml = faucetHtml.replace(/{faucetWallet}/, () => {
       return ServiceManager.GetService(EthWeb3Manager).getFaucetAddress();
     });
+    let powParams;
+    switch(faucetConfig.powHashAlgo) {
+      case PoWHashAlgo.SCRYPT:
+        powParams = {
+          a: PoWHashAlgo.SCRYPT,
+          n: faucetConfig.powScryptParams.cpuAndMemory,
+          r: faucetConfig.powScryptParams.blockSize,
+          p: faucetConfig.powScryptParams.parallelization,
+          l: faucetConfig.powScryptParams.keyLength,
+          d: faucetConfig.powScryptParams.difficulty,
+        };
+        break;
+      case PoWHashAlgo.CRYPTONIGHT:
+        powParams = {
+          a: PoWHashAlgo.CRYPTONIGHT,
+          c: faucetConfig.powCryptoNightParams.algo,
+          v: faucetConfig.powCryptoNightParams.variant,
+          h: faucetConfig.powCryptoNightParams.height,
+          d: faucetConfig.powCryptoNightParams.difficulty,
+        };
+        break;
+      case PoWHashAlgo.ARGON2:
+        powParams = {
+          a: PoWHashAlgo.ARGON2,
+          t: faucetConfig.powArgon2Params.type,
+          v: faucetConfig.powArgon2Params.version,
+          i: faucetConfig.powArgon2Params.timeCost,
+          m: faucetConfig.powArgon2Params.memoryCost,
+          p: faucetConfig.powArgon2Params.parallelization,
+          l: faucetConfig.powArgon2Params.keyLength,
+          d: faucetConfig.powArgon2Params.difficulty,
+        };
+        break;
+    }
     return {
       faucetTitle: faucetConfig.faucetTitle,
       faucetStatus: faucetStatus.status,
@@ -151,19 +187,19 @@ export class FaucetWebApi {
       maxClaim: faucetConfig.claimMaxAmount,
       powTimeout: faucetConfig.powSessionTimeout,
       claimTimeout: faucetConfig.claimSessionTimeout,
-      powParams: {
-        n: faucetConfig.powScryptParams.cpuAndMemory,
-        r: faucetConfig.powScryptParams.blockSize,
-        p: faucetConfig.powScryptParams.paralellization,
-        l: faucetConfig.powScryptParams.keyLength,
-        d: faucetConfig.powScryptParams.difficulty,
-      },
+      powParams: powParams,
       powNonceCount: faucetConfig.powNonceCount,
       powHashrateLimit: faucetConfig.powHashrateSoftLimit,
       resolveEnsNames: !!faucetConfig.ensResolver,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
       time: Math.floor((new Date()).getTime() / 1000),
       resultSharing: faucetConfig.resultSharing,
+      passportBoost: faucetConfig.passportBoost ? {
+        refreshTimeout: faucetConfig.passportBoost.refreshCooldown,
+        manualVerification: (faucetConfig.passportBoost.trustedIssuers && faucetConfig.passportBoost.trustedIssuers.length > 0),
+        stampScoring: faucetConfig.passportBoost.stampScoring,
+        boostFactor: faucetConfig.passportBoost.boostFactor,
+      } : null,
     };
   }
 
@@ -199,6 +235,7 @@ export class FaucetWebApi {
         clientVersion = activeClient.getClientVersion();
       }
 
+      let boostInfo = session.getBoostInfo();
       return {
         id: session.getSessionId(true),
         start: Math.floor(session.getStartTime().getTime() / 1000),
@@ -211,8 +248,10 @@ export class FaucetWebApi {
         hashrate: session.getReportedHashRate(),
         status: session.getSessionStatus(),
         claimable: session.isClaimable(),
-        limit: rewardLimiter.getSessionRestriction(session),
+        restr: rewardLimiter.getSessionRestriction(session),
         cliver: clientVersion,
+        boostF: boostInfo?.factor || 1,
+        boostS: boostInfo?.score || 0,
       }
     });
 

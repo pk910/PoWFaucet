@@ -6,7 +6,7 @@ static/index.seo.html
 faucet-config.json
 faucet-config.yaml
 faucet-status.json
-faucet-store.json
+faucet-store.*
 faucet-stats.log
 faucet-events.log
 faucet-pid.txt

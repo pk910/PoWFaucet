@@ -7,7 +7,7 @@ import { PoWTime } from './PoWTime';
 export interface IPoWSessionOptions {
   client: PoWClient;
   powTime: PoWTime;
-  getInputs: () => object;
+  getInputs: () => Promise<object>;
   showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => number;
 }
 
@@ -19,6 +19,12 @@ export interface IPoWSessionInfo {
   balance: number;
   recovery: string;
   noncePos: number;
+}
+
+export interface IPoWSessionBoostInfo {
+  stamps: string[];
+  score: number;
+  factor: number;
 }
 
 export interface IPoWSessionBalanceUpdate {
@@ -52,6 +58,7 @@ interface IPoWSessionTokenInfo {
 
 interface PoWSessionEvents {
   'update': () => void;
+  'update-boost': (boostInfo: IPoWSessionBoostInfo) => void;
   'killed': (killInfo: any) => void;
   'error': (message: string) => void;
   'claimable': (claimInfo: IPoWClaimInfo) => void;
@@ -64,6 +71,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   private shareQueueProcessing: boolean;
   private verifyResultQueue: any[];
   private miner: PoWMiner;
+  private boostInfo: IPoWSessionBoostInfo;
 
   public constructor(options: IPoWSessionOptions) {
     super();
@@ -81,8 +89,9 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public startSession() {
-    let sessionInputs = this.options.getInputs();
-    return this.options.client.sendRequest("startSession", sessionInputs).then((session) => {
+    return this.options.getInputs().then((sessionInputs) => {
+      return this.options.client.sendRequest("startSession", sessionInputs)
+    }).then((session) => {
       this.options.client.setCurrentSession(this);
       this.sessionInfo = Object.assign({
         balance: 0,
@@ -222,6 +231,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     this.emit("update");
   }
 
+  public updateBoostInfo(boostInfo: IPoWSessionBoostInfo) {
+    this.boostInfo = boostInfo;
+    this.emit("update-boost", boostInfo);
+  }
+
+  public getBoostInfo(): IPoWSessionBoostInfo {
+    return this.boostInfo;
+  }
+
   public getNonceRange(count: number): number {
     if(!this.sessionInfo)
       return null;
@@ -253,17 +271,17 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public processSessionKill(killInfo: any) {
-    let claimable = false;
-    if(killInfo.level === "timeout" && killInfo.token) {
+    let skipMessage = false;
+    if(killInfo.token) {
       let claimInfo = this.getClaimInfo(killInfo.token);
       this.storeClaimInfo(claimInfo);
       this.emit("claimable", claimInfo);
-      claimable = true;
+      skipMessage = (killInfo.level === "timeout");
     }
     this.sessionInfo = null;
-    if(killInfo.level === "session" || killInfo.level === "timeout")
+    if(killInfo.level === "restriction" || killInfo.level === "session" || killInfo.level === "timeout")
       this.storeSessionStatus();
-    if(!claimable)
+    if(!skipMessage)
       this.emit("killed", killInfo);
     this.emit("update");
   }

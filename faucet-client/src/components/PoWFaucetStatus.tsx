@@ -53,8 +53,10 @@ export interface IPoWFaucetStatusSession {
   hashrate: number;
   status: string;
   claimable: boolean;
-  limit: number;
+  restr: IPoWFaucetRestrictionStatus;
   cliver?: string;
+  boostF: number;
+  boostS: number;
 }
 
 export interface IPoWFaucetStatusIPInfo {
@@ -73,6 +75,15 @@ export interface IPoWFaucetStatusIPInfo {
   as?: string;
   proxy?: boolean;
   hosting?: boolean;
+}
+
+export interface IPoWFaucetRestrictionStatus {
+  reward: number;
+  messages: {
+    text: string;
+    notify: boolean|string;
+  }[];
+  blocked: false|"close"|"kill";
 }
 
 export interface IPoWFaucetStatusClaim {
@@ -264,6 +275,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <th scope="col">Balance</th>
             <th scope="col">Nonce</th>
             <th scope="col">CliVer</th>
+            <th scope="col">Boost</th>
             <th scope="col">Status</th>
           </tr>
         </thead>
@@ -303,8 +315,25 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       default:
         sessionStatus.push(<span key="status" className="badge bg-light text-dark">{session.status}</span>);
     }
-    if(session.limit < 100)
-      sessionStatus.push(<span key="limit" className="badge bg-warning">{session.limit} %</span>);
+    if(session.restr && (session.restr.reward < 100 || session.restr.blocked || session.restr.messages.length > 0)) {
+      let restrClass: string;
+      if(session.restr.blocked) 
+        restrClass = "bg-danger";
+      else if (session.restr.reward < 100)
+        restrClass = "bg-warning";
+      else
+        restrClass = "bg-info";
+
+      sessionStatus.push(
+        <OverlayTrigger
+          placement="auto"
+          delay={{ show: 250, hide: 400 }}
+          overlay={(props) => this.renderRestrictionInfo(session, props)}
+        >
+          <span key="limit" className={["badge", restrClass].join(" ")}>{session.restr.reward} %</span>
+        </OverlayTrigger>
+      );
+    }
 
     return (
       <tr key={session.id}>
@@ -327,6 +356,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{Math.round(weiToEth(session.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{session.nonce}</td>
         <td>{session.cliver}</td>
+        <td>{session.boostF} ({session.boostS})</td>
         <td>{sessionStatus}</td>
       </tr>
     );
@@ -377,6 +407,37 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
               <td className='ipinfo-title'>Hosting:</td>
               <td className='ipinfo-value'>{session.ipInfo.hosting ? "yes" : "no"}</td>
             </tr>
+          </table>
+        </div>
+      </Tooltip>
+    );
+  }
+
+  private renderRestrictionInfo(session: IPoWFaucetStatusSession, props: any): React.ReactElement {
+    if(!session.restr)
+      return null;
+    
+    return (
+      <Tooltip id="ipinfo-tooltip" {...props}>
+        <div className='ipaddr-info'>
+          <table>
+            <tr>
+              <td className='ipinfo-title'>Reward:</td>
+              <td className='ipinfo-value'>{session.restr.reward} %</td>
+            </tr>
+            {session.restr.blocked ?
+              <tr>
+                <td className='ipinfo-title'>Blocked:</td>
+                <td className='ipinfo-value'>{session.restr.blocked}</td>
+              </tr>
+            : null}
+            {session.restr.messages.map((message, idx) => {
+              return (
+                <tr>
+                  <td key={idx} colSpan={2} className='ipinfo-value'>{message.text}</td>
+                </tr>
+              );
+            })}
           </table>
         </div>
       </Tooltip>

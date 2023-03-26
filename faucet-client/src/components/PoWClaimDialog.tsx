@@ -226,7 +226,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
               <div className='alert alert-success'>
                 Claim Transaction has been confirmed in block #{this.state.txBlock}!<br />
                 TX: {this.props.faucetConfig.ethTxExplorerLink ? 
-                <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank'>{this.state.txHash}</a> :
+                <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank' rel='noopener noreferrer'>{this.state.txHash}</a> :
                 <span>{this.state.txHash}</span>}
                 {this.renderResultSharing()}
               </div>
@@ -260,7 +260,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       let tweetUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
       shareEls.push(
         <span className='sh-link sh-tw'>
-          <a href='#' target='_blank' data-url={tweetUrl} onClick={function(evt) {
+          <a href='#' target='_blank' data-url={tweetUrl} rel='noopener noreferrer' onClick={function(evt) {
             let a = document.createElement('a');
             a.target = '_blank';
             a.href = tweetUrl;
@@ -277,7 +277,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       let tweetUrl = "/share?text=" + encodeURIComponent(tweetMsg);
       shareEls.push(
         <span className='sh-link sh-md'>
-          <a href={'https://mastodon.social' + tweetUrl} target='_blank' data-url={tweetUrl} onClick={function(evt) {
+          <a href={'https://mastodon.social' + tweetUrl} target='_blank' data-url={tweetUrl} rel='noopener noreferrer' onClick={function(evt) {
 
             var mastodonUrl = evt.currentTarget.getAttribute("data-instance");
             if(!mastodonUrl)
@@ -293,20 +293,32 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       );
     }
 
+    let resultSharingCaption = this.props.faucetConfig.resultSharing.caption || "Support this faucet with a ";
     return (
       <div className='result-sharing'>
-        <div className='sh-opt'>
-          <span className='sh-label'>Support this faucet with a </span>
-          {shareEls}
-        </div>
+        {this.props.faucetConfig.resultSharing.preHtml ?
+          <div className="sh-html" dangerouslySetInnerHTML={{__html: this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.preHtml)}} />
+        : null}
+        {shareEls.length > 0 ? 
+          <div className='sh-opt'>
+            <span className='sh-label'>{resultSharingCaption}</span>
+            {shareEls}
+          </div>
+        : null}
+        {this.props.faucetConfig.resultSharing.postHtml ?
+          <div className="sh-html" dangerouslySetInnerHTML={{__html: this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.postHtml)}} />
+        : null}
       </div>
     )
   }
 
   private replaceShareMessagePlaceholders(message: string): string {
-    // Boom! Just got {amount} ETH from {url} (Mining for {duration} with {hashrate} H/s)
+    message = message.replace(/{sessionid}/ig, this.props.reward.session);
+    message = message.replace(/{target}/ig, this.props.reward.target);
+
     message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000).toString());
-    message = message.replace(/{url}/ig, location.href);
+    let safeUrl = location.protocol + "//" + location.hostname + location.pathname;
+    message = message.replace(/{url}/ig, safeUrl);
 
     let duration = (this.props.reward.tokenTime || (new Date()).getTime() / 1000) - this.props.reward.startTime;
     message = message.replace(/{duration}/ig, renderTimespan(duration));
@@ -325,9 +337,21 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       this.claimConnKeeper.close();
     this.claimConnKeeper = this.props.powClient.newConnectionKeeper();
 
-    this.props.powClient.sendRequest("claimRewards", {
-      captcha: this.props.faucetConfig.hcapClaim ? this.captchaControl.getToken() : null,
-      token: this.props.reward.token
+    let capPromise: Promise<string>;
+    if(this.props.faucetConfig.hcapClaim && this.captchaControl) {
+      capPromise = this.captchaControl.getToken();
+      capPromise.then(() => {
+        this.captchaControl.resetToken();
+      });
+    }
+    else
+      capPromise = Promise.resolve(null);
+    
+    capPromise.then((capToken) => {
+      return this.props.powClient.sendRequest("claimRewards", {
+        captcha: capToken,
+        token: this.props.reward.token
+      });
     }).then(() => {
       this.props.powSession.storeClaimInfo(null);
       this.setState({

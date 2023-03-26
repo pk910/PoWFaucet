@@ -4,6 +4,7 @@
 
 # Path to faucet db file (defaults to faucet-store.json)
 faucetStore: "faucet-store.json"
+faucetDBFile: "faucet-store.db"
 
 # logfile for faucet events (comment out for no logging)
 faucetLogFile: "faucet-events.log"
@@ -27,7 +28,7 @@ faucetCoinSymbol: "GöETH"
 faucetHomeHtml: |
   <div class='pow-info'>
     <h5>What is a PoW Faucet?</h5>
-    This is a Ethereum Faucet running on the Goerli Testnet.<br>
+    This is an Ethereum Faucet running on the Goerli Testnet.<br>
     To prevent malicious actors from exhausting all available funds or 
     accumulating enough Ether to mount long running spam attacks, 
     this faucet requires some mining work to be done in exchange for 
@@ -83,7 +84,7 @@ ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
 #  Avg. Mining Reward:
 #    reward_per_sec = 1/(2**powScryptParams.difficulty) * hashrate * powShareReward
 
-# reward amount per egliable hash (in wei)
+# reward amount per eligible hash (in wei)
 #powShareReward: 12500000000000000  # 0.0125
 powShareReward:   2000000000000000  # 0.002 ETH
 
@@ -108,7 +109,7 @@ verifyMinerReward:   300000000000000  # 0.0003 ETH  (~1/6th of powShareReward)
 # maximum mining session time (in seconds)
 powSessionTimeout: 18000   # 5h
 
-# how long sessions can be payed out (in seconds)
+# how long sessions can be paid out (in seconds)
 # should be higher than powSessionTimeout
 claimSessionTimeout: 43200  # 12h
 
@@ -137,6 +138,10 @@ powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
 # kill websocket if no ping/pong for that number of seconds
 #powPingTimeout: 30
 
+
+# mining algorithm to use
+powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
+
 # scrypt mining parameters
 powScryptParams:
   # N - iterations count: affects memory and CPU usage, must be a power of 2
@@ -144,19 +149,38 @@ powScryptParams:
   # r - block size: affects memory and CPU usage
   blockSize: 8
   # p - parallelism factor: threads to run in parallel, affects the memory & CPU usage, should be 1 as webworker is single threaded
-  paralellization: 1
+  parallelization: 1
   # klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
   keyLength: 16
+  # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
+  difficulty: 11
+
+# cryptonight mining parameters
+powCryptoNightParams:
+  # crypto night hash algo & variant
+  algo: 0
+  variant: 0
+  height: 0
   # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+  difficulty: 11
+
+# argon2 mining parameters
+powArgon2Params:
+  type: 0
+  version: 13
+  timeCost: 4
+  memoryCost: 4096
+  parallelization: 1
+  keyLength: 16
   difficulty: 11
 
 # number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)
 #powNonceCount: 1
 
 # Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
-# As that can lead to a huge verification work load on the server, this faucet can redistribute shares back to other miners for verification.
+# As that can lead to a huge verification workload on the server, this faucet can redistribute shares back to other miners for verification.
 # These randomly selected miners need to check the share and return its validity to the server within 10 seconds or they're penalized.
-# If theres a missmatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
+# If there's a mismatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
 # Bad shares always result in a slashing (termination of session and loss of all collected mining balance)
 
 # percentage of shares validated locally (0 - 100)
@@ -217,6 +241,12 @@ captchas:
 # ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
 ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
 
+# ip info caching time
+ipInfoCacheTime: 86400 # 1 day
+
+# require valid ip info for session start / recovery (throw error if lookup failed)
+ipInfoRequired: false
+
 # ip info based restrictions
 ipRestrictedRewardShare:
   # percentage of reward per share if IP is in a hosting range (default: 100)
@@ -240,7 +270,10 @@ ipInfoMatchRestrictedReward:
 ### Fund Management
 
 # minimum balance to keep in the faucet wallet (in wei)
-spareFundsAmount: 1000000000000000000  # 1 ETH
+spareFundsAmount: 100000000000000000  # 0.1 ETH
+
+# minimum balance to show the empty faucet error message
+noFundsBalance:   1000000000000000000  # 1 ETH
 
 # minimum balance to show the low funds warning
 lowFundsBalance: 10000000000000000000  # 10 ETH
@@ -272,7 +305,7 @@ faucetBalanceRestrictedReward:
 
 # dynamic reward restriction based on faucet balance
 # alternative to static faucetBalanceRestrictedReward
-# limits the rewards lineary according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
+# limits the rewards linearly according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
 faucetBalanceRestriction:
   enabled: false
   targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
@@ -326,5 +359,94 @@ buildSeoMeta:
   keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow"
 
 resultSharing:
+  preHtml: |
+    <div class="sh-opt">
+      Did you like the faucet? Give that project a 
+      <iframe src="https://ghbtns.com/github-btn.html?user=pk910&repo=PoWFaucet&type=star&count=true" frameborder="0" scrolling="0" width="150" height="20" title="GitHub"></iframe>
+    </div>
+  #postHtml: |
+  #  <div class="sh-opt">
+  #  </div>
+  caption: "Or support this faucet by sharing your result with a "
+
+  # result sharing buttons
   twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s) #goerli #faucet"
   mastodon: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s)"
+
+
+# allow reward boosting by gitcoin passport verification
+passportBoost:
+  trustedIssuers:
+    - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
+  passportCachePath: "passport-cache"
+  
+  refreshCooldown: 10
+  cacheTime: 86400
+  boostFactor:
+    1: 1.1 # x1.1 if score >= 1
+    5: 1.5 # x1.5 if score >= 5
+    10: 2 # x2 if score >= 10
+  stampScoring:
+    "Google": 1
+    "Twitter": 1
+    "Ens": 2
+    "GnosisSafe": 2
+    "Poh": 4
+    "POAP": 1
+    "GitPOAP": 1
+    "Facebook": 1
+    "FacebookFriends": 1
+    "FacebookProfilePicture": 1
+    "Brightid": 10
+    "Github": 1
+    "FiveOrMoreGithubRepos": 1
+    "TenOrMoreGithubFollowers": 2
+    "FiftyOrMoreGithubFollowers": 4
+    "ForkedGithubRepoProvider": 1
+    "StarredGithubRepoProvider": 1
+    "Linkedin": 1
+    "Discord": 1
+    "TwitterTweetGT10": 1
+    "TwitterFollowerGT100": 1
+    "TwitterFollowerGT500": 2
+    "TwitterFollowerGTE1000": 3
+    "TwitterFollowerGT5000": 5
+    "SelfStakingBronze": 1
+    "SelfStakingSilver": 1
+    "SelfStakingGold": 1
+    "CommunityStakingBronze": 1
+    "CommunityStakingSilver": 1
+    "CommunityStakingGold": 1
+    "ClearTextSimple": 1
+    "ClearTextTwitter": 1
+    "ClearTextGithubOrg": 1
+    "SnapshotProposalsProvider": 1
+    "SnapshotVotesProvider": 1
+    "EthGasProvider": 1
+    "FirstEthTxnProvider": 1
+    "EthGTEOneTxnProvider": 1
+    "GitcoinContributorStatistics#numGrantsContributeToGte#1": 1
+    "GitcoinContributorStatistics#numGrantsContributeToGte#10": 1
+    "GitcoinContributorStatistics#numGrantsContributeToGte#25": 2
+    "GitcoinContributorStatistics#numGrantsContributeToGte#100": 2
+    "GitcoinContributorStatistics#totalContributionAmountGte#10": 1
+    "GitcoinContributorStatistics#totalContributionAmountGte#100": 2
+    "GitcoinContributorStatistics#totalContributionAmountGte#1000": 2
+    "GitcoinContributorStatistics#numRoundsContributedToGte#1": 1
+    "GitcoinContributorStatistics#numGr14ContributionsGte#1": 1
+    "GitcoinGranteeStatistics#numOwnedGrants#1": 1
+    "GitcoinGranteeStatistics#numGrantContributors#10": 1
+    "GitcoinGranteeStatistics#numGrantContributors#25": 1
+    "GitcoinGranteeStatistics#numGrantContributors#100": 2
+    "GitcoinGranteeStatistics#totalContributionAmount#100": 1
+    "GitcoinGranteeStatistics#totalContributionAmount#1000": 2
+    "GitcoinGranteeStatistics#totalContributionAmount#10000": 4
+    "GitcoinGranteeStatistics#numGrantsInEcoAndCauseRound#1": 1
+    "gtcPossessionsGte#100": 2
+    "gtcPossessionsGte#10": 1
+    "ethPossessionsGte#32": 1
+    "ethPossessionsGte#10": 1
+    "ethPossessionsGte#1": 1
+    "NFT": 1
+    "Lens": 1
+    "ZkSync": 1

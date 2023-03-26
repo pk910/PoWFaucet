@@ -12,6 +12,7 @@ export interface IFaucetConfig {
   buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
   buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
   faucetStore: string;
+  faucetDBFile: string;
 
   faucetTitle: string; // title of the faucet
   faucetImage: string; // faucet image displayed on the startpage
@@ -34,13 +35,10 @@ export interface IFaucetConfig {
   claimAddrDenyContract: boolean; // check and prevent mining if target address is a contract
   powPingInterval: number; // websocket ping interval
   powPingTimeout: number; // kill websocket if no ping/pong for that number of seconds
-  powScryptParams: { // scrypt parameters
-    cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
-    blockSize: number; // r - block size (affects memory and CPU usage)
-    paralellization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
-    keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
-    difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
-  };
+  powHashAlgo: PoWHashAlgo; // hash algorithm to use ("sc" = SCrypt, "cn" = CryptoNight), defaults to SCrypt
+  powScryptParams: IPoWSCryptParams; // scrypt parameters
+  powCryptoNightParams: IPoWCryptoNightParams; // cryptonight parameters
+  powArgon2Params: IPoWArgon2Params; // argon2 parameters
   powNonceCount: number; // number of scrypt hashs to pack into a share (should be low as that just increases verification load on server side)
   powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
   powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceet the limit)
@@ -67,16 +65,19 @@ export interface IFaucetConfig {
   captchas: IFaucetCaptchaConfig | null; // captcha related settings or null to disable all captchas
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
   ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
+  ipInfoCacheTime: number; // ip info caching time
+  ipInfoRequired: boolean; // require valid ip info for session start / resume / recovery
   ipRestrictedRewardShare: null | { // ip based restrictions
-    hosting?: number; // percentage of reward per share if IP is in a hosting range
-    proxy?: number; // percentage of reward per share if IP is in a proxy range
-    [country: string]: number; // percentage of reward per share if IP is from given country code (DE/US/...)
+    hosting?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a hosting range
+    proxy?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a proxy range
+    [country: string]: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is from given country code (DE/US/...)
   };
   ipInfoMatchRestrictedReward: null | { // ip info pattern based restrictions
-    [pattern: string]: number; // percentage of reward per share if IP info matches regex pattern
+    [pattern: string]: number | IFacuetRestrictionConfig; // percentage of reward per share if IP info matches regex pattern
   };
   ipInfoMatchRestrictedRewardFile: null | { // ip info pattern based restrictions from file
-    file: string; // path to file
+    file?: string; // path to file
+    yaml?: string|string[]; // path to yaml file (for more actions/kill messages/etc.)
     refresh: number; // refresh interval
   };
   faucetBalanceRestrictedReward: null | { // reward restriction based on faucet wallet balance. lowest value applies
@@ -85,6 +86,7 @@ export interface IFaucetConfig {
   faucetBalanceRestriction: IFaucetBalanceRestrictionConfig;
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
+  noFundsBalance: number; // minimum balance to show the empty faucet error message
   lowFundsBalance: number; // minimum balance to show the low funds warning
   lowFundsWarning: string | boolean; // low faucet balance warning message / true to show the generic message / false to disable the warning
   noFundsError: string | boolean; // empty faucet error message / true to show the generic message / false to disable the error
@@ -120,6 +122,15 @@ export interface IFaucetConfig {
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
   resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
+  passportBoost: IPassportBoostConfig | null; // passport boost options or null to disable
+}
+
+export interface IFacuetRestrictionConfig {
+  reward: number;
+  msgkey?: string;
+  message?: string;
+  notify?: boolean|string;
+  blocked?: boolean|"close"|"kill";
 }
 
 export interface IFaucetCaptchaConfig {
@@ -135,6 +146,40 @@ export interface IFaucetBalanceRestrictionConfig {
   targetBalance: number;
 }
 
+export enum PoWHashAlgo {
+  SCRYPT      = "scrypt",
+  CRYPTONIGHT = "cryptonight",
+  ARGON2      = "argon2",
+}
+
+export interface IPoWSCryptParams {
+  cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
+  blockSize: number; // r - block size (affects memory and CPU usage)
+  parallelization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+  keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export interface IPoWCryptoNightParams {
+  algo: number;
+  variant: number;
+  height: number;
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export interface IPoWArgon2Params {
+  type: number;
+  version: number;
+  timeCost: number; // time cost (iterations), default: 1
+  memoryCost: number; // memory size
+  parallelization: number; // parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+  keyLength: number; // how many bytes to generate as output, e.g. 16 bytes (128 bits)
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params;
+
+
 export interface IFaucetEnsResolverConfig {
   rpcHost: string; // ETH execution layer RPC host for ENS resolver
   ensAddr: string | null; // ENS Resolver contract address or null for default resolver
@@ -145,7 +190,19 @@ export interface IFaucetStatsConfig {
 }
 
 export interface IFaucetResultSharingConfig {
+  preHtml: string;
+  postHtml: string;
+  caption: string;
   [provider: string]: string;
+}
+
+export interface IPassportBoostConfig {
+  passportCachePath: string;
+  trustedIssuers: string[];
+  refreshCooldown: number;
+  cacheTime: number;
+  stampScoring: {[stamp: string]: number};
+  boostFactor: {[score: number]: number};
 }
 
 let cliArgs = (function() {
@@ -185,6 +242,7 @@ let defaultConfig: IFaucetConfig = {
     "keywords": "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow",
   },
   faucetStore: path.join(basePath, "faucet-store.json"),
+  faucetDBFile: path.join(basePath, "faucet-store.db"),
 
   powPingInterval: 10,
   powPingTimeout: 30,
@@ -205,10 +263,26 @@ let defaultConfig: IFaucetConfig = {
   claimAddrCooldown: 7200,
   claimAddrMaxBalance: null,
   claimAddrDenyContract: false,
+  powHashAlgo: null,
   powScryptParams: {
     cpuAndMemory: 4096,
     blockSize: 8,
-    paralellization: 1,
+    parallelization: 1,
+    keyLength: 16,
+    difficulty: 9
+  },
+  powCryptoNightParams: {
+    algo: 0,
+    variant: 0,
+    height: 0,
+    difficulty: 9
+  },
+  powArgon2Params: {
+    type: 0,
+    version: 13,
+    timeCost: 1,
+    memoryCost: 1024,
+    parallelization: 1,
     keyLength: 16,
     difficulty: 9
   },
@@ -229,12 +303,15 @@ let defaultConfig: IFaucetConfig = {
   captchas: null,
   concurrentSessions: 0,
   ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
+  ipInfoCacheTime: 86400,
+  ipInfoRequired: false,
   ipRestrictedRewardShare: null,
   ipInfoMatchRestrictedReward: null,
   ipInfoMatchRestrictedRewardFile: null,
   faucetBalanceRestrictedReward: null,
   faucetBalanceRestriction: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
+  noFundsBalance:    100000000000000000, // 0,1 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH
   lowFundsWarning: true,
   noFundsError: true,
@@ -253,6 +330,7 @@ let defaultConfig: IFaucetConfig = {
   ensResolver: null,
   faucetStats: null,
   resultSharing: null,
+  passportBoost: null,
 };
 
 export let faucetConfig: IFaucetConfig = null;
@@ -286,6 +364,8 @@ export function loadFaucetConfig() {
   }
   if(!config.captchas && (config as any).hcaptcha)
     config.captchas = (config as any).hcaptcha;
+  if(config.powScryptParams && typeof config.powScryptParams.parallelization !== "number")
+    config.powScryptParams.parallelization = (config.powScryptParams as any).paralellization || 1;
 
   if(!faucetConfig)
     faucetConfig = {} as any;

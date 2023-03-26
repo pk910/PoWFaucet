@@ -1,7 +1,7 @@
 
 import * as crypto from "crypto";
 import { faucetConfig } from "../common/FaucetConfig";
-import { SessionMark } from "../services/FaucetStore";
+import { FaucetStoreDB, SessionMark } from "../services/FaucetStoreDB";
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from "../common/ServiceManager";
 import { FaucetStore } from "../services/FaucetStore";
@@ -12,6 +12,8 @@ import { renderDate } from "../utils/DateUtils";
 import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
 import { FaucetStatsLog } from "../services/FaucetStatsLog";
 import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
+import { IPassportInfo, PassportVerifier } from "../services/PassportVerifier";
+import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 
 
 export enum PoWSessionSlashReason {
@@ -35,8 +37,30 @@ export interface IPoWSessionRecoveryInfo {
   preimage: string;
   balance: string;
   nonce: number;
+  ident: string;
   tokenTime?: number;
   claimable?: boolean;
+}
+
+export interface IPoWSessionStoreData {
+  id: string;
+  startTime: number;
+  idleTime: number | null;
+  targetAddr: string;
+  preimage: string;
+  balance: string;
+  claimable: boolean;
+  lastNonce: number;
+  ident: string;
+  status: PoWSessionStatus;
+  remoteIp: string;
+  remoteIpInfo: IIPInfo;
+}
+
+export interface IPoWSessionBoostInfo {
+  stamps: string[];
+  score: number;
+  factor: number;
 }
 
 export class PoWSession {
@@ -82,6 +106,20 @@ export class PoWSession {
     return concurrentSessions;
   }
 
+  public static saveSessionData() {
+    let sessionData = this.getAllSessions().map((session) => session.getSessionStoreData());
+    ServiceManager.GetService(FaucetStore).setSessionStore(sessionData);
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Persisted session data to faucet store: " + sessionData.length + " sessions");
+  }
+
+  public static loadSessionData() {
+    let sessionData = ServiceManager.GetService(FaucetStore).getSessionStore();
+    if(!sessionData)
+      return;
+    sessionData.forEach((data) => new PoWSession(null, data));
+    ServiceManager.GetService(FaucetStore).setSessionStore(null);
+  }
+
   private sessionId: string;
   private startTime: Date;
   private idleTime: Date | null;
@@ -90,6 +128,7 @@ export class PoWSession {
   private balance: bigint;
   private claimable: boolean;
   private lastNonce: number;
+  private ident: string;
   private reportedHashRate: number[];
   private activeClient: PoWClient;
   private cleanupTimer: NodeJS.Timeout;
@@ -99,12 +138,26 @@ export class PoWSession {
   private lastIpInfo: IIPInfo;
   private missedVerifications: number;
   private pendingVerifications: number;
+  private rewardRestriction: IPoWRewardRestriction;
+  private rewardRestrictionRefresh: number;
+  private lastBoostRefresh: number;
+  private boostInfo: IPoWSessionBoostInfo;
 
   // cache
   private hashedRemoteIp: string;
   private hashedSessionId: string;
 
-  public constructor(client: PoWClient, target: string | IPoWSessionRecoveryInfo) {
+  public constructor(client: PoWClient, target: string | IPoWSessionRecoveryInfo | IPoWSessionStoreData) {
+    if(client) {
+      this.createSession(client, target as string | IPoWSessionRecoveryInfo);
+    }
+    else {
+      // restore from IPoWSessionStoreData
+      this.restoreSessionData(target as IPoWSessionStoreData);
+    }
+  }
+
+  private createSession(client: PoWClient, target: string | IPoWSessionRecoveryInfo) {
     this.idleTime = null;
     this.claimable = false;
     this.reportedHashRate = [];
@@ -119,6 +172,7 @@ export class PoWSession {
       this.preimage = target.preimage;
       this.balance = BigInt(target.balance);
       this.lastNonce = target.nonce;
+      this.ident = target.ident;
     }
     else {
       this.sessionId = getNewGuid();
@@ -131,9 +185,8 @@ export class PoWSession {
 
     this.activeClient = client;
     client.setSession(this);
-    this.updateRemoteIp();
-
-    PoWSession.activeSessions[this.sessionId] = this;
+    setTimeout(() => this.updateRemoteIp(), 10);
+    
     ServiceManager.GetService(PoWStatusLog).emitLog(
       PoWStatusLogLevel.INFO, 
       "Created new session: " + this.sessionId + 
@@ -141,22 +194,11 @@ export class PoWSession {
         " [Recovered: " + (Math.round(weiToEth(this.balance)*1000)/1000) + " ETH, start: " + renderDate(this.startTime, true) + "]" :
         ""
       ) +
-      " (Remote IP: " + this.activeClient.getRemoteIP() + ")"
+      " (Remote IP: " + client.getRemoteIP() + ")"
     );
 
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let sessionAge = now - Math.floor(this.startTime.getTime() / 1000);
-    let cleanupTime = faucetConfig.powSessionTimeout - sessionAge;
-    if(cleanupTime > 0) {
-      this.cleanupTimer = setTimeout(() => {
-        this.timeoutSession();
-      }, cleanupTime * 1000);
-    }
-    else {
-      setTimeout(() => {
-        this.timeoutSession();
-      }, 0);
-    }
+    this.resetSessionTimer();
+    this.refreshBoostInfo();
   }
 
   private timeoutSession() {
@@ -177,17 +219,12 @@ export class PoWSession {
       this.activeClient = null;
     }
     if(setClosedMark)
-      ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.CLOSED);
+      ServiceManager.GetService(FaucetStoreDB).setSessionMark(this.sessionId, SessionMark.CLOSED);
     
     if(makeClaimable && this.balance >= faucetConfig.claimMinAmount) {
       this.claimable = true;
       if(this.balance > faucetConfig.claimMaxAmount)
         this.balance = BigInt(faucetConfig.claimMaxAmount);
-    }
-
-    if(this.cleanupTimer) {
-      clearTimeout(this.cleanupTimer);
-      this.cleanupTimer = null;
     }
     
     this.setSessionStatus(PoWSessionStatus.CLOSED);
@@ -195,15 +232,86 @@ export class PoWSession {
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Closed session: " + this.sessionId + (this.claimable ? " (claimable reward: " + (Math.round(weiToEth(this.balance)*1000)/1000) + ")" : ""));
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
 
+    this.resetSessionTimer();
+  }
+
+  private resetSessionTimer() {
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionAge = now - Math.floor(this.startTime.getTime() / 1000);
-    let cleanupTime = faucetConfig.claimSessionTimeout - sessionAge + 20;
-    if(cleanupTime > 0) {
-      PoWSession.closedSessions[this.sessionId] = this;
-      setTimeout(() => {
-        delete PoWSession.closedSessions[this.sessionId];
-      }, cleanupTime * 1000);
+
+    if(this.cleanupTimer) {
+      clearTimeout(this.cleanupTimer);
+      this.cleanupTimer = null;
     }
+
+    if(this.sessionStatus === PoWSessionStatus.IDLE || this.sessionStatus === PoWSessionStatus.MINING) {
+      PoWSession.activeSessions[this.sessionId] = this;
+
+      let cleanupTime = faucetConfig.powSessionTimeout - sessionAge;
+      if(cleanupTime > 0) {
+        this.cleanupTimer = setTimeout(() => {
+          this.timeoutSession();
+        }, cleanupTime * 1000);
+      }
+      else {
+        setTimeout(() => {
+          this.timeoutSession();
+        }, 0);
+      }
+    }
+    else {
+      let cleanupTime = faucetConfig.claimSessionTimeout - sessionAge + 20;
+      if(cleanupTime > 0) {
+        PoWSession.closedSessions[this.sessionId] = this;
+        this.cleanupTimer = setTimeout(() => {
+          delete PoWSession.closedSessions[this.sessionId];
+        }, cleanupTime * 1000);
+      }
+    }
+  }
+
+  private restoreSessionData(data: IPoWSessionStoreData) {
+    this.sessionId = data.id;
+    this.startTime = new Date(data.startTime);
+    this.idleTime = data.idleTime ? new Date(data.idleTime) : null;
+    this.targetAddr = data.targetAddr;
+    this.preimage = data.preimage;
+    this.balance = BigInt(data.balance);
+    this.claimable = data.claimable;
+    this.lastNonce = data.lastNonce;
+    this.ident = data.ident;
+    this.sessionStatus = data.status;
+    this.lastRemoteIp = data.remoteIp;
+    this.lastIpInfo = data.remoteIpInfo;
+    this.reportedHashRate = [];
+
+    this.resetSessionTimer();
+
+    if(this.sessionStatus === PoWSessionStatus.MINING) {
+      this.sessionStatus = PoWSessionStatus.IDLE;
+      this.idleTime = new Date();
+    }
+    if(this.sessionStatus === PoWSessionStatus.IDLE) {
+      this.resetIdleTimeout();
+      this.refreshBoostInfo();
+    }
+  }
+
+  public getSessionStoreData(): IPoWSessionStoreData {
+    return {
+      id: this.sessionId,
+      startTime: this.startTime.getTime(),
+      idleTime: this.idleTime?.getTime(),
+      targetAddr: this.targetAddr,
+      preimage: this.preimage,
+      balance: this.balance.toString(),
+      claimable: this.claimable,
+      lastNonce: this.lastNonce,
+      ident: this.ident,
+      status: this.sessionStatus,
+      remoteIp: this.lastRemoteIp,
+      remoteIpInfo: this.lastIpInfo
+    };
   }
 
 
@@ -259,27 +367,35 @@ export class PoWSession {
     if(activeClient) {
       this.idleTime = null;
       this.setSessionStatus(PoWSessionStatus.MINING);
-      this.updateRemoteIp();
+      setTimeout(() => this.updateRemoteIp(), 10);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
-      if(this.idleCloseTimer) {
-        clearTimeout(this.idleCloseTimer);
-        this.idleCloseTimer = null;
-      }
+      
     }
     else {
       this.idleTime = new Date();
       this.setSessionStatus(PoWSessionStatus.IDLE);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Paused session: " + this.sessionId);
-      if(faucetConfig.powIdleTimeout > 0) {
-        this.idleCloseTimer = setTimeout(() => {
-          this.closeSession(false, true);
-        }, faucetConfig.powIdleTimeout * 1000);
+    }
+    this.resetIdleTimeout();
+  }
+
+  private resetIdleTimeout() {
+    if(this.sessionStatus === PoWSessionStatus.IDLE && faucetConfig.powIdleTimeout > 0) {
+      if(this.idleCloseTimer) {
+        clearTimeout(this.idleCloseTimer);
       }
+      this.idleCloseTimer = setTimeout(() => {
+        this.closeSession(false, true);
+      }, faucetConfig.powIdleTimeout * 1000);
+    }
+    else if(this.idleCloseTimer) {
+      clearTimeout(this.idleCloseTimer);
+      this.idleCloseTimer = null;
     }
   }
 
   public getLastRemoteIp(hashed?: boolean): string {
-    if(hashed) {
+    if(this.lastRemoteIp && hashed) {
       if(!this.hashedRemoteIp)
         this.hashedRemoteIp = getHashedIp(this.lastRemoteIp, faucetConfig.faucetSecret);
       return this.hashedRemoteIp;
@@ -293,19 +409,24 @@ export class PoWSession {
       return;
     
     let remoteAddr = this.activeClient.getRemoteIP();
-    if(remoteAddr.match(/^::ffff:/))
-      remoteAddr = remoteAddr.substring(7);
-    
     if(this.lastRemoteIp === remoteAddr)
       return;
 
     this.lastRemoteIp = remoteAddr;
     this.hashedRemoteIp = null;
+
     ServiceManager.GetService(IPInfoResolver).getIpInfo(remoteAddr).then((ipInfo) => {
       this.lastIpInfo = ipInfo;
-      if(this.activeClient)
-        this.activeClient.refreshFaucetStatus();
+
+      setTimeout(() => this.updateRewardRestriction(), 10);
     });
+  }
+
+  public setLastIpInfo(ip: string, ipinfo: IIPInfo) {
+    this.lastRemoteIp = ip;
+    this.hashedRemoteIp = null;
+    this.lastIpInfo = ipinfo;
+    setTimeout(() => this.updateRewardRestriction(), 10);
   }
 
   public getLastIpInfo(): IIPInfo {
@@ -326,6 +447,14 @@ export class PoWSession {
     let hashRateSum = 0;
     this.reportedHashRate.forEach((hashRate) => hashRateSum += hashRate);
     return this.reportedHashRate.length > 0 ? hashRateSum / this.reportedHashRate.length : 0;
+  }
+
+  public getIdent(): string {
+    return this.ident;
+  }
+
+  public setIdent(ident: string) {
+    this.ident = ident;
   }
 
   public getSessionStatus(): PoWSessionStatus {
@@ -389,7 +518,7 @@ export class PoWSession {
 
   private applyKillPenalty(reason: PoWSessionSlashReason) {
     this.setSessionStatus(PoWSessionStatus.SLASHED);
-    ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.KILLED);
+    ServiceManager.GetService(FaucetStoreDB).setSessionMark(this.sessionId, SessionMark.KILLED);
     if(this.activeClient)
       this.activeClient.sendMessage("sessionKill", {
         level: "session",
@@ -412,6 +541,7 @@ export class PoWSession {
       balance: this.balance.toString(),
       claimable: this.claimable,
       nonce: this.lastNonce,
+      ident: this.ident,
     };
     let sessionStr = Buffer.from(JSON.stringify(sessionDict)).toString('base64');
 
@@ -420,6 +550,80 @@ export class PoWSession {
     sessionHash.update(sessionStr);
 
     return sessionStr + "|" + sessionHash.digest('base64');
+  }
+
+  private updateRewardRestriction() {
+    this.rewardRestriction = ServiceManager.GetService(PoWRewardLimiter).getSessionRestriction(this);
+    this.rewardRestrictionRefresh = Math.floor((new Date()).getTime() / 1000);
+
+    if(this.rewardRestriction.blocked) {
+      let activeClient = this.activeClient;
+      this.closeSession(true, this.rewardRestriction.blocked === "close");
+      if(activeClient) {
+        activeClient.sendMessage("sessionKill", {
+          level: "restriction",
+          message: "Session closed due to restrictions: " + this.rewardRestriction.messages.map((msg) => msg.text).join(", "),
+          token: this.isClaimable() ? this.getSignedSession() : null,
+        });
+      }
+      return;
+    }
+
+    if(this.activeClient)
+      this.activeClient.refreshFaucetStatus();
+  }
+
+  public getRewardRestriction(): IPoWRewardRestriction {
+    let now = Math.floor((new Date()).getTime() / 1000);
+    if(!this.rewardRestriction || this.rewardRestrictionRefresh < now - 60)
+      this.updateRewardRestriction();
+    
+    return this.rewardRestriction;
+  }
+
+  public getBoostInfo(): IPoWSessionBoostInfo {
+    return this.boostInfo;
+  }
+
+  public async refreshBoostInfo(refresh?: boolean, passportJson?: string): Promise<IPoWSessionBoostInfo> {
+    let passportVerifier = ServiceManager.GetService(PassportVerifier);
+    let passport: IPassportInfo;
+    if(refresh && passportJson) {
+      let verifyResult = await passportVerifier.verifyUserPassport(this.targetAddr, passportJson);
+      if(!verifyResult.valid) {
+        throw verifyResult.errors.join("\n");
+      }
+      passport = verifyResult.info;
+    }
+    else if(refresh) {
+      let now = Math.floor((new Date()).getTime() / 1000);
+      if(this.lastBoostRefresh && now - this.lastBoostRefresh < faucetConfig.passportBoost.refreshCooldown) {
+        throw "Passport has been refreshed recently, please retry in a few minutes.";
+      }
+      this.lastBoostRefresh = now;
+    }
+
+    if(!passport)
+      passport = await passportVerifier.getPassport(this.targetAddr, refresh);
+    
+    let score = passportVerifier.getPassportScore(passport);
+    if(score) {
+      this.boostInfo = {
+        stamps: passport.stamps?.map((stamp) => stamp.provider) || [],
+        score: score.score,
+        factor: score.factor
+      };
+    }
+    else {
+      this.boostInfo = null;
+    }
+    return this.boostInfo;
+  }
+
+  public getBoostRefreshCooldown(): number {
+    let now = Math.floor((new Date()).getTime() / 1000);
+    let cooldownUntil = (this.lastBoostRefresh || 0) + faucetConfig.passportBoost.refreshCooldown;
+    return cooldownUntil > now ? cooldownUntil : 0;
   }
 
 

@@ -1,9 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { FaucetStore } from '../services/FaucetStore';
+import { FaucetStoreDB } from '../services/FaucetStoreDB';
 import { renderDate } from '../utils/DateUtils';
 import { strPadRight } from '../utils/StringUtils';
+import { PoWSession } from '../websock/PoWSession';
 import { faucetConfig, loadFaucetConfig } from './FaucetConfig';
 import { ServiceManager } from './ServiceManager';
 
@@ -66,7 +67,8 @@ export class PoWStatusLog extends TypedEmitter<PoWStatusLogEvents> {
 
   private shutdown(code: number) {
     try {
-      ServiceManager.GetService(FaucetStore).saveStore(true);
+      PoWSession.saveSessionData();
+      ServiceManager.GetService(FaucetStoreDB).closeDatabase();
     } catch(ex) {}
     process.exit(code);
   }
