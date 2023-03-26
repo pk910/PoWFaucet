@@ -1,6 +1,6 @@
 import { WebSocket, RawData } from 'ws';
 import * as crypto from "crypto";
-import { faucetConfig } from '../common/FaucetConfig';
+import { faucetConfig, PoWHashAlgo } from '../common/FaucetConfig';
 import { IPoWSessionRecoveryInfo, PoWSession, PoWSessionStatus } from './PoWSession';
 import { AddressMark, FaucetStoreDB, SessionMark } from '../services/FaucetStoreDB';
 import { renderTimespan } from '../utils/DateUtils';
@@ -17,6 +17,7 @@ import { PoWRewardLimiter } from '../services/PoWRewardLimiter';
 import { CaptchaVerifier } from '../services/CaptchaVerifier';
 import { FaucetWebApi } from '../webserv/FaucetWebApi';
 import { IIPInfo, IPInfoResolver } from '../services/IPInfoResolver';
+import { getPoWParamsStr } from '../utils/PoWParamsHelper';
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -467,13 +468,7 @@ export class PoWClient {
       hashrate: number;
     } = message.data;
 
-    let powParamsStr = faucetConfig.powScryptParams.cpuAndMemory +
-      "|" + faucetConfig.powScryptParams.blockSize +
-      "|" + faucetConfig.powScryptParams.parallelization +
-      "|" + faucetConfig.powScryptParams.keyLength +
-      "|" + faucetConfig.powScryptParams.difficulty;
-
-    if(shareData.params !== powParamsStr) 
+    if(shareData.params !== getPoWParamsStr()) 
       return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", message);
     if(shareData.nonces.length !== faucetConfig.powNonceCount)
       return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count", message);
@@ -516,7 +511,6 @@ export class PoWClient {
     });
   }
   
-
   private onCliVerifyResult(message: any) {
     if(!this.session)
       return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found");

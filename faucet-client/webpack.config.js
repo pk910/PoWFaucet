@@ -37,10 +37,24 @@ var webpackModuleConfigs = [
     ]
   },
   {
-    entry: './src/worker',
+    entry: './src/worker/worker-scrypt',
     output: {
       path: path.join(__dirname, '/dist'),
-      filename: 'powfaucet-worker.js',
+      filename: 'powfaucet-worker-sc.js',
+    },
+  },
+  {
+    entry: './src/worker/worker-cryptonight',
+    output: {
+      path: path.join(__dirname, '/dist'),
+      filename: 'powfaucet-worker-cn.js',
+    },
+  },
+  {
+    entry: './src/worker/worker-argon2',
+    output: {
+      path: path.join(__dirname, '/dist'),
+      filename: 'powfaucet-worker-a2.js',
     },
 
   },

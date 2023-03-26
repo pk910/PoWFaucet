@@ -138,6 +138,10 @@ powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
 # kill websocket if no ping/pong for that number of seconds
 #powPingTimeout: 30
 
+
+# mining algorithm to use
+powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
+
 # scrypt mining parameters
 powScryptParams:
   # N - iterations count: affects memory and CPU usage, must be a power of 2
@@ -149,6 +153,25 @@ powScryptParams:
   # klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
   keyLength: 16
   # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
+  difficulty: 11
+
+# cryptonight mining parameters
+powCryptoNightParams:
+  # crypto night hash algo & variant
+  algo: 0
+  variant: 0
+  height: 0
+  # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+  difficulty: 11
+
+# argon2 mining parameters
+powArgon2Params:
+  type: 0
+  version: 13
+  timeCost: 4
+  memoryCost: 4096
+  parallelization: 1
+  keyLength: 16
   difficulty: 11
 
 # number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)

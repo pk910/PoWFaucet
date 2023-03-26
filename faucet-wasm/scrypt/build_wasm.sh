@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-if [ ! -f build_wasm.sh ]; then
+if [ ! -f build_scrypt_wasm.sh ]; then
   printf "Please run this script from the faucet-wasm folder.\n"
 fi
 
@@ -47,8 +47,8 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
-node build_scrypt_wasm.js > "../libs/scrypt_wasm.js"
+node build_wasm.js > "../../libs/scrypt_wasm.js"
 
-printf "\n\nbuilt ../libs/scrypt_wasm.js successfully!\n\n"
+printf "\n\nbuilt ../../libs/scrypt_wasm.js successfully!\n\n"
 
 

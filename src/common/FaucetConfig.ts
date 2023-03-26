@@ -35,13 +35,10 @@ export interface IFaucetConfig {
   claimAddrDenyContract: boolean; // check and prevent mining if target address is a contract
   powPingInterval: number; // websocket ping interval
   powPingTimeout: number; // kill websocket if no ping/pong for that number of seconds
-  powScryptParams: { // scrypt parameters
-    cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
-    blockSize: number; // r - block size (affects memory and CPU usage)
-    parallelization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
-    keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
-    difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
-  };
+  powHashAlgo: PoWHashAlgo; // hash algorithm to use ("sc" = SCrypt, "cn" = CryptoNight), defaults to SCrypt
+  powScryptParams: IPoWSCryptParams; // scrypt parameters
+  powCryptoNightParams: IPoWCryptoNightParams; // cryptonight parameters
+  powArgon2Params: IPoWArgon2Params; // argon2 parameters
   powNonceCount: number; // number of scrypt hashs to pack into a share (should be low as that just increases verification load on server side)
   powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
   powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceet the limit)
@@ -149,6 +146,40 @@ export interface IFaucetBalanceRestrictionConfig {
   targetBalance: number;
 }
 
+export enum PoWHashAlgo {
+  SCRYPT      = "scrypt",
+  CRYPTONIGHT = "cryptonight",
+  ARGON2      = "argon2",
+}
+
+export interface IPoWSCryptParams {
+  cpuAndMemory: number; // N - iterations count (affects memory and CPU usage, must be a power of 2)
+  blockSize: number; // r - block size (affects memory and CPU usage)
+  parallelization: number; // p - parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+  keyLength: number; // klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export interface IPoWCryptoNightParams {
+  algo: number;
+  variant: number;
+  height: number;
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export interface IPoWArgon2Params {
+  type: number;
+  version: number;
+  timeCost: number; // time cost (iterations), default: 1
+  memoryCost: number; // memory size
+  parallelization: number; // parallelism factor (threads to run in parallel, affects the memory, CPU usage), should be 1 as webworker is single threaded
+  keyLength: number; // how many bytes to generate as output, e.g. 16 bytes (128 bits)
+  difficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+}
+
+export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params;
+
+
 export interface IFaucetEnsResolverConfig {
   rpcHost: string; // ETH execution layer RPC host for ENS resolver
   ensAddr: string | null; // ENS Resolver contract address or null for default resolver
@@ -232,9 +263,25 @@ let defaultConfig: IFaucetConfig = {
   claimAddrCooldown: 7200,
   claimAddrMaxBalance: null,
   claimAddrDenyContract: false,
+  powHashAlgo: null,
   powScryptParams: {
     cpuAndMemory: 4096,
     blockSize: 8,
+    parallelization: 1,
+    keyLength: 16,
+    difficulty: 9
+  },
+  powCryptoNightParams: {
+    algo: 0,
+    variant: 0,
+    height: 0,
+    difficulty: 9
+  },
+  powArgon2Params: {
+    type: 0,
+    version: 13,
+    timeCost: 1,
+    memoryCost: 1024,
     parallelization: 1,
     keyLength: 16,
     difficulty: 9
