@@ -253,12 +253,12 @@ export class FaucetStoreDB {
   }
 
   public addQueuedClaimTx(claimTx: IQueuedClaimTx) {
-    this.db.prepare("INSERT INTO ClaimJson (SessionId, ClaimJson, Time) VALUES (?, ?, ?)")
+    this.db.prepare("INSERT INTO ClaimTxQueue (SessionId, ClaimJson, Time) VALUES (?, ?, ?)")
       .run(claimTx.session.toLowerCase(), JSON.stringify(claimTx), this.now());
   }
 
   public removeQueuedClaimTx(sessionId: string) {
-    this.db.prepare("DELETE FROM ClaimJson WHERE SessionId = ?")
+    this.db.prepare("DELETE FROM ClaimTxQueue WHERE SessionId = ?")
       .run(sessionId.toLowerCase());
   }
 
