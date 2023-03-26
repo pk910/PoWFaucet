@@ -3,7 +3,7 @@ import { IFaucetConfig, IFaucetStatus } from '../common/IFaucetConfig';
 import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
 import { IPoWClaimInfo, IPoWSessionInfo, PoWSession } from '../common/PoWSession';
 import { PoWMinerStatus } from './PoWMinerStatus';
-import { PoWMiner } from '../common/PoWMiner';
+import { PoWMiner, PoWMinerWorkerSrc } from '../common/PoWMiner';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWClaimDialog } from './PoWClaimDialog';
 import { PoWFaucetStatus } from './PoWFaucetStatus';
@@ -19,7 +19,7 @@ import './PoWFaucet.css'
 export interface IPoWFaucetProps {
   powWebsockUrl: string;
   powApiUrl: string;
-  minerSrc: string;
+  minerSrc: PoWMinerWorkerSrc;
 }
 
 enum PoWFaucetMiningStatus {

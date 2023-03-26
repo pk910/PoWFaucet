@@ -1,18 +1,62 @@
-import { getScrypt, getScryptReadyPromise, Scrypt } from "../../libs/scrypt_wasm";
 import { parentPort } from "worker_threads";
 import { base64ToHex } from "../utils/ConvertHelpers";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator";
+import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from "../common/FaucetConfig";
+
+export type PoWHashFn = (nonceHex: string, preimgHex: string, params: PoWCryptoParams) => string;
 
 export class PoWValidatorWorker {
-  private scrypt: Scrypt;
+  private hashFn: {[algo: string]: Promise<PoWHashFn>} = {};
   private difficultyMasks: {[difficulty: number]: string} = {};
   
   public constructor() {
     parentPort.on("message", (evt) => this.onControlMessage(evt));
-    getScryptReadyPromise().then(() => {
-      this.scrypt = getScrypt();
-      parentPort.postMessage({ action: "init" });
-    });
+    parentPort.postMessage({ action: "init" });
+  }
+
+  private getHashFn(algo: PoWHashAlgo): Promise<PoWHashFn> {
+    let algoKey = algo.toString();
+    if(this.hashFn[algoKey])
+      return this.hashFn[algoKey];
+    else
+      return this.hashFn[algoKey] = this.initHashFn(algo);
+  }
+
+  private async initHashFn(algo: PoWHashAlgo): Promise<PoWHashFn> {
+    let hashFn: PoWHashFn;
+    switch(algo) {
+      case PoWHashAlgo.SCRYPT:
+        hashFn = await (async () => {
+          let module = await import("../../libs/scrypt_wasm");
+          await module.getScryptReadyPromise();
+          let scrypt = module.getScrypt();
+          return (nonce, preimg, params: IPoWSCryptParams) => {
+            return scrypt(nonce, preimg, params.cpuAndMemory, params.blockSize, params.parallelization, params.keyLength);
+          };
+        })();
+        break;
+      case PoWHashAlgo.CRYPTONIGHT:
+        hashFn = await (async () => {
+          let module = await import("../../libs/cryptonight_wasm");
+          await module.getCryptoNightReadyPromise();
+          let cryptonight = module.getCryptoNight();
+          return (nonce, preimg, params: IPoWCryptoNightParams) => {
+            return cryptonight(preimg + nonce, params.algo, params.variant, params.height);
+          };
+        })();
+        break;
+      case PoWHashAlgo.ARGON2:
+        hashFn = await (async () => {
+          let module = await import("../../libs/argon2_wasm");
+          await module.getArgon2ReadyPromise();
+          let argon2 = module.getArgon2();
+          return (nonce, preimg, params: IPoWArgon2Params) => {
+            return argon2(nonce, preimg, params.keyLength, params.timeCost, params.memoryCost, params.parallelization, params.type, params.version);
+          };
+        })();
+        break;
+    }
+    return hashFn;
   }
   
   private onControlMessage(msg: any) {
@@ -41,12 +85,13 @@ export class PoWValidatorWorker {
     return mask;
   }
 
-  private onCtrlValidate(req: IPoWValidatorValidateRequest) {
+  private async onCtrlValidate(req: IPoWValidatorValidateRequest) {
+    let hashFn = await this.getHashFn(req.algo);
     let preimg = base64ToHex(req.preimage);
 
-    let dmask = this.difficultyMasks[req.params.d];
+    let dmask = this.difficultyMasks[req.params.difficulty];
     if(!dmask)
-      dmask = this.difficultyMasks[req.params.d] = this.getDifficultyMask(req.params.d);
+      dmask = this.difficultyMasks[req.params.difficulty] = this.getDifficultyMask(req.params.difficulty);
 
     let isValid = (req.nonces.length > 0);
     for(var i = 0; i < req.nonces.length && isValid; i++) {
@@ -55,13 +100,10 @@ export class PoWValidatorWorker {
         nonceHex = "0000000000000000".substring(0, 16 - nonceHex.length) + nonceHex;
       }
 
-      let hashHex = this.scrypt(
+      let hashHex = hashFn(
         nonceHex, 
         preimg, 
-        req.params.n, 
-        req.params.r, 
-        req.params.p, 
-        req.params.l
+        req.params
       );
       let startOfHash = hashHex.substring(0, dmask.length);
       if(!(startOfHash <= dmask)) {
