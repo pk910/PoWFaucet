@@ -24,7 +24,13 @@ var webpackModuleConfigs = [
       rules: [
         {
           test: /\.css$/,
-          use: [MiniCssExtractPlugin.loader, 'css-loader']
+          use: [
+            debug ? 'style-loader' : MiniCssExtractPlugin.loader,
+            {
+              loader: 'css-loader',
+              options: { url: false }
+            }
+          ]
         }
       ]
     },
