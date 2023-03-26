@@ -14,7 +14,7 @@ import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
 import { strFormatPlaceholder } from '../utils/StringUtils';
 import { FaucetStatsLog } from './FaucetStatsLog';
 import { PromiseDfd } from '../utils/PromiseDfd';
-import { FaucetStore } from './FaucetStore';
+import { FaucetStoreDB } from './FaucetStoreDB';
 import { PoWRewardLimiter } from './PoWRewardLimiter';
 
 interface WalletState {
@@ -111,7 +111,7 @@ export class EthWeb3Manager {
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
 
     // restore saved claimTx queue
-    ServiceManager.GetService(FaucetStore).getClaimTxQueue().forEach((claimTx) => {
+    ServiceManager.GetService(FaucetStoreDB).getClaimTxQueue().forEach((claimTx) => {
       let claim = new ClaimTx(claimTx.target, BigInt(claimTx.amount), claimTx.session, claimTx.time);
       this.claimTxQueue.push(claim);
     });
@@ -271,7 +271,7 @@ export class EthWeb3Manager {
   public addClaimTransaction(target: string, amount: bigint, sessId: string): ClaimTx {
     let claimTx = new ClaimTx(target, amount, sessId);
     this.claimTxQueue.push(claimTx);
-    ServiceManager.GetService(FaucetStore).addQueuedClaimTx(claimTx.serialize());
+    ServiceManager.GetService(FaucetStoreDB).addQueuedClaimTx(claimTx.serialize());
     return claimTx;
   }
 
@@ -360,14 +360,14 @@ export class EthWeb3Manager {
       claimTx.failReason = "Network RPC is currently unreachable.";
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
-      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
+      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
       return;
     }
     if(!this.walletState.ready || this.walletState.balance - BigInt(faucetConfig.spareFundsAmount) < claimTx.amount) {
       claimTx.failReason = "Faucet wallet is out of funds.";
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
-      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
+      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
       return;
     }
 
@@ -405,7 +405,7 @@ export class EthWeb3Manager {
       this.updateFaucetStatus();
 
       this.pendingTxQueue[claimTx.txhash] = claimTx;
-      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
+      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + (Math.round(weiToEth(claimTx.amount)*1000)/1000) + " ETH] to: " + claimTx.target + ": " + claimTx.txhash);
 
       claimTx.status = ClaimTxStatus.PENDING;

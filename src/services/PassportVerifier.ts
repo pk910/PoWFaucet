@@ -6,7 +6,7 @@ import { Passport } from '@gitcoinco/passport-sdk-types';
 import { faucetConfig } from '../common/FaucetConfig';
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from '../common/ServiceManager';
-import { FaucetStore } from './FaucetStore';
+import { FaucetStoreDB } from './FaucetStoreDB';
 
 export interface IPassportInfo {
   found: boolean;
@@ -54,7 +54,7 @@ export class PassportVerifier {
       return this.passportCache[addr];
     
     let now = Math.floor((new Date()).getTime() / 1000);
-    let faucetStore = ServiceManager.GetService(FaucetStore);
+    let faucetStore = ServiceManager.GetService(FaucetStoreDB);
     let cachedPassportInfo = faucetStore.getPassportInfo(addr);
     let passportPromise: Promise<IPassportInfo>;
 

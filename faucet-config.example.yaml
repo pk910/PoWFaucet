@@ -4,6 +4,7 @@
 
 # Path to faucet db file (defaults to faucet-store.json)
 faucetStore: "faucet-store.json"
+faucetDBFile: "faucet-store.db"
 
 # logfile for faucet events (comment out for no logging)
 faucetLogFile: "faucet-events.log"
@@ -216,6 +217,9 @@ captchas:
 
 # ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
 ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
+
+# ip info caching time
+ipInfoCacheTime: 86400 # 1 day
 
 # ip info based restrictions
 ipRestrictedRewardShare:

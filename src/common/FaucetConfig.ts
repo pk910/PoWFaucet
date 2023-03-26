@@ -12,6 +12,7 @@ export interface IFaucetConfig {
   buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
   buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
   faucetStore: string;
+  faucetDBFile: string;
 
   faucetTitle: string; // title of the faucet
   faucetImage: string; // faucet image displayed on the startpage
@@ -67,6 +68,7 @@ export interface IFaucetConfig {
   captchas: IFaucetCaptchaConfig | null; // captcha related settings or null to disable all captchas
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
   ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
+  ipInfoCacheTime: number; // ip info caching time
   ipRestrictedRewardShare: null | { // ip based restrictions
     hosting?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a hosting range
     proxy?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a proxy range
@@ -208,6 +210,7 @@ let defaultConfig: IFaucetConfig = {
     "keywords": "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow",
   },
   faucetStore: path.join(basePath, "faucet-store.json"),
+  faucetDBFile: path.join(basePath, "faucet-store.db"),
 
   powPingInterval: 10,
   powPingTimeout: 30,
@@ -252,6 +255,7 @@ let defaultConfig: IFaucetConfig = {
   captchas: null,
   concurrentSessions: 0,
   ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
+  ipInfoCacheTime: 86400,
   ipRestrictedRewardShare: null,
   ipInfoMatchRestrictedReward: null,
   ipInfoMatchRestrictedRewardFile: null,

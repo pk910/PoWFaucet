@@ -3,286 +3,82 @@ import { faucetConfig } from '../common/FaucetConfig';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { ServiceManager } from '../common/ServiceManager';
 import { IPoWSessionStoreData } from '../websock/PoWSession';
-import { IQueuedClaimTx } from './EthWeb3Manager';
-import { IIPInfo } from './IPInfoResolver';
-import { IPassportInfo } from './PassportVerifier';
+import { FaucetStoreDB } from './FaucetStoreDB';
 
-export enum SessionMark {
-  KILLED = "killed",
-  CLOSED = "closed",
-  CLAIMED = "claimed",
-}
-
-export enum AddressMark {
-  USED = "used",
-}
-
-interface IFaucetStore {
-  sessionMarks: {[sessionId: string]: IFaucetStoreMarks<SessionMark>};
-  addressMarks: {[sessionId: string]: IFaucetStoreMarks<AddressMark>};
-  ipInfoCache: {[ip: string]: IFaucetStoreEntry<IIPInfo>};
-  passportCache: {[addr: string]: IFaucetStoreEntry<IPassportInfo>};
-  claimTxQueue: IQueuedClaimTx[];
+interface IFaucetRecoveryStore {
   sessionStore?: IPoWSessionStoreData[];
 }
 
-interface IFaucetStoreMarks<T> {
-  m: T[];
-  t: number;
-}
-
-interface IFaucetStoreEntry<T> {
-  m: T;
-  t: number;
-} 
-
 export class FaucetStore {
-  private store: IFaucetStore;
-  private saveTimer: NodeJS.Timeout;
-  private dirty: boolean;
+  private recoveryStore: IFaucetRecoveryStore;
 
   public constructor() {
-    this.loadStore();
-    setInterval(() => {
-      this.cleanStore();
-    }, (1000 * 60 * 10));
+    this.loadRecoveryStore();
+    this.migrateLegacyStore();
   }
 
-  public loadStore() {
+  private loadRecoveryStore() {
     if(fs.existsSync(faucetConfig.faucetStore))
-      this.store = JSON.parse(fs.readFileSync(faucetConfig.faucetStore, "utf8"));
+      this.recoveryStore = JSON.parse(fs.readFileSync(faucetConfig.faucetStore, "utf8"));
     else {
-      this.store = {
-        sessionMarks: {},
-        addressMarks: {},
-        ipInfoCache: {},
-        passportCache: {},
-        claimTxQueue: [],
+      this.recoveryStore = {
         sessionStore: null,
       };
     }
-    if(!this.store.ipInfoCache)
-      this.store.ipInfoCache = {};
-    if(!this.store.passportCache)
-      this.store.passportCache = {};
-    if(!this.store.claimTxQueue)
-      this.store.claimTxQueue = [];
-
-    this.dirty = false;
   }
 
-  public saveStore(force?: boolean) {
-    if(!this.dirty)
-      return;
-    if(this.saveTimer && !force)
-      return;
-    if(force) {
-      if(this.saveTimer) {
-        clearTimeout(this.saveTimer);
-        this.saveTimer = null;
-      }
-      fs.writeFileSync(faucetConfig.faucetStore, JSON.stringify(this.store));
-    }
-    else {
-      this.saveTimer = setTimeout(() => {
-        this.saveTimer = null;
-        this.saveStore(true);
-      }, 5000);
-    }
-  }
-
-  private cleanStore() {
+  private migrateLegacyStore() {
     let now = Math.floor((new Date()).getTime() / 1000);
-    let cleared = false;
-
-    let sessionTout = now - faucetConfig.claimSessionTimeout;
-    let sessionIds = Object.keys(this.store.sessionMarks);
-    for(let i = 0; i < sessionIds.length; i++) {
-      if(this.store.sessionMarks[sessionIds[i]].t < sessionTout) {
-        delete this.store.sessionMarks[sessionIds[i]];
-        cleared = true;
-      }
+    let db = ServiceManager.GetService(FaucetStoreDB);
+    if((this.recoveryStore as any).sessionMarks) {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Migrate legacy session mark store to sqlite db");
+      Object.keys((this.recoveryStore as any).sessionMarks).forEach((key) => {
+        let tobj = (this.recoveryStore as any).sessionMarks[key];
+        let tout = faucetConfig.claimSessionTimeout - (now - tobj.t);
+        if(tout > 1)
+          db.setSessionMark(key, tobj.m, tout);
+      });
+      delete (this.recoveryStore as any).sessionMarks;
     }
-
-    let addressTout = now - faucetConfig.claimAddrCooldown;
-    let addresses = Object.keys(this.store.addressMarks);
-    for(let i = 0; i < addresses.length; i++) {
-      if(this.store.addressMarks[addresses[i]].t < addressTout) {
-        delete this.store.addressMarks[addresses[i]];
-        cleared = true;
-      }
+    if((this.recoveryStore as any).addressMarks) {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Migrate legacy address mark store to sqlite db");
+      Object.keys((this.recoveryStore as any).addressMarks).forEach((key) => {
+        let tobj = (this.recoveryStore as any).addressMarks[key];
+        let tout = faucetConfig.claimAddrCooldown - (now - tobj.t);
+        if(tout > 1)
+          db.setAddressMark(key, tobj.m, tout);
+      });
+      delete (this.recoveryStore as any).addressMarks;
     }
-
-    let ipInfoTout = now - (60 * 60 * 12);
-    let ipinfos = Object.keys(this.store.ipInfoCache);
-    for(let i = 0; i < ipinfos.length; i++) {
-      if(this.store.ipInfoCache[ipinfos[i]].t < ipInfoTout) {
-        delete this.store.ipInfoCache[ipinfos[i]];
-        cleared = true;
-      }
+    if((this.recoveryStore as any).ipInfoCache) {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Migrate legacy IP info cache to sqlite db");
+      Object.keys((this.recoveryStore as any).ipInfoCache).forEach((key) => {
+        let tobj = (this.recoveryStore as any).ipInfoCache[key];
+        let tout = faucetConfig.ipInfoCacheTime - (now - tobj.t);
+        if(tout > 1)
+          db.setIPInfo(key, tobj.m, tout);
+      });
+      delete (this.recoveryStore as any).ipInfoCache;
     }
-
-    if(cleared) {
-      this.dirty = true;
-      this.saveStore();
-    }
-  }
-
-  public getSessionMarks(sessionId: string, skipMarks?: SessionMark[]): SessionMark[] {
-    let marks: SessionMark[];
-    let marksEntry = this.store.sessionMarks[sessionId];
-    
-    if(!marksEntry)
-      marks = [];
-    else {
-      marks = marksEntry.m;
-      if(skipMarks) {
-        marks = marks.filter((m) => {
-          return (skipMarks.indexOf(m) === -1);
-        });
-      }
-    }
-    return marks;
-  }
-
-  public setSessionMark(sessionId: string, mark: SessionMark) {
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let marksEntry = this.store.sessionMarks[sessionId];
-
-    if(marksEntry) {
-      if(marksEntry.m.indexOf(mark) === -1)
-        marksEntry.m.push(mark);
-      marksEntry.t = now;
-    }
-    else {
-      marksEntry = this.store.sessionMarks[sessionId] = {
-        m: [ mark ],
-        t: now
-      };
-    }
-
-    this.dirty = true;
-    this.saveStore();
-  }
-
-  public getAddressMarks(address: string, skipMarks?: AddressMark[]): AddressMark[] {
-    address = address.toLowerCase();
-    let marks: AddressMark[];
-    let marksEntry = this.store.addressMarks[address];
-    
-    if(!marksEntry)
-      marks = [];
-    else {
-      marks = marksEntry.m;
-      if(skipMarks) {
-        marks = marks.filter((m) => {
-          return (skipMarks.indexOf(m) === -1);
-        });
-      }
-    }
-    return marks;
-  }
-
-  public setAddressMark(address: string, mark: AddressMark) {
-    address = address.toLowerCase();
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let marksEntry = this.store.addressMarks[address];
-
-    if(marksEntry) {
-      if(marksEntry.m.indexOf(mark) === -1)
-        marksEntry.m.push(mark);
-      marksEntry.t = now;
-    }
-    else {
-      marksEntry = this.store.addressMarks[address] = {
-        m: [ mark ],
-        t: now
-      };
-    }
-
-    this.dirty = true;
-    this.saveStore();
-  }
-
-  public getIPInfo(ip: string): IIPInfo {
-    ip = ip.toLowerCase();
-    let ipInfoEntry = this.store.ipInfoCache[ip];
-    
-    if(!ipInfoEntry)
-      return null;
-    return ipInfoEntry.m;
-  }
-
-  public setIPInfo(ip: string, info: IIPInfo) {
-    ip = ip.toLowerCase();
-    let now = Math.floor((new Date()).getTime() / 1000);
-
-    let ipinfoEntry = this.store.ipInfoCache[ip] = {
-      m: info,
-      t: now
-    };
-
-    this.dirty = true;
-    this.saveStore();
-  }
-
-  public getPassportInfo(addr: string): IPassportInfo {
-    addr = addr.toLowerCase();
-    let passportEntry = this.store.passportCache[addr];
-    
-    if(!passportEntry)
-      return null;
-    return passportEntry.m;
-  }
-
-  public setPassportInfo(addr: string, info: IPassportInfo) {
-    addr = addr.toLowerCase();
-    let now = Math.floor((new Date()).getTime() / 1000);
-
-    let passportEntry = this.store.passportCache[addr] = {
-      m: info,
-      t: now
-    };
-
-    this.dirty = true;
-    this.saveStore();
-  }
-
-  public getClaimTxQueue(): IQueuedClaimTx[] {
-    return this.store.claimTxQueue.slice();
-  }
-
-  public addQueuedClaimTx(claimTx: IQueuedClaimTx) {
-    this.store.claimTxQueue.push(claimTx);
-    this.dirty = true;
-    this.saveStore();
-  }
-
-  public removeQueuedClaimTx(sessionId: string) {
-    let found = false;
-    for(let i = 0; i < this.store.claimTxQueue.length; i++) {
-      if(this.store.claimTxQueue[i].session === sessionId) {
-        if(i !== 0)
-          ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Out of order claim tx removal from persistent queue! Idx: " + i);
-        this.store.claimTxQueue.splice(i, 1);
-        found = true;
-        break;
-      }
-    }
-    if(found) {
-      this.dirty = true;
-      this.saveStore();
+    if((this.recoveryStore as any).passportCache) {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Migrate legacy passport cache to sqlite db");
+      Object.keys((this.recoveryStore as any).passportCache).forEach((key) => {
+        let tobj = (this.recoveryStore as any).passportCache[key];
+        let tout = (faucetConfig.passportBoost?.cacheTime || 3600) - (now - tobj.t);
+        if(tout > 1)
+          db.setPassportInfo(key, tobj.m, tout);
+      });
+      delete (this.recoveryStore as any).passportCache;
     }
   }
 
   public getSessionStore(): IPoWSessionStoreData[] {
-    return this.store.sessionStore;
+    return this.recoveryStore.sessionStore;
   }
 
   public setSessionStore(sessionStore: IPoWSessionStoreData[]) {
-    this.store.sessionStore = sessionStore;
-    this.dirty = true;
-    this.saveStore();
+    this.recoveryStore.sessionStore = sessionStore;
+    fs.writeFileSync(faucetConfig.faucetStore, JSON.stringify(this.recoveryStore));
   }
 
 }

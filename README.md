@@ -46,9 +46,10 @@ create a data directory
 
 create a copy of [faucet-config.example.yaml](https://github.com/pk910/PoWFaucet/blob/master/faucet-config.example.yaml) and save as `faucet-config.yaml`
 
-edit `faucet-config.yaml` and prepend /config/ to faucetStore & faucetLogFile (ensure they're not lost on updates)
+edit `faucet-config.yaml` and prepend /config/ to faucetStore, faucetDBFile & faucetLogFile (ensure they're not lost on updates)
 ```
 faucetStore: "/config/faucet-store.json"
+faucetDBFile: "/config/faucet-store.db"
 faucetLogFile: "/config/faucet-events.log"
 ```
 

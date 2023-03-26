@@ -2,7 +2,7 @@ import { WebSocket, RawData } from 'ws';
 import * as crypto from "crypto";
 import { faucetConfig } from '../common/FaucetConfig';
 import { IPoWSessionRecoveryInfo, PoWSession, PoWSessionStatus } from './PoWSession';
-import { AddressMark, FaucetStore, SessionMark } from '../services/FaucetStore';
+import { AddressMark, FaucetStoreDB, SessionMark } from '../services/FaucetStoreDB';
 import { renderTimespan } from '../utils/DateUtils';
 import { isValidGuid } from '../utils/GuidUtils';
 import { ClaimTx, EthWeb3Manager } from '../services/EthWeb3Manager';
@@ -275,7 +275,7 @@ export class PoWClient {
     if(typeof targetAddr !== "string" || !targetAddr.match(/^0x[0-9a-f]{40}$/i) || targetAddr.match(/^0x0{40}$/i))
       return this.sendErrorResponse("INVALID_ADDR", "Invalid target address: " + targetAddr, message, PoWStatusLogLevel.INFO);
 
-    let addressMarks = ServiceManager.GetService(FaucetStore).getAddressMarks(targetAddr);
+    let addressMarks = ServiceManager.GetService(FaucetStoreDB).getAddressMarks(targetAddr);
     if(addressMarks.indexOf(AddressMark.USED) !== -1)
       return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (please wait " + renderTimespan(faucetConfig.claimAddrCooldown) + " between requests)", message, PoWStatusLogLevel.INFO);
     else if(addressMarks.length > 0)
@@ -304,7 +304,7 @@ export class PoWClient {
     
     if(this.session)
       return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
-    ServiceManager.GetService(FaucetStore).setAddressMark(targetAddr, AddressMark.USED);
+    ServiceManager.GetService(FaucetStoreDB).setAddressMark(targetAddr, AddressMark.USED);
 
     // create new session
     let session = new PoWSession(this, targetAddr);
@@ -339,7 +339,7 @@ export class PoWClient {
       if((session = PoWSession.getClosedSession(sessionId))) {
         let sessClaim: any = null;
         // check if closed session is claimable and return claim token if so
-        if(session.isClaimable() && ServiceManager.GetService(FaucetStore).getSessionMarks(session.getSessionId(), []).indexOf(SessionMark.CLAIMED) === -1) {
+        if(session.isClaimable() && ServiceManager.GetService(FaucetStoreDB).getSessionMarks(session.getSessionId(), []).indexOf(SessionMark.CLAIMED) === -1) {
           sessClaim = {
             balance: session.getBalance().toString(),
             token: session.getSignedSession(),
@@ -402,7 +402,7 @@ export class PoWClient {
     let now = Math.floor((new Date()).getTime() / 1000);
     if(faucetConfig.claimSessionTimeout && (now - sessionInfo.startTime) > faucetConfig.claimSessionTimeout)
       return this.sendErrorResponse("SESSION_TIMEOUT", "Session is too old to recover (timeout)", message);
-    let sessionMarks = ServiceManager.GetService(FaucetStore).getSessionMarks(sessionInfo.id, []);
+    let sessionMarks = ServiceManager.GetService(FaucetStoreDB).getSessionMarks(sessionInfo.id, []);
     if(sessionMarks.length > 0)
       return this.sendErrorResponse("INVALID_SESSION", "Session cannot be recovered (" + sessionMarks.join(",") + ")", message);
 
@@ -559,11 +559,11 @@ export class PoWClient {
     if(faucetConfig.claimSessionTimeout && ((new Date()).getTime() - startTime.getTime()) / 1000 > faucetConfig.claimSessionTimeout)
       return this.sendErrorResponse("INVALID_CLAIM", "Invalid claim token (expired)", message);
 
-    let sessionMarks = ServiceManager.GetService(FaucetStore).getSessionMarks(sessionInfo.id, [SessionMark.CLOSED]);
+    let sessionMarks = ServiceManager.GetService(FaucetStoreDB).getSessionMarks(sessionInfo.id, [SessionMark.CLOSED]);
     if(sessionMarks.length > 0) 
       return this.sendErrorResponse("INVALID_CLAIM", "Session is not allowed to claim (" + sessionMarks.join(",") + ")", message);
 
-    ServiceManager.GetService(FaucetStore).setSessionMark(sessionInfo.id, SessionMark.CLAIMED);
+    ServiceManager.GetService(FaucetStoreDB).setSessionMark(sessionInfo.id, SessionMark.CLAIMED);
 
     let closedSession = PoWSession.getClosedSession(sessionInfo.id);
     if(closedSession)

@@ -1,7 +1,7 @@
 
 import * as crypto from "crypto";
 import { faucetConfig } from "../common/FaucetConfig";
-import { SessionMark } from "../services/FaucetStore";
+import { FaucetStoreDB, SessionMark } from "../services/FaucetStoreDB";
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from "../common/ServiceManager";
 import { FaucetStore } from "../services/FaucetStore";
@@ -219,7 +219,7 @@ export class PoWSession {
       this.activeClient = null;
     }
     if(setClosedMark)
-      ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.CLOSED);
+      ServiceManager.GetService(FaucetStoreDB).setSessionMark(this.sessionId, SessionMark.CLOSED);
     
     if(makeClaimable && this.balance >= faucetConfig.claimMinAmount) {
       this.claimable = true;
@@ -513,7 +513,7 @@ export class PoWSession {
 
   private applyKillPenalty(reason: PoWSessionSlashReason) {
     this.setSessionStatus(PoWSessionStatus.SLASHED);
-    ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.KILLED);
+    ServiceManager.GetService(FaucetStoreDB).setSessionMark(this.sessionId, SessionMark.KILLED);
     if(this.activeClient)
       this.activeClient.sendMessage("sessionKill", {
         level: "session",
