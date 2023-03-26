@@ -185,8 +185,8 @@ export class PoWSession {
 
     this.activeClient = client;
     client.setSession(this);
-    this.updateRemoteIp();
-
+    setTimeout(() => this.updateRemoteIp(), 10);
+    
     ServiceManager.GetService(PoWStatusLog).emitLog(
       PoWStatusLogLevel.INFO, 
       "Created new session: " + this.sessionId + 
@@ -367,7 +367,7 @@ export class PoWSession {
     if(activeClient) {
       this.idleTime = null;
       this.setSessionStatus(PoWSessionStatus.MINING);
-      this.updateRemoteIp();
+      setTimeout(() => this.updateRemoteIp(), 10);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
       
     }
@@ -409,19 +409,24 @@ export class PoWSession {
       return;
     
     let remoteAddr = this.activeClient.getRemoteIP();
-    if(remoteAddr.match(/^::ffff:/))
-      remoteAddr = remoteAddr.substring(7);
-    
     if(this.lastRemoteIp === remoteAddr)
       return;
 
     this.lastRemoteIp = remoteAddr;
     this.hashedRemoteIp = null;
+
     ServiceManager.GetService(IPInfoResolver).getIpInfo(remoteAddr).then((ipInfo) => {
       this.lastIpInfo = ipInfo;
 
       setTimeout(() => this.updateRewardRestriction(), 10);
     });
+  }
+
+  public setLastIpInfo(ip: string, ipinfo: IIPInfo) {
+    this.lastRemoteIp = ip;
+    this.hashedRemoteIp = null;
+    this.lastIpInfo = ipinfo;
+    setTimeout(() => this.updateRewardRestriction(), 10);
   }
 
   public getLastIpInfo(): IIPInfo {

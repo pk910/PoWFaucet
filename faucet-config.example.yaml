@@ -221,6 +221,9 @@ ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
 # ip info caching time
 ipInfoCacheTime: 86400 # 1 day
 
+# require valid ip info for session start / recovery (throw error if lookup failed)
+ipInfoRequired: false
+
 # ip info based restrictions
 ipRestrictedRewardShare:
   # percentage of reward per share if IP is in a hosting range (default: 100)

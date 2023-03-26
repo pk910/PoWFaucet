@@ -16,6 +16,7 @@ import { FaucetStatsLog } from '../services/FaucetStatsLog';
 import { PoWRewardLimiter } from '../services/PoWRewardLimiter';
 import { CaptchaVerifier } from '../services/CaptchaVerifier';
 import { FaucetWebApi } from '../webserv/FaucetWebApi';
+import { IIPInfo, IPInfoResolver } from '../services/IPInfoResolver';
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -46,6 +47,8 @@ export class PoWClient {
 
   public constructor(socket: WebSocket, remoteIp: string) {
     this.socket = socket;
+    if(remoteIp.match(/^::ffff:/))
+      remoteIp = remoteIp.substring(7);
     this.remoteIp = remoteIp;
     this.lastPingPong = new Date();
 
@@ -301,6 +304,17 @@ export class PoWClient {
         return this.sendErrorResponse("BALANCE_ERROR", "Could not check contract status of wallet " + targetAddr + ": " + ex.toString(), message);
       }
     }
+
+    let ipInfo: IIPInfo = null;
+    if(faucetConfig.ipInfoRequired) {
+      try {
+        ipInfo = await ServiceManager.GetService(IPInfoResolver).getIpInfo(this.remoteIp);
+        if(ipInfo.status !== "success")
+          return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP: " + ipInfo.status, message, PoWStatusLogLevel.INFO);
+      } catch(ex) {
+        return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP. Please try again later.", message, PoWStatusLogLevel.INFO);
+      }
+    }
     
     if(this.session)
       return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
@@ -310,6 +324,8 @@ export class PoWClient {
     let session = new PoWSession(this, targetAddr);
     if(sessionIdent)
       session.setIdent(sessionIdent);
+    if(ipInfo)
+      session.setLastIpInfo(this.remoteIp, ipInfo);
 
     this.sendMessage("ok", {
       sessionId: session.getSessionId(),
@@ -374,7 +390,7 @@ export class PoWClient {
     this.refreshBoostInfoAndNotify();
   }
 
-  private onCliRecoverSession(message: any) {
+  private async onCliRecoverSession(message: any) {
     let reqId = message.id || undefined;
 
     if(this.session)
@@ -406,7 +422,21 @@ export class PoWClient {
     if(sessionMarks.length > 0)
       return this.sendErrorResponse("INVALID_SESSION", "Session cannot be recovered (" + sessionMarks.join(",") + ")", message);
 
-    new PoWSession(this, {
+    let ipInfo: IIPInfo = null;
+    if(faucetConfig.ipInfoRequired) {
+      try {
+        ipInfo = await ServiceManager.GetService(IPInfoResolver).getIpInfo(this.remoteIp);
+        if(ipInfo.status !== "success")
+          return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP: " + ipInfo.status, message, PoWStatusLogLevel.INFO);
+      } catch(ex) {
+        return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP. Please try again later.", message, PoWStatusLogLevel.INFO);
+      }
+    }
+
+    if(this.session)
+      return this.sendErrorResponse("INVALID_REQUEST", "Duplicate Session", message);
+
+    let session = new PoWSession(this, {
       id: sessionInfo.id,
       startTime: sessionInfo.startTime,
       targetAddr: sessionInfo.targetAddr,
@@ -415,6 +445,9 @@ export class PoWClient {
       nonce: sessionInfo.nonce,
       ident: sessionInfo.ident,
     });
+    if(ipInfo)
+      session.setLastIpInfo(this.remoteIp, ipInfo);
+    
     this.sendMessage("ok", null, reqId);
 
     this.refreshBoostInfoAndNotify();

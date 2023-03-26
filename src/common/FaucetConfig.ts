@@ -69,6 +69,7 @@ export interface IFaucetConfig {
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
   ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
   ipInfoCacheTime: number; // ip info caching time
+  ipInfoRequired: boolean; // require valid ip info for session start / resume / recovery
   ipRestrictedRewardShare: null | { // ip based restrictions
     hosting?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a hosting range
     proxy?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a proxy range
@@ -256,6 +257,7 @@ let defaultConfig: IFaucetConfig = {
   concurrentSessions: 0,
   ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
   ipInfoCacheTime: 86400,
+  ipInfoRequired: false,
   ipRestrictedRewardShare: null,
   ipInfoMatchRestrictedReward: null,
   ipInfoMatchRestrictedRewardFile: null,
