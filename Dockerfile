@@ -1,4 +1,4 @@
-FROM node:17-slim
+FROM nikolaik/python-nodejs:python3.10-nodejs18-slim
 WORKDIR /app
 COPY . /app
 RUN npm install
