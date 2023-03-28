@@ -6,6 +6,8 @@ import ReCAPTCHA from "react-google-recaptcha";
 export interface IPoWFaucetCaptchaProps {
   faucetConfig: IFaucetConfig;
   onChange?: (token: string) => void;
+  variant: string;
+  target?: string;
 }
 
 export interface IPoWFaucetCaptchaState {
@@ -15,6 +17,8 @@ interface IPoWFaucetCustomCaptchaLoader {
   createCaptcha(options?: {
     onChange?: (token: string) => void;
     customData?: any;
+    variant?: string;
+    target?: string;
   }): IPoWFaucetCustomCaptcha;
 }
 
@@ -178,6 +182,8 @@ export class PoWFaucetCaptcha extends React.PureComponent<IPoWFaucetCaptchaProps
       controlPromise = captchaLoader.then((loader) => {
         return this.customControl = loader.createCaptcha({
           onChange: (token) => this.onTokenChange(token),
+          variant: this.props.variant,
+          target: this.props.target,
         });
       });
     }

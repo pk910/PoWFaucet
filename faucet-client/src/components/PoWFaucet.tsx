@@ -472,6 +472,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
               <PoWFaucetCaptcha 
                 faucetConfig={this.state.faucetConfig} 
                 ref={(cap) => this.captchaControl = cap} 
+                variant='session'
               />
             </div>
           : null}

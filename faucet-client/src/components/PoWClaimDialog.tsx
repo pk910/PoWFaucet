@@ -207,6 +207,8 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 <PoWFaucetCaptcha 
                   faucetConfig={this.props.faucetConfig} 
                   ref={(cap) => this.captchaControl = cap} 
+                  variant='claim'
+                  target={this.props.reward.target}
                 />
               </div>
             </div>
