@@ -475,15 +475,27 @@ export class EthWeb3Manager {
       return;
     this.lastWalletRefillTry = now;
 
-    if(this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance() > faucetConfig.ethRefillContract.triggerBalance)
+    let walletBalance = this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance();
+    let refillAction: string = null;
+    if(faucetConfig.ethRefillContract.overflowBalance && walletBalance > BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()))
+      refillAction = "overflow";
+    else if(walletBalance < BigInt(faucetConfig.ethRefillContract.triggerBalance.toString()))
+      refillAction = "refill";
+    
+    if(!refillAction)
       return;
     
     this.walletRefilling = true;
     try {
-      let txResult = await this.refillWallet();
+      let txResult: [string, Promise<TransactionReceipt>];
+      if(refillAction == "refill")
+        txResult = await this.refillWallet();
+      else if(refillAction == "overflow")
+        txResult = await this.overflowWallet(walletBalance - BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()));
+      
       this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
 
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending withdraw transaction to vault contract: " + txResult[0]);
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult[0]);
 
       let txReceipt = await txResult[1];
       if(!txReceipt.status)
@@ -510,8 +522,8 @@ export class EthWeb3Manager {
     let refillContract = new this.web3.eth.Contract(refillContractAbi, faucetConfig.ethRefillContract.contract, {
       from: this.walletAddr,
     });
-    let refillAmount = faucetConfig.ethRefillContract.requestAmount || 0;
-    let refillAllowance: number = null;
+    let refillAmount = BigInt(faucetConfig.ethRefillContract.requestAmount) || 0n;
+    let refillAllowance: bigint = null;
 
     let getCallArgs = (args) => {
       return args.map((arg) => {
@@ -520,7 +532,7 @@ export class EthWeb3Manager {
             arg = this.walletAddr;
             break;
           case "{amount}":
-            arg = BigInt(refillAmount);
+            arg = refillAmount;
             break;
         }
         return arg;
@@ -530,8 +542,8 @@ export class EthWeb3Manager {
     if(faucetConfig.ethRefillContract.allowanceFn) {
       // check allowance
       let callArgs = getCallArgs(faucetConfig.ethRefillContract.allowanceFnArgs || ["{walletAddr}"]);
-      refillAllowance = await refillContract.methods[faucetConfig.ethRefillContract.allowanceFn].apply(this, callArgs).call();
-      if(refillAllowance == 0)
+      refillAllowance = BigInt(await refillContract.methods[faucetConfig.ethRefillContract.allowanceFn].apply(this, callArgs).call());
+      if(refillAllowance == 0n)
         throw "no withdrawable funds from refill contract";
       if(refillAmount > refillAllowance)
         refillAmount = refillAllowance;
@@ -539,8 +551,8 @@ export class EthWeb3Manager {
 
     if(faucetConfig.ethRefillContract.checkContractBalance) {
       let checkAddr = (typeof faucetConfig.ethRefillContract.checkContractBalance === "string" ? faucetConfig.ethRefillContract.checkContractBalance : faucetConfig.ethRefillContract.contract);
-      let contractBalance = parseInt(await this.web3.eth.getBalance(checkAddr));
-      if(contractBalance <= (faucetConfig.ethRefillContract.contractDustBalance || 1000000000))
+      let contractBalance = BigInt(await this.web3.eth.getBalance(checkAddr));
+      if(contractBalance <= (BigInt(faucetConfig.ethRefillContract.contractDustBalance.toString()) || BigInt(1000000000)))
         throw "refill contract is out of funds";
       if(refillAmount > contractBalance)
         refillAmount = contractBalance;
@@ -556,6 +568,47 @@ export class EthWeb3Manager {
       to: faucetConfig.ethRefillContract.contract,
       value: 0,
       data: refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI()
+    };
+    var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
+    tx = tx.sign(this.walletKey);
+    let txHex = tx.serialize().toString('hex');
+
+    let txResult = await this.sendTransaction(txHex);
+    this.walletState.nonce++;
+
+    return txResult;
+  }
+
+  private async overflowWallet(amount: bigint): Promise<[string, Promise<TransactionReceipt>]> {
+    let refillContractAbi = JSON.parse(faucetConfig.ethRefillContract.abi);
+    let refillContract = new this.web3.eth.Contract(refillContractAbi, faucetConfig.ethRefillContract.contract, {
+      from: this.walletAddr,
+    });
+
+    let getCallArgs = (args) => {
+      return args.map((arg) => {
+        switch(arg) {
+          case "{walletAddr}":
+            arg = this.walletAddr;
+            break;
+          case "{amount}":
+            arg = amount;
+            break;
+        }
+        return arg;
+      })
+    };
+
+    let callArgs = getCallArgs(faucetConfig.ethRefillContract.depositFnArgs || []);
+    var rawTx = {
+      nonce: this.walletState.nonce,
+      gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit || faucetConfig.ethTxGasLimit,
+      maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
+      maxFeePerGas: faucetConfig.ethTxMaxFee,
+      from: this.walletAddr,
+      to: faucetConfig.ethRefillContract.contract,
+      value: "0x" + amount.toString(16),
+      data: faucetConfig.ethRefillContract.depositFn ? refillContract.methods[faucetConfig.ethRefillContract.depositFn].apply(this, callArgs).encodeABI() : undefined,
     };
     var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
     tx = tx.sign(this.walletKey);

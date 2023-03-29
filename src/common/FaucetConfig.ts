@@ -113,13 +113,16 @@ export interface IFaucetConfig {
     allowanceFnArgs: string[]; // vault contract getAllowance function args
     withdrawFn: string; // vault contract withdraw function name
     withdrawFnArgs: string[]; // vault contract withdraw function args
-    withdrawGasLimit: number; // gas limit for withdraw transaction (in wei)
+    depositFn: string; // vault contract deposit function name
+    depositFnArgs: string[]; // vault contract deposit function args
+    withdrawGasLimit: number; // gas limit for withdraw/deposit transaction (in wei)
     checkContractBalance: boolean | string; // check balance of contract before withdrawing
-    contractDustBalance: number; // don't request funds if contract balance is lower than this
+    contractDustBalance: string; // don't request funds if contract balance is lower than this
 
-    triggerBalance: number;
+    triggerBalance: string;
+    overflowBalance: string;
     cooldownTime: number;
-    requestAmount: number;
+    requestAmount: string;
   };
 
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
