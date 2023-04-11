@@ -38,7 +38,7 @@ see [faucet-config.example.yaml](https://github.com/pk910/PoWFaucet/blob/master/
 
 For productive setups I'd suggest using a more complex webserver that supports SSL, caching and other stuff.
 
-See [docs/apache-config.md](https://github.com/pk910/PoWFaucet/blob/master/docs/apache-config.md) for more.
+See [docs/webserver-setup.md](https://github.com/pk910/PoWFaucet/blob/master/docs/webserver-setup.md) for more.
 
 # Run with docker
 
