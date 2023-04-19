@@ -289,18 +289,20 @@ faucetBalanceRestriction:
 
 # dynamic reward restriction based on faucet outflow
 # alternative to static faucetBalanceRestrictedReward
-# limits the rewards linearly according to the faucet outflow
+# limits the rewards according to the faucet outflow
 faucetOutflowRestriction:
   enabled: false
+  # limit outflow to 1000ETH per day
   amount: 1000000000000000000000 # 1000 ETH
-  duration: 86400
+  duration: 86400 # 1 day
+  # apply linear reward restriction after `half of the duration` has been used
   restrict: 43200
 
 
 ### Automatic wallet refill
 
 # refill contract options
-# advanced configuration to limit the amount of funds that can be mined on the faucet via a separate vault contract
+# advanced configuration to secure the faucet funds via a separate vault contract
 # the faucet tries to refill its wallet balance from the vault contract when it gets empty
 # see contract code in docs folder
 ethRefillContract:
