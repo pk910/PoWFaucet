@@ -17,6 +17,7 @@ export interface IPoWFaucetStatusState {
   refreshing: boolean;
   status: IPoWFaucetGeneralStatus;
   refillStatus: IPoWFaucetRefillStatus;
+  outflowStatus: IPoWFaucetOutflowStatus;
   activeSessions: IPoWFaucetStatusSession[];
   activeClaims: IPoWFaucetStatusClaim[];
 }
@@ -24,6 +25,7 @@ export interface IPoWFaucetStatusState {
 export interface IPoWFaucetStatus {
   status: IPoWFaucetGeneralStatus;
   refill: IPoWFaucetRefillStatus;
+  outflowRestriction: IPoWFaucetOutflowStatus;
   sessions: IPoWFaucetStatusSession[];
   claims: IPoWFaucetStatusClaim[];
 }
@@ -39,6 +41,16 @@ export interface IPoWFaucetRefillStatus {
   trigger: number;
   amount: number;
   cooldown: number;
+}
+
+export interface IPoWFaucetOutflowStatus {
+  now: number;
+  trackTime: number;
+  dustAmount: number;
+  restriction: number;
+  duration: number;
+  restrict: number;
+  amount: number;
 }
 
 export interface IPoWFaucetStatusSession {
@@ -105,6 +117,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       refreshing: false,
       status: null,
       refillStatus: null,
+      outflowStatus: null,
       activeSessions: [],
       activeClaims: [],
 		};
@@ -142,6 +155,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         refreshing: false,
         status: faucetStatus.status,
         refillStatus: faucetStatus.refill,
+        outflowStatus: faucetStatus.outflowRestriction,
         activeSessions: activeSessions,
         activeClaims: activeClaims,
       });
@@ -235,6 +249,28 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
               </div>
             </div>
           </div>
+          {this.state.outflowStatus ?
+          <div className="col-xl-3 col-lg-4 col-6">
+            <div className="status-block">
+              <div className="status-prop">
+                <span className="status-title">Outflow TrackTime:</span>
+                <span className="status-value">{this.state.outflowStatus.now - this.state.outflowStatus.trackTime} / {this.state.outflowStatus.restrict}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Outflow Limit:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.outflowStatus.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol} / {renderTimespan(this.state.outflowStatus.duration, 2)}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Dust Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.outflowStatus.dustAmount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Outflow Restriction:</span>
+                <span className="status-value">{Math.round(this.state.outflowStatus.restriction * 1000) / 1000} %</span>
+              </div>
+            </div>
+          </div>
+          : null}
           {this.state.refillStatus ?
           <div className="col-xl-3 col-lg-4 col-6">
             <div className="status-block">

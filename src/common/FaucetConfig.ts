@@ -87,6 +87,7 @@ export interface IFaucetConfig {
     [limit: number]: number; // limit: min balance in wei, value: percent of normal reward (eg. 50 = half rewards)
   };
   faucetBalanceRestriction: IFaucetBalanceRestrictionConfig;
+  faucetOutflowRestriction: IFaucetOutflowRestrictionConfig;
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   noFundsBalance: number; // minimum balance to show the empty faucet error message
@@ -150,6 +151,13 @@ export interface IFaucetCaptchaConfig {
 export interface IFaucetBalanceRestrictionConfig {
   enabled: boolean;
   targetBalance: number;
+}
+
+export interface IFaucetOutflowRestrictionConfig {
+  enabled: boolean;
+  amount: number;
+  duration: number;
+  restrict: number;
 }
 
 export interface IFaucetEnsResolverConfig {
@@ -266,6 +274,7 @@ let defaultConfig: IFaucetConfig = {
   ipInfoMatchRestrictedRewardFile: null,
   faucetBalanceRestrictedReward: null,
   faucetBalanceRestriction: null,
+  faucetOutflowRestriction: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
   noFundsBalance:    100000000000000000, // 0,1 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH

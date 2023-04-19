@@ -5,6 +5,7 @@ import { ServiceManager } from "../common/ServiceManager";
 import { ClaimTxStatus, EthWeb3Manager } from "../services/EthWeb3Manager";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
 import { IIPInfo } from "../services/IPInfoResolver";
+import { PoWOutflowLimiter } from "../services/PoWOutflowLimiter";
 import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 import { getHashedSessionId } from "../utils/HashedInfo";
 import { PoWClient } from "../websock/PoWClient";
@@ -65,6 +66,15 @@ export interface IClientFaucetStatus {
     trigger: string;
     amount: string;
     cooldown: number;
+  };
+  outflowRestriction: {
+    now: number;
+    trackTime: number;
+    dustAmount: string;
+    restriction: number;
+    duration: number;
+    restrict: number;
+    amount: number;
   };
   sessions: {
     id: string;
@@ -195,6 +205,7 @@ export class FaucetWebApi {
         unclaimedBalance: rewardLimiter.getUnclaimedBalance().toString(),
         balanceRestriction: rewardLimiter.getBalanceRestriction(),
       },
+      outflowRestriction: ServiceManager.GetService(PoWOutflowLimiter).getOutflowDebugState(),
       refill: faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract ? {
         balance: (await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract)).toString(),
         trigger: faucetConfig.ethRefillContract.triggerBalance.toString(),

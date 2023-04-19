@@ -14,6 +14,7 @@ import { FaucetStatsLog } from "../services/FaucetStatsLog";
 import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
 import { IPassportInfo, PassportVerifier } from "../services/PassportVerifier";
 import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
+import { PoWOutflowLimiter } from "../services/PoWOutflowLimiter";
 
 
 export enum PoWSessionSlashReason {
@@ -434,6 +435,7 @@ export class PoWSession {
   }
 
   public addBalance(value: bigint) {
+    ServiceManager.GetService(PoWOutflowLimiter).addMinedAmount(value);
     this.balance += value;
   }
 

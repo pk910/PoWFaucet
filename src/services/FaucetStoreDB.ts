@@ -86,7 +86,16 @@ export class FaucetStoreDB {
             PRIMARY KEY("SessionId")
           );
         `);
-        
+      case 1: // upgrade to version 2
+        schemaVersion = 2;
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
+        this.db.exec(`
+          CREATE TABLE "KeyValueStore" (
+            "Key"	TEXT NOT NULL UNIQUE,
+            "Value"	TEXT NOT NULL,
+            PRIMARY KEY("Key")
+          );
+        `);
     }
     if(schemaVersion !== oldVersion)
       this.db.prepare("UPDATE SchemaVersion SET SchemaVersion = ?").run(schemaVersion);
@@ -260,6 +269,27 @@ export class FaucetStoreDB {
   public removeQueuedClaimTx(sessionId: string) {
     this.db.prepare("DELETE FROM ClaimTxQueue WHERE SessionId = ?")
       .run(sessionId.toLowerCase());
+  }
+
+  public getKeyValueEntry(key: string): string {
+    let row = this.db.prepare("SELECT Value FROM KeyValueStore WHERE Key = ?").get(key);
+    return row?.Value;
+  }
+
+  public setKeyValueEntry(key: string, value: string) {
+    let row = this.db.prepare("SELECT Key FROM KeyValueStore WHERE Key = ?").get(key);
+    if(row) {
+      this.db.prepare("UPDATE KeyValueStore SET Value = ? WHERE Key = ?")
+        .run(value, key);
+    }
+    else {
+      this.db.prepare("INSERT INTO KeyValueStore (Key, Value) VALUES (?, ?)")
+        .run(key, value);
+    }
+  }
+
+  public deleteKeyValueEntry(key: string) {
+    this.db.prepare("DELETE FROM KeyValueStore WHERE Key = ?").run(key);
   }
 
 }

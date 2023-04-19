@@ -287,6 +287,15 @@ faucetBalanceRestriction:
   enabled: false
   targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
 
+# dynamic reward restriction based on faucet outflow
+# alternative to static faucetBalanceRestrictedReward
+# limits the rewards linearly according to the faucet outflow
+faucetOutflowRestriction:
+  enabled: false
+  amount: 1000000000000000000000 # 1000 ETH
+  duration: 86400
+  restrict: 43200
+
 
 ### Automatic wallet refill
 
