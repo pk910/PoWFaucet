@@ -261,8 +261,8 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
                 <span className="status-value">{Math.round(weiToEth(this.state.outflowStatus.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol} / {renderTimespan(this.state.outflowStatus.duration, 2)}</span>
               </div>
               <div className="status-prop">
-                <span className="status-title">Dust Balance:</span>
-                <span className="status-value">{Math.round(weiToEth(this.state.outflowStatus.dustAmount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+                <span className="status-title">Outflow Balance:</span>
+                <span className="status-value">{Math.round(weiToEth((this.state.outflowStatus.amount / this.state.outflowStatus.duration * (this.state.outflowStatus.now - this.state.outflowStatus.trackTime)) + parseInt(this.state.outflowStatus.dustAmount.toString())) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Outflow Restriction:</span>
