@@ -296,20 +296,44 @@ export class EthWeb3Manager {
     return null;
   }
 
-  private buildEthTx(target: string, amount: bigint, nonce: number): string {
+  private async buildEthTx(target: string, amount: bigint, nonce: number, data?: string, gasLimit?: number): Promise<string> {
     if(target.match(/^0X/))
       target = "0x" + target.substring(2);
 
-    var rawTx = {
-      nonce: nonce,
-      gasLimit: faucetConfig.ethTxGasLimit,
-      maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
-      maxFeePerGas: faucetConfig.ethTxMaxFee,
-      from: this.walletAddr,
-      to: target,
-      value: "0x" + amount.toString(16)
-    };
-    var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
+    let tx: EthTx.Transaction | EthTx.FeeMarketEIP1559Transaction;
+    if(faucetConfig.ethLegacyTx) {
+      // legacy transaction
+      let gasPrice = parseInt(await this.web3.eth.getGasPrice());
+      gasPrice += faucetConfig.ethTxPrioFee;
+      if(faucetConfig.ethTxMaxFee > 0 && gasPrice > faucetConfig.ethTxMaxFee)
+        gasPrice = faucetConfig.ethTxMaxFee;
+
+      tx = EthTx.Transaction.fromTxData({
+        nonce: nonce,
+        gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
+        gasPrice: gasPrice,
+        to: target,
+        value: "0x" + amount.toString(16),
+        data: data ? data : "0x"
+      }, {
+        common: this.chainCommon
+      });
+    }
+    else {
+      // eip1559 transaction
+      tx = EthTx.FeeMarketEIP1559Transaction.fromTxData({
+        nonce: nonce,
+        gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
+        maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
+        maxFeePerGas: faucetConfig.ethTxMaxFee,
+        to: target,
+        value: "0x" + amount.toString(16),
+        data: data ? data : "0x"
+      }, {
+        common: this.chainCommon
+      });
+    }
+
     tx = tx.sign(this.walletKey);
     return tx.serialize().toString('hex');
   }
@@ -386,7 +410,8 @@ export class EthWeb3Manager {
 
       do {
         try {
-          let txResult = await this.sendTransaction(buildTx());
+          let txHex = await buildTx();
+          let txResult = await this.sendTransaction(txHex);
           claimTx.txhash = txResult[0];
           txPromise = txResult[1];
         } catch(ex) {
@@ -552,26 +577,21 @@ export class EthWeb3Manager {
     if(faucetConfig.ethRefillContract.checkContractBalance) {
       let checkAddr = (typeof faucetConfig.ethRefillContract.checkContractBalance === "string" ? faucetConfig.ethRefillContract.checkContractBalance : faucetConfig.ethRefillContract.contract);
       let contractBalance = BigInt(await this.web3.eth.getBalance(checkAddr));
-      if(contractBalance <= (BigInt(faucetConfig.ethRefillContract.contractDustBalance.toString()) || BigInt(1000000000)))
+      let dustBalance = faucetConfig.ethRefillContract.contractDustBalance ? BigInt(faucetConfig.ethRefillContract.contractDustBalance.toString()) : 1000000000n;
+      if(contractBalance <= dustBalance)
         throw "refill contract is out of funds";
       if(refillAmount > contractBalance)
         refillAmount = contractBalance;
     }
 
     let callArgs = getCallArgs(faucetConfig.ethRefillContract.withdrawFnArgs || ["{amount}"]);
-    var rawTx = {
-      nonce: this.walletState.nonce,
-      gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit || faucetConfig.ethTxGasLimit,
-      maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
-      maxFeePerGas: faucetConfig.ethTxMaxFee,
-      from: this.walletAddr,
-      to: faucetConfig.ethRefillContract.contract,
-      value: 0,
-      data: refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI()
-    };
-    var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
-    tx = tx.sign(this.walletKey);
-    let txHex = tx.serialize().toString('hex');
+    let txHex = await this.buildEthTx(
+      faucetConfig.ethRefillContract.contract,
+      0n, 
+      this.walletState.nonce, 
+      refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI(),
+      faucetConfig.ethRefillContract.withdrawGasLimit
+    );
 
     let txResult = await this.sendTransaction(txHex);
     this.walletState.nonce++;
@@ -600,19 +620,13 @@ export class EthWeb3Manager {
     };
 
     let callArgs = getCallArgs(faucetConfig.ethRefillContract.depositFnArgs || []);
-    var rawTx = {
-      nonce: this.walletState.nonce,
-      gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit || faucetConfig.ethTxGasLimit,
-      maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
-      maxFeePerGas: faucetConfig.ethTxMaxFee,
-      from: this.walletAddr,
-      to: faucetConfig.ethRefillContract.contract,
-      value: "0x" + amount.toString(16),
-      data: faucetConfig.ethRefillContract.depositFn ? refillContract.methods[faucetConfig.ethRefillContract.depositFn].apply(this, callArgs).encodeABI() : undefined,
-    };
-    var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
-    tx = tx.sign(this.walletKey);
-    let txHex = tx.serialize().toString('hex');
+    let txHex = await this.buildEthTx(
+      faucetConfig.ethRefillContract.contract,
+      amount, 
+      this.walletState.nonce, 
+      faucetConfig.ethRefillContract.depositFn ? refillContract.methods[faucetConfig.ethRefillContract.depositFn].apply(this, callArgs).encodeABI() : undefined,
+      faucetConfig.ethRefillContract.withdrawGasLimit
+    );
 
     let txResult = await this.sendTransaction(txHex);
     this.walletState.nonce++;

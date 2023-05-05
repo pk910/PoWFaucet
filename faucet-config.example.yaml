@@ -63,8 +63,13 @@ ethChainId: 5
 # use 21000 to prevent transactions to contracts
 ethTxGasLimit: 21000
 
+# use legacy (non-eip1559) transaction type
+# true: Type 0 (Legacy Transactions), false: Type 2 (EIP1559 Transactions)
+ethLegacyTx: false
+
 # max transaction gas fee (in wei)
-ethTxMaxFee: 10000000000  # 10 gwei
+# used as limit for legacy transactions (faucet won't build transactions with higher gas price)
+ethTxMaxFee: 100000000000  # 100 gwei
 
 # max transaction priority fee (in wei)
 ethTxPrioFee: 2000000000  # 2 gwei

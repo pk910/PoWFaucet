@@ -101,6 +101,7 @@ export interface IFaucetConfig {
   ethWalletKey: string; // faucet wallet private key
   ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)
+  ethLegacyTx: boolean; // use legacy (non-eip1559) transaction type
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
@@ -286,6 +287,7 @@ let defaultConfig: IFaucetConfig = {
   ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
   ethChainId: null,
   ethTxGasLimit: 21000,
+  ethLegacyTx: false,
   ethTxMaxFee: 1800000000,
   ethTxPrioFee: 800000000,
   ethMaxPending: 12,
