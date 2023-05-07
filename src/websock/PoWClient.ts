@@ -216,6 +216,9 @@ export class PoWClient {
       case "watchClaimTx":
         this.onCliWatchClaimTx(message);
         break;
+      case "getClaimQueueState":
+        this.onCliGetClaimQueueState(message);
+        break;
       case "refreshBoost":
         this.onCliRefreshBoost(message);
         break;
@@ -609,7 +612,9 @@ export class PoWClient {
       faucetStats.statClaimRewards += BigInt(sessionInfo.balance);
     });
     this.bindClaimTxEvents(claimTx);
-    this.sendMessage("ok", null, reqId);
+    this.sendMessage("ok", {
+      queueIdx: claimTx.queueIdx
+    }, reqId);
   }
 
   private onCliWatchClaimTx(message: any) {
@@ -622,7 +627,9 @@ export class PoWClient {
       return this.sendErrorResponse("CLAIM_NOT_FOUND", "Claim transaction not found in queue", message);
     
     this.bindClaimTxEvents(claimTx);
-    this.sendMessage("ok", null, reqId);
+    this.sendMessage("ok", {
+      queueIdx: claimTx.queueIdx
+    }, reqId);
   }
 
   private bindClaimTxEvents(claimTx: ClaimTx) {
@@ -676,6 +683,13 @@ export class PoWClient {
     this.session.refreshBoostInfo().then((boostInfo) => {
       this.sendMessage("boostInfo", boostInfo);
     });
+  }
+
+  private onCliGetClaimQueueState(message: any) {
+    let reqId = message.id || undefined;
+    this.sendMessage("ok", {
+      lastIdx: ServiceManager.GetService(EthWeb3Manager).getLastProcessedClaimIdx(),
+    }, reqId);
   }
 
 }

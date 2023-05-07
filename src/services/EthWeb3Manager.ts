@@ -54,6 +54,7 @@ export interface IQueuedClaimTx {
 }
 
 export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
+  public queueIdx: number;
   public status: ClaimTxStatus;
   public readonly time: Date;
   public readonly target: string;
@@ -98,6 +99,8 @@ export class EthWeb3Manager {
   private historyTxDict: {[nonce: number]: ClaimTx} = {};
   private lastWalletRefresh: number;
   private queueProcessing: boolean = false;
+  private lastClaimTxIdx: number = 1;
+  private lastProcessedClaimTxIdx: number = 0;
   private lastWalletRefill: number;
   private lastWalletRefillTry: number;
   private walletRefilling: boolean;
@@ -113,6 +116,7 @@ export class EthWeb3Manager {
     // restore saved claimTx queue
     ServiceManager.GetService(FaucetStoreDB).getClaimTxQueue().forEach((claimTx) => {
       let claim = new ClaimTx(claimTx.target, BigInt(claimTx.amount), claimTx.session, claimTx.time);
+      claim.queueIdx = this.lastClaimTxIdx++;
       this.claimTxQueue.push(claim);
     });
 
@@ -268,8 +272,13 @@ export class EthWeb3Manager {
     return this.walletState?.balance || null;
   }
 
+  public getLastProcessedClaimIdx(): number {
+    return this.lastProcessedClaimTxIdx;
+  }
+
   public addClaimTransaction(target: string, amount: bigint, sessId: string): ClaimTx {
     let claimTx = new ClaimTx(target, amount, sessId);
+    claimTx.queueIdx = this.lastClaimTxIdx++;
     this.claimTxQueue.push(claimTx);
     ServiceManager.GetService(FaucetStoreDB).addQueuedClaimTx(claimTx.serialize());
     return claimTx;
@@ -350,6 +359,7 @@ export class EthWeb3Manager {
         }
 
         let claimTx = this.claimTxQueue.splice(0, 1)[0];
+        this.lastProcessedClaimTxIdx = claimTx.queueIdx;
         await this.processQueueTx(claimTx);
       }
 
@@ -437,7 +447,15 @@ export class EthWeb3Manager {
       claimTx.emit("pending");
 
       // await transaction receipt
-      txPromise.then((receipt) => {
+      txPromise.catch((ex) => {
+        if(ex.toString().match(/Transaction was not mined within/)) {
+          // poll receipt
+          return this.awaitTransactionReceipt(claimTx.txhash);
+        }
+        else {
+          throw ex;
+        }
+      }).then((receipt) => {
         delete this.pendingTxQueue[claimTx.txhash];
         claimTx.txblock = receipt.blockNumber;
         claimTx.status = ClaimTxStatus.CONFIRMED;
@@ -459,6 +477,21 @@ export class EthWeb3Manager {
       claimTx.failReason = "Processing Exception: " + ex.toString();
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
+    }
+  }
+
+  private async awaitTransactionReceipt(txhash: string): Promise<TransactionReceipt> {
+    try {
+      let receipt: TransactionReceipt;
+      do {
+        await this.sleepPromise(30000); // 30 secs
+        receipt = await this.web3.eth.getTransactionReceipt(txhash);
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Polled transaction receipt for " + txhash + ": " + (receipt ? "found!" : "pending"));
+      } while(!receipt);
+      return receipt;
+    } catch(ex) {
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
+      throw ex;
     }
   }
 
@@ -522,7 +555,15 @@ export class EthWeb3Manager {
 
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult[0]);
 
-      let txReceipt = await txResult[1];
+      let txReceipt: TransactionReceipt;
+      try {
+        txReceipt = await txResult[1];
+      } catch(ex) {
+        if(ex.toString().match(/Transaction was not mined within/))
+          txReceipt = await this.awaitTransactionReceipt(txResult[0]);
+        else
+          throw ex;
+      }
       if(!txReceipt.status)
         throw txReceipt;
 
