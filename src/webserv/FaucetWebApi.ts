@@ -59,6 +59,7 @@ export interface IClientFaucetStatus {
   status: {
     walletBalance: string;
     unclaimedBalance: string;
+    queuedBalance: string;
     balanceRestriction: number;
   };
   refill: {
@@ -203,6 +204,7 @@ export class FaucetWebApi {
       status: {
         walletBalance: ethWeb3Manager.getFaucetBalance()?.toString(),
         unclaimedBalance: rewardLimiter.getUnclaimedBalance().toString(),
+        queuedBalance: ethWeb3Manager.getPendingAmount().toString(),
         balanceRestriction: rewardLimiter.getBalanceRestriction(),
       },
       outflowRestriction: ServiceManager.GetService(PoWOutflowLimiter).getOutflowDebugState(),

@@ -272,6 +272,14 @@ export class EthWeb3Manager {
     return this.walletState?.balance || null;
   }
 
+  public getPendingAmount(): bigint | null {
+    let totalPending = 0n;
+    Object.values(this.pendingTxQueue).forEach((claimTx) => {
+      totalPending += claimTx.amount;
+    });
+    return totalPending;
+  }
+
   public getLastProcessedClaimIdx(): number {
     return this.lastProcessedClaimTxIdx;
   }
@@ -490,7 +498,7 @@ export class EthWeb3Manager {
       } while(!receipt);
       return receipt;
     } catch(ex) {
-      if(ex.toString().match(/CONNECTION/)) {
+      if(ex.toString().match(/CONNECTION ERROR/)) {
         // just retry when RPC connection issue
         return this.awaitTransactionReceipt(txhash);
       }
@@ -538,7 +546,7 @@ export class EthWeb3Manager {
       return;
     this.lastWalletRefillTry = now;
 
-    let walletBalance = this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance();
+    let walletBalance = this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance() - this.getPendingAmount();
     let refillAction: string = null;
     if(faucetConfig.ethRefillContract.overflowBalance && walletBalance > BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()))
       refillAction = "overflow";

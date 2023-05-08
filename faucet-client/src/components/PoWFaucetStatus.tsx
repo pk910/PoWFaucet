@@ -33,6 +33,7 @@ export interface IPoWFaucetStatus {
 export interface IPoWFaucetGeneralStatus {
   walletBalance: number;
   unclaimedBalance: number;
+  queuedBalance: number;
   balanceRestriction: number;
 }
 
@@ -242,6 +243,10 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
               <div className="status-prop">
                 <span className="status-title">Unclaimed Balance:</span>
                 <span className="status-value">{Math.round(weiToEth(this.state.status.unclaimedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">TX-Queue Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.status.queuedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Reward Restriction:</span>

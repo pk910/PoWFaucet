@@ -113,6 +113,7 @@ export class PoWRewardLimiter {
     
     this.balanceRestrictionsRefresh = now;
     faucetBalance -= this.getUnclaimedBalance(); // subtract mined balance from active & claimable sessions
+    faucetBalance -= ServiceManager.GetService(EthWeb3Manager).getPendingAmount(); // subtract pending transaction amounts
     
     this.balanceRestriction = Math.min(
       this.getStaticBalanceRestriction(faucetBalance),
