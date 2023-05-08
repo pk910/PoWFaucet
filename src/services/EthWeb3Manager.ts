@@ -39,7 +39,7 @@ enum FucetWalletState {
   OFFLINE = 4,
 }
 
-interface ClaimTxEvents {
+export interface ClaimTxEvents {
   'processing': () => void;
   'pending': () => void;
   'confirmed': () => void;

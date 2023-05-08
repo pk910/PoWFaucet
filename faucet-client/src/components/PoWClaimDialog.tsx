@@ -105,13 +105,20 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
         txError: res.error,
       });
     }
-    else {
+    else if(res.status === "confirmed") {
       this.setState({
         claimStatus: PoWClaimStatus.CONFIRMED,
         txHash: res.txHash,
         txBlock: res.txBlock,
       });
     }
+    else if(res.status === "pending") {
+      this.setState({
+        claimStatus: PoWClaimStatus.PENDING,
+        txHash: res.txHash,
+      });
+    }
+
     if(this.claimConnKeeper) {
       this.claimConnKeeper.close();
       this.claimConnKeeper = null;
@@ -254,7 +261,10 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                         Status:
                       </div>
                       <div className='col'>
-                        {this.state.queueIndex > this.state.lastProcessedIdx ? "Queued" : "Sending"}
+                        {(this.state.txHash || this.state.queueIndex > this.state.lastProcessedIdx) ? 
+                          "Queued" : 
+                          "Sending" + (this.state.txHash ? " (TX: " + this.state.txHash + ")" : "")
+                        }
                       </div>
                     </div>
                     <div className='row'>

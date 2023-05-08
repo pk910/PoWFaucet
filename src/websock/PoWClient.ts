@@ -5,7 +5,7 @@ import { IPoWSessionRecoveryInfo, PoWSession, PoWSessionStatus } from './PoWSess
 import { AddressMark, FaucetStoreDB, SessionMark } from '../services/FaucetStoreDB';
 import { renderTimespan } from '../utils/DateUtils';
 import { isValidGuid } from '../utils/GuidUtils';
-import { ClaimTx, EthWeb3Manager } from '../services/EthWeb3Manager';
+import { ClaimTx, ClaimTxEvents, EthWeb3Manager } from '../services/EthWeb3Manager';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWShareVerification } from './PoWShareVerification';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
@@ -17,6 +17,11 @@ import { PoWRewardLimiter } from '../services/PoWRewardLimiter';
 import { CaptchaVerifier } from '../services/CaptchaVerifier';
 import { FaucetWebApi } from '../webserv/FaucetWebApi';
 import { IIPInfo, IPInfoResolver } from '../services/IPInfoResolver';
+
+interface PoWClientClaimTxSubscription {
+  claimTx: ClaimTx;
+  fns: {[key: string]: () => void};
+}
 
 export class PoWClient {
   private static activeClients: PoWClient[] = [];
@@ -44,6 +49,7 @@ export class PoWClient {
   private lastPingPong: Date;
   private statusHash: string;
   private clientVersion: string;
+  private subscribedClaimTxs: PoWClientClaimTxSubscription[] = [];
 
   public constructor(socket: WebSocket, remoteIp: string) {
     this.socket = socket;
@@ -108,6 +114,12 @@ export class PoWClient {
     
     if(this.session)
       this.session.setActiveClient(null);
+
+    if(this.subscribedClaimTxs.length > 0) {
+      for(let i = 0; i < this.subscribedClaimTxs.length; i++) {
+        this.unbindClaimTxEvents(this.subscribedClaimTxs[i]);
+      }
+    }
   }
 
   private killClient(reason?: string) {
@@ -633,19 +645,58 @@ export class PoWClient {
   }
 
   private bindClaimTxEvents(claimTx: ClaimTx) {
-    claimTx.once("confirmed", () => {
-      this.sendMessage("claimTx", {
-        session: claimTx.session,
-        txHash: claimTx.txhash,
-        txBlock: claimTx.txblock
-      });
-    });
-    claimTx.once("failed", () => {
-      this.sendMessage("claimTx", {
-        session: claimTx.session,
-        error: claimTx.failReason
-      });
-    });
+    for(let i = 0; i < this.subscribedClaimTxs.length; i++) {
+      if(this.subscribedClaimTxs[i].claimTx === claimTx)
+        return;
+    }
+
+    let subscription: PoWClientClaimTxSubscription = {
+      claimTx: claimTx,
+      fns: {
+        "pending": () => {
+          this.sendMessage("claimTx", {
+            session: claimTx.session,
+            status: "pending",
+            txHash: claimTx.txhash
+          });
+          this.unbindClaimTxEvents(subscription);
+        },
+        "confirmed": () => {
+          this.sendMessage("claimTx", {
+            session: claimTx.session,
+            status: "confirmed",
+            txHash: claimTx.txhash,
+            txBlock: claimTx.txblock
+          });
+          this.unbindClaimTxEvents(subscription);
+        },
+        "failed": () => {
+          this.sendMessage("claimTx", {
+            session: claimTx.session,
+            status: "failed",
+            error: claimTx.failReason
+          });
+          this.unbindClaimTxEvents(subscription);
+        }
+      }
+    }
+    this.subscribedClaimTxs.push(subscription);
+
+    let events = Object.keys(subscription.fns);
+    for(let i = 0; i < events.length; i++) {
+      subscription.claimTx.on(events[i] as keyof ClaimTxEvents, subscription.fns[events[i]]);
+    }
+  }
+
+  private unbindClaimTxEvents(subscription: PoWClientClaimTxSubscription) {
+    let events = Object.keys(subscription.fns);
+    for(let i = 0; i < events.length; i++) {
+      subscription.claimTx.off(events[i] as keyof ClaimTxEvents, subscription.fns[events[i]]);
+    }
+    let subscriptionIdx = this.subscribedClaimTxs.indexOf(subscription);
+    if(subscriptionIdx > -1) {
+      this.subscribedClaimTxs.splice(subscriptionIdx, 1);
+    }
   }
 
   private onCliRefreshBoost(message: any) {
