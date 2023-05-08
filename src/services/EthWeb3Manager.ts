@@ -490,6 +490,11 @@ export class EthWeb3Manager {
       } while(!receipt);
       return receipt;
     } catch(ex) {
+      if(ex.toString().match(/CONNECTION/)) {
+        // just retry when RPC connection issue
+        return this.awaitTransactionReceipt(txhash);
+      }
+
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
       throw ex;
     }
