@@ -1,6 +1,6 @@
 import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import React from 'react';
-import { Button, Modal, Spinner } from 'react-bootstrap';
+import { Button, Modal, OverlayTrigger, Spinner, Tooltip } from 'react-bootstrap';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTimespan } from '../utils/DateUtils';
@@ -29,6 +29,9 @@ enum PoWClaimStatus {
 export interface IPoWClaimDialogState {
   refreshIndex: number;
   claimStatus: PoWClaimStatus;
+  queueIndex: number;
+  lastQueueStatusPoll: number;
+  lastProcessedIdx: number;
   claimProcessing: boolean;
   pendingTime: number;
   claimError: string;
@@ -51,6 +54,9 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     this.state = {
       refreshIndex: 0,
       claimStatus: PoWClaimStatus.PREPARE,
+      queueIndex: 0,
+      lastQueueStatusPoll: 0,
+      lastProcessedIdx: 0,
       claimProcessing: false,
       pendingTime: 0,
       claimError: null,
@@ -117,7 +123,11 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       return;
     this.props.powClient.sendRequest("watchClaimTx", {
       sessionId: this.props.reward.session
-    }).catch((err) => {
+    }).then((res) => {
+      this.setState({
+        queueIndex: res.queueIdx,
+      });
+    },(err) => {
       this.setState({
         claimStatus: PoWClaimStatus.FAILED,
         txError: "[" + err.code + "] " + err.message,
@@ -149,6 +159,13 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       return;
     }
 
+    if(this.state.claimStatus === PoWClaimStatus.PENDING && exactNow - this.state.lastQueueStatusPoll > 30 * 1000) {
+      this.setState({
+        lastQueueStatusPoll: exactNow,
+      });
+      this.pollQueueStatus();
+    }
+
     let timeLeft = (1000 - (exactNow % 1000)) + 2;
     this.updateTimer = setTimeout(() => {
       this.updateTimer = null;
@@ -157,6 +174,14 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       });
       this.setUpdateTimer();
     }, timeLeft);
+  }
+
+  private pollQueueStatus() {
+    this.props.powClient.sendRequest("getClaimQueueState").then((res) => {
+      this.setState({
+        lastProcessedIdx: res.lastIdx,
+      });
+    });
   }
 
 	public render(): React.ReactElement<IPoWClaimDialogProps> {
@@ -221,6 +246,37 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 <span className="spinner-text">The faucet is now processing your claim...</span>
                 {this.state.pendingTime > 0 && (now - this.state.pendingTime) > 60 ? 
                   <span className="spinner-text"><br />This seems to take longer than usual... <br />You can close this page now. Your claim is queued and will be processed as soon as possible.</span> : 
+                  null}
+                {this.state.pendingTime > 0 && (now - this.state.pendingTime) > 60 ? 
+                  <div className="queue-info container">
+                    <div className='row'>
+                      <div className='col-3'>
+                        Status:
+                      </div>
+                      <div className='col'>
+                        {this.state.queueIndex > this.state.lastProcessedIdx ? "Queued" : "Sending"}
+                      </div>
+                    </div>
+                    <div className='row'>
+                      <div className='col-3'>
+                        Queue Position:
+                      </div>
+                      <div className='col'>
+                        <OverlayTrigger
+                          placement="auto"
+                          overlay={
+                            <Tooltip>
+                              {(this.state.queueIndex - this.state.lastProcessedIdx - 1)} claims will be processed before yours.
+                            </Tooltip>
+                          }
+                        >
+                          <span>
+                            #{this.state.queueIndex - this.state.lastProcessedIdx}
+                          </span>
+                        </OverlayTrigger>
+                      </div>
+                    </div>
+                  </div> : 
                   null}
               </div>
              : null}
@@ -354,10 +410,11 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
         captcha: capToken,
         token: this.props.reward.token
       });
-    }).then(() => {
+    }).then((res) => {
       this.props.powSession.storeClaimInfo(null);
       this.setState({
         claimStatus: PoWClaimStatus.PENDING,
+        queueIndex: res.queueIdx,
         pendingTime: this.props.powTime.getSyncedTime(),
       });
     }, (err) => {
