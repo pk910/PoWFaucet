@@ -64,6 +64,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public txhex: string;
   public txhash: string;
   public txblock: number;
+  public txfee: bigint;
   public retryCount: number;
   public failReason: string;
 
@@ -74,6 +75,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
     this.target = target;
     this.amount = amount;
     this.session = sessId;
+    this.txfee = 0n;
     this.retryCount = 0;
   }
 
@@ -428,8 +430,8 @@ export class EthWeb3Manager {
 
       do {
         try {
-          let txHex = await buildTx();
-          let txResult = await this.sendTransaction(txHex);
+          claimTx.txhex = await buildTx();
+          let txResult = await this.sendTransaction(claimTx.txhex);
           claimTx.txhash = txResult[0];
           txPromise = txResult[1];
         } catch(ex) {
@@ -467,6 +469,7 @@ export class EthWeb3Manager {
         delete this.pendingTxQueue[claimTx.txhash];
         claimTx.txblock = receipt.blockNumber;
         claimTx.status = ClaimTxStatus.CONFIRMED;
+        claimTx.txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
         claimTx.emit("confirmed");
         ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
       }, (error) => {

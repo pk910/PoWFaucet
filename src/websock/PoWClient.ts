@@ -17,6 +17,7 @@ import { PoWRewardLimiter } from '../services/PoWRewardLimiter';
 import { CaptchaVerifier } from '../services/CaptchaVerifier';
 import { FaucetWebApi } from '../webserv/FaucetWebApi';
 import { IIPInfo, IPInfoResolver } from '../services/IPInfoResolver';
+import { PoWOutflowLimiter } from '../services/PoWOutflowLimiter';
 
 interface PoWClientClaimTxSubscription {
   claimTx: ClaimTx;
@@ -622,6 +623,9 @@ export class PoWClient {
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
       faucetStats.statClaimCount++;
       faucetStats.statClaimRewards += BigInt(sessionInfo.balance);
+
+      // add paid tx fee to mined amount
+      ServiceManager.GetService(PoWOutflowLimiter).addMinedAmount(claimTx.txfee);
     });
     this.bindClaimTxEvents(claimTx);
     this.sendMessage("ok", {
