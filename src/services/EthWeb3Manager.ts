@@ -272,9 +272,9 @@ export class EthWeb3Manager {
     return this.walletState?.balance || null;
   }
 
-  public getPendingAmount(): bigint | null {
+  public getQueuedAmount(): bigint | null {
     let totalPending = 0n;
-    Object.values(this.pendingTxQueue).forEach((claimTx) => {
+    this.claimTxQueue.forEach((claimTx) => {
       totalPending += claimTx.amount;
     });
     return totalPending;
@@ -546,7 +546,7 @@ export class EthWeb3Manager {
       return;
     this.lastWalletRefillTry = now;
 
-    let walletBalance = this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance() - this.getPendingAmount();
+    let walletBalance = this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance() - this.getQueuedAmount();
     let refillAction: string = null;
     if(faucetConfig.ethRefillContract.overflowBalance && walletBalance > BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()))
       refillAction = "overflow";

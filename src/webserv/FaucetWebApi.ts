@@ -204,7 +204,7 @@ export class FaucetWebApi {
       status: {
         walletBalance: ethWeb3Manager.getFaucetBalance()?.toString(),
         unclaimedBalance: rewardLimiter.getUnclaimedBalance().toString(),
-        queuedBalance: ethWeb3Manager.getPendingAmount().toString(),
+        queuedBalance: ethWeb3Manager.getQueuedAmount().toString(),
         balanceRestriction: rewardLimiter.getBalanceRestriction(),
       },
       outflowRestriction: ServiceManager.GetService(PoWOutflowLimiter).getOutflowDebugState(),
