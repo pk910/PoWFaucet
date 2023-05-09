@@ -98,12 +98,14 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   private onClaimStatusChange(res: any) {
     if(res.session !== this.props.reward.session)
       return;
+    let finalState = false;
 
     if(res.error) {
       this.setState({
         claimStatus: PoWClaimStatus.FAILED,
         txError: res.error,
       });
+      finalState = true;
     }
     else if(res.status === "confirmed") {
       this.setState({
@@ -111,6 +113,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
         txHash: res.txHash,
         txBlock: res.txBlock,
       });
+      finalState = true;
     }
     else if(res.status === "pending") {
       this.setState({
@@ -119,7 +122,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       });
     }
 
-    if(this.claimConnKeeper) {
+    if(finalState && this.claimConnKeeper) {
       this.claimConnKeeper.close();
       this.claimConnKeeper = null;
     }
@@ -261,9 +264,9 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                         Status:
                       </div>
                       <div className='col'>
-                        {(this.state.txHash || this.state.queueIndex > this.state.lastProcessedIdx) ? 
-                          "Queued" : 
-                          "Sending" + (this.state.txHash ? " (TX: " + this.state.txHash + ")" : "")
+                        {(this.state.txHash || this.state.queueIndex <= this.state.lastProcessedIdx) ? 
+                          "Sending" + (this.state.txHash ? " (TX: " + this.state.txHash + ")" : "") :
+                          "Queued"
                         }
                       </div>
                     </div>
@@ -281,7 +284,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                           }
                         >
                           <span>
-                            #{this.state.queueIndex - this.state.lastProcessedIdx}
+                            #{(this.state.txHash || this.state.queueIndex <= this.state.lastProcessedIdx) ? "0" : this.state.queueIndex - this.state.lastProcessedIdx}
                           </span>
                         </OverlayTrigger>
                       </div>

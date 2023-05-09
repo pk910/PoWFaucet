@@ -7,6 +7,7 @@ import { renderDate, renderTime, renderTimespan } from '../utils/DateUtils';
 import getCountryIcon from 'country-flag-icons/unicode'
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { PoWApi } from 'common/PoWApi';
+import { IPoWQueueStatusClaim } from './PoWQueueStatus';
 
 export interface IPoWFaucetStatusProps {
   powApi: PoWApi;
@@ -19,7 +20,7 @@ export interface IPoWFaucetStatusState {
   refillStatus: IPoWFaucetRefillStatus;
   outflowStatus: IPoWFaucetOutflowStatus;
   activeSessions: IPoWFaucetStatusSession[];
-  activeClaims: IPoWFaucetStatusClaim[];
+  activeClaims: IPoWQueueStatusClaim[];
 }
 
 export interface IPoWFaucetStatus {
@@ -27,7 +28,7 @@ export interface IPoWFaucetStatus {
   refill: IPoWFaucetRefillStatus;
   outflowRestriction: IPoWFaucetOutflowStatus;
   sessions: IPoWFaucetStatusSession[];
-  claims: IPoWFaucetStatusClaim[];
+  claims: IPoWQueueStatusClaim[];
 }
 
 export interface IPoWFaucetGeneralStatus {
@@ -97,16 +98,6 @@ export interface IPoWFaucetRestrictionStatus {
     notify: boolean|string;
   }[];
   blocked: false|"close"|"kill";
-}
-
-export interface IPoWFaucetStatusClaim {
-  time: number;
-  session: string;
-  target: string;
-  amount: number;
-  status: string;
-  error: string;
-  nonce: number | null;
 }
 
 export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, IPoWFaucetStatusState> {
@@ -495,6 +486,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <th scope="col">To Address</th>
             <th scope="col">Amount</th>
             <th scope="col">Nonce</th>
+            <th scope="col">TX Hash</th>
             <th scope="col">Status</th>
           </tr>
         </thead>
@@ -502,7 +494,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           {this.state.activeClaims.length > 0 ?
             this.state.activeClaims.map((claim) => this.renderActiveClaimRow(claim)) :
             <tr key="none">
-              <th scope="row" colSpan={6}>No active claims</th>
+              <th scope="row" colSpan={7}>No active claims</th>
             </tr>
           }
         </tbody>
@@ -510,7 +502,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     );
   }
 
-  private renderActiveClaimRow(claim: IPoWFaucetStatusClaim): React.ReactElement {
+  private renderActiveClaimRow(claim: IPoWQueueStatusClaim): React.ReactElement {
     let claimStatus: React.ReactElement = null;
     switch(claim.status) {
       case "queue":
@@ -542,12 +534,13 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{claim.target}</td>
         <td>{Math.round(weiToEth(claim.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{claim.nonce || ""}</td>
+        <td>{claim.hash || ""}</td>
         <td>{claimStatus}</td>
       </tr>
     );
   }
 
-  private renderClaimFailInfo(claim: IPoWFaucetStatusClaim, props: any): React.ReactElement {
+  private renderClaimFailInfo(claim: IPoWQueueStatusClaim, props: any): React.ReactElement {
     if(!claim.error)
       return null;
     

@@ -15,6 +15,7 @@ import { PoWApi } from '../common/PoWApi';
 import { PoWFaucetNotification } from './PoWFaucetNotification';
 import { PoWTime } from '../common/PoWTime';
 import './PoWFaucet.css'
+import { PoWQueueStatus } from './PoWQueueStatus';
 
 export interface IPoWFaucetProps {
   powWebsockUrl: string;
@@ -43,6 +44,7 @@ export interface IPoWFaucetState {
   statusMessage: string;
   showRestoreSessionDialog: boolean;
   showClaimRewardDialog: IPoWClaimInfo;
+  showQueueStatus: boolean;
   showFaucetStatus: boolean;
   notifications: IPoWFaucetNotification[];
 }
@@ -166,6 +168,7 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
       statusMessage: null,
       showRestoreSessionDialog: false,
       showClaimRewardDialog: null,
+      showQueueStatus: !!(location.hash && location.hash.match(/queue\-status/)),
       showFaucetStatus: !!(location.hash && location.hash.match(/faucet\-status/)),
       notifications: [],
 		};
@@ -333,6 +336,9 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           </div>
         </div>
       );
+    }
+    else if(this.state.showQueueStatus) {
+      return <PoWQueueStatus powApi={this.powApi} faucetConfig={this.state.faucetConfig} />;
     }
     else if(this.state.showFaucetStatus) {
       return <PoWFaucetStatus powApi={this.powApi} faucetConfig={this.state.faucetConfig} />;

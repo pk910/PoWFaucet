@@ -659,7 +659,6 @@ export class PoWClient {
             status: "pending",
             txHash: claimTx.txhash
           });
-          this.unbindClaimTxEvents(subscription);
         },
         "confirmed": () => {
           this.sendMessage("claimTx", {
