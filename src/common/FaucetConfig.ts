@@ -12,6 +12,7 @@ export interface IFaucetConfig {
   buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
   buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
   faucetStore: string;
+  faucetDBFile: string;
 
   faucetTitle: string; // title of the faucet
   faucetImage: string; // faucet image displayed on the startpage
@@ -64,6 +65,8 @@ export interface IFaucetConfig {
   captchas: IFaucetCaptchaConfig | null; // captcha related settings or null to disable all captchas
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
   ipInfoApi: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
+  ipInfoCacheTime: number; // ip info caching time
+  ipInfoRequired: boolean; // require valid ip info for session start / resume / recovery
   ipRestrictedRewardShare: null | { // ip based restrictions
     hosting?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a hosting range
     proxy?: number | IFacuetRestrictionConfig; // percentage of reward per share if IP is in a proxy range
@@ -81,6 +84,7 @@ export interface IFaucetConfig {
     [limit: number]: number; // limit: min balance in wei, value: percent of normal reward (eg. 50 = half rewards)
   };
   faucetBalanceRestriction: IFaucetBalanceRestrictionConfig;
+  faucetOutflowRestriction: IFaucetOutflowRestrictionConfig;
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   noFundsBalance: number; // minimum balance to show the empty faucet error message
@@ -94,6 +98,7 @@ export interface IFaucetConfig {
   ethWalletKey: string; // faucet wallet private key
   ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)
+  ethLegacyTx: boolean; // use legacy (non-eip1559) transaction type
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
@@ -107,13 +112,16 @@ export interface IFaucetConfig {
     allowanceFnArgs: string[]; // vault contract getAllowance function args
     withdrawFn: string; // vault contract withdraw function name
     withdrawFnArgs: string[]; // vault contract withdraw function args
-    withdrawGasLimit: number; // gas limit for withdraw transaction (in wei)
+    depositFn: string; // vault contract deposit function name
+    depositFnArgs: string[]; // vault contract deposit function args
+    withdrawGasLimit: number; // gas limit for withdraw/deposit transaction (in wei)
     checkContractBalance: boolean | string; // check balance of contract before withdrawing
-    contractDustBalance: number; // don't request funds if contract balance is lower than this
+    contractDustBalance: string; // don't request funds if contract balance is lower than this
 
-    triggerBalance: number;
+    triggerBalance: string;
+    overflowBalance: string;
     cooldownTime: number;
-    requestAmount: number;
+    requestAmount: string;
   };
 
   ensResolver: IFaucetEnsResolverConfig | null; // ENS resolver options or null to disable ENS names
@@ -141,6 +149,13 @@ export interface IFaucetCaptchaConfig {
 export interface IFaucetBalanceRestrictionConfig {
   enabled: boolean;
   targetBalance: number;
+}
+
+export interface IFaucetOutflowRestrictionConfig {
+  enabled: boolean;
+  amount: number;
+  duration: number;
+  restrict: number;
 }
 
 export enum PoWHashAlgo {
@@ -239,6 +254,7 @@ let defaultConfig: IFaucetConfig = {
     "keywords": "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow",
   },
   faucetStore: path.join(basePath, "faucet-store.json"),
+  faucetDBFile: path.join(basePath, "faucet-store.db"),
 
   powPingInterval: 10,
   powPingTimeout: 30,
@@ -299,11 +315,14 @@ let defaultConfig: IFaucetConfig = {
   captchas: null,
   concurrentSessions: 0,
   ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
+  ipInfoCacheTime: 86400,
+  ipInfoRequired: false,
   ipRestrictedRewardShare: null,
   ipInfoMatchRestrictedReward: null,
   ipInfoMatchRestrictedRewardFile: null,
   faucetBalanceRestrictedReward: null,
   faucetBalanceRestriction: null,
+  faucetOutflowRestriction: null,
   spareFundsAmount:   10000000000000000, // 0,01 ETH
   noFundsBalance:    100000000000000000, // 0,1 ETH
   lowFundsBalance: 10000000000000000000, // 10 ETH
@@ -315,6 +334,7 @@ let defaultConfig: IFaucetConfig = {
   ethWalletKey: "fc2d0a2d823f90e0599e1e9d9202204e42a5ed388000ab565a34e7cbb566274b",
   ethChainId: null,
   ethTxGasLimit: 21000,
+  ethLegacyTx: false,
   ethTxMaxFee: 1800000000,
   ethTxPrioFee: 800000000,
   ethMaxPending: 12,

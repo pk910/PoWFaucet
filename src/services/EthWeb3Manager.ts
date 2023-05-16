@@ -14,7 +14,7 @@ import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
 import { strFormatPlaceholder } from '../utils/StringUtils';
 import { FaucetStatsLog } from './FaucetStatsLog';
 import { PromiseDfd } from '../utils/PromiseDfd';
-import { FaucetStore } from './FaucetStore';
+import { FaucetStoreDB } from './FaucetStoreDB';
 import { PoWRewardLimiter } from './PoWRewardLimiter';
 
 interface WalletState {
@@ -39,7 +39,7 @@ enum FucetWalletState {
   OFFLINE = 4,
 }
 
-interface ClaimTxEvents {
+export interface ClaimTxEvents {
   'processing': () => void;
   'pending': () => void;
   'confirmed': () => void;
@@ -54,6 +54,7 @@ export interface IQueuedClaimTx {
 }
 
 export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
+  public queueIdx: number;
   public status: ClaimTxStatus;
   public readonly time: Date;
   public readonly target: string;
@@ -63,6 +64,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
   public txhex: string;
   public txhash: string;
   public txblock: number;
+  public txfee: bigint;
   public retryCount: number;
   public failReason: string;
 
@@ -73,6 +75,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
     this.target = target;
     this.amount = amount;
     this.session = sessId;
+    this.txfee = 0n;
     this.retryCount = 0;
   }
 
@@ -98,6 +101,8 @@ export class EthWeb3Manager {
   private historyTxDict: {[nonce: number]: ClaimTx} = {};
   private lastWalletRefresh: number;
   private queueProcessing: boolean = false;
+  private lastClaimTxIdx: number = 1;
+  private lastProcessedClaimTxIdx: number = 0;
   private lastWalletRefill: number;
   private lastWalletRefillTry: number;
   private walletRefilling: boolean;
@@ -111,8 +116,9 @@ export class EthWeb3Manager {
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
 
     // restore saved claimTx queue
-    ServiceManager.GetService(FaucetStore).getClaimTxQueue().forEach((claimTx) => {
+    ServiceManager.GetService(FaucetStoreDB).getClaimTxQueue().forEach((claimTx) => {
       let claim = new ClaimTx(claimTx.target, BigInt(claimTx.amount), claimTx.session, claimTx.time);
+      claim.queueIdx = this.lastClaimTxIdx++;
       this.claimTxQueue.push(claim);
     });
 
@@ -268,10 +274,23 @@ export class EthWeb3Manager {
     return this.walletState?.balance || null;
   }
 
+  public getQueuedAmount(): bigint | null {
+    let totalPending = 0n;
+    this.claimTxQueue.forEach((claimTx) => {
+      totalPending += claimTx.amount;
+    });
+    return totalPending;
+  }
+
+  public getLastProcessedClaimIdx(): number {
+    return this.lastProcessedClaimTxIdx;
+  }
+
   public addClaimTransaction(target: string, amount: bigint, sessId: string): ClaimTx {
     let claimTx = new ClaimTx(target, amount, sessId);
+    claimTx.queueIdx = this.lastClaimTxIdx++;
     this.claimTxQueue.push(claimTx);
-    ServiceManager.GetService(FaucetStore).addQueuedClaimTx(claimTx.serialize());
+    ServiceManager.GetService(FaucetStoreDB).addQueuedClaimTx(claimTx.serialize());
     return claimTx;
   }
 
@@ -296,20 +315,44 @@ export class EthWeb3Manager {
     return null;
   }
 
-  private buildEthTx(target: string, amount: bigint, nonce: number): string {
+  private async buildEthTx(target: string, amount: bigint, nonce: number, data?: string, gasLimit?: number): Promise<string> {
     if(target.match(/^0X/))
       target = "0x" + target.substring(2);
 
-    var rawTx = {
-      nonce: nonce,
-      gasLimit: faucetConfig.ethTxGasLimit,
-      maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
-      maxFeePerGas: faucetConfig.ethTxMaxFee,
-      from: this.walletAddr,
-      to: target,
-      value: "0x" + amount.toString(16)
-    };
-    var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
+    let tx: EthTx.Transaction | EthTx.FeeMarketEIP1559Transaction;
+    if(faucetConfig.ethLegacyTx) {
+      // legacy transaction
+      let gasPrice = parseInt(await this.web3.eth.getGasPrice());
+      gasPrice += faucetConfig.ethTxPrioFee;
+      if(faucetConfig.ethTxMaxFee > 0 && gasPrice > faucetConfig.ethTxMaxFee)
+        gasPrice = faucetConfig.ethTxMaxFee;
+
+      tx = EthTx.Transaction.fromTxData({
+        nonce: nonce,
+        gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
+        gasPrice: gasPrice,
+        to: target,
+        value: "0x" + amount.toString(16),
+        data: data ? data : "0x"
+      }, {
+        common: this.chainCommon
+      });
+    }
+    else {
+      // eip1559 transaction
+      tx = EthTx.FeeMarketEIP1559Transaction.fromTxData({
+        nonce: nonce,
+        gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
+        maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
+        maxFeePerGas: faucetConfig.ethTxMaxFee,
+        to: target,
+        value: "0x" + amount.toString(16),
+        data: data ? data : "0x"
+      }, {
+        common: this.chainCommon
+      });
+    }
+
     tx = tx.sign(this.walletKey);
     return tx.serialize().toString('hex');
   }
@@ -326,6 +369,7 @@ export class EthWeb3Manager {
         }
 
         let claimTx = this.claimTxQueue.splice(0, 1)[0];
+        this.lastProcessedClaimTxIdx = claimTx.queueIdx;
         await this.processQueueTx(claimTx);
       }
 
@@ -360,14 +404,14 @@ export class EthWeb3Manager {
       claimTx.failReason = "Network RPC is currently unreachable.";
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
-      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
+      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
       return;
     }
     if(!this.walletState.ready || this.walletState.balance - BigInt(faucetConfig.spareFundsAmount) < claimTx.amount) {
       claimTx.failReason = "Faucet wallet is out of funds.";
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
-      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
+      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
       return;
     }
 
@@ -386,7 +430,8 @@ export class EthWeb3Manager {
 
       do {
         try {
-          let txResult = await this.sendTransaction(buildTx());
+          claimTx.txhex = await buildTx();
+          let txResult = await this.sendTransaction(claimTx.txhex);
           claimTx.txhash = txResult[0];
           txPromise = txResult[1];
         } catch(ex) {
@@ -405,17 +450,26 @@ export class EthWeb3Manager {
       this.updateFaucetStatus();
 
       this.pendingTxQueue[claimTx.txhash] = claimTx;
-      ServiceManager.GetService(FaucetStore).removeQueuedClaimTx(claimTx.session);
+      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + (Math.round(weiToEth(claimTx.amount)*1000)/1000) + " ETH] to: " + claimTx.target + ": " + claimTx.txhash);
 
       claimTx.status = ClaimTxStatus.PENDING;
       claimTx.emit("pending");
 
       // await transaction receipt
-      txPromise.then((receipt) => {
+      txPromise.catch((ex) => {
+        if(ex.toString().match(/Transaction was not mined within/)) {
+          // poll receipt
+          return this.awaitTransactionReceipt(claimTx.txhash);
+        }
+        else {
+          throw ex;
+        }
+      }).then((receipt) => {
         delete this.pendingTxQueue[claimTx.txhash];
         claimTx.txblock = receipt.blockNumber;
         claimTx.status = ClaimTxStatus.CONFIRMED;
+        claimTx.txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
         claimTx.emit("confirmed");
         ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
       }, (error) => {
@@ -434,6 +488,26 @@ export class EthWeb3Manager {
       claimTx.failReason = "Processing Exception: " + ex.toString();
       claimTx.status = ClaimTxStatus.FAILED;
       claimTx.emit("failed");
+    }
+  }
+
+  private async awaitTransactionReceipt(txhash: string): Promise<TransactionReceipt> {
+    try {
+      let receipt: TransactionReceipt;
+      do {
+        await this.sleepPromise(30000); // 30 secs
+        receipt = await this.web3.eth.getTransactionReceipt(txhash);
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Polled transaction receipt for " + txhash + ": " + (receipt ? "found!" : "pending"));
+      } while(!receipt);
+      return receipt;
+    } catch(ex) {
+      if(ex.toString().match(/CONNECTION ERROR/)) {
+        // just retry when RPC connection issue
+        return this.awaitTransactionReceipt(txhash);
+      }
+
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
+      throw ex;
     }
   }
 
@@ -475,17 +549,37 @@ export class EthWeb3Manager {
       return;
     this.lastWalletRefillTry = now;
 
-    if(this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance() > faucetConfig.ethRefillContract.triggerBalance)
+    let walletBalance = this.walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance() - this.getQueuedAmount();
+    let refillAction: string = null;
+    if(faucetConfig.ethRefillContract.overflowBalance && walletBalance > BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()))
+      refillAction = "overflow";
+    else if(walletBalance < BigInt(faucetConfig.ethRefillContract.triggerBalance.toString()))
+      refillAction = "refill";
+    
+    if(!refillAction)
       return;
     
     this.walletRefilling = true;
     try {
-      let txResult = await this.refillWallet();
+      let txResult: [string, Promise<TransactionReceipt>];
+      if(refillAction == "refill")
+        txResult = await this.refillWallet();
+      else if(refillAction == "overflow")
+        txResult = await this.overflowWallet(walletBalance - BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()));
+      
       this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
 
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending withdraw transaction to vault contract: " + txResult[0]);
+      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult[0]);
 
-      let txReceipt = await txResult[1];
+      let txReceipt: TransactionReceipt;
+      try {
+        txReceipt = await txResult[1];
+      } catch(ex) {
+        if(ex.toString().match(/Transaction was not mined within/))
+          txReceipt = await this.awaitTransactionReceipt(txResult[0]);
+        else
+          throw ex;
+      }
       if(!txReceipt.status)
         throw txReceipt;
 
@@ -510,8 +604,8 @@ export class EthWeb3Manager {
     let refillContract = new this.web3.eth.Contract(refillContractAbi, faucetConfig.ethRefillContract.contract, {
       from: this.walletAddr,
     });
-    let refillAmount = faucetConfig.ethRefillContract.requestAmount || 0;
-    let refillAllowance: number = null;
+    let refillAmount = BigInt(faucetConfig.ethRefillContract.requestAmount) || 0n;
+    let refillAllowance: bigint = null;
 
     let getCallArgs = (args) => {
       return args.map((arg) => {
@@ -520,7 +614,7 @@ export class EthWeb3Manager {
             arg = this.walletAddr;
             break;
           case "{amount}":
-            arg = BigInt(refillAmount);
+            arg = refillAmount;
             break;
         }
         return arg;
@@ -530,8 +624,8 @@ export class EthWeb3Manager {
     if(faucetConfig.ethRefillContract.allowanceFn) {
       // check allowance
       let callArgs = getCallArgs(faucetConfig.ethRefillContract.allowanceFnArgs || ["{walletAddr}"]);
-      refillAllowance = await refillContract.methods[faucetConfig.ethRefillContract.allowanceFn].apply(this, callArgs).call();
-      if(refillAllowance == 0)
+      refillAllowance = BigInt(await refillContract.methods[faucetConfig.ethRefillContract.allowanceFn].apply(this, callArgs).call());
+      if(refillAllowance == 0n)
         throw "no withdrawable funds from refill contract";
       if(refillAmount > refillAllowance)
         refillAmount = refillAllowance;
@@ -539,27 +633,57 @@ export class EthWeb3Manager {
 
     if(faucetConfig.ethRefillContract.checkContractBalance) {
       let checkAddr = (typeof faucetConfig.ethRefillContract.checkContractBalance === "string" ? faucetConfig.ethRefillContract.checkContractBalance : faucetConfig.ethRefillContract.contract);
-      let contractBalance = parseInt(await this.web3.eth.getBalance(checkAddr));
-      if(contractBalance <= (faucetConfig.ethRefillContract.contractDustBalance || 1000000000))
+      let contractBalance = BigInt(await this.web3.eth.getBalance(checkAddr));
+      let dustBalance = faucetConfig.ethRefillContract.contractDustBalance ? BigInt(faucetConfig.ethRefillContract.contractDustBalance.toString()) : 1000000000n;
+      if(contractBalance <= dustBalance)
         throw "refill contract is out of funds";
       if(refillAmount > contractBalance)
         refillAmount = contractBalance;
     }
 
     let callArgs = getCallArgs(faucetConfig.ethRefillContract.withdrawFnArgs || ["{amount}"]);
-    var rawTx = {
-      nonce: this.walletState.nonce,
-      gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit || faucetConfig.ethTxGasLimit,
-      maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
-      maxFeePerGas: faucetConfig.ethTxMaxFee,
+    let txHex = await this.buildEthTx(
+      faucetConfig.ethRefillContract.contract,
+      0n, 
+      this.walletState.nonce, 
+      refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI(),
+      faucetConfig.ethRefillContract.withdrawGasLimit
+    );
+
+    let txResult = await this.sendTransaction(txHex);
+    this.walletState.nonce++;
+
+    return txResult;
+  }
+
+  private async overflowWallet(amount: bigint): Promise<[string, Promise<TransactionReceipt>]> {
+    let refillContractAbi = JSON.parse(faucetConfig.ethRefillContract.abi);
+    let refillContract = new this.web3.eth.Contract(refillContractAbi, faucetConfig.ethRefillContract.contract, {
       from: this.walletAddr,
-      to: faucetConfig.ethRefillContract.contract,
-      value: 0,
-      data: refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI()
+    });
+
+    let getCallArgs = (args) => {
+      return args.map((arg) => {
+        switch(arg) {
+          case "{walletAddr}":
+            arg = this.walletAddr;
+            break;
+          case "{amount}":
+            arg = amount;
+            break;
+        }
+        return arg;
+      })
     };
-    var tx = EthTx.FeeMarketEIP1559Transaction.fromTxData(rawTx, { common: this.chainCommon });
-    tx = tx.sign(this.walletKey);
-    let txHex = tx.serialize().toString('hex');
+
+    let callArgs = getCallArgs(faucetConfig.ethRefillContract.depositFnArgs || []);
+    let txHex = await this.buildEthTx(
+      faucetConfig.ethRefillContract.contract,
+      amount, 
+      this.walletState.nonce, 
+      faucetConfig.ethRefillContract.depositFn ? refillContract.methods[faucetConfig.ethRefillContract.depositFn].apply(this, callArgs).encodeABI() : undefined,
+      faucetConfig.ethRefillContract.withdrawGasLimit
+    );
 
     let txResult = await this.sendTransaction(txHex);
     this.walletState.nonce++;

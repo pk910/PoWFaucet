@@ -7,6 +7,7 @@ import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWSession, PoWSessionStatus } from '../websock/PoWSession';
 import { EthWeb3Manager } from './EthWeb3Manager';
 import { IIPInfo } from "./IPInfoResolver";
+import { PoWOutflowLimiter } from './PoWOutflowLimiter';
 
 
 export interface IPoWRewardRestriction {
@@ -112,6 +113,7 @@ export class PoWRewardLimiter {
     
     this.balanceRestrictionsRefresh = now;
     faucetBalance -= this.getUnclaimedBalance(); // subtract mined balance from active & claimable sessions
+    faucetBalance -= ServiceManager.GetService(EthWeb3Manager).getQueuedAmount(); // subtract pending transaction amounts
     
     this.balanceRestriction = Math.min(
       this.getStaticBalanceRestriction(faucetBalance),
@@ -232,7 +234,10 @@ export class PoWRewardLimiter {
     let shareReward = BigInt(faucetConfig.powShareReward);
 
     // apply balance restriction if faucet wallet is low on funds
-    let balanceRestriction = this.getBalanceRestriction();
+    let balanceRestriction = Math.min(
+      this.getBalanceRestriction(),
+      ServiceManager.GetService(PoWOutflowLimiter).getOutflowRestriction()
+    );
     if(balanceRestriction < 100)
       shareReward = shareReward * BigInt(Math.floor(balanceRestriction * 1000)) / 100000n;
 
@@ -253,10 +258,13 @@ export class PoWRewardLimiter {
     let shareReward = BigInt(faucetConfig.verifyMinerReward);
 
     // apply balance restriction if faucet wallet is low on funds
-    let balanceRestriction = this.getBalanceRestriction();
+    let balanceRestriction = Math.min(
+      this.getBalanceRestriction(),
+      ServiceManager.GetService(PoWOutflowLimiter).getOutflowRestriction()
+    );
     if(balanceRestriction < 100)
       shareReward = shareReward * BigInt(Math.floor(balanceRestriction * 1000)) / 100000n;
-
+    
     let restrictedReward = session.getRewardRestriction();
     if(restrictedReward.reward < 100)
       shareReward = shareReward * BigInt(Math.floor(restrictedReward.reward * 1000)) / 100000n;

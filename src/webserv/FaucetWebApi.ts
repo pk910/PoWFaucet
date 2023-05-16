@@ -5,6 +5,7 @@ import { ServiceManager } from "../common/ServiceManager";
 import { ClaimTxStatus, EthWeb3Manager } from "../services/EthWeb3Manager";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
 import { IIPInfo } from "../services/IPInfoResolver";
+import { PoWOutflowLimiter } from "../services/PoWOutflowLimiter";
 import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 import { getHashedSessionId } from "../utils/HashedInfo";
 import { PoWClient } from "../websock/PoWClient";
@@ -48,44 +49,64 @@ export interface IClientFaucetConfig {
   };
 }
 
+export interface IClientSessionStatus {
+  id: string;
+  start: number;
+  idle: number;
+  target: string;
+  ip: string;
+  ipInfo: IIPInfo;
+  balance: string;
+  nonce: number;
+  hashrate: number;
+  status: PoWSessionStatus;
+  claimable: boolean;
+  restr: IPoWRewardRestriction;
+  cliver: string;
+  boostF: number;
+  boostS: number;
+}
+
+export interface IClientClaimStatus {
+  time: number;
+  session: string;
+  target: string;
+  amount: string;
+  status: ClaimTxStatus;
+  error: string;
+  nonce: number;
+  hash: string;
+  txhex: string;
+}
+
 export interface IClientFaucetStatus {
   status: {
     walletBalance: string;
     unclaimedBalance: string;
+    queuedBalance: string;
     balanceRestriction: number;
   };
   refill: {
     balance: string;
-    trigger: number;
-    amount: number;
+    trigger: string;
+    amount: string;
     cooldown: number;
   };
-  sessions: {
-    id: string;
-    start: number;
-    idle: number;
-    target: string;
-    ip: string;
-    ipInfo: IIPInfo;
-    balance: string;
-    nonce: number;
-    hashrate: number;
-    status: PoWSessionStatus;
-    claimable: boolean;
-    restr: IPoWRewardRestriction;
-    cliver: string;
-    boostF: number;
-    boostS: number;
-  }[];
-  claims: {
-    time: number;
-    session: string;
-    target: string;
-    amount: string;
-    status: ClaimTxStatus;
-    error: string;
-    nonce: number;
-  }[];
+  outflowRestriction: {
+    now: number;
+    trackTime: number;
+    dustAmount: string;
+    restriction: number;
+    duration: number;
+    restrict: number;
+    amount: number;
+  };
+  sessions: IClientSessionStatus[];
+  claims: IClientClaimStatus[];
+}
+
+export interface IClientQueueStatus {
+  claims: IClientClaimStatus[];
 }
 
 const FAUCETSTATUS_CACHE_TIME = 10;
@@ -105,6 +126,8 @@ export class FaucetWebApi {
         return this.onGetFaucetConfig(apiUrl.query['cliver'] as string);
       case "getFaucetStatus".toLowerCase():
         return await this.onGetFaucetStatus((req.headers['x-forwarded-for'] as string || req.socket.remoteAddress).split(", ")[0]);
+      case "getQueueStatus".toLowerCase():
+        return this.onGetQueueStatus();
     }
     return new FaucetHttpResponse(404, "Not Found");
   }
@@ -215,12 +238,14 @@ export class FaucetWebApi {
       status: {
         walletBalance: ethWeb3Manager.getFaucetBalance()?.toString(),
         unclaimedBalance: rewardLimiter.getUnclaimedBalance().toString(),
+        queuedBalance: ethWeb3Manager.getQueuedAmount().toString(),
         balanceRestriction: rewardLimiter.getBalanceRestriction(),
       },
+      outflowRestriction: ServiceManager.GetService(PoWOutflowLimiter).getOutflowDebugState(),
       refill: faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract ? {
         balance: (await ethWeb3Manager.getWalletBalance(faucetConfig.ethRefillContract.contract)).toString(),
-        trigger: faucetConfig.ethRefillContract.triggerBalance,
-        amount: faucetConfig.ethRefillContract.requestAmount,
+        trigger: faucetConfig.ethRefillContract.triggerBalance.toString(),
+        amount: faucetConfig.ethRefillContract.requestAmount.toString(),
         cooldown: ethWeb3Manager.getFaucetRefillCooldown(),
       } : null,
       sessions: null,
@@ -255,18 +280,8 @@ export class FaucetWebApi {
       }
     });
 
-    let claims = ethWeb3Manager.getTransactionQueue();
-    statusRsp.claims = claims.map((claimTx) => {
-      return {
-        time: Math.floor(claimTx.time.getTime() / 1000),
-        session: getHashedSessionId(claimTx.session, faucetConfig.faucetSecret),
-        target: claimTx.target,
-        amount: claimTx.amount.toString(),
-        status: claimTx.status,
-        error: claimTx.failReason,
-        nonce: claimTx.nonce || null,
-      }
-    });
+    let queueStatus = this.buildQueueStatus();
+    statusRsp.claims = queueStatus.claims;
 
     return statusRsp;
   }
@@ -290,6 +305,33 @@ export class FaucetWebApi {
   private onGetFaucetStatus(remoteIp: string): Promise<IClientFaucetStatus> {
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Client requested faucet status (IP: " + remoteIp + ")");
     return this.getFaucetStatus();
+  }
+
+  private buildQueueStatus(): IClientQueueStatus {
+    let ethWeb3Manager = ServiceManager.GetService(EthWeb3Manager);
+
+    let claims = ethWeb3Manager.getTransactionQueue();
+    let rspClaims = claims.map((claimTx) => {
+      return {
+        time: Math.floor(claimTx.time.getTime() / 1000),
+        session: getHashedSessionId(claimTx.session, faucetConfig.faucetSecret),
+        target: claimTx.target,
+        amount: claimTx.amount.toString(),
+        status: claimTx.status,
+        error: claimTx.failReason,
+        nonce: claimTx.nonce || null,
+        hash: claimTx.txhash || null,
+        txhex: claimTx.txhex || null,
+      }
+    });
+
+    return {
+      claims: rspClaims,
+    };
+  }
+
+  private onGetQueueStatus(): IClientQueueStatus {
+    return this.buildQueueStatus();
   }
 
 }

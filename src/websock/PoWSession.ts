@@ -1,7 +1,7 @@
 
 import * as crypto from "crypto";
 import { faucetConfig } from "../common/FaucetConfig";
-import { SessionMark } from "../services/FaucetStore";
+import { FaucetStoreDB, SessionMark } from "../services/FaucetStoreDB";
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from "../common/ServiceManager";
 import { FaucetStore } from "../services/FaucetStore";
@@ -14,6 +14,7 @@ import { FaucetStatsLog } from "../services/FaucetStatsLog";
 import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
 import { IPassportInfo, PassportVerifier } from "../services/PassportVerifier";
 import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
+import { PoWOutflowLimiter } from "../services/PoWOutflowLimiter";
 
 
 export enum PoWSessionSlashReason {
@@ -185,8 +186,8 @@ export class PoWSession {
 
     this.activeClient = client;
     client.setSession(this);
-    this.updateRemoteIp();
-
+    setTimeout(() => this.updateRemoteIp(), 10);
+    
     ServiceManager.GetService(PoWStatusLog).emitLog(
       PoWStatusLogLevel.INFO, 
       "Created new session: " + this.sessionId + 
@@ -219,7 +220,7 @@ export class PoWSession {
       this.activeClient = null;
     }
     if(setClosedMark)
-      ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.CLOSED);
+      ServiceManager.GetService(FaucetStoreDB).setSessionMark(this.sessionId, SessionMark.CLOSED);
     
     if(makeClaimable && this.balance >= faucetConfig.claimMinAmount) {
       this.claimable = true;
@@ -367,7 +368,7 @@ export class PoWSession {
     if(activeClient) {
       this.idleTime = null;
       this.setSessionStatus(PoWSessionStatus.MINING);
-      this.updateRemoteIp();
+      setTimeout(() => this.updateRemoteIp(), 10);
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
       
     }
@@ -409,14 +410,12 @@ export class PoWSession {
       return;
     
     let remoteAddr = this.activeClient.getRemoteIP();
-    if(remoteAddr.match(/^::ffff:/))
-      remoteAddr = remoteAddr.substring(7);
-    
     if(this.lastRemoteIp === remoteAddr)
       return;
 
     this.lastRemoteIp = remoteAddr;
     this.hashedRemoteIp = null;
+
     ServiceManager.GetService(IPInfoResolver).getIpInfo(remoteAddr).then((ipInfo) => {
       this.lastIpInfo = ipInfo;
 
@@ -424,11 +423,19 @@ export class PoWSession {
     });
   }
 
+  public setLastIpInfo(ip: string, ipinfo: IIPInfo) {
+    this.lastRemoteIp = ip;
+    this.hashedRemoteIp = null;
+    this.lastIpInfo = ipinfo;
+    setTimeout(() => this.updateRewardRestriction(), 10);
+  }
+
   public getLastIpInfo(): IIPInfo {
     return this.lastIpInfo;
   }
 
   public addBalance(value: bigint) {
+    ServiceManager.GetService(PoWOutflowLimiter).addMinedAmount(value);
     this.balance += value;
   }
 
@@ -513,7 +520,7 @@ export class PoWSession {
 
   private applyKillPenalty(reason: PoWSessionSlashReason) {
     this.setSessionStatus(PoWSessionStatus.SLASHED);
-    ServiceManager.GetService(FaucetStore).setSessionMark(this.sessionId, SessionMark.KILLED);
+    ServiceManager.GetService(FaucetStoreDB).setSessionMark(this.sessionId, SessionMark.KILLED);
     if(this.activeClient)
       this.activeClient.sendMessage("sessionKill", {
         level: "session",

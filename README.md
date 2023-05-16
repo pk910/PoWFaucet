@@ -16,8 +16,6 @@ Goerli Testnet: [https://goerli-faucet.pk910.de](https://goerli-faucet.pk910.de)
 
 Sepolia Testnet: [https://sepolia-faucet.pk910.de](https://sepolia-faucet.pk910.de)
 
-Zhejiang Testnet: [https://zhejiang-faucet.pk910.de](https://zhejiang-faucet.pk910.de)
-
 # Run Yourself
 
 `npm install`
@@ -38,7 +36,7 @@ see [faucet-config.example.yaml](https://github.com/pk910/PoWFaucet/blob/master/
 
 For productive setups I'd suggest using a more complex webserver that supports SSL, caching and other stuff.
 
-See [docs/apache-config.md](https://github.com/pk910/PoWFaucet/blob/master/docs/apache-config.md) for more.
+See [docs/webserver-setup.md](https://github.com/pk910/PoWFaucet/blob/master/docs/webserver-setup.md) for more.
 
 # Run with docker
 
@@ -46,9 +44,10 @@ create a data directory
 
 create a copy of [faucet-config.example.yaml](https://github.com/pk910/PoWFaucet/blob/master/faucet-config.example.yaml) and save as `faucet-config.yaml`
 
-edit `faucet-config.yaml` and prepend /config/ to faucetStore & faucetLogFile (ensure they're not lost on updates)
+edit `faucet-config.yaml` and prepend /config/ to faucetStore, faucetDBFile & faucetLogFile (ensure they're not lost on updates)
 ```
 faucetStore: "/config/faucet-store.json"
+faucetDBFile: "/config/faucet-store.db"
 faucetLogFile: "/config/faucet-events.log"
 ```
 

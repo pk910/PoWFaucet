@@ -4,6 +4,7 @@
 
 # Path to faucet db file (defaults to faucet-store.json)
 faucetStore: "faucet-store.json"
+faucetDBFile: "faucet-store.db"
 
 # logfile for faucet events (comment out for no logging)
 faucetLogFile: "faucet-events.log"
@@ -62,8 +63,13 @@ ethChainId: 5
 # use 21000 to prevent transactions to contracts
 ethTxGasLimit: 21000
 
+# use legacy (non-eip1559) transaction type
+# true: Type 0 (Legacy Transactions), false: Type 2 (EIP1559 Transactions)
+ethLegacyTx: false
+
 # max transaction gas fee (in wei)
-ethTxMaxFee: 10000000000  # 10 gwei
+# used as limit for legacy transactions (faucet won't build transactions with higher gas price)
+ethTxMaxFee: 100000000000  # 100 gwei
 
 # max transaction priority fee (in wei)
 ethTxPrioFee: 2000000000  # 2 gwei
@@ -240,6 +246,12 @@ captchas:
 # ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
 ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
 
+# ip info caching time
+ipInfoCacheTime: 86400 # 1 day
+
+# require valid ip info for session start / recovery (throw error if lookup failed)
+ipInfoRequired: false
+
 # ip info based restrictions
 ipRestrictedRewardShare:
   # percentage of reward per share if IP is in a hosting range (default: 100)
@@ -303,11 +315,22 @@ faucetBalanceRestriction:
   enabled: false
   targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
 
+# dynamic reward restriction based on faucet outflow
+# alternative to static faucetBalanceRestrictedReward
+# limits the rewards according to the faucet outflow
+faucetOutflowRestriction:
+  enabled: false
+  # limit outflow to 1000ETH per day
+  amount: 1000000000000000000000 # 1000 ETH
+  duration: 86400 # 1 day
+  # apply linear reward restriction after `half of the duration` has been used
+  restrict: 43200
+
 
 ### Automatic wallet refill
 
 # refill contract options
-# advanced configuration to limit the amount of funds that can be mined on the faucet via a separate vault contract
+# advanced configuration to secure the faucet funds via a separate vault contract
 # the faucet tries to refill its wallet balance from the vault contract when it gets empty
 # see contract code in docs folder
 ethRefillContract:

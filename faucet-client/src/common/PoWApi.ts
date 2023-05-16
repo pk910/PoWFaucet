@@ -1,4 +1,5 @@
 import { IPoWFaucetStatus } from "components/PoWFaucetStatus";
+import { IPoWQueueStatus } from "components/PoWQueueStatus";
 import { IFaucetConfig } from "./IFaucetConfig";
 
 export class PoWApi {
@@ -37,5 +38,9 @@ export class PoWApi {
 
   public getFaucetStatus(): Promise<IPoWFaucetStatus> {
     return this.apiGet("/getFaucetStatus");
+  }
+
+  public getQueueStatus(): Promise<IPoWQueueStatus> {
+    return this.apiGet("/getQueueStatus");
   }
 }

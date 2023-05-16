@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import { faucetConfig } from '../common/FaucetConfig';
 import { ServiceManager } from '../common/ServiceManager';
-import { FaucetStore } from './FaucetStore';
+import { FaucetStoreDB } from './FaucetStoreDB';
 
 
 export interface IIPInfo {
@@ -32,7 +32,7 @@ export class IPInfoResolver {
   }
 
   public getIpInfo(ipAddr: string): Promise<IIPInfo> {
-    let cachedIpInfo = ServiceManager.GetService(FaucetStore).getIPInfo(ipAddr);
+    let cachedIpInfo = ServiceManager.GetService(FaucetStoreDB).getIPInfo(ipAddr);
     if(cachedIpInfo)
       return Promise.resolve(cachedIpInfo);
     if(this.ipInfoCache.hasOwnProperty(ipAddr))
@@ -63,7 +63,7 @@ export class IPInfoResolver {
         ipInfo.proxy = rsp.proxy;
         ipInfo.hosting = rsp.hosting;
 
-        ServiceManager.GetService(FaucetStore).setIPInfo(ipAddr, ipInfo);
+        ServiceManager.GetService(FaucetStoreDB).setIPInfo(ipAddr, ipInfo);
       }
       return ipInfo;
     }, (err) => {

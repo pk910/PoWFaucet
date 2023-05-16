@@ -1,6 +1,6 @@
 import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import React from 'react';
-import { Button, Modal, Spinner } from 'react-bootstrap';
+import { Button, Modal, OverlayTrigger, Spinner, Tooltip } from 'react-bootstrap';
 import { weiToEth } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTimespan } from '../utils/DateUtils';
@@ -29,6 +29,9 @@ enum PoWClaimStatus {
 export interface IPoWClaimDialogState {
   refreshIndex: number;
   claimStatus: PoWClaimStatus;
+  queueIndex: number;
+  lastQueueStatusPoll: number;
+  lastProcessedIdx: number;
   claimProcessing: boolean;
   pendingTime: number;
   claimError: string;
@@ -51,6 +54,9 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     this.state = {
       refreshIndex: 0,
       claimStatus: PoWClaimStatus.PREPARE,
+      queueIndex: 0,
+      lastQueueStatusPoll: 0,
+      lastProcessedIdx: 0,
       claimProcessing: false,
       pendingTime: 0,
       claimError: null,
@@ -92,21 +98,31 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
   private onClaimStatusChange(res: any) {
     if(res.session !== this.props.reward.session)
       return;
+    let finalState = false;
 
     if(res.error) {
       this.setState({
         claimStatus: PoWClaimStatus.FAILED,
         txError: res.error,
       });
+      finalState = true;
     }
-    else {
+    else if(res.status === "confirmed") {
       this.setState({
         claimStatus: PoWClaimStatus.CONFIRMED,
         txHash: res.txHash,
         txBlock: res.txBlock,
       });
+      finalState = true;
     }
-    if(this.claimConnKeeper) {
+    else if(res.status === "pending") {
+      this.setState({
+        claimStatus: PoWClaimStatus.PENDING,
+        txHash: res.txHash,
+      });
+    }
+
+    if(finalState && this.claimConnKeeper) {
       this.claimConnKeeper.close();
       this.claimConnKeeper = null;
     }
@@ -117,7 +133,11 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       return;
     this.props.powClient.sendRequest("watchClaimTx", {
       sessionId: this.props.reward.session
-    }).catch((err) => {
+    }).then((res) => {
+      this.setState({
+        queueIndex: res.queueIdx,
+      });
+    },(err) => {
       this.setState({
         claimStatus: PoWClaimStatus.FAILED,
         txError: "[" + err.code + "] " + err.message,
@@ -149,6 +169,13 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       return;
     }
 
+    if(this.state.claimStatus === PoWClaimStatus.PENDING && exactNow - this.state.lastQueueStatusPoll > 30 * 1000) {
+      this.setState({
+        lastQueueStatusPoll: exactNow,
+      });
+      this.pollQueueStatus();
+    }
+
     let timeLeft = (1000 - (exactNow % 1000)) + 2;
     this.updateTimer = setTimeout(() => {
       this.updateTimer = null;
@@ -157,6 +184,14 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       });
       this.setUpdateTimer();
     }, timeLeft);
+  }
+
+  private pollQueueStatus() {
+    this.props.powClient.sendRequest("getClaimQueueState").then((res) => {
+      this.setState({
+        lastProcessedIdx: res.lastIdx,
+      });
+    });
   }
 
 	public render(): React.ReactElement<IPoWClaimDialogProps> {
@@ -207,6 +242,8 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 <PoWFaucetCaptcha 
                   faucetConfig={this.props.faucetConfig} 
                   ref={(cap) => this.captchaControl = cap} 
+                  variant='claim'
+                  target={this.props.reward.target}
                 />
               </div>
             </div>
@@ -220,13 +257,47 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 {this.state.pendingTime > 0 && (now - this.state.pendingTime) > 60 ? 
                   <span className="spinner-text"><br />This seems to take longer than usual... <br />You can close this page now. Your claim is queued and will be processed as soon as possible.</span> : 
                   null}
+                {this.state.pendingTime > 0 && (now - this.state.pendingTime) > 60 ? 
+                  <div className="queue-info container">
+                    <div className='row'>
+                      <div className='col-3'>
+                        Status:
+                      </div>
+                      <div className='col'>
+                        {(this.state.txHash || this.state.queueIndex <= this.state.lastProcessedIdx) ? 
+                          "Sending" + (this.state.txHash ? " (TX: " + this.state.txHash + ")" : "") :
+                          "Queued"
+                        }
+                      </div>
+                    </div>
+                    <div className='row'>
+                      <div className='col-3'>
+                        Queue Position:
+                      </div>
+                      <div className='col'>
+                        <OverlayTrigger
+                          placement="auto"
+                          overlay={
+                            <Tooltip>
+                              {(this.state.queueIndex - this.state.lastProcessedIdx - 1)} claims will be processed before yours.
+                            </Tooltip>
+                          }
+                        >
+                          <span>
+                            #{(this.state.txHash || this.state.queueIndex <= this.state.lastProcessedIdx) ? "0" : this.state.queueIndex - this.state.lastProcessedIdx}
+                          </span>
+                        </OverlayTrigger>
+                      </div>
+                    </div>
+                  </div> : 
+                  null}
               </div>
              : null}
              {this.state.claimStatus == PoWClaimStatus.CONFIRMED ?
               <div className='alert alert-success'>
                 Claim Transaction has been confirmed in block #{this.state.txBlock}!<br />
                 TX: {this.props.faucetConfig.ethTxExplorerLink ? 
-                <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank'>{this.state.txHash}</a> :
+                <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.txHash)} target='_blank' rel='noopener noreferrer'>{this.state.txHash}</a> :
                 <span>{this.state.txHash}</span>}
                 {this.renderResultSharing()}
               </div>
@@ -260,7 +331,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       let tweetUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(tweetMsg);
       shareEls.push(
         <span className='sh-link sh-tw'>
-          <a href='#' target='_blank' data-url={tweetUrl} onClick={function(evt) {
+          <a href='#' target='_blank' data-url={tweetUrl} rel='noopener noreferrer' onClick={function(evt) {
             let a = document.createElement('a');
             a.target = '_blank';
             a.href = tweetUrl;
@@ -277,7 +348,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
       let tweetUrl = "/share?text=" + encodeURIComponent(tweetMsg);
       shareEls.push(
         <span className='sh-link sh-md'>
-          <a href={'https://mastodon.social' + tweetUrl} target='_blank' data-url={tweetUrl} onClick={function(evt) {
+          <a href={'https://mastodon.social' + tweetUrl} target='_blank' data-url={tweetUrl} rel='noopener noreferrer' onClick={function(evt) {
 
             var mastodonUrl = evt.currentTarget.getAttribute("data-instance");
             if(!mastodonUrl)
@@ -317,7 +388,8 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     message = message.replace(/{target}/ig, this.props.reward.target);
 
     message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000).toString());
-    message = message.replace(/{url}/ig, location.href);
+    let safeUrl = location.protocol + "//" + location.hostname + location.pathname;
+    message = message.replace(/{url}/ig, safeUrl);
 
     let duration = (this.props.reward.tokenTime || (new Date()).getTime() / 1000) - this.props.reward.startTime;
     message = message.replace(/{duration}/ig, renderTimespan(duration));
@@ -351,10 +423,11 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
         captcha: capToken,
         token: this.props.reward.token
       });
-    }).then(() => {
+    }).then((res) => {
       this.props.powSession.storeClaimInfo(null);
       this.setState({
         claimStatus: PoWClaimStatus.PENDING,
+        queueIndex: res.queueIdx,
         pendingTime: this.props.powTime.getSyncedTime(),
       });
     }, (err) => {

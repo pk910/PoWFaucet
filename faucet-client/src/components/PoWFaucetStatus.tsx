@@ -7,6 +7,7 @@ import { renderDate, renderTime, renderTimespan } from '../utils/DateUtils';
 import getCountryIcon from 'country-flag-icons/unicode'
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { PoWApi } from 'common/PoWApi';
+import { IPoWQueueStatusClaim } from './PoWQueueStatus';
 
 export interface IPoWFaucetStatusProps {
   powApi: PoWApi;
@@ -17,20 +18,23 @@ export interface IPoWFaucetStatusState {
   refreshing: boolean;
   status: IPoWFaucetGeneralStatus;
   refillStatus: IPoWFaucetRefillStatus;
+  outflowStatus: IPoWFaucetOutflowStatus;
   activeSessions: IPoWFaucetStatusSession[];
-  activeClaims: IPoWFaucetStatusClaim[];
+  activeClaims: IPoWQueueStatusClaim[];
 }
 
 export interface IPoWFaucetStatus {
   status: IPoWFaucetGeneralStatus;
   refill: IPoWFaucetRefillStatus;
+  outflowRestriction: IPoWFaucetOutflowStatus;
   sessions: IPoWFaucetStatusSession[];
-  claims: IPoWFaucetStatusClaim[];
+  claims: IPoWQueueStatusClaim[];
 }
 
 export interface IPoWFaucetGeneralStatus {
   walletBalance: number;
   unclaimedBalance: number;
+  queuedBalance: number;
   balanceRestriction: number;
 }
 
@@ -39,6 +43,16 @@ export interface IPoWFaucetRefillStatus {
   trigger: number;
   amount: number;
   cooldown: number;
+}
+
+export interface IPoWFaucetOutflowStatus {
+  now: number;
+  trackTime: number;
+  dustAmount: number;
+  restriction: number;
+  duration: number;
+  restrict: number;
+  amount: number;
 }
 
 export interface IPoWFaucetStatusSession {
@@ -86,16 +100,6 @@ export interface IPoWFaucetRestrictionStatus {
   blocked: false|"close"|"kill";
 }
 
-export interface IPoWFaucetStatusClaim {
-  time: number;
-  session: string;
-  target: string;
-  amount: number;
-  status: string;
-  error: string;
-  nonce: number | null;
-}
-
 export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, IPoWFaucetStatusState> {
 
   constructor(props: IPoWFaucetStatusProps, state: IPoWFaucetStatusState) {
@@ -105,6 +109,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
       refreshing: false,
       status: null,
       refillStatus: null,
+      outflowStatus: null,
       activeSessions: [],
       activeClaims: [],
 		};
@@ -142,6 +147,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         refreshing: false,
         status: faucetStatus.status,
         refillStatus: faucetStatus.refill,
+        outflowStatus: faucetStatus.outflowRestriction,
         activeSessions: activeSessions,
         activeClaims: activeClaims,
       });
@@ -230,11 +236,37 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
                 <span className="status-value">{Math.round(weiToEth(this.state.status.unclaimedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
               </div>
               <div className="status-prop">
+                <span className="status-title">TX-Queue Balance:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.status.queuedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
                 <span className="status-title">Reward Restriction:</span>
                 <span className="status-value">{Math.round(this.state.status.balanceRestriction * 1000) / 1000} %</span>
               </div>
             </div>
           </div>
+          {this.state.outflowStatus ?
+          <div className="col-xl-3 col-lg-4 col-6">
+            <div className="status-block">
+              <div className="status-prop">
+                <span className="status-title">Outflow TrackTime:</span>
+                <span className="status-value">{this.state.outflowStatus.now - this.state.outflowStatus.trackTime} / {this.state.outflowStatus.restrict}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Outflow Limit:</span>
+                <span className="status-value">{Math.round(weiToEth(this.state.outflowStatus.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol} / {renderTimespan(this.state.outflowStatus.duration, 2)}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Outflow Balance:</span>
+                <span className="status-value">{Math.round(weiToEth((this.state.outflowStatus.amount / this.state.outflowStatus.duration * (this.state.outflowStatus.now - this.state.outflowStatus.trackTime)) + parseInt(this.state.outflowStatus.dustAmount.toString())) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Outflow Restriction:</span>
+                <span className="status-value">{Math.round(this.state.outflowStatus.restriction * 1000) / 1000} %</span>
+              </div>
+            </div>
+          </div>
+          : null}
           {this.state.refillStatus ?
           <div className="col-xl-3 col-lg-4 col-6">
             <div className="status-block">
@@ -454,6 +486,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <th scope="col">To Address</th>
             <th scope="col">Amount</th>
             <th scope="col">Nonce</th>
+            <th scope="col">TX Hash</th>
             <th scope="col">Status</th>
           </tr>
         </thead>
@@ -461,7 +494,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           {this.state.activeClaims.length > 0 ?
             this.state.activeClaims.map((claim) => this.renderActiveClaimRow(claim)) :
             <tr key="none">
-              <th scope="row" colSpan={6}>No active claims</th>
+              <th scope="row" colSpan={7}>No active claims</th>
             </tr>
           }
         </tbody>
@@ -469,7 +502,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
     );
   }
 
-  private renderActiveClaimRow(claim: IPoWFaucetStatusClaim): React.ReactElement {
+  private renderActiveClaimRow(claim: IPoWQueueStatusClaim): React.ReactElement {
     let claimStatus: React.ReactElement = null;
     switch(claim.status) {
       case "queue":
@@ -501,12 +534,13 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{claim.target}</td>
         <td>{Math.round(weiToEth(claim.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
         <td>{claim.nonce || ""}</td>
+        <td>{claim.hash || ""}</td>
         <td>{claimStatus}</td>
       </tr>
     );
   }
 
-  private renderClaimFailInfo(claim: IPoWFaucetStatusClaim, props: any): React.ReactElement {
+  private renderClaimFailInfo(claim: IPoWQueueStatusClaim, props: any): React.ReactElement {
     if(!claim.error)
       return null;
     
