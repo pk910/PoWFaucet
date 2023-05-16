@@ -42,7 +42,7 @@ export class FaucetStoreDB {
   private upgradeSchema() {
     let schemaVersion: number = 0;
     this.db.prepare("CREATE TABLE IF NOT EXISTS SchemaVersion (SchemaVersion	INTEGER)").run();
-    let res = this.db.prepare("SELECT SchemaVersion FROM SchemaVersion").get();
+    let res = this.db.prepare("SELECT SchemaVersion FROM SchemaVersion").get() as {SchemaVersion: number};
     console.log("Schema Version: ", res);
     if(res)
       schemaVersion = res.SchemaVersion;
@@ -115,21 +115,21 @@ export class FaucetStoreDB {
 
   public getSessionMarks(sessionId: string, skipMarks?: SessionMark[]): SessionMark[] {
     let row = this.db.prepare("SELECT Marks FROM SessionMarks WHERE SessionId = ? AND Timeout > ?")
-      .get(sessionId.toLowerCase(), this.now());
+      .get(sessionId.toLowerCase(), this.now()) as {Marks: string};
     if(!row)
       return [];
     
-    return row.Marks.split(",").filter((mark) => !skipMarks || skipMarks.indexOf(mark) === -1);
+    return row.Marks.split(",").filter((mark) => !skipMarks || skipMarks.indexOf(mark as SessionMark) === -1) as SessionMark[];
   }
 
   public setSessionMark(sessionId: string, mark: SessionMark | SessionMark[], duration?: number) {
     let now = this.now();
     let row = this.db.prepare("SELECT Marks, Timeout FROM SessionMarks WHERE SessionId = ?")
-      .get(sessionId.toLowerCase());
+      .get(sessionId.toLowerCase()) as {Marks: string, Timeout: number};
     
     let marks: SessionMark[];
     if(row && row.Timeout > now)
-      marks = row.Marks.split(",");
+      marks = row.Marks.split(",") as SessionMark[];
     else
       marks = [];
     
@@ -158,21 +158,21 @@ export class FaucetStoreDB {
 
   public getAddressMarks(address: string, skipMarks?: AddressMark[]): AddressMark[] {
     let row = this.db.prepare("SELECT Marks FROM AddressMarks WHERE Address = ? AND Timeout > ?")
-      .get(address.toLowerCase(), this.now());
+      .get(address.toLowerCase(), this.now()) as {Marks: string};
     if(!row)
       return [];
     
-    return row.Marks.split(",").filter((mark) => !skipMarks || skipMarks.indexOf(mark) === -1);
+    return row.Marks.split(",").filter((mark) => !skipMarks || skipMarks.indexOf(mark as AddressMark) === -1) as AddressMark[];
   }
 
   public setAddressMark(address: string, mark: AddressMark | AddressMark[], duration?: number) {
     let now = this.now();
     let row = this.db.prepare("SELECT Marks, Timeout FROM AddressMarks WHERE Address = ?")
-      .get(address.toLowerCase());
+      .get(address.toLowerCase()) as {Marks: string, Timeout: number};
     
     let marks: AddressMark[];
     if(row && row.Timeout > now)
-      marks = row.Marks.split(",");
+      marks = row.Marks.split(",") as AddressMark[];
     else
       marks = [];
     
@@ -201,7 +201,7 @@ export class FaucetStoreDB {
 
   public getIPInfo(ip: string): IIPInfo {
     let row = this.db.prepare("SELECT Json FROM IPInfoCache WHERE IP = ? AND Timeout > ?")
-      .get(ip.toLowerCase(), this.now());
+      .get(ip.toLowerCase(), this.now()) as {Json: string};
     if(!row)
       return null;
     
@@ -228,7 +228,7 @@ export class FaucetStoreDB {
 
   public getPassportInfo(addr: string): IPassportInfo {
     let row = this.db.prepare("SELECT Json FROM PassportCache WHERE Address = ? AND Timeout > ?")
-      .get(addr.toLowerCase(), this.now());
+      .get(addr.toLowerCase(), this.now()) as {Json: string};
     if(!row)
       return null;
     
@@ -256,7 +256,7 @@ export class FaucetStoreDB {
   public getClaimTxQueue(maxtime?: number): IQueuedClaimTx[] {
     return this.db.prepare("SELECT ClaimJson FROM ClaimTxQueue WHERE Time < ? ORDER BY Time ASC")
       .all((typeof maxtime === "number" ? maxtime : this.now() + 86400))
-      .map((row) => {
+      .map((row: {ClaimJson: string}) => {
         return JSON.parse(row.ClaimJson);
       });
   }
@@ -272,7 +272,8 @@ export class FaucetStoreDB {
   }
 
   public getKeyValueEntry(key: string): string {
-    let row = this.db.prepare("SELECT Value FROM KeyValueStore WHERE Key = ?").get(key);
+    let row = this.db.prepare("SELECT Value FROM KeyValueStore WHERE Key = ?")
+      .get(key) as {Value: string};
     return row?.Value;
   }
 
