@@ -172,10 +172,10 @@ const base32768WASM = "Ԑ茻䙠Ҡҫ⫽晤ꜟޟ繠癏陦ҫꊥꗀᓿ星暿鉠幗�
 const wasmBinary = base32768.decode(base32768WASM);
 
 scryptPromise = WebAssembly.instantiate(wasmBinary, {}).then(instantiatedModule => {
-  const wasm = instantiatedModule.instance.exports;
+  __wbg_set_wasm(instantiatedModule.instance.exports);
 
   let wasm;
-  export function __wbg_set_wasm(val) {
+  function __wbg_set_wasm(val) {
       wasm = val;
   }
   

@@ -16,6 +16,9 @@ lines = lines.map(line => {
   if(line.startsWith("export function scrypt")) {
     return line.replace("export function scrypt", "scrypt = function");
   }
+  else if(line.startsWith("export function")) {
+    return line.replace("export function", "function");
+  }
   return line;
 });
 const customWASMWrappperJS = lines.join("\n");
@@ -51,7 +54,7 @@ const base32768WASM = "${base32768WASM}";
 const wasmBinary = base32768.decode(base32768WASM);
 
 scryptPromise = WebAssembly.instantiate(wasmBinary, {}).then(instantiatedModule => {
-  const wasm = instantiatedModule.instance.exports;
+  __wbg_set_wasm(instantiatedModule.instance.exports);
 `);
 
 // Output the WASM wrapper JS code that came from the Rust WASM compiler, 
