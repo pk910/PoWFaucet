@@ -392,6 +392,7 @@ passportBoost:
     "FacebookProfilePicture": 1
     "Brightid": 10
     "Github": 1
+    "Coinbase": 1
     "FiveOrMoreGithubRepos": 1
     "TenOrMoreGithubFollowers": 2
     "FiftyOrMoreGithubFollowers": 4
