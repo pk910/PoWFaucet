@@ -4,10 +4,9 @@ import * as path from 'path';
 import { faucetConfig } from '../common/FaucetConfig';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
 import { ServiceManager } from '../common/ServiceManager';
-import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWClient } from '../websock/PoWClient';
 import { PoWSession, PoWSessionStatus } from '../websock/PoWSession';
-import { ClaimTx } from './EthWeb3Manager';
+import { ClaimTx, EthWeb3Manager } from './EthWeb3Manager';
 
 export class FaucetStatsLog {
   public statShareCount: number = 0;
@@ -100,11 +99,12 @@ export class FaucetStatsLog {
     hashRate = Math.round(hashRate);
 
     let statsLog = [];
+    let ethWeb3Manager = ServiceManager.GetService(EthWeb3Manager);
     statsLog.push("clients: " + PoWClient.getClientCount());
     statsLog.push("sessions: " + sessions.length + " (" + hashRate + " H/s, " + idleSessCount + " idle)");
-    statsLog.push("shares: " + this.statShareCount + " (" + (Math.round(weiToEth(this.statShareRewards)*1000)/1000) + " ETH)");
-    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + (Math.round(weiToEth(this.statVerifyReward)*1000)/1000) + " ETH, missed: " + this.statVerifyMisses + " / -" + (Math.round(weiToEth(this.statVerifyPenalty)*1000)/1000) + " ETH)");
-    statsLog.push("claims: " + this.statClaimCount + " (" + (Math.round(weiToEth(this.statClaimRewards)*1000)/1000) + " ETH)");
+    statsLog.push("shares: " + this.statShareCount + " (" + ethWeb3Manager.readableAmount(this.statShareRewards) + ")");
+    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + ethWeb3Manager.readableAmount(this.statVerifyReward) + ", missed: " + this.statVerifyMisses + " / -" + ethWeb3Manager.readableAmount(this.statVerifyPenalty) + ")");
+    statsLog.push("claims: " + this.statClaimCount + " (" + ethWeb3Manager.readableAmount(this.statClaimRewards) + ")");
     ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "# STATS # " + statsLog.join(", "));
 
     this.addStatsEntry("STATS", {

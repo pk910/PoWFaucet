@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import YAML from 'yaml'
 import randomBytes from 'randombytes'
+import { FaucetCoinType } from '../services/EthWeb3Manager';
 
 export interface IFaucetConfig {
   appBasePath: string; // base path (set automatically)
@@ -18,6 +19,8 @@ export interface IFaucetConfig {
   faucetImage: string; // faucet image displayed on the startpage
   faucetHomeHtml: string; // some additional html to show on the startpage
   faucetCoinSymbol: string; // symbol (short name) of the coin that can be mined
+  faucetCoinType: FaucetCoinType; // coin type (native / erc20)
+  faucetCoinContract: string; // erc20 coin contract (for erc20 coins)
   faucetLogFile: string; // logfile for faucet events / null for no log
   faucetLogStatsInterval: number; // print faucet stats to log interval (10min default)
   serverPort: number; // listener port
@@ -62,8 +65,8 @@ export interface IFaucetConfig {
   verifyMinerMaxPending: number; // max number of pending verifications per miner before not sending any more verification requests
   verifyMinerMaxMissed: number; // max number of missed verifications before not sending any more verification requests
   verifyMinerTimeout: number; // timeout for verification requests (client gets penalized if not responding within this timespan)
-  verifyMinerReward: number; // reward for responding to a verification request in time
-  verifyMinerMissPenalty: number; // penalty for not responding to a verification request (shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so)
+  verifyMinerRewardPerc: number; // percent of powShareReward as reward for responding to a verification request in time
+  verifyMinerMissPenaltyPerc: number; // percent of powShareReward as penalty for not responding to a verification request (shouldn't be too high as this can happen regularily in case of connection loss or so)
 
   captchas: IFaucetCaptchaConfig | null; // captcha related settings or null to disable all captchas
   concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
@@ -231,6 +234,8 @@ let defaultConfig: IFaucetConfig = {
   faucetImage: "/images/fauceth_420.jpg",
   faucetHomeHtml: "",
   faucetCoinSymbol: "ETH",
+  faucetCoinType: FaucetCoinType.NATIVE,
+  faucetCoinContract: null,
   faucetLogFile: null,
   faucetLogStatsInterval: 600,
   serverPort: 8080,
@@ -263,8 +268,8 @@ let defaultConfig: IFaucetConfig = {
   verifyMinerMaxPending: 10,
   verifyMinerMaxMissed: 10,
   verifyMinerTimeout: 15,
-  verifyMinerReward: 0,
-  verifyMinerMissPenalty: 10000000000000000,
+  verifyMinerRewardPerc: 0,
+  verifyMinerMissPenaltyPerc: 30,
   captchas: null,
   concurrentSessions: 0,
   ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839",
@@ -333,6 +338,10 @@ export function loadFaucetConfig() {
     config.captchas = (config as any).hcaptcha;
   if(config.powScryptParams && typeof config.powScryptParams.parallelization !== "number")
     config.powScryptParams.parallelization = (config.powScryptParams as any).paralellization || 1;
+  if(!config.verifyMinerRewardPerc && (config as any).verifyMinerReward)
+    config.verifyMinerRewardPerc = Math.floor((config as any).verifyMinerReward * 10000 / config.powShareReward) / 100;
+  if(!config.verifyMinerMissPenaltyPerc && (config as any).verifyMinerMissPenalty)
+    config.verifyMinerMissPenaltyPerc = Math.floor((config as any).verifyMinerMissPenalty * 10000 / config.powShareReward) / 100;
 
   if(!faucetConfig)
     faucetConfig = {} as any;

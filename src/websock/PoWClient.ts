@@ -9,7 +9,6 @@ import { ClaimTx, ClaimTxEvents, EthWeb3Manager } from '../services/EthWeb3Manag
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWShareVerification } from './PoWShareVerification';
 import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
-import { weiToEth } from '../utils/ConvertHelpers';
 import { FaucetStatus, IFaucetStatus } from '../services/FaucetStatus';
 import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
 import { FaucetStatsLog } from '../services/FaucetStatsLog';
@@ -308,7 +307,7 @@ export class PoWClient {
         return this.sendErrorResponse("BALANCE_ERROR", "Could not get balance of Wallet " + targetAddr + ": " + ex.toString(), message);
       }
       if(walletBalance > faucetConfig.claimAddrMaxBalance)
-        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + (Math.round(weiToEth(walletBalance)*1000)/1000) + " " + faucetConfig.faucetCoinSymbol + " in your wallet. Please give others a chance to get some funds too.", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + ServiceManager.GetService(EthWeb3Manager).readableAmount(walletBalance) + " in your wallet. Please give others a chance to get some funds too.", message, PoWStatusLogLevel.INFO);
     }
 
     if(faucetConfig.claimAddrDenyContract) {

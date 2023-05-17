@@ -21,9 +21,6 @@ faucetTitle: "Goerli PoW Faucet"
 # url to image displayed on the startpage
 faucetImage: "/images/fauceth_420.jpg"
 
-# symbol (short name) of the coin that can be mined
-faucetCoinSymbol: "GöETH"
-
 # some additional html to show on the startpage
 faucetHomeHtml: |
   <div class='pow-info'>
@@ -58,6 +55,17 @@ ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
 
 # EVM chain id
 ethChainId: 5
+
+# symbol (short name) of the coin that can be mined
+faucetCoinSymbol: "GöETH"
+
+# type of coin that can be mined
+# native = native coin (ETH)
+# erc20 = ERC20 token
+faucetCoinType: "native"
+
+# coin contract address (only for faucetCoinType = erc20)
+#faucetCoinContract: "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6" # WETH9 on goerli
 
 # transaction gas limit
 # use 21000 to prevent transactions to contracts
@@ -101,15 +109,14 @@ claimMinAmount:   25000000000000000  # 0.025 ETH
 #claimMaxAmount: 17000000000000000000  # 17 ETH
 claimMaxAmount:   6010000000000000000  # 6.01 ETH
 
-# penalty for not responding to a verification request (in wei)
-# shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so
-#verifyMinerMissPenalty: 5000000000000000  # 0.005 ETH
-verifyMinerMissPenalty: 1250000000000000  # 0.00125 ETH
+# penalty for not responding to a verification request (percent of powShareReward)
+# shouldn't be too high as this can happen regularily in case of connection loss or so
+verifyMinerMissPenaltyPerc: 10  # 10% of powShareReward
 
-# reward for responding to a verification request in time (in wei)
-# some extra reward for slow miners - should be much lower than powShareReward
+# reward for responding to a verification request in time (percent of powShareReward)
+# some extra reward for slow miners
 # comment out to disable rewards for verification requests
-verifyMinerReward:   300000000000000  # 0.0003 ETH  (~1/6th of powShareReward)
+verifyMinerRewardPerc:   15  # 15% of powShareReward
 
 # maximum mining session time (in seconds)
 powSessionTimeout: 18000   # 5h

@@ -5,7 +5,6 @@ import { FaucetStoreDB, SessionMark } from "../services/FaucetStoreDB";
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from "../common/ServiceManager";
 import { FaucetStore } from "../services/FaucetStore";
-import { weiToEth } from "../utils/ConvertHelpers";
 import { getNewGuid } from "../utils/GuidUtils";
 import { PoWClient } from "./PoWClient";
 import { renderDate } from "../utils/DateUtils";
@@ -15,6 +14,7 @@ import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
 import { IPassportInfo, PassportVerifier } from "../services/PassportVerifier";
 import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 import { PoWOutflowLimiter } from "../services/PoWOutflowLimiter";
+import { EthWeb3Manager } from "../services/EthWeb3Manager";
 
 
 export enum PoWSessionSlashReason {
@@ -77,11 +77,12 @@ export class PoWSession {
   }
 
   public static getVerifierSessions(ignoreId?: string): PoWSession[] {
+    let minBalance = BigInt(faucetConfig.powShareReward) * BigInt(faucetConfig.verifyMinerMissPenaltyPerc * 100) / 10000n;
     return Object.values(this.activeSessions).filter((session) => {
       return (
         !!session.activeClient && 
         session.sessionId !== ignoreId && 
-        session.balance > faucetConfig.verifyMinerMissPenalty &&
+        session.balance > minBalance &&
         session.missedVerifications < faucetConfig.verifyMinerMaxMissed &&
         session.pendingVerifications < faucetConfig.verifyMinerMaxPending
       );
@@ -192,7 +193,7 @@ export class PoWSession {
       PoWStatusLogLevel.INFO, 
       "Created new session: " + this.sessionId + 
       (typeof target === "object" ? 
-        " [Recovered: " + (Math.round(weiToEth(this.balance)*1000)/1000) + " ETH, start: " + renderDate(this.startTime, true) + "]" :
+        " [Recovered: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance) + ", start: " + renderDate(this.startTime, true) + "]" :
         ""
       ) +
       " (Remote IP: " + client.getRemoteIP() + ")"
@@ -230,7 +231,11 @@ export class PoWSession {
     
     this.setSessionStatus(PoWSessionStatus.CLOSED);
     delete PoWSession.activeSessions[this.sessionId];
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Closed session: " + this.sessionId + (this.claimable ? " (claimable reward: " + (Math.round(weiToEth(this.balance)*1000)/1000) + ")" : ""));
+    ServiceManager.GetService(PoWStatusLog).emitLog(
+      PoWStatusLogLevel.INFO, 
+      "Closed session: " + this.sessionId + 
+      (this.claimable ? " (claimable reward: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance)+ ")" : "")
+    );
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
 
     this.resetSessionTimer();
@@ -489,7 +494,7 @@ export class PoWSession {
   public slashBadSession(reason: PoWSessionSlashReason) {
     switch(reason) {
       case PoWSessionSlashReason.MISSED_VERIFICATION:
-        this.applyBalancePenalty(faucetConfig.verifyMinerMissPenalty);
+        this.applyBalancePenalty(BigInt(faucetConfig.powShareReward) * BigInt(faucetConfig.verifyMinerMissPenaltyPerc * 100) / 10000n);
         break;
       case PoWSessionSlashReason.INVALID_SHARE:
       case PoWSessionSlashReason.INVALID_VERIFICATION:
@@ -515,7 +520,7 @@ export class PoWSession {
     }
 
     ServiceManager.GetService(FaucetStatsLog).statVerifyPenalty += BigInt(penalty);
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + (Math.round(weiToEth(penalty)*1000)/1000) + "ETH)");
+    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + ServiceManager.GetService(EthWeb3Manager).readableAmount(BigInt(penalty)) + ")");
   }
 
   private applyKillPenalty(reason: PoWSessionSlashReason) {

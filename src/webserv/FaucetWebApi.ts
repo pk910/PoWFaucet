@@ -24,6 +24,9 @@ export interface IClientFaucetConfig {
   faucetImage: string;
   faucetHtml: string;
   faucetCoinSymbol: string;
+  faucetCoinType: string;
+  faucetCoinContract: string;
+  faucetCoinDecimals: number;
   hcapProvider: string;
   hcapSiteKey: string;
   hcapSession: boolean;
@@ -161,9 +164,10 @@ export class FaucetWebApi {
 
   public getFaucetConfig(client?: PoWClient, clientVersion?: string): IClientFaucetConfig {
     let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(client?.getClientVersion() || clientVersion, client?.getSession());
+    let ethWeb3Manager = ServiceManager.GetService(EthWeb3Manager);
     let faucetHtml = faucetConfig.faucetHomeHtml || "";
     faucetHtml = faucetHtml.replace(/{faucetWallet}/, () => {
-      return ServiceManager.GetService(EthWeb3Manager).getFaucetAddress();
+      return ethWeb3Manager.getFaucetAddress();
     });
     return {
       faucetTitle: faucetConfig.faucetTitle,
@@ -172,6 +176,9 @@ export class FaucetWebApi {
       faucetImage: faucetConfig.faucetImage,
       faucetHtml: faucetHtml,
       faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
+      faucetCoinType: faucetConfig.faucetCoinType,
+      faucetCoinContract: faucetConfig.faucetCoinContract,
+      faucetCoinDecimals: ethWeb3Manager.getFaucetDecimals(),
       hcapProvider: faucetConfig.captchas ? faucetConfig.captchas.provider : null,
       hcapSiteKey: faucetConfig.captchas ? faucetConfig.captchas.siteKey : null,
       hcapSession: faucetConfig.captchas && faucetConfig.captchas.checkSessionStart,

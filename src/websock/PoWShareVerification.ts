@@ -151,7 +151,7 @@ export class PoWShareVerification {
 
     delete PoWShareVerification.verifyingShares[this.shareId];
 
-    if(this.verifyMinerSessions.length > 0 && faucetConfig.verifyMinerMissPenalty > 0) {
+    if(this.verifyMinerSessions.length > 0) {
       // penalty for missed verification requests
       this.verifyMinerSessions.forEach((verifierId) => {
         let session = PoWSession.getSession(verifierId);
