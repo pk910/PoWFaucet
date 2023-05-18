@@ -1,12 +1,39 @@
 import fs from 'fs';
 import path from 'path';
 
-import { PassportVerifier as PassportVerifierSDK } from "@gitcoinco/passport-sdk-verifier";
-import { Passport } from '@gitcoinco/passport-sdk-types';
 import { faucetConfig } from '../common/FaucetConfig';
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from '../common/ServiceManager';
 import { FaucetStoreDB } from './FaucetStoreDB';
+
+type DIDKitLib = {
+  verifyCredential: (vc: string, proofOptions: string) => Promise<string>;
+  issueCredential: (credential: string, proofOptions: string, key: string) => Promise<string>;
+  keyToDID: (method_pattern: string, jwk: string) => string;
+  keyToVerificationMethod: (method_pattern: string, jwk: string) => Promise<string>;
+} & { [key: string]: any };
+
+export interface IPassport {
+  issuanceDate: string;
+  expiryDate: string;
+  stamps: {
+    provider: string;
+    credential: IPassportCredential;
+  }[];
+}
+
+export interface IPassportCredential {
+  type: string[],
+  proof: object,
+  issuer: string;
+  issuanceDate: string;
+  expirationDate: string;
+  credentialSubject: {
+    id: string;
+    hash: string;
+    provider: string;
+  };
+}
 
 export interface IPassportInfo {
   found: boolean;
@@ -33,15 +60,12 @@ export interface IPassportVerification {
 }
 
 export class PassportVerifier {
-  private readyPromise: Promise<void>;
-  private passportVerifier: PassportVerifierSDK;
+  private didkitPromise: Promise<DIDKitLib>;
   private passportCache: {[ip: string]: Promise<IPassportInfo>} = {};
   private passportScoreNonce = 1;
 
   public constructor() {
-    this.passportVerifier = new PassportVerifierSDK();
-    this.readyPromise = this.passportVerifier.init();
-    
+    this.didkitPromise = import("@spruceid/didkit-wasm");
     ServiceManager.GetService(PoWStatusLog).addListener("reload", () => {
       this.passportScoreNonce++; // refresh cached scores on config reload
     });
@@ -95,7 +119,7 @@ export class PassportVerifier {
 
     let passportInfo: IPassportInfo = null;
     try {
-      let passport = await this.passportVerifier.verifyPassport(addr);
+      let passport = await this.loadPassport(addr);
       if(passport) {
         passportInfo = this.parsePassportInfo(passport);
 
@@ -119,6 +143,25 @@ export class PassportVerifier {
     };
   }
 
+  private async loadPassport(addr: string): Promise<IPassport> {
+    let passportRsp = await fetch("https://api.scorer.gitcoin.co/registry/stamps/" + addr, {
+      method: 'GET',
+      headers: {'X-API-KEY': faucetConfig.passportBoost.scorerApiKey}
+    }).then((rsp) => rsp.json());
+
+    return {
+      issuanceDate: null,
+      expiryDate: null,
+      stamps: passportRsp.items.map((item) => {
+
+        return {
+          provider: item.credential.credentialSubject.provider,
+          credential: item.credential,
+        };
+      }),
+    };
+  }
+
   private getPassportCacheFile(addr: string): string {
     if(!faucetConfig.passportBoost || !faucetConfig.passportBoost.passportCachePath)
       return null;
@@ -132,7 +175,7 @@ export class PassportVerifier {
     return cacheFile;
   }
 
-  private parsePassportInfo(passport: Passport): IPassportInfo {
+  private parsePassportInfo(passport: IPassport): IPassportInfo {
     let now = Math.floor((new Date()).getTime() / 1000);
     let newestStamp = 0;
     let stamps = passport.stamps.map((stamp) => {
@@ -161,17 +204,16 @@ export class PassportVerifier {
     if(!faucetConfig.passportBoost.trustedIssuers || faucetConfig.passportBoost.trustedIssuers.length == 0)
       return {valid: false, errors: ["Manual passport verification disabled"]};
     
-    await this.readyPromise;
+    let DIDKit = await this.didkitPromise;
 
     let verifyResult: IPassportVerification = {
       valid: null,
       errors: [],
       newest: 0,
     }
-    let DIDKit = this.passportVerifier._DIDKit;
     let providerMap = {};
     
-    let passport: Passport;
+    let passport: IPassport;
     try {
       passport = JSON.parse(passportJson);
     } catch(ex) {
@@ -225,7 +267,7 @@ export class PassportVerifier {
       
       // verify cryptographic stamp integrity
       let verifyResJson = await DIDKit.verifyCredential(JSON.stringify(stamp.credential), JSON.stringify({
-        proofPurpose: stamp.credential.proof.proofPurpose
+        proofPurpose: (stamp.credential.proof as any).proofPurpose
       }));
       let verifyRes = JSON.parse(verifyResJson);
       if(!verifyRes.checks || verifyRes.checks.indexOf("proof") === -1) {
@@ -264,8 +306,8 @@ export class PassportVerifier {
     return verifyResult;
   }
 
-  private savePassportToCache(passport: Passport, cacheFile: string) {
-    let trimmedPassport: Passport = {
+  private savePassportToCache(passport: IPassport, cacheFile: string) {
+    let trimmedPassport: IPassport = {
       issuanceDate: passport.issuanceDate,
       expiryDate: passport.expiryDate,
       stamps: passport.stamps.map((stamp) => {

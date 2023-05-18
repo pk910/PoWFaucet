@@ -9,6 +9,7 @@ import { PoWValidator } from "./validator/PoWValidator";
 import { FaucetStatsLog } from "./services/FaucetStatsLog";
 import { FaucetWebApi } from "./webserv/FaucetWebApi";
 import { PoWSession } from "./websock/PoWSession";
+import { PassportVerifier } from "./services/PassportVerifier";
 
 (() => {
 
@@ -21,6 +22,7 @@ import { PoWSession } from "./websock/PoWSession";
   ServiceManager.InitService(FaucetStatsLog);
   ServiceManager.InitService(FaucetWebApi);
   ServiceManager.InitService(FaucetHttpServer);
+  ServiceManager.InitService(PassportVerifier);
   PoWSession.loadSessionData();
 
 })();
