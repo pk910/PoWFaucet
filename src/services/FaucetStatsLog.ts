@@ -2,7 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { faucetConfig } from '../common/FaucetConfig';
-import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWClient } from '../websock/PoWClient';
 import { PoWSession, PoWSessionStatus } from '../websock/PoWSession';
@@ -105,7 +105,7 @@ export class FaucetStatsLog {
     statsLog.push("shares: " + this.statShareCount + " (" + ethWeb3Manager.readableAmount(this.statShareRewards) + ")");
     statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + ethWeb3Manager.readableAmount(this.statVerifyReward) + ", missed: " + this.statVerifyMisses + " / -" + ethWeb3Manager.readableAmount(this.statVerifyPenalty) + ")");
     statsLog.push("claims: " + this.statClaimCount + " (" + ethWeb3Manager.readableAmount(this.statClaimRewards) + ")");
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "# STATS # " + statsLog.join(", "));
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "# STATS # " + statsLog.join(", "));
 
     this.addStatsEntry("STATS", {
       cliCnt: PoWClient.getClientCount(),

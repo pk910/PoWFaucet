@@ -2,7 +2,7 @@
 import * as crypto from "crypto";
 import { faucetConfig } from "../common/FaucetConfig";
 import { FaucetStoreDB, SessionMark } from "../services/FaucetStoreDB";
-import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
+import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess";
 import { ServiceManager } from "../common/ServiceManager";
 import { FaucetStore } from "../services/FaucetStore";
 import { getNewGuid } from "../utils/GuidUtils";
@@ -122,7 +122,7 @@ export class PoWSession {
   public static saveSessionData() {
     let sessionData = this.getAllSessions().map((session) => session.getSessionStoreData());
     ServiceManager.GetService(FaucetStore).setSessionStore(sessionData);
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Persisted session data to faucet store: " + sessionData.length + " sessions");
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Persisted session data to faucet store: " + sessionData.length + " sessions");
   }
 
   public static loadSessionData() {
@@ -200,8 +200,8 @@ export class PoWSession {
     client.setSession(this);
     setTimeout(() => this.updateRemoteIp(), 10);
     
-    ServiceManager.GetService(PoWStatusLog).emitLog(
-      PoWStatusLogLevel.INFO, 
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO, 
       "Created new session: " + this.sessionId + 
       (typeof target === "object" ? 
         " [Recovered: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance) + ", start: " + renderDate(this.startTime, true) + "]" :
@@ -242,8 +242,8 @@ export class PoWSession {
     
     this.setSessionStatus(PoWSessionStatus.CLOSED);
     delete PoWSession.activeSessions[this.sessionId];
-    ServiceManager.GetService(PoWStatusLog).emitLog(
-      PoWStatusLogLevel.INFO, 
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO, 
       "Closed session: " + this.sessionId + 
       (this.claimable ? " (claimable reward: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance)+ ")" : "")
     );
@@ -385,13 +385,13 @@ export class PoWSession {
       this.idleTime = null;
       this.setSessionStatus(PoWSessionStatus.MINING);
       setTimeout(() => this.updateRemoteIp(), 10);
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
       
     }
     else {
       this.idleTime = new Date();
       this.setSessionStatus(PoWSessionStatus.IDLE);
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Paused session: " + this.sessionId);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Paused session: " + this.sessionId);
     }
     this.resetIdleTimeout();
   }
@@ -531,7 +531,7 @@ export class PoWSession {
     }
 
     ServiceManager.GetService(FaucetStatsLog).statVerifyPenalty += BigInt(penalty);
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + ServiceManager.GetService(EthWeb3Manager).readableAmount(BigInt(penalty)) + ")");
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + ServiceManager.GetService(EthWeb3Manager).readableAmount(BigInt(penalty)) + ")");
   }
 
   private applyKillPenalty(reason: PoWSessionSlashReason) {
@@ -546,7 +546,7 @@ export class PoWSession {
     this.closeSession();
 
     ServiceManager.GetService(FaucetStatsLog).statSlashCount++;
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Slashed session " + this.sessionId + " (reason: " + reason + ", penalty: killed)");
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Slashed session " + this.sessionId + " (reason: " + reason + ", penalty: killed)");
   }
 
   public getSignedSession(): string {

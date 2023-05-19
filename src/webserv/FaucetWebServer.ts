@@ -11,7 +11,7 @@ import { encode } from 'html-entities';
 import { OutgoingHttpHeaders } from 'http2';
 import { FaucetWebApi } from './FaucetWebApi';
 import { ServiceManager } from '../common/ServiceManager';
-import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 
 export class FaucetHttpResponse {
   public readonly code: number;
@@ -48,7 +48,7 @@ export class FaucetHttpServer {
 
     if(faucetConfig.buildSeoIndex) {
       this.buildSeoIndex();
-      ServiceManager.GetService(PoWStatusLog).addListener("reload", () => {
+      ServiceManager.GetService(FaucetProcess).addListener("reload", () => {
         this.buildSeoIndex();
       });
     }
@@ -169,7 +169,7 @@ export class FaucetHttpServer {
       let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
       fs.writeFileSync(seoFile, indexHtml);
     } catch(ex) {
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Could not write seo index to disk: " + ex.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Could not write seo index to disk: " + ex.toString());
     }
   }
 }

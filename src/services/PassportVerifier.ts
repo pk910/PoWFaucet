@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { faucetConfig } from '../common/FaucetConfig';
-import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
+import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess";
 import { ServiceManager } from '../common/ServiceManager';
 import { FaucetStoreDB } from './FaucetStoreDB';
 
@@ -73,7 +73,7 @@ export class PassportVerifier {
 
   public constructor() {
     this.didkitPromise = import("@spruceid/didkit-wasm");
-    ServiceManager.GetService(PoWStatusLog).addListener("reload", () => {
+    ServiceManager.GetService(FaucetProcess).addListener("reload", () => {
       this.passportScoreNonce++; // refresh cached scores on config reload
     });
   }
@@ -175,7 +175,7 @@ export class PassportVerifier {
           headers: {'X-API-KEY': faucetConfig.passportBoost.scorerApiKey}
         }).then((rsp) => rsp.json());
         let gotPassport = passportRsp && passportRsp.items && passportRsp.items.length > 0;
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Requested gitcoin passport for " + addr + ": " + (gotPassport ? "got " + passportRsp.items.length + " stamps" : "no passport"));
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Requested gitcoin passport for " + addr + ": " + (gotPassport ? "got " + passportRsp.items.length + " stamps" : "no passport"));
         if(gotPassport) {
           passport = {
             issuanceDate: null,
@@ -200,7 +200,7 @@ export class PassportVerifier {
         }
       }
     } catch(ex) {
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Exception while fetching passport: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Exception while fetching passport: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
     }
     return passport || cachedPassport || null;
   }

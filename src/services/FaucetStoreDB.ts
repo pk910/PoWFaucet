@@ -1,7 +1,7 @@
 import * as SQLite3 from 'better-sqlite3';
 
 import { faucetConfig } from '../common/FaucetConfig';
-import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
 import { IQueuedClaimTx } from './EthWeb3Manager';
 import { IIPInfo } from './IPInfoResolver';
@@ -53,7 +53,7 @@ export class FaucetStoreDB {
     switch(schemaVersion) {
       case 0: // upgrade to version 1
         schemaVersion = 1;
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
         this.db.exec(`
           CREATE TABLE "SessionMarks" (
             "SessionId"	TEXT NOT NULL UNIQUE,
@@ -88,7 +88,7 @@ export class FaucetStoreDB {
         `);
       case 1: // upgrade to version 2
         schemaVersion = 2;
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
         this.db.exec(`
           CREATE TABLE "KeyValueStore" (
             "Key"	TEXT NOT NULL UNIQUE,
@@ -98,7 +98,7 @@ export class FaucetStoreDB {
         `);
       case 2: // upgrade to version 3
         schemaVersion = 3;
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
         this.db.exec(`
           CREATE TABLE "PassportStamps" (
             "StampHash" TEXT NOT NULL UNIQUE,
@@ -109,7 +109,7 @@ export class FaucetStoreDB {
         `);
       case 3: // upgrade to version 4
         schemaVersion = 4;
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
         this.db.exec(`
           CREATE INDEX "SessionMarksTimeIdx" ON "SessionMarks" (
             "Timeout"	ASC

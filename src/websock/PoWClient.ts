@@ -8,7 +8,7 @@ import { isValidGuid } from '../utils/GuidUtils';
 import { ClaimTx, ClaimTxEvents, EthWeb3Manager } from '../services/EthWeb3Manager';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWShareVerification } from './PoWShareVerification';
-import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { FaucetStatus, IFaucetStatus } from '../services/FaucetStatus';
 import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
 import { FaucetStatsLog } from '../services/FaucetStatsLog';
@@ -70,7 +70,7 @@ export class PoWClient {
       this.lastPingPong = new Date();
     });
     this.socket.on("error", (err) => {
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "WebSocket error: " + err.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "WebSocket error: " + err.toString());
       try {
         if(this.socket)
           this.socket.close();
@@ -126,7 +126,7 @@ export class PoWClient {
     if(!this.socket)
       return;
     try {
-      this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""), null, PoWStatusLogLevel.HIDDEN);
+      this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""), null, FaucetLogLevel.HIDDEN);
       this.socket.close();
     } catch(ex) {}
     this.socket = null;
@@ -162,11 +162,11 @@ export class PoWClient {
     this.socket.send(JSON.stringify(message));
   }
 
-  private sendErrorResponse(errCode: string, errMessage: string, reqMsg?: any, logLevel?: PoWStatusLogLevel, data?: any) {
+  private sendErrorResponse(errCode: string, errMessage: string, reqMsg?: any, logLevel?: FaucetLogLevel, data?: any) {
     if(!logLevel)
-      logLevel = PoWStatusLogLevel.WARNING;
-    let logReqMsg = reqMsg && logLevel !== PoWStatusLogLevel.INFO;
-    ServiceManager.GetService(PoWStatusLog).emitLog(logLevel, "Returned error to client: [" + errCode + "] " + errMessage + (logReqMsg ? "\n    Message: " + JSON.stringify(reqMsg) : ""));
+      logLevel = FaucetLogLevel.WARNING;
+    let logReqMsg = reqMsg && logLevel !== FaucetLogLevel.INFO;
+    ServiceManager.GetService(FaucetProcess).emitLog(logLevel, "Returned error to client: [" + errCode + "] " + errMessage + (logReqMsg ? "\n    Message: " + JSON.stringify(reqMsg) : ""));
     
     let resObj: any = {
       code: errCode,
@@ -265,42 +265,42 @@ export class PoWClient {
 
     if(faucetConfig.denyNewSessions) {
       let denyMessage = typeof faucetConfig.denyNewSessions === "string" ? faucetConfig.denyNewSessions : "The faucet is currently not allowing new sessions";
-      return this.sendErrorResponse("FAUCET_DISABLED", denyMessage, message, PoWStatusLogLevel.INFO);
+      return this.sendErrorResponse("FAUCET_DISABLED", denyMessage, message, FaucetLogLevel.INFO);
     }
 
     if(faucetConfig.captchas && faucetConfig.captchas.checkSessionStart) {
       if(!message.data.token)
-        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha check required to start new session", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha check required to start new session", message, FaucetLogLevel.INFO);
       let tokenValidity = await ServiceManager.GetService(CaptchaVerifier).verifyToken(message.data.token, this.remoteIp, "session");
       if(!tokenValidity)
-        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha verification failed", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha verification failed", message, FaucetLogLevel.INFO);
       if(typeof tokenValidity === "string")
         sessionIdent = tokenValidity;
     }
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCountByIp(this.remoteIp) >= faucetConfig.concurrentSessions)
-      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Only " + faucetConfig.concurrentSessions + " concurrent sessions allowed per IP", message, PoWStatusLogLevel.INFO);
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Only " + faucetConfig.concurrentSessions + " concurrent sessions allowed per IP", message, FaucetLogLevel.INFO);
 
     let targetAddr: string = message.data.addr;
     if(typeof targetAddr === "string" && targetAddr.match(/^[-a-zA-Z0-9@:%._\+~#=]{1,256}\.eth$/) && faucetConfig.ensResolver) {
       try {
         targetAddr = await ServiceManager.GetService(EnsWeb3Manager).resolveEnsName(targetAddr);
       } catch(ex) {
-        return this.sendErrorResponse("INVALID_ENSNAME", "Could not resolve ENS Name '" + targetAddr + "': " + ex.toString(), message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_ENSNAME", "Could not resolve ENS Name '" + targetAddr + "': " + ex.toString(), message, FaucetLogLevel.INFO);
       }
     }
 
     if(typeof targetAddr !== "string" || !targetAddr.match(/^0x[0-9a-f]{40}$/i) || targetAddr.match(/^0x0{40}$/i))
-      return this.sendErrorResponse("INVALID_ADDR", "Invalid target address: " + targetAddr, message, PoWStatusLogLevel.INFO);
+      return this.sendErrorResponse("INVALID_ADDR", "Invalid target address: " + targetAddr, message, FaucetLogLevel.INFO);
 
     let addressMarks = ServiceManager.GetService(FaucetStoreDB).getAddressMarks(targetAddr);
     if(addressMarks.indexOf(AddressMark.USED) !== -1)
-      return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (please wait " + renderTimespan(faucetConfig.claimAddrCooldown) + " between requests)", message, PoWStatusLogLevel.INFO);
+      return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (please wait " + renderTimespan(faucetConfig.claimAddrCooldown) + " between requests)", message, FaucetLogLevel.INFO);
     else if(addressMarks.length > 0)
-      return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (" + addressMarks.join(",") + ")", message, PoWStatusLogLevel.INFO);
+      return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (" + addressMarks.join(",") + ")", message, FaucetLogLevel.INFO);
     
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCountByAddr(targetAddr) >= faucetConfig.concurrentSessions)
-      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Only " + faucetConfig.concurrentSessions + " concurrent sessions allowed per wallet address", message, PoWStatusLogLevel.INFO);
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Only " + faucetConfig.concurrentSessions + " concurrent sessions allowed per wallet address", message, FaucetLogLevel.INFO);
     
     if(typeof faucetConfig.claimAddrMaxBalance === "number") {
       let walletBalance: bigint;
@@ -310,13 +310,13 @@ export class PoWClient {
         return this.sendErrorResponse("BALANCE_ERROR", "Could not get balance of Wallet " + targetAddr + ": " + ex.toString(), message);
       }
       if(walletBalance > faucetConfig.claimAddrMaxBalance)
-        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + ServiceManager.GetService(EthWeb3Manager).readableAmount(walletBalance) + " in your wallet. Please give others a chance to get some funds too.", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + ServiceManager.GetService(EthWeb3Manager).readableAmount(walletBalance) + " in your wallet. Please give others a chance to get some funds too.", message, FaucetLogLevel.INFO);
     }
 
     if(faucetConfig.claimAddrDenyContract) {
       try {
         if(await ServiceManager.GetService(EthWeb3Manager).checkIsContract(targetAddr)) {
-          return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (address is a contract)", message, PoWStatusLogLevel.INFO);
+          return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (address is a contract)", message, FaucetLogLevel.INFO);
         }
       } catch(ex) {
         return this.sendErrorResponse("BALANCE_ERROR", "Could not check contract status of wallet " + targetAddr + ": " + ex.toString(), message);
@@ -328,9 +328,9 @@ export class PoWClient {
       try {
         ipInfo = await ServiceManager.GetService(IPInfoResolver).getIpInfo(this.remoteIp);
         if(ipInfo.status !== "success")
-          return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP: " + ipInfo.status, message, PoWStatusLogLevel.INFO);
+          return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP: " + ipInfo.status, message, FaucetLogLevel.INFO);
       } catch(ex) {
-        return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP. Please try again later.", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP. Please try again later.", message, FaucetLogLevel.INFO);
       }
     }
     
@@ -379,15 +379,15 @@ export class PoWClient {
             token: session.getSignedSession(),
           };
         }
-        return this.sendErrorResponse("SESSION_CLOSED", "Session has been closed.", message, PoWStatusLogLevel.INFO, sessClaim);
+        return this.sendErrorResponse("SESSION_CLOSED", "Session has been closed.", message, FaucetLogLevel.INFO, sessClaim);
       }
       else
-        return this.sendErrorResponse("INVALID_SESSIONID", "Unknown session id: " + sessionId, message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_SESSIONID", "Unknown session id: " + sessionId, message, FaucetLogLevel.INFO);
     }
     
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCountByIp(this.remoteIp, session) >= faucetConfig.concurrentSessions)
-      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, FaucetLogLevel.INFO);
 
     let client: PoWClient;
     if((client = session.getActiveClient())) {
@@ -431,7 +431,7 @@ export class PoWClient {
       return this.sendErrorResponse("DUPLICATE_SESSION", "Session does already exist and cannot be recovered", message);
 
     if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCountByIp(this.remoteIp) >= faucetConfig.concurrentSessions)
-      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, FaucetLogLevel.INFO);
 
     let now = Math.floor((new Date()).getTime() / 1000);
     if(faucetConfig.claimSessionTimeout && (now - sessionInfo.startTime) > faucetConfig.claimSessionTimeout)
@@ -445,9 +445,9 @@ export class PoWClient {
       try {
         ipInfo = await ServiceManager.GetService(IPInfoResolver).getIpInfo(this.remoteIp);
         if(ipInfo.status !== "success")
-          return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP: " + ipInfo.status, message, PoWStatusLogLevel.INFO);
+          return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP: " + ipInfo.status, message, FaucetLogLevel.INFO);
       } catch(ex) {
-        return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP. Please try again later.", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_IPINFO", "Error while checking your IP. Please try again later.", message, FaucetLogLevel.INFO);
       }
     }
 
@@ -586,10 +586,10 @@ export class PoWClient {
 
     if(faucetConfig.captchas && faucetConfig.captchas.checkBalanceClaim) {
       if(!message.data.captcha) 
-        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha check required to claim rewards", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha check required to claim rewards", message, FaucetLogLevel.INFO);
       let tokenValidity = await ServiceManager.GetService(CaptchaVerifier).verifyToken(message.data.captcha, this.remoteIp, "claim");
       if(!tokenValidity)
-        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha verification failed", message, PoWStatusLogLevel.INFO);
+        return this.sendErrorResponse("INVALID_CAPTCHA", "Captcha verification failed", message, FaucetLogLevel.INFO);
     }
 
     let sessionSplit = message.data.token.split("|", 2);
@@ -716,7 +716,7 @@ export class PoWClient {
         }, reqId);
       }, (err) => {
         console.error(err);
-        this.sendErrorResponse("BOOST_PASSPORT_INVALID", "Invalid Passport:\n" + err.toString(), message, PoWStatusLogLevel.HIDDEN);
+        this.sendErrorResponse("BOOST_PASSPORT_INVALID", "Invalid Passport:\n" + err.toString(), message, FaucetLogLevel.HIDDEN);
       });
     }
     else {

@@ -1,6 +1,6 @@
 import { IncomingMessage } from "http";
 import { faucetConfig, IFaucetResultSharingConfig } from "../common/FaucetConfig";
-import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
+import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess";
 import { ServiceManager } from "../common/ServiceManager";
 import { ClaimTxStatus, EthWeb3Manager } from "../services/EthWeb3Manager";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
@@ -288,7 +288,7 @@ export class FaucetWebApi {
   }
 
   private onGetFaucetStatus(remoteIp: string): Promise<IClientFaucetStatus> {
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Client requested faucet status (IP: " + remoteIp + ")");
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Client requested faucet status (IP: " + remoteIp + ")");
     return this.getFaucetStatus();
   }
 

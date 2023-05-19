@@ -10,7 +10,7 @@ import * as EthUtil from 'ethereumjs-util';
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { faucetConfig } from '../common/FaucetConfig';
 import { ServiceManager } from '../common/ServiceManager';
-import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
 import { strFormatPlaceholder } from '../utils/StringUtils';
 import { FaucetStatsLog } from './FaucetStatsLog';
@@ -144,7 +144,7 @@ export class EthWeb3Manager {
     });
 
     // reload handler
-    ServiceManager.GetService(PoWStatusLog).addListener("reload", () => {
+    ServiceManager.GetService(FaucetProcess).addListener("reload", () => {
       this.startWeb3();
       this.lastWalletRefresh = 0;
     });
@@ -153,7 +153,7 @@ export class EthWeb3Manager {
   private initChainCommon(chainId: number) {
     if(this.chainCommon && this.chainCommon.chainIdBN().toNumber() === chainId)
       return;
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Web3 ChainCommon initialized with chainId " + chainId);
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Web3 ChainCommon initialized with chainId " + chainId);
     this.chainCommon = EthCom.default.forCustomChain('mainnet', {
       networkId: chainId,
       chainId: chainId,
@@ -178,10 +178,10 @@ export class EthWeb3Manager {
 
     if(provider.on) {
       provider.on('error', e => {
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Web3 provider error: " + e.toString());
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 provider error: " + e.toString());
       });
       provider.on('end', e => {
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Web3 connection lost...");
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 connection lost...");
         this.web3 = null;
 
         setTimeout(() => {
@@ -210,7 +210,7 @@ export class EthWeb3Manager {
         });
         break;
       default:
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Unknown coin type: " + faucetConfig.faucetCoinType);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Unknown coin type: " + faucetConfig.faucetCoinType);
         return;
     }
   }
@@ -253,7 +253,7 @@ export class EthWeb3Manager {
         nativeBalance: BigInt(res[0]),
         nonce: res[1],
       };
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + this.readableAmount(this.walletState.balance) + "  [Nonce: " + this.walletState.nonce + "]");
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + this.readableAmount(this.walletState.balance) + "  [Nonce: " + this.walletState.nonce + "]");
     }, (err) => {
       this.walletState = {
         ready: false,
@@ -261,7 +261,7 @@ export class EthWeb3Manager {
         nativeBalance: 0n,
         nonce: 0,
       };
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Error loading wallet state for " + this.walletAddr + ": " + err.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error loading wallet state for " + this.walletAddr + ": " + err.toString());
     }).then(() => {
       this.updateFaucetStatus();
     });
@@ -474,7 +474,7 @@ export class EthWeb3Manager {
       } catch(ex) {
         stack = ex.stack;
       }
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Exception in transaction queue processing: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : stack}`);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Exception in transaction queue processing: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : stack}`);
     }
     this.queueProcessing = false;
   }
@@ -530,7 +530,7 @@ export class EthWeb3Manager {
         } catch(ex) {
           if(!txError)
             txError = ex;
-          ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Sending TX for " + claimTx.target + " failed [try: " + retryCount + "]: " + ex.toString());
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Sending TX for " + claimTx.target + " failed [try: " + retryCount + "]: " + ex.toString());
           await this.sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
           await this.loadWalletState();
         }
@@ -546,7 +546,7 @@ export class EthWeb3Manager {
 
       this.pendingTxQueue[claimTx.txhash] = claimTx;
       ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + this.readableAmount(claimTx.amount) + "] to: " + claimTx.target + ": " + claimTx.txhash);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + this.readableAmount(claimTx.amount) + "] to: " + claimTx.target + ": " + claimTx.txhash);
 
       claimTx.status = ClaimTxStatus.PENDING;
       claimTx.emit("pending");
@@ -572,7 +572,7 @@ export class EthWeb3Manager {
         claimTx.emit("confirmed");
         ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
       }, (error) => {
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
         delete this.pendingTxQueue[claimTx.txhash];
         claimTx.failReason = "Transaction Error: " + error.toString();
         claimTx.status = ClaimTxStatus.FAILED;
@@ -596,7 +596,7 @@ export class EthWeb3Manager {
       do {
         await this.sleepPromise(30000); // 30 secs
         receipt = await this.web3.eth.getTransactionReceipt(txhash);
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Polled transaction receipt for " + txhash + ": " + (receipt ? "found!" : "pending"));
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Polled transaction receipt for " + txhash + ": " + (receipt ? "found!" : "pending"));
       } while(!receipt);
       return receipt;
     } catch(ex) {
@@ -605,7 +605,7 @@ export class EthWeb3Manager {
         return this.awaitTransactionReceipt(txhash);
       }
 
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
       throw ex;
     }
   }
@@ -668,7 +668,7 @@ export class EthWeb3Manager {
       
       this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
 
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult[0]);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult[0]);
 
       let txReceipt: TransactionReceipt;
       try {
@@ -688,12 +688,12 @@ export class EthWeb3Manager {
           throw receipt;
         
         this.loadWalletState(); // refresh balance
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Faucet wallet successfully refilled from vault contract.");
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet wallet successfully refilled from vault contract.");
       }).catch((err) => {
-        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Faucet wallet refill transaction reverted: " + err.toString());
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Faucet wallet refill transaction reverted: " + err.toString());
       });
     } catch(ex) {
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Faucet wallet refill from vault contract failed: " + ex.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Faucet wallet refill from vault contract failed: " + ex.toString());
       this.walletRefilling = false;
     }
   }

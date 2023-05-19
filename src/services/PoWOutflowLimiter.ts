@@ -1,7 +1,7 @@
 
 import { clearInterval } from "timers";
 import { faucetConfig } from "../common/FaucetConfig";
-import { PoWStatusLog } from "../common/PoWStatusLog";
+import { FaucetProcess } from "../common/FaucetProcess";
 import { ServiceManager } from "../common/ServiceManager";
 import { FaucetStoreDB } from "./FaucetStoreDB";
 
@@ -15,7 +15,7 @@ export class PoWOutflowLimiter {
   private saveTimer: NodeJS.Timer;
   
   public constructor() {
-    ServiceManager.GetService(PoWStatusLog).addListener("reload", () => this.reloadService());
+    ServiceManager.GetService(FaucetProcess).addListener("reload", () => this.reloadService());
     this.reloadService();
   }
 
