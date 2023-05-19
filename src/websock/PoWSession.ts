@@ -531,7 +531,7 @@ export class PoWSession {
     }
 
     ServiceManager.GetService(FaucetStatsLog).statVerifyPenalty += BigInt(penalty);
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + ServiceManager.GetService(EthWeb3Manager).readableAmount(BigInt(penalty)) + ")");
+    //ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + ServiceManager.GetService(EthWeb3Manager).readableAmount(BigInt(penalty)) + ")");
   }
 
   private applyKillPenalty(reason: PoWSessionSlashReason) {
