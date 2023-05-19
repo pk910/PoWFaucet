@@ -24,7 +24,7 @@ export class FaucetStoreDB {
     this.initDatabase();
     setInterval(() => {
       this.cleanStore();
-    }, (1000 * 60 * 10));
+    }, (1000 * 60 * 60 * 2));
   }
 
   private initDatabase() {
@@ -105,6 +105,26 @@ export class FaucetStoreDB {
             "Address" TEXT NOT NULL,
             "Timeout" INTEGER NOT NULL,
             PRIMARY KEY("StampHash")
+          );
+        `);
+      case 3: // upgrade to version 4
+        schemaVersion = 4;
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
+        this.db.exec(`
+          CREATE INDEX "SessionMarksTimeIdx" ON "SessionMarks" (
+            "Timeout"	ASC
+          );
+          CREATE INDEX "AddressMarksTimeIdx" ON "AddressMarks" (
+            "Timeout"	ASC
+          );
+          CREATE INDEX "IPInfoCacheTimeIdx" ON "IPInfoCache" (
+            "Timeout"	ASC
+          );
+          CREATE INDEX "PassportCacheTimeIdx" ON "PassportCache" (
+            "Timeout"	ASC
+          );
+          CREATE INDEX "PassportStampsTimeIdx" ON "PassportStamps" (
+            "Timeout"	ASC
           );
         `);
     }
