@@ -1,5 +1,5 @@
 import React from 'react';
-import { weiToEth } from '../utils/ConvertHelpers';
+import { toReadableAmount } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate } from '../utils/DateUtils';
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
@@ -146,7 +146,7 @@ export class PoWQueueStatus extends React.PureComponent<IPoWQueueStatusProps, IP
         <th scope="row">{renderDate(new Date(claim.time * 1000), true, true)}</th>
         <td>{claim.session}</td>
         <td>{claim.target}</td>
-        <td>{Math.round(weiToEth(claim.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
+        <td>{toReadableAmount(claim.amount, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</td>
         <td>{claim.nonce || ""}</td>
         <td>
           {this.props.faucetConfig.ethTxExplorerLink && claim.hash ? 

@@ -1,7 +1,7 @@
 import { IPoWClaimInfo, PoWSession } from '../common/PoWSession';
 import React from 'react';
 import { Button, Modal, OverlayTrigger, Spinner, Tooltip } from 'react-bootstrap';
-import { weiToEth } from '../utils/ConvertHelpers';
+import { toReadableAmount } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTimespan } from '../utils/DateUtils';
 import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
@@ -158,7 +158,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
           title: "Claim expired",
           body: (
             <div className='altert alert-danger'>
-              Sorry, your reward ({Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}) has not been claimed in time.
+              Sorry, your reward ({toReadableAmount(this.props.reward.balance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
             </div>
           ),
           closeButton: {
@@ -222,7 +222,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
                 Claimable Reward:
               </div>
               <div className='col'>
-                {Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}
+                {toReadableAmount(this.props.reward.balance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}
               </div>
             </div>
             <div className='row'>
@@ -387,7 +387,7 @@ export class PoWClaimDialog extends React.PureComponent<IPoWClaimDialogProps, IP
     message = message.replace(/{sessionid}/ig, this.props.reward.session);
     message = message.replace(/{target}/ig, this.props.reward.target);
 
-    message = message.replace(/{amount}/ig, (Math.round(weiToEth(this.props.reward.balance) * 1000) / 1000).toString());
+    message = message.replace(/{amount}/ig, toReadableAmount(this.props.reward.balance, this.props.faucetConfig.faucetCoinDecimals));
     let safeUrl = location.protocol + "//" + location.hostname + location.pathname;
     message = message.replace(/{url}/ig, safeUrl);
 

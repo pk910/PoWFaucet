@@ -4,7 +4,7 @@ import { IPoWClientConnectionKeeper, PoWClient } from '../common/PoWClient';
 import { IPoWClaimInfo, IPoWSessionInfo, PoWSession } from '../common/PoWSession';
 import { PoWMinerStatus } from './PoWMinerStatus';
 import { PoWMiner } from '../common/PoWMiner';
-import { weiToEth } from '../utils/ConvertHelpers';
+import { toReadableAmount } from '../utils/ConvertHelpers';
 import { PoWClaimDialog } from './PoWClaimDialog';
 import { PoWFaucetStatus } from './PoWFaucetStatus';
 import { TypedEmitter } from 'tiny-typed-emitter';
@@ -572,8 +572,8 @@ export class PoWFaucet extends React.PureComponent<IPoWFaucetProps, IPoWFaucetSt
           title: "Mining balance too low",
           body: (
             <div className='alert alert-warning'>
-              Your mining balance of {Math.round(weiToEth(sessionInfo.balance) * 1000) / 1000} {this.state.faucetConfig.faucetCoinSymbol} is too low to be claimed.<br />
-              The minimum allowed amount is {Math.round(weiToEth(this.state.faucetConfig.minClaim) * 1000) / 1000} {this.state.faucetConfig.faucetCoinSymbol}.<br />
+              Your mining balance of {toReadableAmount(sessionInfo.balance, this.state.faucetConfig.faucetCoinDecimals, this.state.faucetConfig.faucetCoinSymbol)} is too low to be claimed.<br />
+              The minimum allowed amount is {toReadableAmount(this.state.faucetConfig.minClaim, this.state.faucetConfig.faucetCoinDecimals, this.state.faucetConfig.faucetCoinSymbol)}.<br />
               Do you want to stop mining and loose the rewards you've already collected?
               </div>
           ),

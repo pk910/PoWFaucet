@@ -1,7 +1,5 @@
-import { IPoWMinerStats, PoWMiner } from '../common/PoWMiner';
-import { PoWSession } from '../common/PoWSession';
 import React from 'react';
-import { weiToEth } from '../utils/ConvertHelpers';
+import { toReadableAmount } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderDate, renderTime, renderTimespan } from '../utils/DateUtils';
 import getCountryIcon from 'country-flag-icons/unicode'
@@ -229,15 +227,15 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <div className="status-block">
               <div className="status-prop">
                 <span className="status-title">Faucet Wallet Balance:</span>
-                <span className="status-value">{Math.round(weiToEth(this.state.status.walletBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+                <span className="status-value">{toReadableAmount(this.state.status.walletBalance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Unclaimed Balance:</span>
-                <span className="status-value">{Math.round(weiToEth(this.state.status.unclaimedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+                <span className="status-value">{toReadableAmount(this.state.status.unclaimedBalance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">TX-Queue Balance:</span>
-                <span className="status-value">{Math.round(weiToEth(this.state.status.queuedBalance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+                <span className="status-value">{toReadableAmount(this.state.status.queuedBalance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Reward Restriction:</span>
@@ -254,11 +252,11 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
               </div>
               <div className="status-prop">
                 <span className="status-title">Outflow Limit:</span>
-                <span className="status-value">{Math.round(weiToEth(this.state.outflowStatus.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol} / {renderTimespan(this.state.outflowStatus.duration, 2)}</span>
+                <span className="status-value">{toReadableAmount(this.state.outflowStatus.amount, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Outflow Balance:</span>
-                <span className="status-value">{Math.round(weiToEth((this.state.outflowStatus.amount / this.state.outflowStatus.duration * (this.state.outflowStatus.now - this.state.outflowStatus.trackTime)) + parseInt(this.state.outflowStatus.dustAmount.toString())) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+                <span className="status-value">{toReadableAmount((this.state.outflowStatus.amount / this.state.outflowStatus.duration * (this.state.outflowStatus.now - this.state.outflowStatus.trackTime)) + parseInt(this.state.outflowStatus.dustAmount.toString()), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Outflow Restriction:</span>
@@ -272,15 +270,15 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
             <div className="status-block">
               <div className="status-prop">
                 <span className="status-title">Refill Contract Balance:</span>
-                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+                <span className="status-value">{toReadableAmount(this.state.refillStatus.balance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Refill Trigger Balance:</span>
-                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.trigger) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+                <span className="status-value">{toReadableAmount(this.state.refillStatus.trigger, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Refill Amount:</span>
-                <span className="status-value">{Math.round(weiToEth(this.state.refillStatus.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</span>
+                <span className="status-value">{toReadableAmount(this.state.refillStatus.amount, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Refill Cooldown:</span>
@@ -385,7 +383,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <td>{session.target}</td>
         <td>{renderDate(new Date(session.start * 1000), true)}</td>
         <td>{renderDate(new Date((session.start + this.props.faucetConfig.powTimeout) * 1000), true)}</td>
-        <td>{Math.round(weiToEth(session.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
+        <td>{toReadableAmount(session.balance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</td>
         <td>{session.nonce}</td>
         <td>{session.cliver}</td>
         <td>{session.boostF} ({session.boostS})</td>
@@ -532,7 +530,7 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
         <th scope="row">{renderDate(new Date(claim.time * 1000), true, true)}</th>
         <td>{claim.session}</td>
         <td>{claim.target}</td>
-        <td>{Math.round(weiToEth(claim.amount) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</td>
+        <td>{toReadableAmount(claim.amount, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</td>
         <td>{claim.nonce || ""}</td>
         <td>{claim.hash || ""}</td>
         <td>{claimStatus}</td>
