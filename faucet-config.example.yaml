@@ -376,6 +376,7 @@ resultSharing:
 
 # allow reward boosting by gitcoin passport verification
 passportBoost:
+  scorerApiKey: "" # Gitcoin Passport Scorer API Key
   trustedIssuers:
     - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
   passportCachePath: "passport-cache"
@@ -399,6 +400,7 @@ passportBoost:
     "FacebookProfilePicture": 1
     "Brightid": 10
     "Github": 1
+    "Coinbase": 1
     "FiveOrMoreGithubRepos": 1
     "TenOrMoreGithubFollowers": 2
     "FiftyOrMoreGithubFollowers": 4

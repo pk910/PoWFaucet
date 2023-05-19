@@ -1,22 +1,52 @@
 import fs from 'fs';
 import path from 'path';
 
-import { PassportVerifier as PassportVerifierSDK } from "@gitcoinco/passport-sdk-verifier";
-import { Passport } from '@gitcoinco/passport-sdk-types';
 import { faucetConfig } from '../common/FaucetConfig';
 import { PoWStatusLog, PoWStatusLogLevel } from "../common/PoWStatusLog";
 import { ServiceManager } from '../common/ServiceManager';
 import { FaucetStoreDB } from './FaucetStoreDB';
 
+type DIDKitLib = {
+  verifyCredential: (vc: string, proofOptions: string) => Promise<string>;
+  issueCredential: (credential: string, proofOptions: string, key: string) => Promise<string>;
+  keyToDID: (method_pattern: string, jwk: string) => string;
+  keyToVerificationMethod: (method_pattern: string, jwk: string) => Promise<string>;
+} & { [key: string]: any };
+
+export interface IPassport {
+  issuanceDate: string;
+  expiryDate: string;
+  stamps: {
+    provider: string;
+    credential: IPassportCredential;
+  }[];
+}
+
+export interface IPassportCredential {
+  type: string[],
+  proof: object,
+  issuer: string;
+  issuanceDate: string;
+  expirationDate: string;
+  credentialSubject: {
+    id: string;
+    hash: string;
+    provider: string;
+  };
+}
+
 export interface IPassportInfo {
   found: boolean;
   parsed: number;
   newest: number;
-  stamps?: {
-    provider: string;
-    expiration: number;
-  }[];
+  stamps?: IPassportStampInfo[];
   _score?: IPassportScore;
+}
+
+export interface IPassportStampInfo {
+  provider: string;
+  expiration: number;
+  duplicate?: string;
 }
 
 export interface IPassportScore {
@@ -29,23 +59,25 @@ export interface IPassportVerification {
   valid: boolean;
   errors: string[];
   newest?: number;
-  info?: IPassportInfo;
+  passport?: IPassport;
+}
+
+export interface IPassportVerificationResult extends IPassportVerification {
+  passportInfo?: IPassportInfo;
 }
 
 export class PassportVerifier {
-  private readyPromise: Promise<void>;
-  private passportVerifier: PassportVerifierSDK;
-  private passportCache: {[ip: string]: Promise<IPassportInfo>} = {};
+  private didkitPromise: Promise<DIDKitLib>;
+  private passportCache: {[addr: string]: Promise<IPassportInfo>} = {};
   private passportScoreNonce = 1;
 
   public constructor() {
-    this.passportVerifier = new PassportVerifierSDK();
-    this.readyPromise = this.passportVerifier.init();
-    
+    this.didkitPromise = import("@spruceid/didkit-wasm");
     ServiceManager.GetService(PoWStatusLog).addListener("reload", () => {
       this.passportScoreNonce++; // refresh cached scores on config reload
     });
   }
+
 
   public async getPassport(addr: string, refresh?: boolean): Promise<IPassportInfo> {
     if(!faucetConfig.passportBoost)
@@ -56,22 +88,21 @@ export class PassportVerifier {
     let now = Math.floor((new Date()).getTime() / 1000);
     let faucetStore = ServiceManager.GetService(FaucetStoreDB);
     let cachedPassportInfo = faucetStore.getPassportInfo(addr);
-    let passportPromise: Promise<IPassportInfo>;
+    let passportInfoPromise: Promise<IPassportInfo>;
 
     if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (faucetConfig.passportBoost.cacheTime || 60)) {
-      passportPromise = Promise.resolve(cachedPassportInfo);
+      passportInfoPromise = Promise.resolve(cachedPassportInfo);
     }
     else {
-      passportPromise = this.passportCache[addr] = this.refreshPassport(addr);
-      passportPromise.then((passportInfo) => {
-        faucetStore.setPassportInfo(addr, passportInfo);
+      passportInfoPromise = this.passportCache[addr] = this.refreshPassport(addr).then((passport) => {
+        return this.buildPassportInfo(addr, passport);
       });
-      passportPromise.finally(() => {
+      passportInfoPromise.finally(() => {
         delete this.passportCache[addr];
       });
     }
 
-    passportPromise.then((passportInfo) => {
+    passportInfoPromise.then((passportInfo) => {
       if(!passportInfo.hasOwnProperty("_score")) {
         Object.defineProperty(passportInfo, "_score", {
           configurable: true,
@@ -82,26 +113,85 @@ export class PassportVerifier {
       }
     })
 
-    return passportPromise;
+    return passportInfoPromise;
   }
 
-  private async refreshPassport(addr: string): Promise<IPassportInfo> {
-    let cacheFile = this.getPassportCacheFile(addr);
-    let cachedPassportInfo: IPassportInfo = null;
-    if(cacheFile && fs.existsSync(cacheFile)) {
-      let cachedPassport = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-      cachedPassportInfo = this.parsePassportInfo(cachedPassport);
+  public async verifyUserPassport(addr: string, passportJson: string): Promise<IPassportVerificationResult> {
+    if(!faucetConfig.passportBoost)
+      return {valid: false, errors: ["Passport Boost disabled"]};
+    if(!faucetConfig.passportBoost.trustedIssuers || faucetConfig.passportBoost.trustedIssuers.length == 0)
+      return {valid: false, errors: ["Manual passport verification disabled"]};
+
+    let passport: IPassport;
+    try {
+      passport = JSON.parse(passportJson);
+    } catch(ex) {
+      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://passport.gitcoin.co"]};
     }
 
-    let passportInfo: IPassportInfo = null;
-    try {
-      let passport = await this.passportVerifier.verifyPassport(addr);
-      if(passport) {
-        passportInfo = this.parsePassportInfo(passport);
+    if(!passport || typeof passport !== "object" || !passport.stamps || !Array.isArray(passport.stamps))
+      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://passport.gitcoin.co"]};
 
-        if(cachedPassportInfo && (!passportInfo.found || cachedPassportInfo.newest > passportInfo.newest)) {
+    // verify integrity
+    let verifyResult = await this.verifyPassportIntegrity(addr, passport);
+    if(!verifyResult.valid || !verifyResult.passport)
+      return verifyResult;
+
+    // refresh passport if neccesary
+    passport = await this.refreshPassport(addr, verifyResult.passport);
+    if(passport !== verifyResult.passport)
+      return {valid: false, errors: ["Cannot update to an older passport"]};
+    
+    return {
+      ...verifyResult,
+      passportInfo: this.buildPassportInfo(addr, passport)
+    };
+  }
+
+  private getNewestPassportStampTime(passport: IPassport): number {
+    let newest = 0;
+    if(passport.stamps) {
+      for(let i = 0; i < passport.stamps.length; i++) {
+        let issuanceTime = Math.floor((new Date(passport.stamps[i].credential.issuanceDate)).getTime() / 1000);
+        if(issuanceTime > newest) {
+          newest = issuanceTime;
+        }
+      }
+    }
+    return newest;
+  }
+
+  private async refreshPassport(addr: string, passport?: IPassport): Promise<IPassport> {
+    let cacheFile = this.getPassportCacheFile(addr);
+    let cachedPassport: IPassport = null;
+    if(cacheFile && fs.existsSync(cacheFile)) {
+      cachedPassport = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+    }
+    try {
+      if(!passport) {
+        // load passport from api
+        let passportRsp = await fetch("https://api.scorer.gitcoin.co/registry/stamps/" + addr, {
+          method: 'GET',
+          headers: {'X-API-KEY': faucetConfig.passportBoost.scorerApiKey}
+        }).then((rsp) => rsp.json());
+
+        if(passportRsp && passportRsp.items && passportRsp.items.length > 0) {
+          passport = {
+            issuanceDate: null,
+            expiryDate: null,
+            stamps: passportRsp.items.map((item) => {
+              return {
+                provider: item.credential.credentialSubject.provider,
+                credential: item.credential,
+              };
+            }),
+          };
+        }
+      }
+      if(passport) {
+        if(cachedPassport && this.getNewestPassportStampTime(cachedPassport) > this.getNewestPassportStampTime(passport)) {
           // passport from cache is newer.. so use the cached one
-          return cachedPassportInfo
+          return cachedPassport;
         }
         if(cacheFile) {
           // save to cache
@@ -111,75 +201,18 @@ export class PassportVerifier {
     } catch(ex) {
       ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.WARNING, "Exception while fetching passport: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
     }
-
-    return passportInfo || cachedPassportInfo || { 
-      found: false,
-      parsed: Math.floor((new Date()).getTime() / 1000),
-      newest: 0,
-    };
+    return passport || cachedPassport || null;
   }
 
-  private getPassportCacheFile(addr: string): string {
-    if(!faucetConfig.passportBoost || !faucetConfig.passportBoost.passportCachePath)
-      return null;
-    
-    let cacheFile: string;
-    if(faucetConfig.passportBoost.passportCachePath.match(/^\//))
-      cacheFile = faucetConfig.passportBoost.passportCachePath;
-    else
-      cacheFile = path.join(faucetConfig.appBasePath, faucetConfig.passportBoost.passportCachePath);
-    cacheFile = path.join(cacheFile, "passport-" + addr.replace(/[^a-f0-9x]+/gi, "").toLowerCase() + ".json");
-    return cacheFile;
-  }
-
-  private parsePassportInfo(passport: Passport): IPassportInfo {
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let newestStamp = 0;
-    let stamps = passport.stamps.map((stamp) => {
-      let issuanceTime = Math.floor((new Date(stamp.credential.issuanceDate)).getTime() / 1000);
-      if(issuanceTime > newestStamp)
-      newestStamp = issuanceTime;
-
-      let expirationTime = Math.floor((new Date(stamp.credential.expirationDate)).getTime() / 1000);
-      return {
-        provider: stamp.provider as string,
-        expiration: expirationTime,
-      };
-    })
-
-    return {
-      found: true,
-      parsed: now,
-      newest: newestStamp,
-      stamps: stamps,
-    };
-  }
-
-  public async verifyUserPassport(addr: string, passportJson: string): Promise<IPassportVerification> {
-    if(!faucetConfig.passportBoost)
-      return {valid: false, errors: ["Passport Boost disabled"]};
-    if(!faucetConfig.passportBoost.trustedIssuers || faucetConfig.passportBoost.trustedIssuers.length == 0)
-      return {valid: false, errors: ["Manual passport verification disabled"]};
-    
-    await this.readyPromise;
+  private async verifyPassportIntegrity(addr: string, passport: IPassport): Promise<IPassportVerification> {
+    let DIDKit = await this.didkitPromise;
 
     let verifyResult: IPassportVerification = {
       valid: null,
       errors: [],
       newest: 0,
     }
-    let DIDKit = this.passportVerifier._DIDKit;
     let providerMap = {};
-    
-    let passport: Passport;
-    try {
-      passport = JSON.parse(passportJson);
-    } catch(ex) {
-      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://passport.gitcoin.co"]};
-    }
-
-    if(!passport || typeof passport !== "object" || !passport.stamps || !Array.isArray(passport.stamps))
-      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://passport.gitcoin.co"]};
     
     // verify passport
 
@@ -225,7 +258,7 @@ export class PassportVerifier {
       
       // verify cryptographic stamp integrity
       let verifyResJson = await DIDKit.verifyCredential(JSON.stringify(stamp.credential), JSON.stringify({
-        proofPurpose: stamp.credential.proof.proofPurpose
+        proofPurpose: (stamp.credential.proof as any).proofPurpose
       }));
       let verifyRes = JSON.parse(verifyResJson);
       if(!verifyRes.checks || verifyRes.checks.indexOf("proof") === -1) {
@@ -240,32 +273,27 @@ export class PassportVerifier {
     }));
 
     verifyResult.valid = (verifyResult.errors.length === 0);
-    verifyResult.info = this.parsePassportInfo(passport);
+    verifyResult.passport = passport;
     //console.log("[PassportVerifier] verify info ", verifyResult.info);
-
-    if(verifyResult.valid) {
-      // save to cache
-      let cacheFile = this.getPassportCacheFile(addr);
-      let haveNewer = false;
-      if(cacheFile && fs.existsSync(cacheFile)) {
-        let cachedPassport = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-        let cachedPassportInfo = this.parsePassportInfo(cachedPassport);
-        haveNewer = cachedPassportInfo.found && (cachedPassportInfo.newest > verifyResult.info.newest);
-      }
-      if(haveNewer) {
-        // prevent reverting to an older passport!
-        verifyResult.valid = false;
-        verifyResult.errors.push("Cannot update to an older passport");
-      } else if(cacheFile) {
-        this.savePassportToCache(passport, cacheFile);
-      }
-    }
     
     return verifyResult;
   }
 
-  private savePassportToCache(passport: Passport, cacheFile: string) {
-    let trimmedPassport: Passport = {
+  private getPassportCacheFile(addr: string): string {
+    if(!faucetConfig.passportBoost || !faucetConfig.passportBoost.passportCachePath)
+      return null;
+    
+    let cacheFile: string;
+    if(faucetConfig.passportBoost.passportCachePath.match(/^\//))
+      cacheFile = faucetConfig.passportBoost.passportCachePath;
+    else
+      cacheFile = path.join(faucetConfig.appBasePath, faucetConfig.passportBoost.passportCachePath);
+    cacheFile = path.join(cacheFile, "passport-" + addr.replace(/[^a-f0-9x]+/gi, "").toLowerCase() + ".json");
+    return cacheFile;
+  }
+
+  private savePassportToCache(passport: IPassport, cacheFile: string) {
+    let trimmedPassport: IPassport = {
       issuanceDate: passport.issuanceDate,
       expiryDate: passport.expiryDate,
       stamps: passport.stamps.map((stamp) => {
@@ -277,6 +305,63 @@ export class PassportVerifier {
     };
     fs.writeFileSync(cacheFile, JSON.stringify(trimmedPassport));
   }
+
+  private buildPassportInfo(addr: string, passport: IPassport): IPassportInfo {
+    let passportInfo: IPassportInfo;
+    let faucetStore = ServiceManager.GetService(FaucetStoreDB);
+    let now = Math.floor((new Date()).getTime() / 1000);
+
+    if(passport) {
+      let stampHashes = passport.stamps.map((stamp) => stamp.credential.credentialSubject.hash);
+      let stampAssignments = faucetStore.getPassportStamps(stampHashes);
+      
+      let newestStamp = 0;
+      let stamps: IPassportStampInfo[] = [];
+      for(let i = 0; i < passport.stamps.length; i++) {
+        let stamp = passport.stamps[i];
+        let issuanceTime = Math.floor((new Date(stamp.credential.issuanceDate)).getTime() / 1000);
+        if(issuanceTime > newestStamp)
+          newestStamp = issuanceTime;
+        
+        let expirationTime = Math.floor((new Date(stamp.credential.expirationDate)).getTime() / 1000);
+        let stampInfo: IPassportStampInfo = {
+          provider: stamp.provider as string,
+          expiration: expirationTime,
+        };
+
+        // check duplicate use
+        let assignedAddr = stampAssignments[stamp.credential.credentialSubject.hash];
+        if(assignedAddr && assignedAddr.toLowerCase() !== addr.toLowerCase())
+          stampInfo.duplicate = assignedAddr;
+        else
+          stampAssignments[stamp.credential.credentialSubject.hash] = addr;
+
+        stamps.push(stampInfo);
+      }
+
+      passportInfo = {
+        found: true,
+        parsed: now,
+        newest: newestStamp,
+        stamps: stamps,
+      };
+      faucetStore.updatePassportStamps(stampHashes.filter((stampHash) => {
+        return stampAssignments[stampHash]?.toLowerCase() === addr.toLowerCase();
+      }), addr);
+    }
+    else {
+      passportInfo = {
+        found: false,
+        parsed: now,
+        newest: 0,
+      };
+    }
+    
+    faucetStore.setPassportInfo(addr, passportInfo);
+
+    return passportInfo;
+  }
+
 
   public getPassportScore(passportInfo: IPassportInfo): IPassportScore {
     if(!passportInfo)
@@ -290,6 +375,8 @@ export class PassportVerifier {
     if(passportInfo.found && passportInfo.stamps) {
       passportInfo.stamps.forEach((stamp) => {
         if(stamp.expiration < now)
+          return;
+        if(stamp.duplicate)
           return;
         
         let stampScore = faucetConfig.passportBoost.stampScoring[stamp.provider];

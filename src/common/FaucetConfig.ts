@@ -181,6 +181,7 @@ export interface IFaucetResultSharingConfig {
 }
 
 export interface IPassportBoostConfig {
+  scorerApiKey: string;
   passportCachePath: string;
   trustedIssuers: string[];
   refreshCooldown: number;

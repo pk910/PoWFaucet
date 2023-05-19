@@ -11,7 +11,7 @@ import { renderDate } from "../utils/DateUtils";
 import { IIPInfo, IPInfoResolver } from "../services/IPInfoResolver";
 import { FaucetStatsLog } from "../services/FaucetStatsLog";
 import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
-import { IPassportInfo, PassportVerifier } from "../services/PassportVerifier";
+import { IPassportInfo, IPassportStampInfo, PassportVerifier } from "../services/PassportVerifier";
 import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 import { PoWOutflowLimiter } from "../services/PoWOutflowLimiter";
 import { EthWeb3Manager } from "../services/EthWeb3Manager";
@@ -59,7 +59,7 @@ export interface IPoWSessionStoreData {
 }
 
 export interface IPoWSessionBoostInfo {
-  stamps: string[];
+  stamps: IPassportStampInfo[];
   score: number;
   factor: number;
 }
@@ -97,12 +97,23 @@ export class PoWSession {
     return sessions;
   }
 
-  public static getConcurrentSessionCount(remoteIp: string, skipSession?: PoWSession): number {
+  public static getConcurrentSessionCountByIp(remoteIp: string, skipSession?: PoWSession): number {
     let concurrentSessions = 0;
     Object.values(this.activeSessions).forEach((session) => {
       if(skipSession && skipSession === session)
         return;
       if(session.activeClient && session.activeClient.getRemoteIP() === remoteIp)
+        concurrentSessions++;
+    });
+    return concurrentSessions;
+  }
+
+  public static getConcurrentSessionCountByAddr(addr: string, skipSession?: PoWSession): number {
+    let concurrentSessions = 0;
+    Object.values(this.activeSessions).forEach((session) => {
+      if(skipSession && skipSession === session)
+        return;
+      if(session.activeClient && session.getTargetAddr().toLowerCase() === addr.toLowerCase())
         concurrentSessions++;
     });
     return concurrentSessions;
@@ -600,7 +611,7 @@ export class PoWSession {
       if(!verifyResult.valid) {
         throw verifyResult.errors.join("\n");
       }
-      passport = verifyResult.info;
+      passport = verifyResult.passportInfo;
     }
     else if(refresh) {
       let now = Math.floor((new Date()).getTime() / 1000);
@@ -616,7 +627,7 @@ export class PoWSession {
     let score = passportVerifier.getPassportScore(passport);
     if(score) {
       this.boostInfo = {
-        stamps: passport.stamps?.map((stamp) => stamp.provider) || [],
+        stamps: passport.stamps || [],
         score: score.score,
         factor: score.factor
       };
