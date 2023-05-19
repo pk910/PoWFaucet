@@ -174,8 +174,9 @@ export class PassportVerifier {
           method: 'GET',
           headers: {'X-API-KEY': faucetConfig.passportBoost.scorerApiKey}
         }).then((rsp) => rsp.json());
-
-        if(passportRsp && passportRsp.items && passportRsp.items.length > 0) {
+        let gotPassport = passportRsp && passportRsp.items && passportRsp.items.length > 0;
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Requested gitcoin passport for " + addr + ": " + (gotPassport ? "got " + passportRsp.items.length + " stamps" : "no passport"));
+        if(gotPassport) {
           passport = {
             issuanceDate: null,
             expiryDate: null,
