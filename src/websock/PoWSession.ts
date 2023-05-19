@@ -96,12 +96,23 @@ export class PoWSession {
     return sessions;
   }
 
-  public static getConcurrentSessionCount(remoteIp: string, skipSession?: PoWSession): number {
+  public static getConcurrentSessionCountByIp(remoteIp: string, skipSession?: PoWSession): number {
     let concurrentSessions = 0;
     Object.values(this.activeSessions).forEach((session) => {
       if(skipSession && skipSession === session)
         return;
       if(session.activeClient && session.activeClient.getRemoteIP() === remoteIp)
+        concurrentSessions++;
+    });
+    return concurrentSessions;
+  }
+
+  public static getConcurrentSessionCountByAddr(addr: string, skipSession?: PoWSession): number {
+    let concurrentSessions = 0;
+    Object.values(this.activeSessions).forEach((session) => {
+      if(skipSession && skipSession === session)
+        return;
+      if(session.activeClient && session.getTargetAddr().toLowerCase() === addr.toLowerCase())
         concurrentSessions++;
     });
     return concurrentSessions;

@@ -279,8 +279,8 @@ export class PoWClient {
         sessionIdent = tokenValidity;
     }
 
-    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
-      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
+    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCountByIp(this.remoteIp) >= faucetConfig.concurrentSessions)
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Only " + faucetConfig.concurrentSessions + " concurrent sessions allowed per IP", message, PoWStatusLogLevel.INFO);
 
     let targetAddr: string = message.data.addr;
     if(typeof targetAddr === "string" && targetAddr.match(/^[-a-zA-Z0-9@:%._\+~#=]{1,256}\.eth$/) && faucetConfig.ensResolver) {
@@ -299,6 +299,9 @@ export class PoWClient {
       return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (please wait " + renderTimespan(faucetConfig.claimAddrCooldown) + " between requests)", message, PoWStatusLogLevel.INFO);
     else if(addressMarks.length > 0)
       return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (" + addressMarks.join(",") + ")", message, PoWStatusLogLevel.INFO);
+    
+    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCountByAddr(targetAddr) >= faucetConfig.concurrentSessions)
+      return this.sendErrorResponse("CONCURRENCY_LIMIT", "Only " + faucetConfig.concurrentSessions + " concurrent sessions allowed per wallet address", message, PoWStatusLogLevel.INFO);
     
     if(typeof faucetConfig.claimAddrMaxBalance === "number") {
       let walletBalance: bigint;
@@ -384,7 +387,7 @@ export class PoWClient {
     }
     
 
-    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp, session) >= faucetConfig.concurrentSessions)
+    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCountByIp(this.remoteIp, session) >= faucetConfig.concurrentSessions)
       return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
 
     let client: PoWClient;
@@ -428,7 +431,7 @@ export class PoWClient {
     if(PoWSession.getSession(sessionInfo.id))
       return this.sendErrorResponse("DUPLICATE_SESSION", "Session does already exist and cannot be recovered", message);
 
-    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCount(this.remoteIp) >= faucetConfig.concurrentSessions)
+    if(faucetConfig.concurrentSessions > 0 && PoWSession.getConcurrentSessionCountByIp(this.remoteIp) >= faucetConfig.concurrentSessions)
       return this.sendErrorResponse("CONCURRENCY_LIMIT", "Concurrent session limit reached", message, PoWStatusLogLevel.INFO);
 
     let now = Math.floor((new Date()).getTime() / 1000);
