@@ -381,8 +381,11 @@ passportBoost:
     - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
   passportCachePath: "passport-cache"
   
-  refreshCooldown: 10
-  cacheTime: 86400
+  refreshCooldown: 300 # allow refreshing every 5mins
+  cacheTime: 86400 # cache passports for 1 day (does not affect manual refreshing)
+
+  stampDeduplicationTime: 604800 # allow reusing a stamp in another passport after 7 days
+
   boostFactor:
     1: 1.1 # x1.1 if score >= 1
     5: 1.5 # x1.5 if score >= 5

@@ -347,7 +347,7 @@ export class PassportVerifier {
       };
       faucetStore.updatePassportStamps(stampHashes.filter((stampHash) => {
         return stampAssignments[stampHash]?.toLowerCase() === addr.toLowerCase();
-      }), addr);
+      }), addr, faucetConfig.passportBoost.stampDeduplicationTime || faucetConfig.passportBoost.cacheTime || 86400);
     }
     else {
       passportInfo = {
