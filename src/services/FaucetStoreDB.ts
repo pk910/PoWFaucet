@@ -96,6 +96,17 @@ export class FaucetStoreDB {
             PRIMARY KEY("Key")
           );
         `);
+      case 2: // upgrade to version 3
+        schemaVersion = 3;
+        ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
+        this.db.exec(`
+          CREATE TABLE "PassportStamps" (
+            "StampHash" TEXT NOT NULL UNIQUE,
+            "Address" TEXT NOT NULL,
+            "Timeout" INTEGER NOT NULL,
+            PRIMARY KEY("StampHash")
+          );
+        `);
     }
     if(schemaVersion !== oldVersion)
       this.db.prepare("UPDATE SchemaVersion SET SchemaVersion = ?").run(schemaVersion);
@@ -111,6 +122,7 @@ export class FaucetStoreDB {
     this.db.prepare("DELETE FROM AddressMarks WHERE Timeout < ?").run(now);
     this.db.prepare("DELETE FROM IPInfoCache WHERE Timeout < ?").run(now);
     this.db.prepare("DELETE FROM PassportCache WHERE Timeout < ?").run(now);
+    this.db.prepare("DELETE FROM PassportStamps WHERE Timeout < ?").run(now);
   }
 
   public getSessionMarks(sessionId: string, skipMarks?: SessionMark[]): SessionMark[] {
@@ -291,6 +303,42 @@ export class FaucetStoreDB {
 
   public deleteKeyValueEntry(key: string) {
     this.db.prepare("DELETE FROM KeyValueStore WHERE Key = ?").run(key);
+  }
+
+  public getPassportStamps(stampHashs: string[]): {[hash: string]: string} {
+    let query = this.db.prepare("SELECT StampHash, Address FROM PassportStamps WHERE StampHash IN (" + stampHashs.map(() => "?").join(",") + ") AND Timeout > ?");
+    let args: any[] = [];
+    let stamps: {[hash: string]: string} = {};
+    stampHashs.forEach((stampHash) => {
+      args.push(stampHash);
+      stamps[stampHash] = null;
+    });
+    args.push(this.now());
+
+    (query.all.apply(query, args) as {StampHash: string, Address: string}[]).forEach((row) => {
+      stamps[row.StampHash] = row.Address;
+    });
+
+    return stamps;
+  }
+
+  public updatePassportStamps(stampHashs: string[], address: string, duration?: number) {
+    if(stampHashs.length === 0)
+      return;
+
+    let now = this.now();
+    let timeout = now + (typeof duration === "number" ? duration : faucetConfig.passportBoost?.cacheTime || 3600);
+
+    let queryArgs: any[] = [];
+    let queryRows = stampHashs.map((stampHash) => {
+      queryArgs.push(stampHash);
+      queryArgs.push(address);
+      queryArgs.push(timeout);
+      return "(?,?,?)";
+    }).join(",");
+    
+    let query = this.db.prepare("INSERT OR REPLACE INTO PassportStamps (StampHash, Address, Timeout) VALUES " + queryRows);
+    query.run.apply(query, queryArgs);
   }
 
 }

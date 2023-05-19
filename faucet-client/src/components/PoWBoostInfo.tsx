@@ -158,6 +158,7 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
   }
 
   private renderPassportDetails(): React.ReactElement {
+    let now = this.props.powTime.getSyncedTime();
     let stamps = this.props.boostInfo?.stamps || [];
     return (
       <div className="passport-details container">
@@ -168,12 +169,38 @@ export class PoWBoostInfo extends React.PureComponent<IPoWBoostInfoProps, IPoWBo
         </div>
         {stamps.map((stamp) => {
           return (
-            <div key={"stamp-" + stamp} className="row passport-stamp">
+            <div key={"stamp-" + stamp.provider} className="row passport-stamp">
               <div className="col-8">
-                {stamp}
+                {stamp.provider}
               </div>
               <div className="col-4">
-                + {this.props.faucetConfig.passportBoost.stampScoring[stamp]}
+                {stamp.expiration > now && !stamp.duplicate ?
+                  <span>+ {this.props.faucetConfig.passportBoost.stampScoring[stamp.provider]}</span>
+                  : null}
+                {stamp.expiration <= now ?
+                  <OverlayTrigger
+                    placement="bottom"
+                    overlay={
+                      <Tooltip>
+                        This stamp has been expired. Please refresh it on passport.gitcoin.co
+                      </Tooltip>
+                    }
+                  >
+                    <span key="status" className="badge bg-danger">Expired</span>
+                  </OverlayTrigger>
+                  : null}
+                {stamp.duplicate ?
+                  <OverlayTrigger
+                    placement="bottom"
+                    overlay={
+                      <Tooltip>
+                        This stamp has already been used in the passport for {stamp.duplicate}
+                      </Tooltip>
+                    }
+                  >
+                    <span key="status" className="badge bg-danger">Reused</span>
+                  </OverlayTrigger>
+                  : null}
               </div>
             </div>
           )
