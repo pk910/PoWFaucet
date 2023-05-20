@@ -18,52 +18,7 @@ Sepolia Testnet: [https://sepolia-faucet.pk910.de](https://sepolia-faucet.pk910.
 
 # Run Yourself
 
-`npm install`
-
-`cp faucet-config.example.yaml faucet-config.yaml`
-
-edit faucet-config.yaml
-
-`npm run start`
-
-access the faucet via http://localhost:8080
-
-# Configure
-
-see [faucet-config.example.yaml](https://github.com/pk910/PoWFaucet/blob/master/faucet-config.example.yaml)
-
-# Productive Setups
-
-For productive setups I'd suggest using a more complex webserver that supports SSL, caching and other stuff.
-
-See [docs/webserver-setup.md](https://github.com/pk910/PoWFaucet/blob/master/docs/webserver-setup.md) for more.
-
-# Run with docker
-
-create a data directory
-
-create a copy of [faucet-config.example.yaml](https://github.com/pk910/PoWFaucet/blob/master/faucet-config.example.yaml) and save as `faucet-config.yaml`
-
-edit `faucet-config.yaml` and prepend /config/ to faucetStore, faucetDBFile & faucetLogFile (ensure they're not lost on updates)
-```
-faucetStore: "/config/faucet-store.json"
-faucetDBFile: "/config/faucet-store.db"
-faucetLogFile: "/config/faucet-events.log"
-```
-
-start the container: (change `/home/powfaucet` to your datadir)
-
-`docker run -d --restart unless-stopped --name=powfaucet -v /home/powfaucet:/config -p 8080:8080 -it pk910/powfaucet:latest --config=/config/faucet-config.yaml`
-
-You should now be able to access the faucet via http://localhost:8080
-
-read logs:
-
-`docker logs powfaucet --follow`
-
-stop container:
-
-`docker rm -f powfaucet`
+Read the [Faucet Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) to see the installation and configuration instructions.
 
 # Bugs & Features
 
