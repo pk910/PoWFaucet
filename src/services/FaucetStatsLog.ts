@@ -61,6 +61,7 @@ export class FaucetStatsLog {
 
   public addSessionStats(session: PoWSession) {
     let ipinfo = session.getLastIpInfo();
+    let boostinfo = session.getBoostInfo();
     this.addStatsEntry("SESS", {
       st: Math.floor(session.getStartTime().getTime() / 1000),
       ip: session.getLastRemoteIp(),
@@ -76,6 +77,8 @@ export class FaucetStatsLog {
       } : null,
       in: session.getIdent(),
       id: session.getSessionId(),
+      ps: boostinfo ? boostinfo.score : 0,
+      pf: boostinfo ? boostinfo.factor : 1,
     });
   }
 

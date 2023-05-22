@@ -53,8 +53,8 @@ ethRpcHost: "https://rpc.goerli.mudit.blog"
 # faucet wallet private key (hex, without 0x prefix)
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
 
-# EVM chain id
-ethChainId: 5
+# EVM chain id (null for auto-detect from RPC)
+ethChainId: null
 
 # symbol (short name) of the coin that can be mined
 faucetCoinSymbol: "GöETH"
