@@ -273,10 +273,8 @@ export class EthWeb3Manager {
       newStatus = FucetWalletState.NORMAL;
       if(!this.walletState.ready)
         newStatus = FucetWalletState.OFFLINE;
-      else if(this.walletState.balance <= faucetConfig.noFundsBalance) {
-        console.log("nofunds: " + this.walletState.balance + " <= " + faucetConfig.noFundsBalance);
+      else if(this.walletState.balance <= faucetConfig.noFundsBalance)
         newStatus = FucetWalletState.NOFUNDS;
-      }
       else if(this.walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee))
         newStatus = FucetWalletState.NOFUNDS;
       else if(this.walletState.balance <= faucetConfig.lowFundsBalance)

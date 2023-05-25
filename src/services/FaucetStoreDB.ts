@@ -43,7 +43,7 @@ export class FaucetStoreDB {
     let schemaVersion: number = 0;
     this.db.prepare("CREATE TABLE IF NOT EXISTS SchemaVersion (SchemaVersion	INTEGER)").run();
     let res = this.db.prepare("SELECT SchemaVersion FROM SchemaVersion").get() as {SchemaVersion: number};
-    console.log("Schema Version: ", res);
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Current FaucetStore schema version: " + (res ? res.SchemaVersion : "uninitialized"));
     if(res)
       schemaVersion = res.SchemaVersion;
     else

@@ -208,7 +208,13 @@ let cliArgs = (function() {
 })();
 
 let packageJson = require('../../package.json');
-let basePath = path.join(__dirname, "..", "..");
+let internalBasePath = path.join(__dirname, "..", "..");
+let basePath: string;
+if((process as any).pkg) 
+  basePath = process.cwd();
+else
+  basePath = internalBasePath;
+
 let configFile: string;
 if(cliArgs['config']) {
   if(cliArgs['config'].match(/^\//))
@@ -221,14 +227,14 @@ else
 let defaultConfig: IFaucetConfig = {
   appBasePath: basePath,
   faucetVersion: packageJson.version,
-  staticPath: path.join(basePath, "static"),
+  staticPath: resolveRelativePath("~app/static"),
   faucetPidFile: null,
   buildSeoIndex: true,
   buildSeoMeta: {
     "keywords": "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow",
   },
-  faucetStore: path.join(basePath, "faucet-store.json"),
-  faucetDBFile: path.join(basePath, "faucet-store.db"),
+  faucetStore: resolveRelativePath("faucet-store.json"),
+  faucetDBFile: resolveRelativePath("faucet-store.db"),
 
   powPingInterval: 10,
   powPingTimeout: 30,
@@ -314,7 +320,7 @@ export function loadFaucetConfig() {
 
   if(!fs.existsSync(configFile)) {
     // create copy of faucet-config.example.yml
-    let exampleConfigFile = path.join(basePath, "faucet-config.example.yaml")
+    let exampleConfigFile = resolveRelativePath("~app/faucet-config.example.yaml");
     if(!fs.existsSync(exampleConfigFile))
       throw exampleConfigFile + " not found";
 
@@ -345,7 +351,28 @@ export function loadFaucetConfig() {
   if(!config.verifyMinerMissPenaltyPerc && (config as any).verifyMinerMissPenalty)
     config.verifyMinerMissPenaltyPerc = Math.floor((config as any).verifyMinerMissPenalty * 10000 / config.powShareReward) / 100;
 
+  if(config.staticPath) config.staticPath = resolveRelativePath(config.staticPath);
+  if(config.faucetStore) config.faucetStore = resolveRelativePath(config.faucetStore);
+  if(config.faucetDBFile) config.faucetPidFile = resolveRelativePath(config.faucetPidFile);
+  if(config.faucetPidFile) config.faucetPidFile = resolveRelativePath(config.faucetDBFile);
+  if(config.faucetLogFile) config.faucetLogFile = resolveRelativePath(config.faucetLogFile);
+  if(config.faucetStats?.logfile) config.faucetStats.logfile = resolveRelativePath(config.faucetStats.logfile);
+  if(config.passportBoost?.passportCachePath) config.passportBoost.passportCachePath = resolveRelativePath(config.passportBoost.passportCachePath);
+
   if(!faucetConfig)
     faucetConfig = {} as any;
   Object.assign(faucetConfig, defaultConfig, config);
+}
+
+export function resolveRelativePath(inputPath: string, customBasePath?: string): string {
+  if(!inputPath || typeof inputPath !== "string")
+    return inputPath;
+  let outputPath: string = inputPath;
+  if(!customBasePath)
+    customBasePath = basePath;
+  if(inputPath.match(/^~app\//))
+    outputPath = path.join(internalBasePath, inputPath.replace(/^~app\//, ""));
+  else if(!path.isAbsolute(inputPath))
+    outputPath = path.join(customBasePath, inputPath);
+  return outputPath;
 }

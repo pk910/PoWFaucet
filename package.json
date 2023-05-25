@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "PoW Faucet Server",
   "main": "dist/app.js",
+  "bin": "dist/app.js",
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/app.js",
@@ -10,6 +11,13 @@
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",
+  "pkg": {
+    "scripts": "dist/**/*.js",
+    "assets": [ "faucet-config.example.yaml", "static/**/*"],
+    "targets": [ "node18-linux-x64", "node18-win-x64" ],
+    "outputPath": "dist",
+    "options": [ "no-warnings" ]
+  },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.4",
     "@types/node-static": "^0.7.7",

@@ -8,7 +8,7 @@ import { PoWOutflowLimiter } from '../services/PoWOutflowLimiter';
 import { renderDate } from '../utils/DateUtils';
 import { strPadRight } from '../utils/StringUtils';
 import { PoWSession } from '../websock/PoWSession';
-import { faucetConfig, loadFaucetConfig } from './FaucetConfig';
+import { faucetConfig, loadFaucetConfig, resolveRelativePath } from './FaucetConfig';
 import { ServiceManager } from './ServiceManager';
 
 
@@ -85,7 +85,7 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
     let logLine = renderDate(new Date(), true, true) + "  " + strPadRight(level, 7, " ") + "  " + message;
 
     if(faucetConfig.faucetLogFile) {
-      let logFile = faucetConfig.faucetLogFile.match(/^\//) ? faucetConfig.faucetLogFile : path.join(faucetConfig.appBasePath, faucetConfig.faucetLogFile);
+      let logFile = resolveRelativePath(faucetConfig.faucetLogFile);
       fs.appendFileSync(logFile, logLine + "\r\n");
     }
 

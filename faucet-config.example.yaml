@@ -48,7 +48,7 @@ faucetSecret: "RandomStringThatShouldBeVerySecret!"
 
 # ETH execution layer RPC host
 #ethRpcHost: "http://127.0.0.1:8545/"
-ethRpcHost: "https://rpc.goerli.mudit.blog"
+ethRpcHost: "https://ethereum-goerli.publicnode.com"
 
 # faucet wallet private key (hex, without 0x prefix)
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
