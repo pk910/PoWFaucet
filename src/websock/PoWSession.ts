@@ -216,7 +216,7 @@ export class PoWSession {
 
   private timeoutSession() {
     let activeClient = this.activeClient;
-    this.closeSession(false, true);
+    this.closeSession(false, true, "session-timeout");
     if(activeClient) {
       activeClient.sendMessage("sessionKill", {
         level: "timeout",
@@ -226,7 +226,7 @@ export class PoWSession {
     }
   }
 
-  public closeSession(setClosedMark?: boolean, makeClaimable?: boolean) {
+  public closeSession(setClosedMark: boolean, makeClaimable: boolean, reason: string) {
     if(this.activeClient) {
       this.activeClient.setSession(null);
       this.activeClient = null;
@@ -244,8 +244,8 @@ export class PoWSession {
     delete PoWSession.activeSessions[this.sessionId];
     ServiceManager.GetService(FaucetProcess).emitLog(
       FaucetLogLevel.INFO, 
-      "Closed session: " + this.sessionId + 
-      (this.claimable ? " (claimable reward: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance)+ ")" : "")
+      "Closed session: " + this.sessionId + " (" + reason + ")" +
+      (this.claimable ? " [reward: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance)+ "]" : "")
     );
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
 
@@ -402,7 +402,7 @@ export class PoWSession {
         clearTimeout(this.idleCloseTimer);
       }
       this.idleCloseTimer = setTimeout(() => {
-        this.closeSession(false, true);
+        this.closeSession(false, true, "idle-timeout");
       }, faucetConfig.powIdleTimeout * 1000);
     }
     else if(this.idleCloseTimer) {
@@ -543,7 +543,7 @@ export class PoWSession {
         message: reason,
         token: null
       });
-    this.closeSession();
+    this.closeSession(false, false, "killed");
 
     ServiceManager.GetService(FaucetStatsLog).statSlashCount++;
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Slashed session " + this.sessionId + " (reason: " + reason + ", penalty: killed)");
@@ -576,7 +576,7 @@ export class PoWSession {
 
     if(this.rewardRestriction.blocked) {
       let activeClient = this.activeClient;
-      this.closeSession(true, this.rewardRestriction.blocked === "close");
+      this.closeSession(true, this.rewardRestriction.blocked === "close", "restriction");
       if(activeClient) {
         activeClient.sendMessage("sessionKill", {
           level: "restriction",

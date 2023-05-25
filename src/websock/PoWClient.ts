@@ -569,7 +569,7 @@ export class PoWClient {
       return this.sendErrorResponse("SESSION_NOT_FOUND", "No active session found", message);
 
     let session = this.session;
-    this.session.closeSession(true, true);
+    this.session.closeSession(true, true, "requested");
 
     let claimToken = session.isClaimable() ? session.getSignedSession() : null;
     this.sendMessage("ok", {
