@@ -1,0 +1,42 @@
+
+name: Binary Release
+
+on:
+  workflow_dispatch:
+
+
+jobs:
+
+  build_release:
+    name: Build Binary Release
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 18.15.0
+    - run: npm install -g pkg
+
+    - run: npm install
+    - run: npm rebuild
+    - run: npm run build
+
+    - run: pkg --compress Brotli .
+
+    - name: Get project versions
+      run: |
+        echo "server_version=$(cat package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
+        echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
+      id: version
+
+    - name: Upload linux binary artifact
+      uses: actions/upload-artifact@v3
+      with:
+        path: ./dist/pow-faucet-server-linux
+        name: powfaucet-server-linux
+    - name: Upload windows binary artifact
+      uses: actions/upload-artifact@v3
+      with:
+        path: ./dist/pow-faucet-server-win.exe
+        name: powfaucet-server-win.exe

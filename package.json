@@ -13,7 +13,7 @@
   "license": "AGPL-3.0",
   "pkg": {
     "scripts": "dist/**/*.js",
-    "assets": [ "faucet-config.example.yaml", "static/**/*"],
+    "assets": [ "faucet-config.example.yaml", "static/**/*", "node_modules/better-sqlite3/build/Release/better_sqlite3.node"],
     "targets": [ "node18-linux-x64", "node18-win-x64" ],
     "outputPath": "dist",
     "options": [ "no-warnings" ]
