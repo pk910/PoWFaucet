@@ -10,11 +10,15 @@ For clarification: This faucet does NOT generate new coins with the "mining" pro
 It's just a protection method to prevent anyone from requesting big amount of funds and draining the faucet wallet.
 If you want to run your own instance you need to transfer the mineable funds to the faucet wallet yourself!
 
+For a more detailed description, take a look into the [Project Wiki](https://github.com/pk910/PoWFaucet/wiki)
+
 # Instances
 
 Goerli Testnet: [https://goerli-faucet.pk910.de](https://goerli-faucet.pk910.de)
 
 Sepolia Testnet: [https://sepolia-faucet.pk910.de](https://sepolia-faucet.pk910.de)
+
+[Ephemery](https://github.com/ephemery-testnet/ephemery-resources) Testnet: [https://ephemery-faucet.pk910.de](https://ephemery-faucet.pk910.de)
 
 # Run Yourself
 
