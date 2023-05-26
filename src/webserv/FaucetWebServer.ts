@@ -169,7 +169,7 @@ export class FaucetHttpServer {
       let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
       fs.writeFileSync(seoFile, indexHtml);
     } catch(ex) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Could not write seo index to disk: " + ex.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Could not write seo index to disk, because static folder is not writable. Serving seo index from memory.");
     }
   }
 }

@@ -1,5 +1,5 @@
 
-name: Build latest Release
+name: Build latest master version
 
 on:
   push:
@@ -101,6 +101,8 @@ jobs:
         body: |
           Latest automatically built executables.
           Built from master branch (commit: ${{ github.sha }})
+
+          Please read the [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) for setup / configuration instructions.
 
           Server Version: ${{ steps.version.outputs.server_version }}
           Client Version: ${{ steps.version.outputs.client_version }}

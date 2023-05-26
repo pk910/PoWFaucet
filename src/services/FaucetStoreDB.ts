@@ -28,6 +28,7 @@ export class FaucetStoreDB {
   }
 
   private initDatabase() {
+    console.log(faucetConfig.faucetDBFile);
     this.db = new SQLite3.default(faucetConfig.faucetDBFile, {
       //verbose: console.log
     });

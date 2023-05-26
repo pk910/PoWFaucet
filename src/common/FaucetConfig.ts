@@ -210,14 +210,19 @@ let cliArgs = (function() {
 let packageJson = require('../../package.json');
 let internalBasePath = path.join(__dirname, "..", "..");
 let basePath: string;
-if((process as any).pkg) 
+if(cliArgs['datadir']) {
+  basePath = cliArgs['datadir'];
+  if(!path.isAbsolute(basePath))
+    basePath = resolveRelativePath(basePath, process.cwd());
+}
+else if((process as any).pkg) 
   basePath = process.cwd();
 else
   basePath = internalBasePath;
 
 let configFile: string;
 if(cliArgs['config']) {
-  if(cliArgs['config'].match(/^\//))
+  if(path.isAbsolute(cliArgs['config']))
     configFile = cliArgs['config'];
   else
     configFile = path.join(basePath, cliArgs['config']);
@@ -353,8 +358,8 @@ export function loadFaucetConfig() {
 
   if(config.staticPath) config.staticPath = resolveRelativePath(config.staticPath);
   if(config.faucetStore) config.faucetStore = resolveRelativePath(config.faucetStore);
-  if(config.faucetDBFile) config.faucetPidFile = resolveRelativePath(config.faucetPidFile);
-  if(config.faucetPidFile) config.faucetPidFile = resolveRelativePath(config.faucetDBFile);
+  if(config.faucetDBFile) config.faucetDBFile = resolveRelativePath(config.faucetDBFile);
+  if(config.faucetPidFile) config.faucetPidFile = resolveRelativePath(config.faucetPidFile);
   if(config.faucetLogFile) config.faucetLogFile = resolveRelativePath(config.faucetLogFile);
   if(config.faucetStats?.logfile) config.faucetStats.logfile = resolveRelativePath(config.faucetStats.logfile);
   if(config.passportBoost?.passportCachePath) config.passportBoost.passportCachePath = resolveRelativePath(config.passportBoost.passportCachePath);
