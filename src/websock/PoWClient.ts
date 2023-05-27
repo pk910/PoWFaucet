@@ -189,7 +189,7 @@ export class PoWClient {
     this.sendFaucetStatus(status.status, status.hash);
   }
 
-  private onClientMessage(data: RawData, isBinary: boolean) {
+  protected async onClientMessage(data: RawData, isBinary: boolean): Promise<void> {
     let message;
     try {
       message = JSON.parse(data.toString());
@@ -202,37 +202,37 @@ export class PoWClient {
 
     switch(message.action) {
       case "getConfig":
-        this.onCliGetConfig(message);
+        await this.onCliGetConfig(message);
         break;
       case "startSession":
-        this.onCliStartSession(message);
+        await this.onCliStartSession(message);
         break;
       case "resumeSession":
-        this.onCliResumeSession(message);
+        await this.onCliResumeSession(message);
         break;
       case "recoverSession":
-        this.onCliRecoverSession(message);
+        await this.onCliRecoverSession(message);
         break;
       case "foundShare":
-        this.onCliFoundShare(message);
+        await this.onCliFoundShare(message);
         break;
       case "verifyResult":
-        this.onCliVerifyResult(message);
+        await this.onCliVerifyResult(message);
         break;
       case "closeSession":
-        this.onCliCloseSession(message);
+        await this.onCliCloseSession(message);
         break;
       case "claimRewards":
-        this.onCliClaimRewards(message);
+        await this.onCliClaimRewards(message);
         break;
       case "watchClaimTx":
-        this.onCliWatchClaimTx(message);
+        await this.onCliWatchClaimTx(message);
         break;
       case "getClaimQueueState":
-        this.onCliGetClaimQueueState(message);
+        await this.onCliGetClaimQueueState(message);
         break;
       case "refreshBoost":
-        this.onCliRefreshBoost(message);
+        await this.onCliRefreshBoost(message);
         break;
       default:
         this.sendMessage("error", {
@@ -316,10 +316,10 @@ export class PoWClient {
     if(faucetConfig.claimAddrDenyContract) {
       try {
         if(await ServiceManager.GetService(EthWeb3Manager).checkIsContract(targetAddr)) {
-          return this.sendErrorResponse("INVALID_ADDR", "Cannot start session for " + targetAddr + " (address is a contract)", message, FaucetLogLevel.INFO);
+          return this.sendErrorResponse("CONTRACT_ADDR", "Cannot start session for " + targetAddr + " (address is a contract)", message, FaucetLogLevel.INFO);
         }
       } catch(ex) {
-        return this.sendErrorResponse("BALANCE_ERROR", "Could not check contract status of wallet " + targetAddr + ": " + ex.toString(), message);
+        return this.sendErrorResponse("CONTRACT_LIMIT", "Could not check contract status of wallet " + targetAddr + ": " + ex.toString(), message);
       }
     }
 

@@ -76,4 +76,11 @@ export class ServiceManager {
     return serviceObj;
   }
 
+  public static ClearAllServices() {
+    this._serviceInstances.forEach((instanceArr) => {
+      if(instanceArr.length > 0)
+        instanceArr.splice(0, instanceArr.length);
+    });
+  }
+
 }

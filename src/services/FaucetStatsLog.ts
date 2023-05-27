@@ -1,7 +1,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { faucetConfig } from '../common/FaucetConfig';
+import { faucetConfig, resolveRelativePath } from '../common/FaucetConfig';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWClient } from '../websock/PoWClient';
@@ -26,7 +26,7 @@ export class FaucetStatsLog {
   public constructor() {
     if(faucetConfig.faucetStats) {
       this.enabled = true;
-      this.statsFile = path.join(faucetConfig.appBasePath, faucetConfig.faucetStats.logfile || "faucet-stats.log");
+      this.statsFile = resolveRelativePath(faucetConfig.faucetStats.logfile || "faucet-stats.log");
     }
     else {
       this.enabled = false;

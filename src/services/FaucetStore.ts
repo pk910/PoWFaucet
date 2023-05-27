@@ -10,9 +10,14 @@ interface IFaucetRecoveryStore {
 }
 
 export class FaucetStore {
+  private initialized: boolean;
   private recoveryStore: IFaucetRecoveryStore;
 
-  public constructor() {
+  public initialize() {
+    if(this.initialized)
+      return;
+    this.initialized = true;
+
     this.loadRecoveryStore();
     this.migrateLegacyStore();
   }
@@ -28,6 +33,8 @@ export class FaucetStore {
   }
 
   public saveRecoveryStore() {
+    if(!this.recoveryStore)
+      return;
     fs.writeFileSync(faucetConfig.faucetStore, JSON.stringify(this.recoveryStore));
   }
 
@@ -77,10 +84,14 @@ export class FaucetStore {
   }
 
   public getSessionStore(): IPoWSessionStoreData[] {
+    if(!this.recoveryStore)
+      return [];
     return this.recoveryStore.sessionStore;
   }
 
   public setSessionStore(sessionStore: IPoWSessionStoreData[]) {
+    if(!this.recoveryStore)
+      return;
     this.recoveryStore.sessionStore = sessionStore;
   }
 

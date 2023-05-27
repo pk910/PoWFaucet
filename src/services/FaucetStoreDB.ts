@@ -18,9 +18,14 @@ export enum AddressMark {
 }
 
 export class FaucetStoreDB {
+  private initialized: boolean;
   private db: SQLite3.Database;
 
-  public constructor() {
+  public initialize() {
+    if(this.initialized)
+      return;
+    this.initialized = true;
+
     this.initDatabase();
     setInterval(() => {
       this.cleanStore();
@@ -28,7 +33,6 @@ export class FaucetStoreDB {
   }
 
   private initDatabase() {
-    console.log(faucetConfig.faucetDBFile);
     this.db = new SQLite3.default(faucetConfig.faucetDBFile, {
       //verbose: console.log
     });

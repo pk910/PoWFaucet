@@ -3,6 +3,8 @@ import * as path from 'path';
 import YAML from 'yaml'
 import randomBytes from 'randombytes'
 import { FaucetCoinType } from '../services/EthWeb3Manager';
+import { ServiceManager } from './ServiceManager';
+import { FaucetLogLevel, FaucetProcess } from './FaucetProcess';
 
 export interface IFaucetConfig {
   appBasePath: string; // base path (set automatically)
@@ -220,15 +222,15 @@ else if((process as any).pkg)
 else
   basePath = internalBasePath;
 
-let configFile: string;
+export let faucetConfigFile: string;
 if(cliArgs['config']) {
   if(path.isAbsolute(cliArgs['config']))
-    configFile = cliArgs['config'];
+    faucetConfigFile = cliArgs['config'];
   else
-    configFile = path.join(basePath, cliArgs['config']);
+    faucetConfigFile = path.join(basePath, cliArgs['config']);
 }
 else
-  configFile = path.join(basePath, "faucet-config.yaml");
+  faucetConfigFile = path.join(basePath, "faucet-config.yaml");
 let defaultConfig: IFaucetConfig = {
   appBasePath: basePath,
   faucetVersion: packageJson.version,
@@ -320,10 +322,14 @@ let defaultConfig: IFaucetConfig = {
 
 export let faucetConfig: IFaucetConfig = null;
 
-export function loadFaucetConfig() {
+export function loadFaucetConfig(loadDefaultConfig?: boolean) {
   let config: IFaucetConfig;
+  let configFile = faucetConfigFile;
 
-  if(!fs.existsSync(configFile)) {
+  if(loadDefaultConfig) {
+    configFile = resolveRelativePath("~app/faucet-config.example.yaml");
+  }
+  else if(!fs.existsSync(configFile)) {
     // create copy of faucet-config.example.yml
     let exampleConfigFile = resolveRelativePath("~app/faucet-config.example.yaml");
     if(!fs.existsSync(exampleConfigFile))
@@ -336,7 +342,6 @@ export function loadFaucetConfig() {
     fs.writeFileSync(configFile, exampleYamlSrc);
   }
 
-  console.log("Loading yaml faucet config from " + configFile);
   let yamlSrc = fs.readFileSync(configFile, "utf8");
   let yamlObj = YAML.parse(yamlSrc);
   config = yamlObj;
@@ -367,6 +372,8 @@ export function loadFaucetConfig() {
   if(!faucetConfig)
     faucetConfig = {} as any;
   Object.assign(faucetConfig, defaultConfig, config);
+
+  ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Loaded faucet config from yaml file: " + configFile);
 }
 
 export function resolveRelativePath(inputPath: string, customBasePath?: string): string {

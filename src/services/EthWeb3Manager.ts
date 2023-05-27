@@ -18,6 +18,7 @@ import { PromiseDfd } from '../utils/PromiseDfd';
 import { FaucetStoreDB } from './FaucetStoreDB';
 import { PoWRewardLimiter } from './PoWRewardLimiter';
 import ERC20_ABI from '../abi/ERC20.json';
+import { sleepPromise } from '../utils/SleepPromise';
 
 interface WalletState {
   ready: boolean;
@@ -107,6 +108,7 @@ export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
 }
 
 export class EthWeb3Manager {
+  private initialized: boolean;
   private web3: Web3;
   private chainCommon: EthCom.default;
   private walletKey: Buffer;
@@ -124,7 +126,11 @@ export class EthWeb3Manager {
   private lastWalletRefillTry: number;
   private walletRefilling: boolean;
 
-  public constructor() {
+  public initialize() {
+    if(this.initialized)
+      return;
+    this.initialized = true;
+
     this.startWeb3();
     if(typeof faucetConfig.ethChainId === "number")
       this.initChainCommon(faucetConfig.ethChainId);
@@ -477,12 +483,6 @@ export class EthWeb3Manager {
     this.queueProcessing = false;
   }
 
-  private sleepPromise(delay: number): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(resolve, delay);
-    });
-  }
-
   private async processQueueTx(claimTx: ClaimTx) {
     if(!this.walletState.ready) {
       claimTx.failReason = "Network RPC is currently unreachable.";
@@ -529,7 +529,7 @@ export class EthWeb3Manager {
           if(!txError)
             txError = ex;
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Sending TX for " + claimTx.target + " failed [try: " + retryCount + "]: " + ex.toString());
-          await this.sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
+          await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
           await this.loadWalletState();
         }
       } while(!txPromise && retryCount++ < 3);
@@ -592,7 +592,7 @@ export class EthWeb3Manager {
     try {
       let receipt: TransactionReceipt;
       do {
-        await this.sleepPromise(30000); // 30 secs
+        await sleepPromise(30000); // 30 secs
         receipt = await this.web3.eth.getTransactionReceipt(txhash);
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Polled transaction receipt for " + txhash + ": " + (receipt ? "found!" : "pending"));
       } while(!receipt);

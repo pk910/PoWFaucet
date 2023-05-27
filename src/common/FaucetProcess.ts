@@ -25,13 +25,20 @@ export enum FaucetLogLevel {
 }
 
 export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
-
+  private initialized: boolean;
+  
   public constructor() {
     super();
 
     if(faucetConfig.faucetPidFile) {
       fs.writeFileSync(faucetConfig.faucetPidFile, process.pid.toString());
     }
+  }
+
+  public initialize() {
+    if(this.initialized)
+      return;
+    this.initialized = true;
 
     process.on('uncaughtException', (err, origin) => {
       this.emitLog(FaucetLogLevel.ERROR, `### Caught unhandled exception: ${err}\r\n` + `  Exception origin: ${origin}\r\n` + `  Stack Trace: ${err.stack}\r\n`);

@@ -133,6 +133,19 @@ export class PoWSession {
     ServiceManager.GetService(FaucetStore).setSessionStore(null);
   }
 
+  public static resetSessionData() {
+    Object.values(this.activeSessions).forEach((session) => {
+      session.closeSession(false, false, "reset sessions");
+    });
+    Object.values(this.closedSessions).forEach((session) => {
+      if(session.cleanupTimer) {
+        clearTimeout(session.cleanupTimer);
+        session.cleanupTimer = null;
+      }
+    });
+    this.closedSessions = {};
+  }
+
   private sessionId: string;
   private startTime: Date;
   private idleTime: Date | null;
