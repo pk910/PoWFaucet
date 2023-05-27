@@ -28,15 +28,16 @@ export class FaucetHttpResponse {
 }
 
 export class FaucetHttpServer {
+  private httpServer: HttpServer;
   private wssServer: WebSocketServer;
   private staticServer: StaticServer;
   private cachedSeoIndex: string;
 
   public constructor() {
-    let server = createServer();
-    server.on("request", (req, rsp) => this.onHttpRequest(req, rsp));
-    server.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock, head));
-    server.listen(faucetConfig.serverPort);
+    this.httpServer = createServer();
+    this.httpServer.on("request", (req, rsp) => this.onHttpRequest(req, rsp));
+    this.httpServer.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock, head));
+    this.httpServer.listen(faucetConfig.serverPort);
 
     this.wssServer = new WebSocketServer({
       noServer: true
@@ -52,6 +53,14 @@ export class FaucetHttpServer {
         this.buildSeoIndex();
       });
     }
+  }
+
+  public getListenPort(): number {
+    let addr = this.httpServer.address();
+    if(typeof addr === "object")
+      return addr.port;
+    else
+      return faucetConfig.serverPort;
   }
 
   private onHttpRequest(req: IncomingMessage, rsp: ServerResponse) {

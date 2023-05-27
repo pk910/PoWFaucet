@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { isMainThread, parentPort, Worker } from 'worker_threads';
 import { faucetConfig } from '../common/FaucetConfig';
 import { PromiseDfd } from '../utils/PromiseDfd';
@@ -53,8 +54,7 @@ export class PoWValidator {
   }
 
   private onWorkerMessage(msg: any) {
-    if(!msg || typeof msg !== "object")
-      return;
+    assert.equal(msg && (typeof msg === "object"), true);
 
     switch(msg.action) {
       case "init":
@@ -67,8 +67,7 @@ export class PoWValidator {
   }
 
   private onWorkerValidated(msg: any) {
-    if(!this.validateQueue.hasOwnProperty(msg.shareId))
-      return;
+    assert.equal(this.validateQueue.hasOwnProperty(msg.shareId), true);
     
     let resDfd = this.validateQueue[msg.shareId];
     delete this.validateQueue[msg.shareId];

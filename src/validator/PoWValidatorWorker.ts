@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { getScrypt, getScryptReadyPromise, Scrypt } from "../../libs/scrypt_wasm";
 import { MessagePort } from "worker_threads";
 import { base64ToHex } from "../utils/ConvertHelpers";
@@ -18,8 +19,7 @@ export class PoWValidatorWorker {
   }
   
   private onControlMessage(msg: any) {
-    if(!msg || typeof msg !== "object")
-      return;
+    assert.equal(msg && (typeof msg === "object"), true);
 
     //console.log(evt);
     
