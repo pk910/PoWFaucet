@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/app.js",
-    "test": "mocha --exit -r ts-node/register 'tests/**/*.ts'"
+    "test": "mocha --exit -r ts-node/register 'tests/**/*.ts'",
+    "test-coverage": "nyc --reporter=text --reporter=lcov mocha --exit -r ts-node/register 'tests/**/*.ts'"
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",
@@ -37,6 +38,7 @@
     "@types/ws": "^8.5.4",
     "chai": "^4.3.7",
     "mocha": "^10.2.0",
+    "nyc": "^15.1.0",
     "sinon": "^15.1.0",
     "ts-node": "^10.9.1",
     "tslint": "^6.1.3",
