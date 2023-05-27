@@ -1,17 +1,19 @@
 import { getScrypt, getScryptReadyPromise, Scrypt } from "../../libs/scrypt_wasm";
-import { parentPort } from "worker_threads";
+import { MessagePort } from "worker_threads";
 import { base64ToHex } from "../utils/ConvertHelpers";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator";
 
 export class PoWValidatorWorker {
   private scrypt: Scrypt;
+  private port: MessagePort;
   private difficultyMasks: {[difficulty: number]: string} = {};
   
-  public constructor() {
-    parentPort.on("message", (evt) => this.onControlMessage(evt));
+  public constructor(port: MessagePort) {
+    this.port = port;
+    this.port.on("message", (evt) => this.onControlMessage(evt));
     getScryptReadyPromise().then(() => {
       this.scrypt = getScrypt();
-      parentPort.postMessage({ action: "init" });
+      this.port.postMessage({ action: "init" });
     });
   }
   
@@ -69,7 +71,7 @@ export class PoWValidatorWorker {
       }
     }
 
-    parentPort.postMessage({
+    this.port.postMessage({
       action: "validated", 
       data: {
         shareId: req.shareId,

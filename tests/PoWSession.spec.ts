@@ -1,58 +1,18 @@
 import 'mocha';
-
-import sinon from 'sinon';
 import { expect } from 'chai';
-
-import { WebSocket } from 'ws';
-import { PoWClient } from "../../src/websock/PoWClient";
-import { PoWSession, PoWSessionStatus } from '../../src/websock/PoWSession';
-import { faucetConfig, loadFaucetConfig } from '../../src/common/FaucetConfig';
-import { IPInfoResolver } from '../../src/services/IPInfoResolver';
-import { PassportVerifier } from '../../src/services/PassportVerifier';
-import { FaucetProcess } from '../../src/common/FaucetProcess';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { sleepPromise } from '../../src/utils/SleepPromise';
-import { FaucetStoreDB } from '../../src/services/FaucetStoreDB';
-
-class FakeWebSocket extends WebSocket {
-  constructor() {
-    super(null);
-  }
-}
+import { bindTestStubs, FakeWebSocket, unbindTestStubs } from './common';
+import { PoWClient } from "../src/websock/PoWClient";
+import { PoWSession, PoWSessionStatus } from '../src/websock/PoWSession';
+import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
+import { ServiceManager } from '../src/common/ServiceManager';
+import { sleepPromise } from '../src/utils/SleepPromise';
+import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
 
 describe("Session Management", () => {
   let globalStubs;
 
   beforeEach(() => {
-    globalStubs = {
-      "WebSocket.send": sinon.stub(WebSocket.prototype, "send"),
-      "WebSocket.close": sinon.stub(WebSocket.prototype, "close"),
-      "WebSocket.ping": sinon.stub(WebSocket.prototype, "ping"),
-
-      "FaucetProcess.emitLog": sinon.stub(FaucetProcess.prototype, "emitLog"),
-      "IPInfoResolver.getIpInfo": sinon.stub(IPInfoResolver.prototype, "getIpInfo").resolves({
-        status: "success",
-        country: "United States",
-        countryCode: "US",
-        region: "Virginia",
-        regionCode: "VA",
-        city: "Ashburn",
-        cityCode: "Ashburn",
-        locLat: 39.03,
-        locLon: -77.5,
-        zone: "America/New_York",
-        isp: "Google LLC",
-        org: "Google Public DNS",
-        as: "AS15169 Google LLC",
-        proxy: false,
-        hosting: true,
-      }),
-      "PassportVerifier.getPassport": sinon.stub(PassportVerifier.prototype, "getPassport").resolves({
-        found: false,
-        parsed: Math.floor((new Date()).getTime()/1000),
-        newest: 0,
-      }),
-    };
+    globalStubs = bindTestStubs();
     loadFaucetConfig(true);
     faucetConfig.faucetStats = null;
     faucetConfig.faucetDBFile = ":memory:";
@@ -62,7 +22,7 @@ describe("Session Management", () => {
     PoWSession.resetSessionData();
     ServiceManager.GetService(FaucetStoreDB).closeDatabase();
     ServiceManager.ClearAllServices();
-    sinon.restore();
+    unbindTestStubs();
   });
 
   it("Create new session", async () => {

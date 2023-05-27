@@ -9,9 +9,22 @@ on:
 
 
 jobs:
+  run_tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 18.15.0
+
+    - run: npm install
+    - run: npm run test
 
   build_binaries:
     name: Build Binaries
+    needs: [run_tests]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -154,6 +167,7 @@ jobs:
         GITHUB_TOKEN: ${{ github.token }}
   build_docker:
     name: Build Docker Image
+    needs: [run_tests]
     runs-on: ubuntu-latest
     steps:
       -

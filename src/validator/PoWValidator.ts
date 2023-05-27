@@ -1,4 +1,4 @@
-import { isMainThread, Worker } from 'worker_threads';
+import { isMainThread, parentPort, Worker } from 'worker_threads';
 import { faucetConfig } from '../common/FaucetConfig';
 import { PromiseDfd } from '../utils/PromiseDfd';
 import { IPoWValidatorValidateRequest } from './IPoWValidator';
@@ -6,7 +6,7 @@ import { IPoWValidatorValidateRequest } from './IPoWValidator';
 (() => {
   if (!isMainThread) {
     let worker = require("./PoWValidatorWorker");
-    new worker.PoWValidatorWorker();
+    new worker.PoWValidatorWorker(parentPort);
   }
 })();
 
@@ -15,9 +15,9 @@ export class PoWValidator {
   private readyDfd: PromiseDfd<void>;
   private validateQueue: {[shareId: string]: PromiseDfd<boolean>} = {};
 
-  public constructor() {
+  public constructor(worker?: Worker) {
     this.readyDfd = new PromiseDfd<void>();
-    this.worker = new Worker(__filename);
+    this.worker = worker || new Worker(__filename);
     this.worker.on("message", (msg) => this.onWorkerMessage(msg))
   }
 

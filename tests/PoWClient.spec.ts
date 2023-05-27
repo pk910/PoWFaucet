@@ -1,30 +1,16 @@
 import 'mocha';
-
-import sinon from 'sinon';
 import { expect } from 'chai';
-
-import { WebSocket, RawData } from 'ws';
-import { PoWClient } from "../../src/websock/PoWClient";
-import { faucetConfig, loadFaucetConfig } from '../../src/common/FaucetConfig';
-import { IPInfoResolver } from '../../src/services/IPInfoResolver';
-import { PassportVerifier } from '../../src/services/PassportVerifier';
-import { FaucetProcess } from '../../src/common/FaucetProcess';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { PoWSession } from '../../src/websock/PoWSession';
-import { CaptchaVerifier } from '../../src/services/CaptchaVerifier';
-import { EnsWeb3Manager } from '../../src/services/EnsWeb3Manager';
-import { EthWeb3Manager } from '../../src/services/EthWeb3Manager';
-import { FaucetStoreDB } from '../../src/services/FaucetStoreDB';
-import { sleepPromise } from '../../src/utils/SleepPromise';
-
-class FakeWebSocket extends WebSocket {
-  constructor() {
-    super(null);
-  }
-}
+import { RawData } from 'ws';
+import { bindTestStubs, FakeWebSocket, unbindTestStubs } from './common';
+import { PoWClient } from "../src/websock/PoWClient";
+import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
+import { ServiceManager } from '../src/common/ServiceManager';
+import { PoWSession } from '../src/websock/PoWSession';
+import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
+import { sleepPromise } from '../src/utils/SleepPromise';
 
 class TestPoWClient extends PoWClient {
-  public sentMessages: {
+  private sentMessages: {
     action: string;
     data: any;
     rsp: any;
@@ -48,35 +34,17 @@ class TestPoWClient extends PoWClient {
         return this.sentMessages[i];
     }
   }
+
+  public clearSentMessages() {
+    this.sentMessages = [];
+  }
 }
 
 describe("WebSocket Client Handling", () => {
   let globalStubs;
 
   beforeEach(() => {
-    globalStubs = {
-      "WebSocket.send": sinon.stub(WebSocket.prototype, "send"),
-      "WebSocket.close": sinon.stub(WebSocket.prototype, "close"),
-      "WebSocket.ping": sinon.stub(WebSocket.prototype, "ping"),
-
-      "FaucetProcess.emitLog": sinon.stub(FaucetProcess.prototype, "emitLog"),
-      "IPInfoResolver.getIpInfo": sinon.stub(IPInfoResolver.prototype, "getIpInfo").resolves({
-        status: "success", country: "United States", countryCode: "US",
-        region: "Virginia", regionCode: "VA", city: "Ashburn", cityCode: "Ashburn",
-        locLat: 39.03, locLon: -77.5, zone: "America/New_York",
-        isp: "Google LLC", org: "Google Public DNS", as: "AS15169 Google LLC",
-        proxy: false, hosting: true,
-      }),
-      "PassportVerifier.getPassport": sinon.stub(PassportVerifier.prototype, "getPassport").resolves({
-        found: false,
-        parsed: Math.floor((new Date()).getTime()/1000),
-        newest: 0,
-      }),
-      "CaptchaVerifier.verifyToken": sinon.stub(CaptchaVerifier.prototype, "verifyToken").resolves(true),
-      "EnsWeb3Manager.verifyToken": sinon.stub(EnsWeb3Manager.prototype, "resolveEnsName").resolves(null),
-      "EthWeb3Manager.getWalletBalance": sinon.stub(EthWeb3Manager.prototype, "getWalletBalance").resolves(0n),
-      "EthWeb3Manager.checkIsContract": sinon.stub(EthWeb3Manager.prototype, "checkIsContract").resolves(false),
-    };
+    globalStubs = bindTestStubs();
     loadFaucetConfig(true);
     faucetConfig.faucetStats = null;
     faucetConfig.faucetDBFile = ":memory:";
@@ -86,7 +54,7 @@ describe("WebSocket Client Handling", () => {
     PoWSession.resetSessionData();
     ServiceManager.GetService(FaucetStoreDB).closeDatabase();
     ServiceManager.ClearAllServices();
-    sinon.restore();
+    unbindTestStubs();
   });
 
   function encodeClientMessage(message: any): Buffer {
@@ -402,7 +370,7 @@ describe("WebSocket Client Handling", () => {
       let recoverToken = session.getSignedSession();
       await sleepPromise(100);
       let killResponse = client.getSentMessage("sessionKill");
-      client.sentMessages = [];
+      client.clearSentMessages();
       expect(killResponse?.data.level).to.equal("timeout", "session has not been killed immediatly");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
@@ -440,7 +408,9 @@ describe("WebSocket Client Handling", () => {
         keyLength: 16,
         difficulty: 9
       };
+      faucetConfig.verifyLocalPercent = 0;
       faucetConfig.verifyLocalLowPeerPercent = 0;
+      faucetConfig.verifyMinerPeerCount = 10;
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "foundShare",
@@ -529,6 +499,276 @@ describe("WebSocket Client Handling", () => {
       let errorResponse = client.getSentMessage("error");
       expect(errorResponse?.rsp).to.equal("test", "response id mismatch");
       expect(errorResponse?.data.code).to.equal("INVALID_SHARE", "unexpected error code");
+    });
+    it("invalid foundShare call (nonce too high)", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let sessionTime = (new Date().getTime() / 1000) - 42;
+      let session = new PoWSession(client, {
+        id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+        startTime: sessionTime,
+        targetAddr: "0x0000000000000000000000000000000000001337",
+        preimage: "CIogLzT0cLA=",
+        balance: "0",
+        nonce: 200,
+        ident: "xyz-zyx",
+      });
+      faucetConfig.powNonceCount = 1;
+      faucetConfig.powScryptParams = {
+        cpuAndMemory: 4096,
+        blockSize: 8,
+        parallelization: 1,
+        keyLength: 16,
+        difficulty: 9
+      };
+      faucetConfig.verifyLocalLowPeerPercent = 0;
+      faucetConfig.powHashrateHardLimit = 10;
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "foundShare",
+        data: {
+          nonces: [3468],
+          params: "4096|8|1|16|9",
+          hashrate: 50
+        }
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.not.equal("ok", "unexpected success response");
+      let errorResponse = client.getSentMessage("error");
+      expect(errorResponse?.rsp).to.equal("test", "response id mismatch");
+      expect(errorResponse?.data.code).to.equal("HASHRATE_LIMIT", "unexpected error code");
+    });
+  });
+
+  describe("Request Handling: verifyResult", () => {
+    it("valid verifyResult call", async () => {
+      let client1 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client2 = new TestPoWClient(new FakeWebSocket(), "8.8.4.4");
+      let sessionTime = (new Date().getTime() / 1000) - 42;
+      let session1 = new PoWSession(client1, {
+        id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+        startTime: sessionTime,
+        targetAddr: "0x0000000000000000000000000000000000001337",
+        preimage: "CIogLzT0cLA=",
+        balance: "0",
+        nonce: 0,
+        ident: "xyz-zyx",
+      });
+      let session2 = new PoWSession(client2, "0x0000000000000000000000000000000000001338");
+      session2.addBalance(BigInt(faucetConfig.powShareReward));
+      faucetConfig.powNonceCount = 1;
+      faucetConfig.powScryptParams = {
+        cpuAndMemory: 4096,
+        blockSize: 8,
+        parallelization: 1,
+        keyLength: 16,
+        difficulty: 9
+      };
+      faucetConfig.verifyMinerIndividuals = 1;
+      faucetConfig.verifyMinerPeerCount = 1;
+      faucetConfig.verifyLocalPercent = 0;
+      faucetConfig.verifyMinerPercent = 100;
+      await client1.emitClientMessage(encodeClientMessage({
+        id: "test1",
+        action: "foundShare",
+        data: {
+          nonces: [156],
+          params: "4096|8|1|16|9",
+          hashrate: 50
+        }
+      }));
+      await sleepPromise(50);
+      let verifyRequest = client2.getSentMessage("verify");
+      expect(verifyRequest?.action).to.equal("verify", "no verify request for verifier session");
+      expect(verifyRequest.data.preimage).to.equal("CIogLzT0cLA=", "invalid preimage in verify request");
+      expect(verifyRequest.data.nonces[0]).to.equal(156, "invalid nonce in verify request");
+      await client2.emitClientMessage(encodeClientMessage({
+        id: "test2",
+        action: "verifyResult",
+        data: {
+          shareId: verifyRequest.data.shareId,
+          isValid: true
+        }
+      }));
+      let balanceResponse = client2.getSentMessage("updateBalance");
+      expect(balanceResponse?.action).to.equal("updateBalance", "no balance update response");
+      expect(parseInt(balanceResponse?.data.balance)).to.be.at.least(1, "balance too low");
+      let resultResponse = client1.getSentMessage("ok");
+      expect(resultResponse?.action).to.equal("ok", "no miner result response");
+      expect(resultResponse?.rsp).to.equal("test1", "miner response id mismatch");
+    });
+  });
+
+  describe("Request Handling: closeSession", () => {
+    it("valid closeSession call", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "closeSession",
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.equal("ok", "no result response");
+      expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
+    });
+    it("valid closeSession call (with claimable balance)", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
+      session.addBalance(BigInt(faucetConfig.claimMinAmount));
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "closeSession",
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.equal("ok", "no result response");
+      expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
+      expect(resultResponse?.data.claimable).to.equal(true, "not claimable");
+    });
+    it("invalid closeSession call (no session)", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "closeSession",
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.not.equal("ok", "unexpected success response");
+      let errorResponse = client.getSentMessage("error");
+      expect(errorResponse?.rsp).to.equal("test", "response id mismatch");
+      expect(errorResponse?.data.code).to.equal("SESSION_NOT_FOUND", "unexpected error code");
+    });
+  });
+  
+  describe("Request Handling: claimRewards", () => {
+    it("valid claimRewards call", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
+      session.addBalance(BigInt(faucetConfig.claimMinAmount));
+      session.closeSession(true, true, "test");
+      let claimToken = session.getSignedSession();
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "claimRewards",
+        data: {
+          token: claimToken,
+          captcha: "captcha_token"
+        }
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.equal("ok", "no result response");
+      expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
+    });
+    it("invalid claimRewards call (captcha verification)", async () => {
+      faucetConfig.captchas.checkBalanceClaim = true;
+      globalStubs["CaptchaVerifier.verifyToken"].resolves(false);
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
+      session.addBalance(BigInt(faucetConfig.claimMinAmount));
+      session.closeSession(true, true, "test");
+      let claimToken = session.getSignedSession();
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "claimRewards",
+        data: {
+          token: claimToken,
+          captcha: "captcha_token"
+        }
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.not.equal("ok", "unexpected success response");
+      let errorResponse = client.getSentMessage("error");
+      expect(errorResponse?.rsp).to.equal("test", "response id mismatch");
+      expect(errorResponse?.data.code).to.equal("INVALID_CAPTCHA", "unexpected error code");
+    });
+    it("invalid claimRewards call (invalid token)", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "claimRewards",
+        data: {
+          token: "invalid_claim_token",
+          captcha: "captcha_token"
+        }
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.not.equal("ok", "unexpected success response");
+      let errorResponse = client.getSentMessage("error");
+      expect(errorResponse?.rsp).to.equal("test", "response id mismatch");
+      expect(errorResponse?.data.code).to.equal("INVALID_CLAIM", "unexpected error code");
+    });
+    it("invalid claimRewards call (expired claim)", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let sessionTime = (new Date().getTime() / 1000) - faucetConfig.claimSessionTimeout - 2;
+      let session = new PoWSession(client, {
+        id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+        startTime: sessionTime,
+        targetAddr: "0x0000000000000000000000000000000000001337",
+        preimage: "CIogLzT0cLA=",
+        balance: faucetConfig.claimMinAmount.toString(),
+        nonce: 0,
+        ident: "xyz-zyx",
+      });
+      session.closeSession(true, true, "test");
+      await sleepPromise(10);
+      let claimToken = session.getSignedSession();
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "claimRewards",
+        data: {
+          token: claimToken,
+          captcha: "captcha_token"
+        }
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.not.equal("ok", "unexpected success response");
+      let errorResponse = client.getSentMessage("error");
+      expect(errorResponse?.rsp).to.equal("test", "response id mismatch");
+      expect(errorResponse?.data.code).to.equal("INVALID_CLAIM", "unexpected error code");
+    });
+  });
+
+  describe("Request Handling: watchClaimTx", () => {
+    it("valid watchClaimTx call", async () => {
+      let client1 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let session = new PoWSession(client1, "0x0000000000000000000000000000000000001337");
+      session.addBalance(BigInt(faucetConfig.claimMinAmount));
+      session.closeSession(true, true, "test");
+      let claimToken = session.getSignedSession();
+      await client1.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "claimRewards",
+        data: {
+          token: claimToken,
+          captcha: "captcha_token"
+        }
+      }));
+      let claimResultResponse = client1.getSentMessage("ok");
+      expect(claimResultResponse?.action).to.equal("ok", "no result response");
+      expect(claimResultResponse?.rsp).to.equal("test", "response id mismatch");
+      let client2 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      await client2.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "watchClaimTx",
+        data: {
+          sessionId: session.getSessionId(),
+        }
+      }));
+      let resultResponse = client2.getSentMessage("ok");
+      expect(resultResponse?.action).to.equal("ok", "no result response");
+      expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
+    });
+    it("invalid watchClaimTx call (unknown session id)", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "watchClaimTx",
+        data: {
+          sessionId: "38f04fda-5a52-4694-84e5-12edbed9539e"
+        }
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.not.equal("ok", "unexpected success response");
+      let errorResponse = client.getSentMessage("error");
+      expect(errorResponse?.rsp).to.equal("test", "response id mismatch");
+      expect(errorResponse?.data.code).to.equal("CLAIM_NOT_FOUND", "unexpected error code");
     });
   });
   
