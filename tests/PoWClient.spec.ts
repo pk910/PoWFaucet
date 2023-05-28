@@ -1290,5 +1290,44 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("CLAIM_NOT_FOUND", "unexpected error code");
     });
   });
+
+  describe("Request Handling: getClaimQueueState", () => {
+    it("valid getClaimQueueState call", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "getClaimQueueState",
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.equal("ok", "no result response");
+      expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
+    });
+  });
+
+  describe("Request Handling: refreshBoost", () => {
+    it("valid refreshBoost call", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "refreshBoost",
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.equal("ok", "no result response");
+      expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
+    });
+    it("invalid refreshBoost call (unknown session id)", async () => {
+      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      await client.emitClientMessage(encodeClientMessage({
+        id: "test",
+        action: "refreshBoost",
+      }));
+      let resultResponse = client.getSentMessage("ok");
+      expect(resultResponse?.action).to.not.equal("ok", "unexpected success response");
+      let errorResponse = client.getSentMessage("error");
+      expect(errorResponse?.rsp).to.equal("test", "response id mismatch");
+      expect(errorResponse?.data.code).to.equal("SESSION_NOT_FOUND", "unexpected error code");
+    });
+  });
   
 });

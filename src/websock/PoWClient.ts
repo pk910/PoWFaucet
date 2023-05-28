@@ -532,9 +532,10 @@ export class PoWClient {
         faucetStats.statVerifyCount += shareVerification.getMinerVerifyCount();
         faucetStats.statVerifyMisses += shareVerification.getMinerVerifyMisses();
       }
-    }, () => {
-      if(this.session)
-        this.sendErrorResponse("VERIFY_FAILED", "Share verification error", message);
+    }, (err) => {
+      if(this.session) {
+        this.sendErrorResponse("VERIFY_FAILED", "Share verification error" + (err ? ": " + err.toString() : ""), message);
+      }
     });
   }
   
