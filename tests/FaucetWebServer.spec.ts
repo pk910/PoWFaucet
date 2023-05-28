@@ -5,13 +5,9 @@ import * as path from 'path';
 import fetch from 'node-fetch';
 import { WebSocket } from 'ws';
 import { bindTestStubs, unbindTestStubs } from './common';
-import { PoWSession, PoWSessionStatus } from '../src/websock/PoWSession';
+import { PoWSession } from '../src/websock/PoWSession';
 import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
-import { FaucetWebApi } from '../src/webserv/FaucetWebApi';
-import { IncomingHttpHeaders, IncomingMessage } from 'http';
-import { Socket } from 'net';
-import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
 import { FaucetHttpServer } from '../src/webserv/FaucetWebServer';
 
 describe("Faucet Web Server", () => {

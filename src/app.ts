@@ -14,11 +14,11 @@ import { FaucetProcess } from "./common/FaucetProcess";
 (() => {
 
   loadFaucetConfig()
-  ServiceManager.InitService(FaucetProcess).initialize();
-  ServiceManager.InitService(FaucetStoreDB).initialize();
-  ServiceManager.InitService(FaucetStore).initialize();
-  ServiceManager.InitService(EthWeb3Manager).initialize();
-  ServiceManager.InitService(EnsWeb3Manager).initialize();
+  ServiceManager.GetService(FaucetProcess).initialize();
+  ServiceManager.GetService(FaucetStoreDB).initialize();
+  ServiceManager.GetService(FaucetStore).initialize();
+  ServiceManager.GetService(EthWeb3Manager).initialize();
+  ServiceManager.GetService(EnsWeb3Manager).initialize();
   ServiceManager.InitService(PoWValidator);
   ServiceManager.InitService(FaucetStatsLog);
   ServiceManager.InitService(FaucetWebApi);

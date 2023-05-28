@@ -46,11 +46,13 @@ export interface IPoWFaucetRefillStatus {
 export interface IPoWFaucetOutflowStatus {
   now: number;
   trackTime: number;
+  balance: number;
   dustAmount: number;
   restriction: number;
-  duration: number;
-  restrict: number;
   amount: number;
+  duration: number;
+  lowerLimit: number;
+  upperLimit: number;
 }
 
 export interface IPoWFaucetStatusSession {
@@ -247,16 +249,16 @@ export class PoWFaucetStatus extends React.PureComponent<IPoWFaucetStatusProps, 
           <div className="col-xl-3 col-lg-4 col-6">
             <div className="status-block">
               <div className="status-prop">
-                <span className="status-title">Outflow TrackTime:</span>
-                <span className="status-value">{this.state.outflowStatus.now - this.state.outflowStatus.trackTime} / {this.state.outflowStatus.restrict}</span>
-              </div>
-              <div className="status-prop">
                 <span className="status-title">Outflow Limit:</span>
-                <span className="status-value">{toReadableAmount(this.state.outflowStatus.amount, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
+                <span className="status-value">{toReadableAmount(this.state.outflowStatus.amount, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)} / {renderTimespan(this.state.outflowStatus.duration, 2)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Outflow Balance:</span>
-                <span className="status-value">{toReadableAmount((this.state.outflowStatus.amount / this.state.outflowStatus.duration * (this.state.outflowStatus.now - this.state.outflowStatus.trackTime)) + parseInt(this.state.outflowStatus.dustAmount.toString()), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
+                <span className="status-value">{this.state.outflowStatus.balance > 0 ? "+" : "-"} {toReadableAmount(Math.abs(this.state.outflowStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
+              </div>
+              <div className="status-prop">
+                <span className="status-title">Balance Limits:</span>
+                <span className="status-value">{toReadableAmount(this.state.outflowStatus.lowerLimit, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)} / {toReadableAmount(this.state.outflowStatus.upperLimit, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</span>
               </div>
               <div className="status-prop">
                 <span className="status-title">Outflow Restriction:</span>

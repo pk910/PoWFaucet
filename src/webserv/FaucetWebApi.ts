@@ -105,10 +105,13 @@ export interface IClientFaucetStatus {
     now: number;
     trackTime: number;
     dustAmount: string;
+    balance: string;
+
     restriction: number;
-    duration: number;
-    restrict: number;
     amount: number;
+    duration: number;
+    lowerLimit: number;
+    upperLimit: number;
   };
   sessions: IClientSessionStatus[];
   claims: IClientClaimStatus[];

@@ -302,13 +302,19 @@ faucetBalanceRestriction:
 # dynamic reward restriction based on faucet outflow
 # alternative to static faucetBalanceRestrictedReward
 # limits the rewards according to the faucet outflow
+# the faucet keeps track of the outflow via a internal "outflow balance".
+# amount/duration wei are added to that balance every second.
+# whenever some reward is mined, it is subtracted from that balance.
+# So, whenever the balance gets negative, there is more mining activity than the allowed outflow and the reward is reduced linearly down to 0% when it reaches lowerLimit.
+# Whenever the balance gets positive, there is less mining activity than allowed. The positive balance is a 'buffer' for activity spikes, anything above upperLimit gets burned.
 faucetOutflowRestriction:
   enabled: false
   # limit outflow to 1000ETH per day
   amount: 1000000000000000000000 # 1000 ETH
   duration: 86400 # 1 day
-  # apply linear reward restriction after `half of the duration` has been used
-  restrict: 43200
+  # outflow balance limits
+  lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
+  upperLimit: 500000000000000000000 # 500 ETH
 
 
 ### Automatic wallet refill

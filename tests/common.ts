@@ -33,6 +33,7 @@ export function bindTestStubs(stubs?) {
     "EnsWeb3Manager.verifyToken": sinon.stub(EnsWeb3Manager.prototype, "resolveEnsName").resolves(null),
     "EthWeb3Manager.getWalletBalance": sinon.stub(EthWeb3Manager.prototype, "getWalletBalance").resolves(BigInt(0)),
     "EthWeb3Manager.checkIsContract": sinon.stub(EthWeb3Manager.prototype, "checkIsContract").resolves(false),
+    "EthWeb3Manager.getFaucetBalance": sinon.stub(EthWeb3Manager.prototype, "getFaucetBalance").returns(BigInt(0)),
     ...stubs,
   }
 }

@@ -163,7 +163,8 @@ export interface IFaucetOutflowRestrictionConfig {
   enabled: boolean;
   amount: number;
   duration: number;
-  restrict: number;
+  lowerLimit: number;
+  upperLimit: number;
 }
 
 export interface IFaucetEnsResolverConfig {

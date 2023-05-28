@@ -1,8 +1,6 @@
 import 'mocha';
-import sinon from 'sinon';
 import { expect } from 'chai';
 import { bindTestStubs, FakeWebSocket, unbindTestStubs } from './common';
-import { PoWClient } from "../src/websock/PoWClient";
 import { PoWSession, PoWSessionStatus } from '../src/websock/PoWSession';
 import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
