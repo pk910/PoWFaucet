@@ -2,19 +2,25 @@
 import sinon from 'sinon';
 import { WebSocket } from 'ws';
 import { FaucetProcess } from '../src/common/FaucetProcess';
+import { ServiceManager } from '../src/common/ServiceManager';
 import { CaptchaVerifier } from '../src/services/CaptchaVerifier';
 import { EnsWeb3Manager } from '../src/services/EnsWeb3Manager';
 import { EthWeb3Manager } from '../src/services/EthWeb3Manager';
 import { IPInfoResolver } from '../src/services/IPInfoResolver';
 import { PassportVerifier } from '../src/services/PassportVerifier';
+import { sleepPromise } from '../src/utils/SleepPromise';
+import { PoWSession } from '../src/websock/PoWSession';
+
+let fakeWebSockets: FakeWebSocket[] = [];
 
 export function bindTestStubs(stubs?) {
   if(!stubs)
     stubs = {};
   return {
-    "WebSocket.send": sinon.stub(WebSocket.prototype, "send"),
-    "WebSocket.close": sinon.stub(WebSocket.prototype, "close"),
-    "WebSocket.ping": sinon.stub(WebSocket.prototype, "ping"),
+    "FakeWebSocket.send": sinon.stub(FakeWebSocket.prototype, "send"),
+    "FakeWebSocket.close": sinon.stub(FakeWebSocket.prototype, "close"),
+    "FakeWebSocket.ping": sinon.stub(FakeWebSocket.prototype, "ping"),
+    "FakeWebSocket.pong": sinon.stub(FakeWebSocket.prototype, "pong"),
 
     "FaucetProcess.emitLog": sinon.stub(FaucetProcess.prototype, "emitLog"),
     "IPInfoResolver.getIpInfo": sinon.stub(IPInfoResolver.prototype, "getIpInfo").resolves({
@@ -38,15 +44,31 @@ export function bindTestStubs(stubs?) {
   }
 }
 
-export function unbindTestStubs() {
+export async function unbindTestStubs() {
+  fakeWebSockets.forEach((fakeWebSocket) => {
+    fakeWebSocket.emit("close");
+  });
+  fakeWebSockets = [];
+  PoWSession.resetSessionData();
+  ServiceManager.ClearAllServices();
   sinon.restore();
+}
+
+export async function awaitSleepPromise(timeout: number, poll: () => boolean) {
+  let start = new Date().getTime();
+  while(true) {
+    let now = new Date().getTime();
+    if(now - start >= timeout)
+      return;
+    if(poll())
+      return;
+    await sleepPromise(10);
+  }
 }
 
 export class FakeWebSocket extends WebSocket {
   constructor() {
     super(null);
+    fakeWebSockets.push(this);
   }
-  public override send() {}
-  public override ping() {}
-  public override close() {}
 }

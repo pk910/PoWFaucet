@@ -1,11 +1,10 @@
 import 'mocha';
 import { expect } from 'chai';
-import { bindTestStubs, FakeWebSocket, unbindTestStubs } from './common';
+import { awaitSleepPromise, bindTestStubs, FakeWebSocket, unbindTestStubs } from './common';
 import { PoWClient } from "../src/websock/PoWClient";
 import { PoWSession, PoWSessionStatus } from '../src/websock/PoWSession';
 import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
-import { sleepPromise } from '../src/utils/SleepPromise';
 import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
 
 describe("Session Management", () => {
@@ -19,16 +18,14 @@ describe("Session Management", () => {
     ServiceManager.InitService(FaucetStoreDB).initialize();
   });
   afterEach(() => {
-    PoWSession.resetSessionData();
     ServiceManager.GetService(FaucetStoreDB).closeDatabase();
-    ServiceManager.ClearAllServices();
-    unbindTestStubs();
+    return unbindTestStubs();
   });
 
   it("Create new session", async () => {
     let client = new PoWClient(new FakeWebSocket(), "8.8.8.8");
     let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
-    await sleepPromise(100);
+    await awaitSleepPromise(100, () => !!session.getLastIpInfo());
     expect(session.getActiveClient()).equal(client, "getActiveClient check failed");
     expect(session.getBalance()).equal(0n, "getBalance check failed");
     expect(session.getLastNonce()).equal(0, "getLastNonce check failed");
@@ -50,7 +47,7 @@ describe("Session Management", () => {
       nonce: 50,
       ident: "xyz-zyx",
     });
-    await sleepPromise(100);
+    await awaitSleepPromise(100, () => !!session.getLastIpInfo());
     expect(session.getSessionId()).equal("e9e86c6a-2abc-46c0-9d72-1512ef8c0691", "getSessionId check failed");
     expect(session.getStartTime().getTime()).equal(sessionTime * 1000, "getStartTime check failed");
     expect(session.getActiveClient()).equal(client, "getActiveClient check failed");
@@ -76,7 +73,7 @@ describe("Session Management", () => {
       ident: "xyz-zyx",
     });
 
-    await sleepPromise(100);
+    await awaitSleepPromise(100, () => session.getSessionStatus() === PoWSessionStatus.CLOSED);
     expect(session.getSessionStatus()).equal(PoWSessionStatus.CLOSED, "getSessionStatus check failed");
     expect(session.isClaimable()).equal(true, "isClaimable check failed");
     session.closeSession(false, false, "test");

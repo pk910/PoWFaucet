@@ -36,9 +36,7 @@ describe("Share Verification", () => {
     ServiceManager.InitService(PoWValidator, createFakeValidatorWorker());
   });
   afterEach(() => {
-    PoWSession.resetSessionData();
-    ServiceManager.ClearAllServices();
-    unbindTestStubs();
+    return unbindTestStubs();
   });
 
   it("Verify valid share (local verification)", async () => {

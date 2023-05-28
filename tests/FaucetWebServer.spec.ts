@@ -5,10 +5,16 @@ import * as path from 'path';
 import fetch from 'node-fetch';
 import { WebSocket } from 'ws';
 import { bindTestStubs, unbindTestStubs } from './common';
-import { PoWSession } from '../src/websock/PoWSession';
+import { PoWSession, PoWSessionStatus } from '../src/websock/PoWSession';
 import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
+import { FaucetWebApi } from '../src/webserv/FaucetWebApi';
+import { IncomingHttpHeaders, IncomingMessage } from 'http';
+import { Socket } from 'net';
+import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
 import { FaucetHttpServer } from '../src/webserv/FaucetWebServer';
+import { sleepPromise } from '../src/utils/SleepPromise';
+import { PromiseDfd } from '../src/utils/PromiseDfd';
 
 describe("Faucet Web Server", () => {
   let globalStubs;
@@ -60,16 +66,28 @@ describe("Faucet Web Server", () => {
     faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
     faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
+    globalStubs["FakeWebSocket.send"].restore();
+    globalStubs["FakeWebSocket.close"].restore();
     let webServer = new FaucetHttpServer();
     let listenPort = webServer.getListenPort();
     let webSocket = new WebSocket("ws://127.0.0.1:" + listenPort + "/pow");
-    webSocket.on('error', console.error);
     await new Promise<void>((resolve) => {
       webSocket.onopen = (evt) => {
+        webSocket.send(JSON.stringify({"id":"test","action":"getConfig","data":{"version":"0.0.1337"}}));
         resolve();
       };
     });
-    expect(webSocket.readyState).equals(WebSocket.OPEN, "websocket not ready");
+    let configDfd = new PromiseDfd<any>();
+    webSocket.onmessage = (evt) => {
+      let data = JSON.parse(evt.data.toString());
+      if(data && data.action === "config")
+        configDfd.resolve(data);
+    };
+    let configResponse = await configDfd.promise;
+    expect(!!configResponse).equals(true, "no websocket response");
+    expect(configResponse.data.faucetTitle).equals(faucetConfig.faucetTitle, "api response mismatch");
+    webSocket.close();
+    await sleepPromise(50);
   });
 
 });

@@ -8,6 +8,7 @@ import { FaucetWebApi } from '../src/webserv/FaucetWebApi';
 import { IncomingHttpHeaders, IncomingMessage } from 'http';
 import { Socket } from 'net';
 import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
+import { FaucetHttpResponse } from '../src/webserv/FaucetWebServer';
 
 describe("Faucet Web API", () => {
   let globalStubs;
@@ -18,9 +19,7 @@ describe("Faucet Web API", () => {
     faucetConfig.faucetStats = null;
   });
   afterEach(() => {
-    PoWSession.resetSessionData();
-    ServiceManager.ClearAllServices();
-    unbindTestStubs();
+    return unbindTestStubs();
   });
 
   function encodeApiRequest(options: {
@@ -42,6 +41,26 @@ describe("Faucet Web API", () => {
     Object.setPrototypeOf(message, IncomingMessage.prototype);
     return message;
   }
+
+  it("check unknown endpoint call", async () => {
+    let webApi = new FaucetWebApi();
+    let apiResponse = await webApi.onApiRequest(encodeApiRequest({
+      url: "/api/unknown_Endpoint_126368",
+      remoteAddr: "8.8.8.8"
+    }));
+    expect(apiResponse instanceof FaucetHttpResponse).equal(true, "no api error response");
+    expect(apiResponse.code).equal(404, "unexpected response code");
+  });
+
+  it("check null endpoint call", async () => {
+    let webApi = new FaucetWebApi();
+    let apiResponse = await webApi.onApiRequest(encodeApiRequest({
+      url: "/api",
+      remoteAddr: "8.8.8.8"
+    }));
+    expect(apiResponse instanceof FaucetHttpResponse).equal(true, "no api error response");
+    expect(apiResponse.code).equal(404, "unexpected response code");
+  });
 
   it("check /api/getMaxReward", async () => {
     let webApi = new FaucetWebApi();
@@ -106,6 +125,14 @@ describe("Faucet Web API", () => {
     expect(apiResponse.sessions[0].status).equal("idle", "value mismatch: session.status");
   });
 
-  
+  it("check /api/getQueueStatus", async () => {
+    let webApi = new FaucetWebApi();
+    let apiResponse = await webApi.onApiRequest(encodeApiRequest({
+      url: "/api/getQueueStatus",
+      remoteAddr: "8.8.8.8"
+    }));
+    expect(!!apiResponse).equal(true, "no api response");
+    expect(apiResponse.claims.length).equal(0, "unexpected response value");
+  });
 
 });

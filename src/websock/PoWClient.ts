@@ -83,6 +83,10 @@ export class PoWClient {
     this.pingClientLoop();
   }
 
+  public isReady(): boolean {
+    return !!this.socket;
+  }
+
   public getSession(): PoWSession {
     return this.session;
   }
@@ -129,7 +133,7 @@ export class PoWClient {
       this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""), null, FaucetLogLevel.HIDDEN);
       this.socket.close();
     } catch(ex) {}
-    this.socket = null;
+    this.dispose();
   }
 
   private pingClientLoop() {

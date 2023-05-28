@@ -583,7 +583,7 @@ export class PoWSession {
     return sessionStr + "|" + sessionHash.digest('base64');
   }
 
-  private updateRewardRestriction() {
+  public updateRewardRestriction() {
     this.rewardRestriction = ServiceManager.GetService(PoWRewardLimiter).getSessionRestriction(this);
     this.rewardRestrictionRefresh = Math.floor((new Date()).getTime() / 1000);
 
