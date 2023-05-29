@@ -76,12 +76,12 @@ export class PoWSession {
     return this.closedSessions[sessionId];
   }
 
-  public static getVerifierSessions(ignoreId?: string): PoWSession[] {
+  public static getVerifierSessions(skipSession?: PoWSession): PoWSession[] {
     let minBalance = BigInt(faucetConfig.powShareReward) * BigInt(faucetConfig.verifyMinerMissPenaltyPerc * 100) / 10000n;
     return Object.values(this.activeSessions).filter((session) => {
       return (
         !!session.activeClient && 
-        session.sessionId !== ignoreId && 
+        session !== skipSession && 
         session.balance > minBalance &&
         session.missedVerifications < faucetConfig.verifyMinerMaxMissed &&
         session.pendingVerifications < faucetConfig.verifyMinerMaxPending

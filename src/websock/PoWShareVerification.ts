@@ -22,7 +22,7 @@ export class PoWShareVerification {
   }
 
   private shareId: string;
-  private sessionId: string;
+  private session: PoWSession;
   private nonces: number[];
   private verifyLocal = false;
   private verifyMinerCount = 0;
@@ -34,7 +34,7 @@ export class PoWShareVerification {
 
   public constructor(session: PoWSession, nonces: number[]) {
     this.shareId = getNewGuid();
-    this.sessionId = session.getSessionId();
+    this.session = session;
     this.nonces = nonces;
     PoWShareVerification.verifyingShares[this.shareId] = this;
   }
@@ -57,15 +57,12 @@ export class PoWShareVerification {
   }
 
   public startVerification(): Promise<IPoWShareVerificationResult> {
-    let session = PoWSession.getSession(this.sessionId);
-    if(!session)
-      return Promise.reject("session not found");
     if(this.resultDfd)
       return this.resultDfd.promise;
 
     this.resultDfd = new PromiseDfd<IPoWShareVerificationResult>();
 
-    let validatorSessions = PoWSession.getVerifierSessions(session.getSessionId());
+    let validatorSessions = PoWSession.getVerifierSessions(this.session);
     let verifyLocalPercent = faucetConfig.verifyLocalPercent;
     if(validatorSessions.length < faucetConfig.verifyMinerPeerCount && faucetConfig.verifyLocalLowPeerPercent > verifyLocalPercent)
       verifyLocalPercent = faucetConfig.verifyLocalLowPeerPercent;
@@ -76,7 +73,7 @@ export class PoWShareVerification {
 
     if(this.verifyLocal) {
       // verify locally
-      ServiceManager.GetService(PoWValidator).validateShare(this.shareId, this.nonces, session.getPreImage()).then((isValid) => {
+      ServiceManager.GetService(PoWValidator).validateShare(this.shareId, this.nonces, this.session.getPreImage()).then((isValid) => {
         if(!isValid)
           this.isInvalid = true;
         this.completeVerification();
@@ -93,7 +90,7 @@ export class PoWShareVerification {
 
         validatorSession.getActiveClient().sendMessage("verify", {
           shareId: this.shareId,
-          preimage: session.getPreImage(),
+          preimage: this.session.getPreImage(),
           nonces: this.nonces,
         });
       }
@@ -131,17 +128,11 @@ export class PoWShareVerification {
       clearTimeout(this.verifyMinerTimer);
       this.verifyMinerTimer = null;
     }
-    let session = PoWSession.getSession(this.sessionId);
-    if(!session) {
-      this.resultDfd.reject("session not found");
-      delete PoWShareVerification.verifyingShares[this.shareId];
-      return;
-    }
 
     if(this.isInvalid && !this.verifyLocal) {
       // always verify invalid shares locally
       this.verifyLocal = true;
-      ServiceManager.GetService(PoWValidator).validateShare(this.shareId, this.nonces, session.getPreImage()).then((isValid) => {
+      ServiceManager.GetService(PoWValidator).validateShare(this.shareId, this.nonces, this.session.getPreImage()).then((isValid) => {
         if(isValid)
           this.isInvalid = false;
         this.completeVerification();
@@ -174,18 +165,18 @@ export class PoWShareVerification {
 
     let shareReward: bigint;
     if(this.isInvalid) {
-      session.slashBadSession(PoWSessionSlashReason.INVALID_SHARE);
+      this.session.slashBadSession(PoWSessionSlashReason.INVALID_SHARE);
       shareReward = 0n;
     }
     else {
       // valid share - add rewards
-      shareReward = ServiceManager.GetService(PoWRewardLimiter).getShareReward(session);
-      session.addBalance(shareReward);
+      shareReward = ServiceManager.GetService(PoWRewardLimiter).getShareReward(this.session);
+      this.session.addBalance(shareReward);
       
-      if(session.getActiveClient()) {
-        session.getActiveClient().sendMessage("updateBalance", {
-          balance: session.getBalance().toString(),
-          recovery: session.getSignedSession(),
+      if(this.session.getActiveClient()) {
+        this.session.getActiveClient().sendMessage("updateBalance", {
+          balance: this.session.getBalance().toString(),
+          recovery: this.session.getSignedSession(),
           reason: "valid share"
         });
       }
