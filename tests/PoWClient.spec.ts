@@ -1,8 +1,7 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { RawData } from 'ws';
-import { awaitSleepPromise, bindTestStubs, FakeWebSocket, unbindTestStubs } from './common';
+import { awaitSleepPromise, bindTestStubs, FakePoWClient, FakeWebSocket, unbindTestStubs } from './common';
 import { PoWClient } from "../src/websock/PoWClient";
 import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
@@ -10,37 +9,6 @@ import { PoWSession } from '../src/websock/PoWSession';
 import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
 import { sleepPromise } from '../src/utils/SleepPromise';
 import { PoWShareVerification } from '../src/websock/PoWShareVerification';
-
-class TestPoWClient extends PoWClient {
-  private sentMessages: {
-    action: string;
-    data: any;
-    rsp: any;
-  }[] = [];
-
-  public emitClientMessage(data: RawData) {
-    return this.onClientMessage(data, false);
-  }
-
-  public override sendMessage(action: string, data?: any, rsp?: any) {
-    this.sentMessages.push({
-      action: action,
-      data: data,
-      rsp: rsp
-    });
-  }
-
-  public getSentMessage(action: string): any {
-    for(let i = 0; i < this.sentMessages.length; i++) {
-      if(this.sentMessages[i].action === action)
-        return this.sentMessages[i];
-    }
-  }
-
-  public clearSentMessages() {
-    this.sentMessages = [];
-  }
-}
 
 describe("WebSocket Client Handling", () => {
   let globalStubs;
@@ -65,7 +33,7 @@ describe("WebSocket Client Handling", () => {
   describe("Client Lifecycle", () => {
     it("check error handling", async () => {
       let fakeSocket = new FakeWebSocket();
-      let client = new TestPoWClient(fakeSocket, "8.8.8.8");
+      let client = new FakePoWClient(fakeSocket, "8.8.8.8");
       expect(PoWClient.getClientCount()).to.equal(1, "unexpected client count");
       PoWClient.sendToAll("test");
       let testMsg = client.getSentMessage("test");
@@ -78,7 +46,7 @@ describe("WebSocket Client Handling", () => {
       faucetConfig.powPingInterval = 1;
       faucetConfig.powPingTimeout = 2;
       let fakeSocket = new FakeWebSocket();
-      let client = new TestPoWClient(fakeSocket, "8.8.8.8");
+      let client = new FakePoWClient(fakeSocket, "8.8.8.8");
       fakeSocket.emit("pong");
       fakeSocket.emit("ping");
       expect(globalStubs["FakeWebSocket.pong"].called).to.equal(true, "pong not called");
@@ -94,13 +62,13 @@ describe("WebSocket Client Handling", () => {
     }).timeout(5000);
     it("check invalid message handling", async () => {
       let fakeSocket = new FakeWebSocket();
-      let client = new TestPoWClient(fakeSocket, "8.8.8.8");
+      let client = new FakePoWClient(fakeSocket, "8.8.8.8");
       await client.emitClientMessage("test" as any);
       expect(client.isReady()).to.equal(false, "client is still ready");
     });
     it("check unknown message handling", async () => {
       let fakeSocket = new FakeWebSocket();
-      let client = new TestPoWClient(fakeSocket, "8.8.8.8");
+      let client = new FakePoWClient(fakeSocket, "8.8.8.8");
       await client.emitClientMessage('"test"' as any);
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
@@ -117,7 +85,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: getConfig", () => {
     it("valid getConfig call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "getConfig",
@@ -133,7 +101,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: startSession", () => {
     it("valid startSession call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -149,7 +117,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.data.startTime).to.be.gte(Math.floor(new Date().getTime()/1000) - 1, "invalid startTime");
     });
     it("invalid startSession call (malformed request)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -161,7 +129,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_REQUEST", "unexpected error code");
     });
     it("invalid startSession call (duplicate session)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test1",
         action: "startSession",
@@ -190,7 +158,7 @@ describe("WebSocket Client Handling", () => {
     });
     it("valid startSession call (mandatory ip check)", async () => {
       faucetConfig.ipInfoRequired = true;
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -207,7 +175,7 @@ describe("WebSocket Client Handling", () => {
     });
     it("rejected startSession call (faucet disabled)", async () => {
       faucetConfig.denyNewSessions = "Faucet disabled";
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -225,7 +193,7 @@ describe("WebSocket Client Handling", () => {
     it("valid startSession call (captcha verification)", async () => {
       faucetConfig.captchas.checkSessionStart = true;
       globalStubs["CaptchaVerifier.verifyToken"].resolves("test_ident");
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -243,7 +211,7 @@ describe("WebSocket Client Handling", () => {
     it("invalid startSession call (captcha verification)", async () => {
       faucetConfig.captchas.checkSessionStart = true;
       globalStubs["CaptchaVerifier.verifyToken"].resolves(false);
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -260,7 +228,7 @@ describe("WebSocket Client Handling", () => {
     });
     it("invalid startSession call (missing captcha token)", async () => {
       faucetConfig.captchas.checkSessionStart = true;
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -276,7 +244,7 @@ describe("WebSocket Client Handling", () => {
     });
     it("valid startSession call (ens name)", async () => {
       globalStubs["EnsResolver.resolveEnsName"].resolves("0x0000000000000000000000000000000000001337");
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -292,7 +260,7 @@ describe("WebSocket Client Handling", () => {
     });
     it("invalid startSession call (ens name)", async () => {
       globalStubs["EnsResolver.resolveEnsName"].rejects("test_error");
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -308,7 +276,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_ENSNAME", "unexpected error code");
     });
     it("invalid startSession call (invalid address)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -326,7 +294,7 @@ describe("WebSocket Client Handling", () => {
     it("invalid startSession call (wallet balance exceeds limit)", async () => {
       globalStubs["EthWalletManager.getWalletBalance"].resolves("1000");
       faucetConfig.claimAddrMaxBalance = 500;
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -344,7 +312,7 @@ describe("WebSocket Client Handling", () => {
     it("invalid startSession call (wallet is contract)", async () => {
       globalStubs["EthWalletManager.checkIsContract"].resolves(true);
       faucetConfig.claimAddrDenyContract = true;
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -364,7 +332,7 @@ describe("WebSocket Client Handling", () => {
         status: "failed",
       });
       faucetConfig.ipInfoRequired = true;
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -381,7 +349,7 @@ describe("WebSocket Client Handling", () => {
     });
     it("invalid startSession call (concurrent session limit by ip)", async () => {
       faucetConfig.concurrentSessions = 1;
-      let client1 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client1 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client1.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -395,7 +363,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
       expect(resultResponse?.data.targetAddr).to.equal("0x0000000000000000000000000000000000001337", "target address mismatch");
       expect(resultResponse?.data.startTime).to.be.gte(Math.floor(new Date().getTime()/1000) - 1, "invalid startTime");
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -413,7 +381,7 @@ describe("WebSocket Client Handling", () => {
     it("invalid startSession call (concurrent session limit by addr)", async () => {
       faucetConfig.concurrentSessions = 1;
       faucetConfig.claimAddrCooldown = 0;
-      let client1 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client1 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client1.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -427,7 +395,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
       expect(resultResponse?.data.targetAddr).to.equal("0x0000000000000000000000000000000000001337", "target address mismatch");
       expect(resultResponse?.data.startTime).to.be.gte(Math.floor(new Date().getTime()/1000) - 1, "invalid startTime");
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.4.4");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.4.4");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "startSession",
@@ -444,7 +412,7 @@ describe("WebSocket Client Handling", () => {
     });
     it("invalid startSession call (address cooldown)", async () => {
       faucetConfig.concurrentSessions = 1;
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test1",
         action: "startSession",
@@ -486,7 +454,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: resumeSession", () => {
     it("valid resumeSession call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
       client.setSession(null);
@@ -504,7 +472,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.data.lastNonce).to.equal(1337, "lastNonce mismatch");
     });
     it("invalid resumeSession call (duplicate session)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session1 = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session1.setLastNonce(1337);
       client.setSession(null);
@@ -524,7 +492,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_REQUEST", "unexpected error code");
     });
     it("invalid resumeSession call (malformed request)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "resumeSession",
@@ -536,7 +504,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_REQUEST", "unexpected error code");
     });
     it("invalid resumeSession call (malformed guid)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "resumeSession",
@@ -551,7 +519,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_SESSIONID", "unexpected error code");
     });
     it("invalid resumeSession call (unknown session id)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "resumeSession",
@@ -566,7 +534,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_SESSIONID", "unexpected error code");
     });
     it("invalid resumeSession call (closed session)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
       session.addBalance(BigInt(faucetConfig.claimMinAmount));
@@ -586,10 +554,10 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.data.balance).to.equal(faucetConfig.claimMinAmount.toString(), "invalid claim-token amount");
     });
     it("valid resumeSession call (duplicate connection, kill other client)", async () => {
-      let client1 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client1 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client1, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
-      let client2 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client2 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client2.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "resumeSession",
@@ -608,7 +576,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: recoverSession", () => {
     it("valid recoverSession call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
       session.addBalance(100n);
@@ -626,7 +594,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
     });
     it("invalid recoverSession call (malformed request)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "recoverSession"
@@ -638,7 +606,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_REQUEST", "unexpected error code");
     });
     it("invalid recoverSession call (duplicate session)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
       session.addBalance(100n);
@@ -659,7 +627,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_REQUEST", "unexpected error code");
     });
     it("invalid recoverSession call (invalid recovery data)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "recoverSession",
@@ -672,7 +640,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_DATA", "unexpected error code");
     });
     it("invalid recoverSession call (session already known)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
       session.addBalance(100n);
@@ -691,8 +659,8 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("DUPLICATE_SESSION", "unexpected error code");
     });
     it("invalid recoverSession call (concurrent session limit)", async () => {
-      let client1 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
-      let client2 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client1 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client2 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client1, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
       session.addBalance(100n);
@@ -713,7 +681,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
     });
     it("invalid recoverSession call (closed session)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
       session.addBalance(BigInt(faucetConfig.claimMinAmount));
@@ -731,7 +699,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_SESSION", "unexpected error code");
     });
     it("invalid recoverSession call (claim timeout)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let sessionTime = (new Date().getTime() / 1000) - faucetConfig.claimSessionTimeout - 1;
       let session = new PoWSession(client, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -758,7 +726,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("SESSION_TIMEOUT", "unexpected error code");
     });
     it("valid recoverSession call + immediate session close (session timeout)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let sessionTime = (new Date().getTime() / 1000) - faucetConfig.powSessionTimeout - 1;
       let session = new PoWSession(client, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -791,7 +759,7 @@ describe("WebSocket Client Handling", () => {
     });
     it("valid recoverSession call (mandatory ip check)", async () => {
       faucetConfig.ipInfoRequired = true;
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.setLastNonce(1337);
       session.addBalance(100n);
@@ -812,7 +780,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: foundShare", () => {
     it("valid foundShare call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let sessionTime = (new Date().getTime() / 1000) - 42;
       let session = new PoWSession(client, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -852,7 +820,7 @@ describe("WebSocket Client Handling", () => {
       expect(parseInt(balanceResponse?.data.balance)).to.be.at.least(1, "balance too low");
     });
     it("invalid foundShare call (malformed request)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
@@ -865,7 +833,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_SHARE", "unexpected error code");
     });
     it("invalid foundShare call (no active session)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "foundShare",
@@ -882,7 +850,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("SESSION_NOT_FOUND", "unexpected error code");
     });
     it("invalid foundShare call (invalid nonce count)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       faucetConfig.powNonceCount = 1;
       faucetConfig.powScryptParams = {
@@ -908,7 +876,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_SHARE", "unexpected error code");
     });
     it("invalid foundShare call (pow params mismatch)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let sessionTime = (new Date().getTime() / 1000) - 42;
       let session = new PoWSession(client, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -944,7 +912,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_SHARE", "unexpected error code");
     });
     it("invalid foundShare call (nonce too low)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let sessionTime = (new Date().getTime() / 1000) - 42;
       let session = new PoWSession(client, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -980,7 +948,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_SHARE", "unexpected error code");
     });
     it("invalid foundShare call (nonce too high)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let sessionTime = (new Date().getTime() / 1000) - 42;
       let session = new PoWSession(client, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -1021,7 +989,7 @@ describe("WebSocket Client Handling", () => {
         isValid: false,
         reward: 0n,
       });
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let sessionTime = (new Date().getTime() / 1000) - 42;
       let session = new PoWSession(client, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -1061,8 +1029,8 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: verifyResult", () => {
     it("valid verifyResult call", async () => {
-      let client1 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
-      let client2 = new TestPoWClient(new FakeWebSocket(), "8.8.4.4");
+      let client1 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client2 = new FakePoWClient(new FakeWebSocket(), "8.8.4.4");
       let sessionTime = (new Date().getTime() / 1000) - 42;
       let session1 = new PoWSession(client1, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -1120,7 +1088,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: closeSession", () => {
     it("valid closeSession call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
@@ -1131,7 +1099,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
     });
     it("valid closeSession call (with claimable balance)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.addBalance(BigInt(faucetConfig.claimMinAmount));
       await client.emitClientMessage(encodeClientMessage({
@@ -1144,7 +1112,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.data.claimable).to.equal(true, "not claimable");
     });
     it("invalid closeSession call (no session)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "closeSession",
@@ -1159,7 +1127,7 @@ describe("WebSocket Client Handling", () => {
   
   describe("Request Handling: claimRewards", () => {
     it("valid claimRewards call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.addBalance(BigInt(faucetConfig.claimMinAmount));
       session.closeSession(true, true, "test");
@@ -1179,7 +1147,7 @@ describe("WebSocket Client Handling", () => {
     it("invalid claimRewards call (captcha verification)", async () => {
       faucetConfig.captchas.checkBalanceClaim = true;
       globalStubs["CaptchaVerifier.verifyToken"].resolves(false);
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       session.addBalance(BigInt(faucetConfig.claimMinAmount));
       session.closeSession(true, true, "test");
@@ -1199,7 +1167,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_CAPTCHA", "unexpected error code");
     });
     it("invalid claimRewards call (invalid token)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "claimRewards",
@@ -1215,7 +1183,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_CLAIM", "unexpected error code");
     });
     it("invalid claimRewards call (expired claim)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let sessionTime = (new Date().getTime() / 1000) - faucetConfig.claimSessionTimeout - 2;
       let session = new PoWSession(client, {
         id: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -1246,7 +1214,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: watchClaimTx", () => {
     it("valid watchClaimTx call", async () => {
-      let client1 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client1 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client1, "0x0000000000000000000000000000000000001337");
       session.addBalance(BigInt(faucetConfig.claimMinAmount));
       session.closeSession(true, true, "test");
@@ -1262,7 +1230,7 @@ describe("WebSocket Client Handling", () => {
       let claimResultResponse = client1.getSentMessage("ok");
       expect(claimResultResponse?.action).to.equal("ok", "no result response");
       expect(claimResultResponse?.rsp).to.equal("test", "response id mismatch");
-      let client2 = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client2 = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client2.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "watchClaimTx",
@@ -1275,7 +1243,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
     });
     it("invalid watchClaimTx call (unknown session id)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "watchClaimTx",
@@ -1293,7 +1261,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: getClaimQueueState", () => {
     it("valid getClaimQueueState call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "getClaimQueueState",
@@ -1306,7 +1274,7 @@ describe("WebSocket Client Handling", () => {
 
   describe("Request Handling: refreshBoost", () => {
     it("valid refreshBoost call", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
@@ -1317,7 +1285,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.rsp).to.equal("test", "response id mismatch");
     });
     it("invalid refreshBoost call (unknown session id)", async () => {
-      let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
+      let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
         action: "refreshBoost",

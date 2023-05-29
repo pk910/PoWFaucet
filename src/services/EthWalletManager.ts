@@ -56,6 +56,7 @@ export class EthWalletManager {
   private walletState: WalletState;
   private tokenState: FaucetTokenState;
   private lastWalletRefresh: number;
+  private txReceiptPollInterval = 30000;
 
   public initialize() {
     if(this.initialized)
@@ -97,7 +98,9 @@ export class EthWalletManager {
 
   private startWeb3() {
     let provider: any;
-    if(faucetConfig.ethRpcHost.match(/^wss?:\/\//))
+    if(faucetConfig.ethRpcHost && typeof faucetConfig.ethRpcHost === "object")
+      provider = faucetConfig.ethRpcHost as any;
+    else if(faucetConfig.ethRpcHost.match(/^wss?:\/\//))
       provider = new Web3.providers.WebsocketProvider(faucetConfig.ethRpcHost);
     else if(faucetConfig.ethRpcHost.match(/^\//))
       provider = new Web3.providers.IpcProvider(faucetConfig.ethRpcHost, net);
@@ -447,7 +450,7 @@ export class EthWalletManager {
     try {
       let receipt: TransactionReceipt;
       do {
-        await sleepPromise(30000); // 30 secs
+        await sleepPromise(this.txReceiptPollInterval); // 30 secs
         receipt = await this.web3.eth.getTransactionReceipt(txhash);
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Polled transaction receipt for " + txhash + ": " + (receipt ? "found!" : "pending"));
       } while(!receipt);

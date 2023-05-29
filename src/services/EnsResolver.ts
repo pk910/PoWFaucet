@@ -25,7 +25,7 @@ export class EnsResolver {
 
   private initEns() {
     if(faucetConfig.ensResolver) {
-      let provider = new Web3.providers.HttpProvider(faucetConfig.ensResolver.rpcHost);
+      let provider = typeof faucetConfig.ensResolver.rpcHost == "object" ? faucetConfig.ensResolver.rpcHost : new Web3.providers.HttpProvider(faucetConfig.ensResolver.rpcHost);
       this.ens = new ENS(provider, faucetConfig.ensResolver.ensAddr || undefined, Web3);
     }
     else {

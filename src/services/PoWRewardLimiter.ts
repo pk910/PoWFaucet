@@ -25,10 +25,10 @@ export class PoWRewardLimiter {
   private balanceRestriction: number;
   private balanceRestrictionsRefresh: number;
 
-  private refreshIpInfoMatchRestrictions() {
+  public refreshIpInfoMatchRestrictions(force?: boolean) {
     let now = Math.floor((new Date()).getTime() / 1000);
     let refresh = faucetConfig.ipInfoMatchRestrictedRewardFile ? faucetConfig.ipInfoMatchRestrictedRewardFile.refresh : 30;
-    if(this.ipInfoMatchRestrictionsRefresh > now - refresh)
+    if(this.ipInfoMatchRestrictionsRefresh > now - refresh && !force)
       return;
     
     this.ipInfoMatchRestrictionsRefresh = now;

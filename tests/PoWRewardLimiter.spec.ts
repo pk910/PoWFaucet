@@ -393,7 +393,10 @@ describe("Reward Restrictions", () => {
     };
 
     fs.writeFileSync(patternFile, YAML.stringify(restrictions1));
-    let rewardLimiter = new PoWRewardLimiter();
+    let rewardLimiter = ServiceManager.GetService(PoWRewardLimiter);
+    rewardLimiter.refreshIpInfoMatchRestrictions(true);
+    session.updateRewardRestriction();
+    
     let restriction = rewardLimiter.getSessionRestriction(session);
     expect(rewardLimiter.getShareReward(session)).equal(900000000000000000n, "unexpected getShareReward");
     expect(rewardLimiter.getVerificationReward(session)).equal(180000000000000000n, "unexpected getVerificationReward");
@@ -403,7 +406,7 @@ describe("Reward Restrictions", () => {
     expect(restriction.messages[0].key).equal("key1", "unexpected message key in restriction");
 
     fs.writeFileSync(patternFile, YAML.stringify(restrictions2));
-    await sleepPromise(2200);
+    rewardLimiter.refreshIpInfoMatchRestrictions(true);
     session.updateRewardRestriction();
 
     restriction = rewardLimiter.getSessionRestriction(session);

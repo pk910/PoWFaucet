@@ -141,7 +141,7 @@ export class EthClaimManager {
     return null;
   }
 
-  private async processQueue() {
+  public async processQueue() {
     if(this.queueProcessing)
       return;
     this.queueProcessing = true;
