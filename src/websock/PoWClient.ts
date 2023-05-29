@@ -75,10 +75,10 @@ export class PoWClient {
         if(this.socket)
           this.socket.close();
       } catch(ex) {}
-      this.dispose();
+      this.dispose("client error");
     });
     this.socket.on("close", () => {
-      this.dispose();
+      this.dispose("client closed");
     });
     this.pingClientLoop();
   }
@@ -104,7 +104,7 @@ export class PoWClient {
     return this.clientVersion;
   }
 
-  private dispose() {
+  private dispose(reason: string) {
     this.socket = null;
 
     let clientIdx = PoWClient.activeClients.indexOf(this);
@@ -117,7 +117,7 @@ export class PoWClient {
     }
     
     if(this.session)
-      this.session.setActiveClient(null);
+      this.session.setActiveClient(null, reason);
 
     if(this.subscribedClaimTxs.length > 0) {
       for(let i = 0; i < this.subscribedClaimTxs.length; i++) {
@@ -133,7 +133,7 @@ export class PoWClient {
       this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""), null, FaucetLogLevel.HIDDEN);
       this.socket.close();
     } catch(ex) {}
-    this.dispose();
+    this.dispose(reason);
   }
 
   private pingClientLoop() {

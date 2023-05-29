@@ -257,7 +257,7 @@ export class PoWSession {
     delete PoWSession.activeSessions[this.sessionId];
     ServiceManager.GetService(FaucetProcess).emitLog(
       FaucetLogLevel.INFO, 
-      "Closed session: " + this.sessionId + " (" + reason + ")" +
+      "Closed session: " + this.sessionId + " (Reason: " + reason + ")" +
       (this.claimable ? " [reward: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance)+ "]" : "")
     );
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
@@ -391,20 +391,20 @@ export class PoWSession {
     return this.activeClient;
   }
 
-  public setActiveClient(activeClient: PoWClient) {
+  public setActiveClient(activeClient: PoWClient, reason?: string) {
     this.activeClient = activeClient;
     this.pendingVerifications = 0;
     if(activeClient) {
       this.idleTime = null;
       this.setSessionStatus(PoWSessionStatus.MINING);
       setTimeout(() => this.updateRemoteIp(), 10);
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + ")");
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Resumed session: " + this.sessionId + " (Remote IP: " + this.activeClient.getRemoteIP() + (reason ? ", Reason: " + reason : "") + ")");
       
     }
     else {
       this.idleTime = new Date();
       this.setSessionStatus(PoWSessionStatus.IDLE);
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Paused session: " + this.sessionId);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Paused session: " + this.sessionId + (reason ? " (Reason: " + reason + ")" : ""));
     }
     this.resetIdleTimeout();
   }
