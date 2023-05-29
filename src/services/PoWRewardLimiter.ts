@@ -4,7 +4,8 @@ import YAML from 'yaml'
 import { faucetConfig, IFacuetRestrictionConfig } from "../common/FaucetConfig";
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWSession, PoWSessionStatus } from '../websock/PoWSession';
-import { EthWeb3Manager } from './EthWeb3Manager';
+import { EthClaimManager } from './EthClaimManager';
+import { EthWalletManager } from './EthWalletManager';
 import { IIPInfo } from "./IPInfoResolver";
 import { PoWOutflowLimiter } from './PoWOutflowLimiter';
 
@@ -105,13 +106,13 @@ export class PoWRewardLimiter {
     if(this.balanceRestrictionsRefresh > now - 30)
       return;
       
-    let faucetBalance = ServiceManager.GetService(EthWeb3Manager).getFaucetBalance();
+    let faucetBalance = ServiceManager.GetService(EthWalletManager).getFaucetBalance();
     if(faucetBalance === null)
       return;
     
     this.balanceRestrictionsRefresh = now;
     faucetBalance -= this.getUnclaimedBalance(); // subtract mined balance from active & claimable sessions
-    faucetBalance -= ServiceManager.GetService(EthWeb3Manager).getQueuedAmount(); // subtract pending transaction amounts
+    faucetBalance -= ServiceManager.GetService(EthClaimManager).getQueuedAmount(); // subtract pending transaction amounts
     
     this.balanceRestriction = Math.min(
       this.getStaticBalanceRestriction(faucetBalance),
@@ -140,7 +141,7 @@ export class PoWRewardLimiter {
 
     let restrictedReward = 100;
     let minbalances = Object.keys(faucetConfig.faucetBalanceRestrictedReward).map((v) => parseInt(v)).sort((a, b) => a - b);
-    let faucetBalance = ServiceManager.GetService(EthWeb3Manager).decimalUnitAmount(balance);
+    let faucetBalance = ServiceManager.GetService(EthWalletManager).decimalUnitAmount(balance);
     if(faucetBalance <= minbalances[minbalances.length - 1]) {
       for(let i = 0; i < minbalances.length; i++) {
         if(faucetBalance <= minbalances[i]) {
@@ -157,7 +158,7 @@ export class PoWRewardLimiter {
   private getDynamicBalanceRestriction(balance: bigint): number {
     if(!faucetConfig.faucetBalanceRestriction || !faucetConfig.faucetBalanceRestriction.enabled)
       return 100;
-    let targetBalance = BigInt(faucetConfig.faucetBalanceRestriction.targetBalance) * BigInt(Math.pow(10, ServiceManager.GetService(EthWeb3Manager).getFaucetDecimals()));
+    let targetBalance = BigInt(faucetConfig.faucetBalanceRestriction.targetBalance) * BigInt(Math.pow(10, ServiceManager.GetService(EthWalletManager).getFaucetDecimals()));
     if(balance >= targetBalance)
       return 100;
     if(balance <= faucetConfig.spareFundsAmount)

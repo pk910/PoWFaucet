@@ -6,7 +6,8 @@ import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWClient } from '../websock/PoWClient';
 import { PoWSession, PoWSessionStatus } from '../websock/PoWSession';
-import { ClaimTx, EthWeb3Manager } from './EthWeb3Manager';
+import { ClaimTx } from './EthClaimManager';
+import { EthWalletManager } from './EthWalletManager';
 
 export class FaucetStatsLog {
   public statShareCount: number = 0;
@@ -102,12 +103,12 @@ export class FaucetStatsLog {
     hashRate = Math.round(hashRate);
 
     let statsLog = [];
-    let ethWeb3Manager = ServiceManager.GetService(EthWeb3Manager);
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     statsLog.push("clients: " + PoWClient.getClientCount());
     statsLog.push("sessions: " + sessions.length + " (" + hashRate + " H/s, " + idleSessCount + " idle)");
-    statsLog.push("shares: " + this.statShareCount + " (" + ethWeb3Manager.readableAmount(this.statShareRewards) + ")");
-    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + ethWeb3Manager.readableAmount(this.statVerifyReward) + ", missed: " + this.statVerifyMisses + " / -" + ethWeb3Manager.readableAmount(this.statVerifyPenalty) + ")");
-    statsLog.push("claims: " + this.statClaimCount + " (" + ethWeb3Manager.readableAmount(this.statClaimRewards) + ")");
+    statsLog.push("shares: " + this.statShareCount + " (" + ethWalletManager.readableAmount(this.statShareRewards) + ")");
+    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + ethWalletManager.readableAmount(this.statVerifyReward) + ", missed: " + this.statVerifyMisses + " / -" + ethWalletManager.readableAmount(this.statVerifyPenalty) + ")");
+    statsLog.push("claims: " + this.statClaimCount + " (" + ethWalletManager.readableAmount(this.statClaimRewards) + ")");
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "# STATS # " + statsLog.join(", "));
 
     this.addStatsEntry("STATS", {

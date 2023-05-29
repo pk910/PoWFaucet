@@ -1,6 +1,6 @@
 import { loadFaucetConfig } from "./common/FaucetConfig";
-import { EthWeb3Manager } from "./services/EthWeb3Manager";
-import { EnsWeb3Manager } from "./services/EnsWeb3Manager";
+import { EthWalletManager } from "./services/EthWalletManager";
+import { EnsResolver } from "./services/EnsResolver";
 import { FaucetHttpServer } from "./webserv/FaucetWebServer";
 import { FaucetStoreDB } from "./services/FaucetStoreDB";
 import { FaucetStore } from "./services/FaucetStore";
@@ -10,6 +10,7 @@ import { FaucetStatsLog } from "./services/FaucetStatsLog";
 import { FaucetWebApi } from "./webserv/FaucetWebApi";
 import { PoWSession } from "./websock/PoWSession";
 import { FaucetProcess } from "./common/FaucetProcess";
+import { EthClaimManager } from "./services/EthClaimManager";
 
 (() => {
 
@@ -17,8 +18,9 @@ import { FaucetProcess } from "./common/FaucetProcess";
   ServiceManager.GetService(FaucetProcess).initialize();
   ServiceManager.GetService(FaucetStoreDB).initialize();
   ServiceManager.GetService(FaucetStore).initialize();
-  ServiceManager.GetService(EthWeb3Manager).initialize();
-  ServiceManager.GetService(EnsWeb3Manager).initialize();
+  ServiceManager.GetService(EthWalletManager).initialize();
+  ServiceManager.GetService(EthClaimManager).initialize();
+  ServiceManager.GetService(EnsResolver).initialize();
   ServiceManager.InitService(PoWValidator);
   ServiceManager.InitService(FaucetStatsLog);
   ServiceManager.InitService(FaucetWebApi);

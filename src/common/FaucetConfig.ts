@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import YAML from 'yaml'
 import randomBytes from 'randombytes'
-import { FaucetCoinType } from '../services/EthWeb3Manager';
+import { FaucetCoinType } from '../services/EthWalletManager';
 import { ServiceManager } from './ServiceManager';
 import { FaucetLogLevel, FaucetProcess } from './FaucetProcess';
 

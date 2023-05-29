@@ -85,7 +85,7 @@ describe("Reward Restrictions", () => {
 
   it("check global static balance restriction (no restriction)", async () => {
     let session = createTestSession();
-    globalStubs["EthWeb3Manager.getFaucetBalance"].returns(1000000000000000000000n); // 1000 ETH
+    globalStubs["EthWalletManager.getFaucetBalance"].returns(1000000000000000000000n); // 1000 ETH
     faucetConfig.faucetBalanceRestrictedReward = {
       999: 50,
       500: 25,
@@ -98,7 +98,7 @@ describe("Reward Restrictions", () => {
 
   it("check global static balance restriction (50% restriction)", async () => {
     let session = createTestSession();
-    globalStubs["EthWeb3Manager.getFaucetBalance"].returns(900000000000000000000n); // 900 ETH
+    globalStubs["EthWalletManager.getFaucetBalance"].returns(900000000000000000000n); // 900 ETH
     faucetConfig.faucetBalanceRestrictedReward = {
       999: 50,
       500: 25,
@@ -111,7 +111,7 @@ describe("Reward Restrictions", () => {
 
   it("check global static balance restriction (25% restriction)", async () => {
     let session = createTestSession();
-    globalStubs["EthWeb3Manager.getFaucetBalance"].returns(550000000000000000000n); // 550 ETH
+    globalStubs["EthWalletManager.getFaucetBalance"].returns(550000000000000000000n); // 550 ETH
     session.addBalance(50000000000000000000n); // 50 ETH
     faucetConfig.faucetBalanceRestrictedReward = {
       999: 50,
@@ -125,7 +125,7 @@ describe("Reward Restrictions", () => {
 
   it("check global dynamic balance restriction (no restriction)", async () => {
     let session = createTestSession();
-    globalStubs["EthWeb3Manager.getFaucetBalance"].returns(1000000000000000000000n); // 1000 ETH
+    globalStubs["EthWalletManager.getFaucetBalance"].returns(1000000000000000000000n); // 1000 ETH
     faucetConfig.faucetBalanceRestriction = {
       enabled: true,
       targetBalance: 1000,
@@ -137,7 +137,7 @@ describe("Reward Restrictions", () => {
 
   it("check global dynamic balance restriction (50% restriction)", async () => {
     let session = createTestSession();
-    globalStubs["EthWeb3Manager.getFaucetBalance"].returns(500000000000000000000n); // 500 ETH
+    globalStubs["EthWalletManager.getFaucetBalance"].returns(500000000000000000000n); // 500 ETH
     faucetConfig.faucetBalanceRestriction = {
       enabled: true,
       targetBalance: 1000,
@@ -149,7 +149,7 @@ describe("Reward Restrictions", () => {
 
   it("check global dynamic balance restriction (25% restriction)", async () => {
     let session = createTestSession();
-    globalStubs["EthWeb3Manager.getFaucetBalance"].returns(300000000000000000000n); // 300 ETH
+    globalStubs["EthWalletManager.getFaucetBalance"].returns(300000000000000000000n); // 300 ETH
     session.addBalance(50000000000000000000n); // 50 ETH
     faucetConfig.faucetBalanceRestriction = {
       enabled: true,

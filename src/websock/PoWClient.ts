@@ -5,18 +5,19 @@ import { IPoWSessionRecoveryInfo, PoWSession, PoWSessionStatus } from './PoWSess
 import { AddressMark, FaucetStoreDB, SessionMark } from '../services/FaucetStoreDB';
 import { renderTimespan } from '../utils/DateUtils';
 import { isValidGuid } from '../utils/GuidUtils';
-import { ClaimTx, ClaimTxEvents, EthWeb3Manager } from '../services/EthWeb3Manager';
+import { EthWalletManager } from '../services/EthWalletManager';
 import { ServiceManager } from '../common/ServiceManager';
 import { PoWShareVerification } from './PoWShareVerification';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { FaucetStatus, IFaucetStatus } from '../services/FaucetStatus';
-import { EnsWeb3Manager } from '../services/EnsWeb3Manager';
+import { EnsResolver } from '../services/EnsResolver';
 import { FaucetStatsLog } from '../services/FaucetStatsLog';
 import { PoWRewardLimiter } from '../services/PoWRewardLimiter';
 import { CaptchaVerifier } from '../services/CaptchaVerifier';
 import { FaucetWebApi } from '../webserv/FaucetWebApi';
 import { IIPInfo, IPInfoResolver } from '../services/IPInfoResolver';
 import { PoWOutflowLimiter } from '../services/PoWOutflowLimiter';
+import { ClaimTx, ClaimTxEvents, EthClaimManager } from '../services/EthClaimManager';
 
 interface PoWClientClaimTxSubscription {
   claimTx: ClaimTx;
@@ -288,7 +289,7 @@ export class PoWClient {
     let targetAddr: string = message.data.addr;
     if(typeof targetAddr === "string" && targetAddr.match(/^[-a-zA-Z0-9@:%._\+~#=]{1,256}\.eth$/) && faucetConfig.ensResolver) {
       try {
-        targetAddr = await ServiceManager.GetService(EnsWeb3Manager).resolveEnsName(targetAddr);
+        targetAddr = await ServiceManager.GetService(EnsResolver).resolveEnsName(targetAddr);
       } catch(ex) {
         return this.sendErrorResponse("INVALID_ENSNAME", "Could not resolve ENS Name '" + targetAddr + "': " + ex.toString(), message, FaucetLogLevel.INFO);
       }
@@ -309,17 +310,17 @@ export class PoWClient {
     if(typeof faucetConfig.claimAddrMaxBalance === "number") {
       let walletBalance: bigint;
       try {
-        walletBalance = await ServiceManager.GetService(EthWeb3Manager).getWalletBalance(targetAddr);
+        walletBalance = await ServiceManager.GetService(EthWalletManager).getWalletBalance(targetAddr);
       } catch(ex) {
         return this.sendErrorResponse("BALANCE_ERROR", "Could not get balance of Wallet " + targetAddr + ": " + ex.toString(), message);
       }
       if(walletBalance > faucetConfig.claimAddrMaxBalance)
-        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + ServiceManager.GetService(EthWeb3Manager).readableAmount(walletBalance) + " in your wallet. Please give others a chance to get some funds too.", message, FaucetLogLevel.INFO);
+        return this.sendErrorResponse("BALANCE_LIMIT", "You're already holding " + ServiceManager.GetService(EthWalletManager).readableAmount(walletBalance) + " in your wallet. Please give others a chance to get some funds too.", message, FaucetLogLevel.INFO);
     }
 
     if(faucetConfig.claimAddrDenyContract) {
       try {
-        if(await ServiceManager.GetService(EthWeb3Manager).checkIsContract(targetAddr)) {
+        if(await ServiceManager.GetService(EthWalletManager).checkIsContract(targetAddr)) {
           return this.sendErrorResponse("CONTRACT_ADDR", "Cannot start session for " + targetAddr + " (address is a contract)", message, FaucetLogLevel.INFO);
         }
       } catch(ex) {
@@ -625,7 +626,7 @@ export class PoWClient {
     if(closedSession)
       closedSession.setSessionStatus(PoWSessionStatus.CLAIMED);
 
-    let claimTx = ServiceManager.GetService(EthWeb3Manager).addClaimTransaction(sessionInfo.targetAddr, BigInt(sessionInfo.balance), sessionInfo.id);
+    let claimTx = ServiceManager.GetService(EthClaimManager).addClaimTransaction(sessionInfo.targetAddr, BigInt(sessionInfo.balance), sessionInfo.id);
     claimTx.once("confirmed", () => {
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
       faucetStats.statClaimCount++;
@@ -645,7 +646,7 @@ export class PoWClient {
     if(typeof message.data !== "object" || !message.data || !message.data.sessionId)
       return this.sendErrorResponse("INVALID_WATCHCLAIM", "Invalid watch claim request", message);
 
-    let claimTx = ServiceManager.GetService(EthWeb3Manager).getClaimTransaction(message.data.sessionId);
+    let claimTx = ServiceManager.GetService(EthClaimManager).getClaimTransaction(message.data.sessionId);
     if(!claimTx)
       return this.sendErrorResponse("CLAIM_NOT_FOUND", "Claim transaction not found in queue", message);
     
@@ -749,7 +750,7 @@ export class PoWClient {
   private onCliGetClaimQueueState(message: any) {
     let reqId = message.id || undefined;
     this.sendMessage("ok", {
-      lastIdx: ServiceManager.GetService(EthWeb3Manager).getLastProcessedClaimIdx(),
+      lastIdx: ServiceManager.GetService(EthClaimManager).getLastProcessedClaimIdx(),
     }, reqId);
   }
 

@@ -14,7 +14,7 @@ import { getHashedIp, getHashedSessionId } from "../utils/HashedInfo";
 import { IPassportInfo, IPassportStampInfo, PassportVerifier } from "../services/PassportVerifier";
 import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
 import { PoWOutflowLimiter } from "../services/PoWOutflowLimiter";
-import { EthWeb3Manager } from "../services/EthWeb3Manager";
+import { EthWalletManager } from "../services/EthWalletManager";
 
 
 export enum PoWSessionSlashReason {
@@ -217,7 +217,7 @@ export class PoWSession {
       FaucetLogLevel.INFO, 
       "Created new session: " + this.sessionId + 
       (typeof target === "object" ? 
-        " [Recovered: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance) + ", start: " + renderDate(this.startTime, true) + "]" :
+        " [Recovered: " + ServiceManager.GetService(EthWalletManager).readableAmount(this.balance) + ", start: " + renderDate(this.startTime, true) + "]" :
         ""
       ) +
       " (Remote IP: " + client.getRemoteIP() + ")"
@@ -258,7 +258,7 @@ export class PoWSession {
     ServiceManager.GetService(FaucetProcess).emitLog(
       FaucetLogLevel.INFO, 
       "Closed session: " + this.sessionId + " (Reason: " + reason + ")" +
-      (this.claimable ? " [reward: " + ServiceManager.GetService(EthWeb3Manager).readableAmount(this.balance)+ "]" : "")
+      (this.claimable ? " [reward: " + ServiceManager.GetService(EthWalletManager).readableAmount(this.balance)+ "]" : "")
     );
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
 
@@ -544,7 +544,7 @@ export class PoWSession {
     }
 
     ServiceManager.GetService(FaucetStatsLog).statVerifyPenalty += BigInt(penalty);
-    //ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + ServiceManager.GetService(EthWeb3Manager).readableAmount(BigInt(penalty)) + ")");
+    //ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Slashed session " + this.sessionId + " (reason: verify miss, penalty: -" + ServiceManager.GetService(EthWalletManager).readableAmount(BigInt(penalty)) + ")");
   }
 
   private applyKillPenalty(reason: PoWSessionSlashReason) {

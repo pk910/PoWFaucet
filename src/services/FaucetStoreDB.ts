@@ -3,7 +3,7 @@ import * as SQLite3 from 'better-sqlite3';
 import { faucetConfig } from '../common/FaucetConfig';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
-import { IQueuedClaimTx } from './EthWeb3Manager';
+import { IQueuedClaimTx } from './EthClaimManager';
 import { IIPInfo } from './IPInfoResolver';
 import { IPassportInfo } from './PassportVerifier';
 

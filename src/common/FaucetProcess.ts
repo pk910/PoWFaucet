@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { EthWeb3Manager } from '../services/EthWeb3Manager';
+import { EthWalletManager } from '../services/EthWalletManager';
 import { FaucetStore } from '../services/FaucetStore';
 import { FaucetStoreDB } from '../services/FaucetStoreDB';
 import { PoWOutflowLimiter } from '../services/PoWOutflowLimiter';

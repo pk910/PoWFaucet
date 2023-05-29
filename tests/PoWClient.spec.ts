@@ -275,7 +275,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_CAPTCHA", "unexpected error code");
     });
     it("valid startSession call (ens name)", async () => {
-      globalStubs["EnsWeb3Manager.verifyToken"].resolves("0x0000000000000000000000000000000000001337");
+      globalStubs["EnsResolver.resolveEnsName"].resolves("0x0000000000000000000000000000000000001337");
       let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
@@ -291,7 +291,7 @@ describe("WebSocket Client Handling", () => {
       expect(resultResponse?.data.targetAddr).to.equal("0x0000000000000000000000000000000000001337", "target address mismatch");
     });
     it("invalid startSession call (ens name)", async () => {
-      globalStubs["EnsWeb3Manager.verifyToken"].rejects("test_error");
+      globalStubs["EnsResolver.resolveEnsName"].rejects("test_error");
       let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
         id: "test",
@@ -324,7 +324,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("INVALID_ADDR", "unexpected error code");
     });
     it("invalid startSession call (wallet balance exceeds limit)", async () => {
-      globalStubs["EthWeb3Manager.getWalletBalance"].resolves("1000");
+      globalStubs["EthWalletManager.getWalletBalance"].resolves("1000");
       faucetConfig.claimAddrMaxBalance = 500;
       let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({
@@ -342,7 +342,7 @@ describe("WebSocket Client Handling", () => {
       expect(errorResponse?.data.code).to.equal("BALANCE_LIMIT", "unexpected error code");
     });
     it("invalid startSession call (wallet is contract)", async () => {
-      globalStubs["EthWeb3Manager.checkIsContract"].resolves(true);
+      globalStubs["EthWalletManager.checkIsContract"].resolves(true);
       faucetConfig.claimAddrDenyContract = true;
       let client = new TestPoWClient(new FakeWebSocket(), "8.8.8.8");
       await client.emitClientMessage(encodeClientMessage({

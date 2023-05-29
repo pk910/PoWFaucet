@@ -4,8 +4,8 @@ import { WebSocket } from 'ws';
 import { FaucetProcess } from '../src/common/FaucetProcess';
 import { ServiceManager } from '../src/common/ServiceManager';
 import { CaptchaVerifier } from '../src/services/CaptchaVerifier';
-import { EnsWeb3Manager } from '../src/services/EnsWeb3Manager';
-import { EthWeb3Manager } from '../src/services/EthWeb3Manager';
+import { EnsResolver } from '../src/services/EnsResolver';
+import { EthWalletManager } from '../src/services/EthWalletManager';
 import { IPInfoResolver } from '../src/services/IPInfoResolver';
 import { PassportVerifier } from '../src/services/PassportVerifier';
 import { sleepPromise } from '../src/utils/SleepPromise';
@@ -36,10 +36,10 @@ export function bindTestStubs(stubs?) {
       newest: 0,
     }),
     "CaptchaVerifier.verifyToken": sinon.stub(CaptchaVerifier.prototype, "verifyToken").resolves(true),
-    "EnsWeb3Manager.verifyToken": sinon.stub(EnsWeb3Manager.prototype, "resolveEnsName").resolves(null),
-    "EthWeb3Manager.getWalletBalance": sinon.stub(EthWeb3Manager.prototype, "getWalletBalance").resolves(BigInt(0)),
-    "EthWeb3Manager.checkIsContract": sinon.stub(EthWeb3Manager.prototype, "checkIsContract").resolves(false),
-    "EthWeb3Manager.getFaucetBalance": sinon.stub(EthWeb3Manager.prototype, "getFaucetBalance").returns(BigInt(0)),
+    "EnsResolver.resolveEnsName": sinon.stub(EnsResolver.prototype, "resolveEnsName").resolves(null),
+    "EthWalletManager.getWalletBalance": sinon.stub(EthWalletManager.prototype, "getWalletBalance").resolves(BigInt(0)),
+    "EthWalletManager.checkIsContract": sinon.stub(EthWalletManager.prototype, "checkIsContract").resolves(false),
+    "EthWalletManager.getFaucetBalance": sinon.stub(EthWalletManager.prototype, "getFaucetBalance").returns(BigInt(0)),
     ...stubs,
   }
 }

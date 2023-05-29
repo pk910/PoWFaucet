@@ -6,7 +6,7 @@ import { faucetConfig } from '../common/FaucetConfig';
 import { ServiceManager } from '../common/ServiceManager';
 import { FaucetProcess } from '../common/FaucetProcess';
 
-export class EnsWeb3Manager {
+export class EnsResolver {
   private initialized: boolean;
   private ens: ENS;
 
