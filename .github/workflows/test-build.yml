@@ -1,0 +1,50 @@
+
+name: Development Build
+
+on:
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+
+  run_tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 18.15.0
+
+    - run: npm install
+    - run: npm run test
+
+  build_binaries:
+    name: Build Binaries
+    needs: [run_tests]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 18.15.0
+    - run: npm install -g pkg
+
+    - run: npm install
+    - run: npm run build
+
+    - run: pkg --compress Brotli .
+
+    - name: Upload linux binary artifact
+      uses: actions/upload-artifact@v3
+      with:
+        path: ./dist/pow-faucet-server-linux
+        name: powfaucet-server-linux
+    - name: Upload windows binary artifact
+      uses: actions/upload-artifact@v3
+      with:
+        path: ./dist/pow-faucet-server-win.exe
+        name: powfaucet-server-win.exe

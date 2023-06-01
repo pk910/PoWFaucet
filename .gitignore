@@ -1,5 +1,6 @@
-
+.nyc_output/
 build/
+coverage/
 dist/
 node_modules/
 static/index.seo.html

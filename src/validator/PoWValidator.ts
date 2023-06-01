@@ -1,4 +1,5 @@
-import { isMainThread, Worker } from 'worker_threads';
+import assert from 'node:assert';
+import { isMainThread, parentPort, Worker } from 'worker_threads';
 import { faucetConfig, PoWHashAlgo } from '../common/FaucetConfig';
 import { PromiseDfd } from '../utils/PromiseDfd';
 import { IPoWValidatorValidateRequest } from './IPoWValidator';
@@ -6,7 +7,7 @@ import { IPoWValidatorValidateRequest } from './IPoWValidator';
 (() => {
   if (!isMainThread) {
     let worker = require("./PoWValidatorWorker");
-    new worker.PoWValidatorWorker();
+    new worker.PoWValidatorWorker(parentPort);
   }
 })();
 
@@ -15,9 +16,9 @@ export class PoWValidator {
   private readyDfd: PromiseDfd<void>;
   private validateQueue: {[shareId: string]: PromiseDfd<boolean>} = {};
 
-  public constructor() {
+  public constructor(worker?: Worker) {
     this.readyDfd = new PromiseDfd<void>();
-    this.worker = new Worker(__filename);
+    this.worker = worker || new Worker(__filename);
     this.worker.on("message", (msg) => this.onWorkerMessage(msg))
   }
 
@@ -56,8 +57,7 @@ export class PoWValidator {
   }
 
   private onWorkerMessage(msg: any) {
-    if(!msg || typeof msg !== "object")
-      return;
+    assert.equal(msg && (typeof msg === "object"), true);
 
     switch(msg.action) {
       case "init":
@@ -70,8 +70,7 @@ export class PoWValidator {
   }
 
   private onWorkerValidated(msg: any) {
-    if(!this.validateQueue.hasOwnProperty(msg.shareId))
-      return;
+    assert.equal(this.validateQueue.hasOwnProperty(msg.shareId), true);
     
     let resDfd = this.validateQueue[msg.shareId];
     delete this.validateQueue[msg.shareId];

@@ -11,7 +11,7 @@ import { encode } from 'html-entities';
 import { OutgoingHttpHeaders } from 'http2';
 import { FaucetWebApi } from './FaucetWebApi';
 import { ServiceManager } from '../common/ServiceManager';
-import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 
 export class FaucetHttpResponse {
   public readonly code: number;
@@ -28,15 +28,16 @@ export class FaucetHttpResponse {
 }
 
 export class FaucetHttpServer {
+  private httpServer: HttpServer;
   private wssServer: WebSocketServer;
   private staticServer: StaticServer;
   private cachedSeoIndex: string;
 
   public constructor() {
-    let server = createServer();
-    server.on("request", (req, rsp) => this.onHttpRequest(req, rsp));
-    server.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock, head));
-    server.listen(faucetConfig.serverPort);
+    this.httpServer = createServer();
+    this.httpServer.on("request", (req, rsp) => this.onHttpRequest(req, rsp));
+    this.httpServer.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock, head));
+    this.httpServer.listen(faucetConfig.serverPort);
 
     this.wssServer = new WebSocketServer({
       noServer: true
@@ -48,10 +49,18 @@ export class FaucetHttpServer {
 
     if(faucetConfig.buildSeoIndex) {
       this.buildSeoIndex();
-      ServiceManager.GetService(PoWStatusLog).addListener("reload", () => {
+      ServiceManager.GetService(FaucetProcess).addListener("reload", () => {
         this.buildSeoIndex();
       });
     }
+  }
+
+  public getListenPort(): number {
+    let addr = this.httpServer.address();
+    if(typeof addr === "object")
+      return addr.port;
+    else
+      return faucetConfig.serverPort;
   }
 
   private onHttpRequest(req: IncomingMessage, rsp: ServerResponse) {
@@ -169,7 +178,7 @@ export class FaucetHttpServer {
       let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
       fs.writeFileSync(seoFile, indexHtml);
     } catch(ex) {
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.ERROR, "Could not write seo index to disk: " + ex.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Could not write seo index to disk, because static folder is not writable. Serving seo index from memory.");
     }
   }
 }

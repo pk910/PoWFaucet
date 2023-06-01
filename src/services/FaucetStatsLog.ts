@@ -1,13 +1,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { faucetConfig } from '../common/FaucetConfig';
-import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { faucetConfig, resolveRelativePath } from '../common/FaucetConfig';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
-import { weiToEth } from '../utils/ConvertHelpers';
 import { PoWClient } from '../websock/PoWClient';
 import { PoWSession, PoWSessionStatus } from '../websock/PoWSession';
-import { ClaimTx } from './EthWeb3Manager';
+import { ClaimTx } from './EthClaimManager';
+import { EthWalletManager } from './EthWalletManager';
 
 export class FaucetStatsLog {
   public statShareCount: number = 0;
@@ -27,7 +27,7 @@ export class FaucetStatsLog {
   public constructor() {
     if(faucetConfig.faucetStats) {
       this.enabled = true;
-      this.statsFile = path.join(faucetConfig.appBasePath, faucetConfig.faucetStats.logfile || "faucet-stats.log");
+      this.statsFile = resolveRelativePath(faucetConfig.faucetStats.logfile || "faucet-stats.log");
     }
     else {
       this.enabled = false;
@@ -62,6 +62,7 @@ export class FaucetStatsLog {
 
   public addSessionStats(session: PoWSession) {
     let ipinfo = session.getLastIpInfo();
+    let boostinfo = session.getBoostInfo();
     this.addStatsEntry("SESS", {
       st: Math.floor(session.getStartTime().getTime() / 1000),
       ip: session.getLastRemoteIp(),
@@ -77,6 +78,8 @@ export class FaucetStatsLog {
       } : null,
       in: session.getIdent(),
       id: session.getSessionId(),
+      ps: boostinfo ? boostinfo.score : 0,
+      pf: boostinfo ? boostinfo.factor : 1,
     });
   }
 
@@ -100,12 +103,13 @@ export class FaucetStatsLog {
     hashRate = Math.round(hashRate);
 
     let statsLog = [];
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     statsLog.push("clients: " + PoWClient.getClientCount());
     statsLog.push("sessions: " + sessions.length + " (" + hashRate + " H/s, " + idleSessCount + " idle)");
-    statsLog.push("shares: " + this.statShareCount + " (" + (Math.round(weiToEth(this.statShareRewards)*1000)/1000) + " ETH)");
-    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + (Math.round(weiToEth(this.statVerifyReward)*1000)/1000) + " ETH, missed: " + this.statVerifyMisses + " / -" + (Math.round(weiToEth(this.statVerifyPenalty)*1000)/1000) + " ETH)");
-    statsLog.push("claims: " + this.statClaimCount + " (" + (Math.round(weiToEth(this.statClaimRewards)*1000)/1000) + " ETH)");
-    ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "# STATS # " + statsLog.join(", "));
+    statsLog.push("shares: " + this.statShareCount + " (" + ethWalletManager.readableAmount(this.statShareRewards) + ")");
+    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + ethWalletManager.readableAmount(this.statVerifyReward) + ", missed: " + this.statVerifyMisses + " / -" + ethWalletManager.readableAmount(this.statVerifyPenalty) + ")");
+    statsLog.push("claims: " + this.statClaimCount + " (" + ethWalletManager.readableAmount(this.statClaimRewards) + ")");
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "# STATS # " + statsLog.join(", "));
 
     this.addStatsEntry("STATS", {
       cliCnt: PoWClient.getClientCount(),

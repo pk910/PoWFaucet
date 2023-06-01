@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import * as hcaptcha from "hcaptcha";
 import { faucetConfig } from "../common/FaucetConfig";
-import { PoWStatusLog, PoWStatusLogLevel } from '../common/PoWStatusLog';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
 
 export class CaptchaVerifier {
@@ -57,7 +57,7 @@ export class CaptchaVerifier {
     }).then((rsp) => rsp.json());
 
     if(!verifyRsp || !verifyRsp.success) {
-      ServiceManager.GetService(PoWStatusLog).emitLog(PoWStatusLogLevel.INFO, "Captcha verification failed: " + (verifyRsp?.info || ""));
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Captcha verification failed: " + (verifyRsp?.info || ""));
       return false;
     }
     return verifyRsp.ident || true;

@@ -9,6 +9,20 @@ export function base64ToHex(str) {
   return result;
 }
 
-export function weiToEth(wei: number): number {
-  return wei / 1000000000000000000;
+export function toDecimalUnit(amount: number, decimals?: number): number {
+  let factor = Math.pow(10, decimals || 18)
+  return amount / factor;
+}
+
+export function toReadableAmount(amount: number, decimals?: number, unit?: string, precision?: number): string {
+  if(!decimals)
+    decimals = 18;
+  if(!precision) 
+    precision = 3;
+  
+  let decimalAmount = toDecimalUnit(amount, decimals);
+  let precisionFactor = Math.pow(10, precision);
+  let amountStr = (Math.round(decimalAmount * precisionFactor) / precisionFactor).toString();
+
+  return amountStr + (unit ? " " + unit : "");
 }

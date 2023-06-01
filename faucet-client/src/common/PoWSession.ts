@@ -22,7 +22,11 @@ export interface IPoWSessionInfo {
 }
 
 export interface IPoWSessionBoostInfo {
-  stamps: string[];
+  stamps: {
+    provider: string;
+    expiration: number;
+    duplicate?: string;
+  }[];
   score: number;
   factor: number;
 }

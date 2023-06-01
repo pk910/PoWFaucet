@@ -1,7 +1,7 @@
 import { IPoWMinerStats, PoWMiner } from '../common/PoWMiner';
 import { IPoWSessionBoostInfo, PoWSession } from '../common/PoWSession';
 import React from 'react';
-import { weiToEth } from '../utils/ConvertHelpers';
+import { toReadableAmount } from '../utils/ConvertHelpers';
 import { IFaucetConfig } from '../common/IFaucetConfig';
 import { renderTimespan } from '../utils/DateUtils';
 import { PoWTime } from '../common/PoWTime';
@@ -168,7 +168,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
         <div className='row pow-status-top'>
           <div className='col-6'>
             <div className='status-title'>Your Mining Reward:</div>
-            <div className='status-value'>{Math.round(weiToEth(this.state.balance) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</div>
+            <div className='status-value'>{toReadableAmount(this.state.balance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</div>
           </div>
           <div className='col-6'>
             <div className='status-title'>Current Hashrate:</div>
@@ -194,7 +194,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='status-title'>Minimum Claim Reward:</div>
           </div>
           <div className='col-6'>
-            <div className='status-value'>{Math.round(weiToEth(this.props.faucetConfig.minClaim) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</div>
+            <div className='status-value'>{toReadableAmount(this.props.faucetConfig.minClaim, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</div>
           </div>
         </div>
         <div className='row pow-status-other'>
@@ -202,7 +202,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='status-title'>Maximum Claim Reward:</div>
           </div>
           <div className='col-6'>
-            <div className='status-value'>{Math.round(weiToEth(this.props.faucetConfig.maxClaim) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}</div>
+            <div className='status-value'>{toReadableAmount(this.props.faucetConfig.maxClaim, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</div>
           </div>
         </div>
         <div className='row pow-status-other'>
@@ -226,7 +226,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='status-title'>Avg. Reward per Hour:</div>
           </div>
           <div className='col-6'>
-            <div className='status-value'>{Math.round(weiToEth(this.state.balance / (miningTime / 3600)) * 1000) / 1000} {this.props.faucetConfig.faucetCoinSymbol}/h</div>
+            <div className='status-value'>{toReadableAmount(this.state.balance / (miningTime / 3600), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}/h</div>
           </div>
         </div>
         {this.props.faucetConfig.passportBoost ?

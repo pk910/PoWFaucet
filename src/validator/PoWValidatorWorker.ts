@@ -1,4 +1,6 @@
-import { parentPort } from "worker_threads";
+import assert from 'node:assert';
+import { getScrypt, getScryptReadyPromise, Scrypt } from "../../libs/scrypt_wasm";
+import { MessagePort } from "worker_threads";
 import { base64ToHex } from "../utils/ConvertHelpers";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator";
 import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from "../common/FaucetConfig";
@@ -7,11 +9,16 @@ export type PoWHashFn = (nonceHex: string, preimgHex: string, params: PoWCryptoP
 
 export class PoWValidatorWorker {
   private hashFn: {[algo: string]: Promise<PoWHashFn>} = {};
+  private port: MessagePort;
   private difficultyMasks: {[difficulty: number]: string} = {};
   
-  public constructor() {
-    parentPort.on("message", (evt) => this.onControlMessage(evt));
-    parentPort.postMessage({ action: "init" });
+  public constructor(port: MessagePort) {
+    this.port = port;
+    this.port.on("message", (evt) => this.onControlMessage(evt));
+    getScryptReadyPromise().then(() => {
+      this.scrypt = getScrypt();
+      this.port.postMessage({ action: "init" });
+    });
   }
 
   private getHashFn(algo: PoWHashAlgo): Promise<PoWHashFn> {
@@ -60,8 +67,7 @@ export class PoWValidatorWorker {
   }
   
   private onControlMessage(msg: any) {
-    if(!msg || typeof msg !== "object")
-      return;
+    assert.equal(msg && (typeof msg === "object"), true);
 
     //console.log(evt);
     
@@ -111,7 +117,7 @@ export class PoWValidatorWorker {
       }
     }
 
-    parentPort.postMessage({
+    this.port.postMessage({
       action: "validated", 
       data: {
         shareId: req.shareId,

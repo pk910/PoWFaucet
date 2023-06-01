@@ -21,9 +21,6 @@ faucetTitle: "Goerli PoW Faucet"
 # url to image displayed on the startpage
 faucetImage: "/images/fauceth_420.jpg"
 
-# symbol (short name) of the coin that can be mined
-faucetCoinSymbol: "GöETH"
-
 # some additional html to show on the startpage
 faucetHomeHtml: |
   <div class='pow-info'>
@@ -51,13 +48,24 @@ faucetSecret: "RandomStringThatShouldBeVerySecret!"
 
 # ETH execution layer RPC host
 #ethRpcHost: "http://127.0.0.1:8545/"
-ethRpcHost: "https://rpc.goerli.mudit.blog"
+ethRpcHost: "https://ethereum-goerli.publicnode.com"
 
 # faucet wallet private key (hex, without 0x prefix)
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
 
-# EVM chain id
-ethChainId: 5
+# EVM chain id (null for auto-detect from RPC)
+ethChainId: null
+
+# symbol (short name) of the coin that can be mined
+faucetCoinSymbol: "GöETH"
+
+# type of coin that can be mined
+# native = native coin (ETH)
+# erc20 = ERC20 token
+faucetCoinType: "native"
+
+# coin contract address (only for faucetCoinType = erc20)
+#faucetCoinContract: "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6" # WETH9 on goerli
 
 # transaction gas limit
 # use 21000 to prevent transactions to contracts
@@ -101,15 +109,14 @@ claimMinAmount:   25000000000000000  # 0.025 ETH
 #claimMaxAmount: 17000000000000000000  # 17 ETH
 claimMaxAmount:   6010000000000000000  # 6.01 ETH
 
-# penalty for not responding to a verification request (in wei)
-# shouldn't be lower than powShareReward, but not too high as this can happen regularily in case of connection loss or so
-#verifyMinerMissPenalty: 5000000000000000  # 0.005 ETH
-verifyMinerMissPenalty: 1250000000000000  # 0.00125 ETH
+# penalty for not responding to a verification request (percent of powShareReward)
+# shouldn't be too high as this can happen regularily in case of connection loss or so
+verifyMinerMissPenaltyPerc: 10  # 10% of powShareReward
 
-# reward for responding to a verification request in time (in wei)
-# some extra reward for slow miners - should be much lower than powShareReward
+# reward for responding to a verification request in time (percent of powShareReward)
+# some extra reward for slow miners
 # comment out to disable rewards for verification requests
-verifyMinerReward:   300000000000000  # 0.0003 ETH  (~1/6th of powShareReward)
+verifyMinerRewardPerc:   15  # 15% of powShareReward
 
 # maximum mining session time (in seconds)
 powSessionTimeout: 18000   # 5h
@@ -318,13 +325,19 @@ faucetBalanceRestriction:
 # dynamic reward restriction based on faucet outflow
 # alternative to static faucetBalanceRestrictedReward
 # limits the rewards according to the faucet outflow
+# the faucet keeps track of the outflow via a internal "outflow balance".
+# amount/duration wei are added to that balance every second.
+# whenever some reward is mined, it is subtracted from that balance.
+# So, whenever the balance gets negative, there is more mining activity than the allowed outflow and the reward is reduced linearly down to 0% when it reaches lowerLimit.
+# Whenever the balance gets positive, there is less mining activity than allowed. The positive balance is a 'buffer' for activity spikes, anything above upperLimit gets burned.
 faucetOutflowRestriction:
   enabled: false
   # limit outflow to 1000ETH per day
   amount: 1000000000000000000000 # 1000 ETH
   duration: 86400 # 1 day
-  # apply linear reward restriction after `half of the duration` has been used
-  restrict: 43200
+  # outflow balance limits
+  lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
+  upperLimit: 500000000000000000000 # 500 ETH
 
 
 ### Automatic wallet refill
@@ -392,12 +405,16 @@ resultSharing:
 
 # allow reward boosting by gitcoin passport verification
 passportBoost:
+  scorerApiKey: "" # Gitcoin Passport Scorer API Key
   trustedIssuers:
     - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
   passportCachePath: "passport-cache"
   
-  refreshCooldown: 10
-  cacheTime: 86400
+  refreshCooldown: 300 # allow refreshing every 5mins
+  cacheTime: 86400 # cache passports for 1 day (does not affect manual refreshing)
+
+  stampDeduplicationTime: 604800 # allow reusing a stamp in another passport after 7 days
+
   boostFactor:
     1: 1.1 # x1.1 if score >= 1
     5: 1.5 # x1.5 if score >= 5
@@ -415,6 +432,7 @@ passportBoost:
     "FacebookProfilePicture": 1
     "Brightid": 10
     "Github": 1
+    "Coinbase": 1
     "FiveOrMoreGithubRepos": 1
     "TenOrMoreGithubFollowers": 2
     "FiftyOrMoreGithubFollowers": 4

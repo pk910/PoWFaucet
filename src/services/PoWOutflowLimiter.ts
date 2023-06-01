@@ -1,7 +1,7 @@
 
 import { clearInterval } from "timers";
 import { faucetConfig } from "../common/FaucetConfig";
-import { PoWStatusLog } from "../common/PoWStatusLog";
+import { FaucetProcess } from "../common/FaucetProcess";
 import { ServiceManager } from "../common/ServiceManager";
 import { FaucetStoreDB } from "./FaucetStoreDB";
 
@@ -15,7 +15,7 @@ export class PoWOutflowLimiter {
   private saveTimer: NodeJS.Timer;
   
   public constructor() {
-    ServiceManager.GetService(PoWStatusLog).addListener("reload", () => this.reloadService());
+    ServiceManager.GetService(FaucetProcess).addListener("reload", () => this.reloadService());
     this.reloadService();
   }
 
@@ -51,7 +51,7 @@ export class PoWOutflowLimiter {
     }
     else {
       this.outflowState = {
-        trackTime: this.now() - faucetConfig.faucetOutflowRestriction.duration,
+        trackTime: this.now(),
         dustAmount: 0n,
       };
     }
@@ -71,13 +71,16 @@ export class PoWOutflowLimiter {
   private updateState(minedAmount: bigint) {
     if(!this.outflowState)
       return;
-    
     let now = this.now();
-    if(this.outflowState.trackTime < now - faucetConfig.faucetOutflowRestriction.duration) {
-      this.outflowState.trackTime = now - faucetConfig.faucetOutflowRestriction.duration;
+
+    // check upperLimit
+    if(this.getOutflowBalance() > faucetConfig.faucetOutflowRestriction.upperLimit) {
+      let upperTimeLimit = BigInt(faucetConfig.faucetOutflowRestriction.upperLimit) * BigInt(faucetConfig.faucetOutflowRestriction.duration) / BigInt(faucetConfig.faucetOutflowRestriction.amount);
+      this.outflowState.trackTime = now - Number(upperTimeLimit);
       this.outflowState.dustAmount = 0n;
     }
     
+    // add minedAmount
     if(minedAmount <= this.outflowState.dustAmount) {
       this.outflowState.dustAmount -= minedAmount;
     }
@@ -93,10 +96,16 @@ export class PoWOutflowLimiter {
         this.outflowState.dustAmount = 0n;
       }
       this.outflowState.trackTime += parseInt(minedTime.toString());
-
-      if(this.outflowState.trackTime > now)
-        this.outflowState.trackTime = now;
     }
+  }
+
+  public getOutflowBalance(): bigint {
+    if(!this.outflowState)
+      return 0n;
+    let timeDiff = this.now() - this.outflowState.trackTime;
+    let balance = BigInt(timeDiff) * BigInt(faucetConfig.faucetOutflowRestriction.amount) / BigInt(faucetConfig.faucetOutflowRestriction.duration);
+    balance += this.outflowState.dustAmount;
+    return balance;
   }
 
   public addMinedAmount(amount: bigint) {
@@ -108,24 +117,29 @@ export class PoWOutflowLimiter {
       return 100;
 
     let now = this.now();
-    if(this.outflowState.trackTime <= now - faucetConfig.faucetOutflowRestriction.restrict)
+    let outflowBalance: bigint;
+    if(this.outflowState.trackTime <= now || (outflowBalance = this.getOutflowBalance()) >= 0)
       return 100;
-    if(this.outflowState.trackTime >= now)
-      return 0;
-    return Math.floor(10000 * (now - this.outflowState.trackTime) / faucetConfig.faucetOutflowRestriction.restrict) / 100;
+
+    let lowerLimit = BigInt(faucetConfig.faucetOutflowRestriction.lowerLimit);
+    let remainingAmount = lowerLimit - outflowBalance;
+
+    return Number(10000n * remainingAmount / lowerLimit) / 100;
   }
 
-  public getOutflowDebugState(): {now: number, trackTime: number, dustAmount: string, restriction: number, duration: number, restrict: number, amount: number} {
+  public getOutflowDebugState(): {now: number, trackTime: number, dustAmount: string, balance: string, restriction: number, amount: number, duration: number, lowerLimit: number, upperLimit: number} {
     if(!this.outflowState)
       return null;
     return {
       now: this.now(),
       trackTime: this.outflowState.trackTime,
       dustAmount: this.outflowState.dustAmount.toString(),
+      balance: this.getOutflowBalance().toString(),
       restriction: this.getOutflowRestriction(),
-      duration: faucetConfig.faucetOutflowRestriction.duration,
-      restrict: faucetConfig.faucetOutflowRestriction.restrict,
       amount: faucetConfig.faucetOutflowRestriction.amount,
+      duration: faucetConfig.faucetOutflowRestriction.duration,
+      lowerLimit: faucetConfig.faucetOutflowRestriction.lowerLimit,
+      upperLimit: faucetConfig.faucetOutflowRestriction.upperLimit,
     };
   }
 
