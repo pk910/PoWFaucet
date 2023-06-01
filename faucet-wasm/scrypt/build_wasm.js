@@ -54,12 +54,12 @@ const base32768WASM = "${base32768WASM}";
 const wasmBinary = base32768.decode(base32768WASM);
 
 scryptPromise = WebAssembly.instantiate(wasmBinary, {}).then(instantiatedModule => {
-  __wbg_set_wasm(instantiatedModule.instance.exports);
 `);
 
 // Output the WASM wrapper JS code that came from the Rust WASM compiler, 
 // slightly modified to use global namespace instead of es6 modules
 console.log(customWASMWrappperJS.split("\n").map(x => `  ${x}`).join("\n"));
 
+console.log("__wbg_set_wasm(instantiatedModule.instance.exports);");
 // finish off by closing scryptPromise
 console.log("});");

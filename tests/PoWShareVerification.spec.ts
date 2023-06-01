@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { bindTestStubs, FakeWebSocket, unbindTestStubs } from './common';
 import { PoWClient } from "../src/websock/PoWClient";
 import { PoWSession } from '../src/websock/PoWSession';
-import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
+import { faucetConfig, loadFaucetConfig, PoWHashAlgo } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
 import { PoWShareVerification } from '../src/websock/PoWShareVerification';
 import { PoWValidator } from '../src/validator/PoWValidator';
@@ -51,6 +51,7 @@ describe("Share Verification", () => {
       nonce: 0,
       ident: "xyz-zyx",
     });
+    faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
     faucetConfig.powNonceCount = 1;
     faucetConfig.powScryptParams = {
       cpuAndMemory: 4096,
@@ -79,6 +80,7 @@ describe("Share Verification", () => {
       nonce: 0,
       ident: "xyz-zyx",
     });
+    faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
     faucetConfig.powNonceCount = 1;
     faucetConfig.powScryptParams = {
       cpuAndMemory: 4096,
@@ -107,6 +109,7 @@ describe("Share Verification", () => {
       nonce: 0,
       ident: "xyz-zyx",
     });
+    faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
     faucetConfig.powNonceCount = 1;
     faucetConfig.powScryptParams = {
       cpuAndMemory: 4096,

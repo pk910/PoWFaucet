@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 import { awaitSleepPromise, bindTestStubs, FakePoWClient, FakeWebSocket, unbindTestStubs } from './common';
 import { PoWClient } from "../src/websock/PoWClient";
-import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
+import { faucetConfig, loadFaucetConfig, PoWHashAlgo } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
 import { PoWSession } from '../src/websock/PoWSession';
 import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
@@ -791,6 +791,7 @@ describe("WebSocket Client Handling", () => {
         nonce: 0,
         ident: "xyz-zyx",
       });
+      faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
       faucetConfig.powNonceCount = 1;
       faucetConfig.powScryptParams = {
         cpuAndMemory: 4096,
@@ -807,7 +808,7 @@ describe("WebSocket Client Handling", () => {
         action: "foundShare",
         data: {
           nonces: [156],
-          params: "4096|8|1|16|9",
+          params: "scrypt|4096|8|1|16|9",
           hashrate: 50
         }
       }));
@@ -839,7 +840,7 @@ describe("WebSocket Client Handling", () => {
         action: "foundShare",
         data: {
           nonces: [156],
-          params: "4096|8|1|16|9",
+          params: "scrypt|4096|8|1|16|9",
           hashrate: 50
         }
       }));
@@ -852,6 +853,7 @@ describe("WebSocket Client Handling", () => {
     it("invalid foundShare call (invalid nonce count)", async () => {
       let client = new FakePoWClient(new FakeWebSocket(), "8.8.8.8");
       let session = new PoWSession(client, "0x0000000000000000000000000000000000001337");
+      faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
       faucetConfig.powNonceCount = 1;
       faucetConfig.powScryptParams = {
         cpuAndMemory: 4096,
@@ -865,7 +867,7 @@ describe("WebSocket Client Handling", () => {
         action: "foundShare",
         data: {
           nonces: [156, 174],
-          params: "4096|8|1|16|9",
+          params: "scrypt|4096|8|1|16|9",
           hashrate: 50
         }
       }));
@@ -887,6 +889,7 @@ describe("WebSocket Client Handling", () => {
         nonce: 0,
         ident: "xyz-zyx",
       });
+      faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
       faucetConfig.powNonceCount = 1;
       faucetConfig.powScryptParams = {
         cpuAndMemory: 4096,
@@ -901,7 +904,7 @@ describe("WebSocket Client Handling", () => {
         action: "foundShare",
         data: {
           nonces: [156],
-          params: "2048|8|1|16|12",
+          params: "scrypt|2048|8|1|16|12",
           hashrate: 50
         }
       }));
@@ -923,6 +926,7 @@ describe("WebSocket Client Handling", () => {
         nonce: 200,
         ident: "xyz-zyx",
       });
+      faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
       faucetConfig.powNonceCount = 1;
       faucetConfig.powScryptParams = {
         cpuAndMemory: 4096,
@@ -937,7 +941,7 @@ describe("WebSocket Client Handling", () => {
         action: "foundShare",
         data: {
           nonces: [156],
-          params: "4096|8|1|16|9",
+          params: "scrypt|4096|8|1|16|9",
           hashrate: 50
         }
       }));
@@ -959,6 +963,7 @@ describe("WebSocket Client Handling", () => {
         nonce: 200,
         ident: "xyz-zyx",
       });
+      faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
       faucetConfig.powNonceCount = 1;
       faucetConfig.powScryptParams = {
         cpuAndMemory: 4096,
@@ -974,7 +979,7 @@ describe("WebSocket Client Handling", () => {
         action: "foundShare",
         data: {
           nonces: [3468],
-          params: "4096|8|1|16|9",
+          params: "scrypt|4096|8|1|16|9",
           hashrate: 50
         }
       }));
@@ -1000,6 +1005,7 @@ describe("WebSocket Client Handling", () => {
         nonce: 0,
         ident: "xyz-zyx",
       });
+      faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
       faucetConfig.powNonceCount = 1;
       faucetConfig.powScryptParams = {
         cpuAndMemory: 4096,
@@ -1015,7 +1021,7 @@ describe("WebSocket Client Handling", () => {
         action: "foundShare",
         data: {
           nonces: [156],
-          params: "4096|8|1|16|9",
+          params: "scrypt|4096|8|1|16|9",
           hashrate: 50
         }
       }));
@@ -1043,6 +1049,7 @@ describe("WebSocket Client Handling", () => {
       });
       let session2 = new PoWSession(client2, "0x0000000000000000000000000000000000001338");
       session2.addBalance(BigInt(faucetConfig.powShareReward));
+      faucetConfig.powHashAlgo = PoWHashAlgo.SCRYPT;
       faucetConfig.powNonceCount = 1;
       faucetConfig.powScryptParams = {
         cpuAndMemory: 4096,
@@ -1060,7 +1067,7 @@ describe("WebSocket Client Handling", () => {
         action: "foundShare",
         data: {
           nonces: [156],
-          params: "4096|8|1|16|9",
+          params: "scrypt|4096|8|1|16|9",
           hashrate: 50
         }
       }));
