@@ -15,10 +15,7 @@ export class PoWValidatorWorker {
   public constructor(port: MessagePort) {
     this.port = port;
     this.port.on("message", (evt) => this.onControlMessage(evt));
-    getScryptReadyPromise().then(() => {
-      this.scrypt = getScrypt();
-      this.port.postMessage({ action: "init" });
-    });
+    this.port.postMessage({ action: "init" });
   }
 
   private getHashFn(algo: PoWHashAlgo): Promise<PoWHashFn> {
