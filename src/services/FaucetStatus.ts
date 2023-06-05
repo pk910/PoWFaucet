@@ -1,10 +1,8 @@
 import * as fs from 'fs'
-import * as path from 'path';
 import * as crypto from "crypto";
-import { faucetConfig } from '../common/FaucetConfig';
-import { PoWClient } from "../websock/PoWClient";
-import { PoWSession } from '../websock/PoWSession';
+import { resolveRelativePath } from '../config/FaucetConfig';
 import { isVersionLower } from '../utils/VersionCompare';
+import { FaucetSession } from '../session/FaucetSession';
 
 export enum FaucetStatusLevel {
   INFO    = "info",
@@ -41,7 +39,7 @@ export class FaucetStatus {
   }
 
   private updateLocalStatus() {
-    let faucetStatusFile = path.join(faucetConfig.appBasePath, "faucet-status.json");
+    let faucetStatusFile = resolveRelativePath("faucet-status.json");
     let faucetStatusStr = "";
     if(!fs.existsSync(faucetStatusFile))
       this.localStatusEntries = [];
@@ -84,14 +82,10 @@ export class FaucetStatus {
 
   private updateFaucetStatus() {
     // update faucet status for each client
-    PoWClient.getAllClients().forEach((client) => {
-      let session = client.getSession();
-      let status = this.getFaucetStatus(client.getClientVersion(), session);
-      client.sendFaucetStatus(status.status, status.hash);
-    });
+
   }
 
-  public getFaucetStatus(clientVersion: string, session?: PoWSession): {status: IFaucetStatus[], hash: string} {
+  public getFaucetStatus(clientVersion: string, session?: FaucetSession): {status: IFaucetStatus[], hash: string} {
     let statusList: IFaucetStatus[] = [];
     let statusHash = crypto.createHash("sha256");
 
@@ -109,7 +103,7 @@ export class FaucetStatus {
       if(status.filter.session !== undefined && status.filter.session !== !!session)
         return false;
       
-      let ipinfo = session ? session.getLastIpInfo() : null;
+      let ipinfo = session ? session.getSessionData("ipinfo.data") : null;
       if(status.filter.country !== undefined) {
         if(!ipinfo || !ipinfo.countryCode)
           return false;
@@ -153,16 +147,18 @@ export class FaucetStatus {
     });
 
     if(session) {
-      let restriction = session.getRewardRestriction();
-      restriction.messages.forEach((message) => {
-        if(!message.notify)
-          return;
-        
-        addStatus({
-          level: (typeof message.notify === "string" ? message.notify as FaucetStatusLevel : FaucetStatusLevel.WARNING),
-          text: message.text,
+      let restriction = session.getSessionModuleRef("ipinfo.restriction.data");
+      if(restriction) {
+        restriction.messages.forEach((message) => {
+          if(!message.notify)
+            return;
+          
+          addStatus({
+            level: (typeof message.notify === "string" ? message.notify as FaucetStatusLevel : FaucetStatusLevel.WARNING),
+            text: message.text,
+          });
         });
-      });
+      }
     }
 
     return {

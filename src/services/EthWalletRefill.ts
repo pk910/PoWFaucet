@@ -1,9 +1,9 @@
-import { faucetConfig } from "../common/FaucetConfig";
+import { faucetConfig } from "../config/FaucetConfig";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
 import { ServiceManager } from "../common/ServiceManager";
 import { EthClaimManager } from "./EthClaimManager";
 import { EthWalletManager, TransactionResult } from "./EthWalletManager";
-import { PoWRewardLimiter } from "./PoWRewardLimiter";
+import { SessionManager } from "../session/SessionManager";
 
 export class EthWalletRefill {
   private lastWalletRefill: number;
@@ -31,7 +31,7 @@ export class EthWalletRefill {
     this.lastWalletRefillTry = now;
 
     let walletState = ServiceManager.GetService(EthWalletManager).getWalletState();
-    let walletBalance = walletState.balance - ServiceManager.GetService(PoWRewardLimiter).getUnclaimedBalance() - ServiceManager.GetService(EthClaimManager).getQueuedAmount();
+    let walletBalance = walletState.balance - ServiceManager.GetService(SessionManager).getUnclaimedBalance() - ServiceManager.GetService(EthClaimManager).getQueuedAmount();
     let refillAction: string = null;
     if(faucetConfig.ethRefillContract.overflowBalance && walletBalance > BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()))
       refillAction = "overflow";

@@ -1,18 +1,15 @@
 import { IncomingMessage } from "http";
-import { faucetConfig, PoWHashAlgo, IFaucetResultSharingConfig } from "../common/FaucetConfig";
-import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess";
+import { faucetConfig } from "../config/FaucetConfig";
 import { ServiceManager } from "../common/ServiceManager";
-import { ClaimTxStatus, EthClaimManager } from "../services/EthClaimManager";
 import { EthWalletManager } from "../services/EthWalletManager";
-import { EthWalletRefill } from "../services/EthWalletRefill";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
-import { IIPInfo } from "../services/IPInfoResolver";
-import { PoWOutflowLimiter } from "../services/PoWOutflowLimiter";
-import { IPoWRewardRestriction, PoWRewardLimiter } from "../services/PoWRewardLimiter";
-import { getHashedSessionId } from "../utils/HashedInfo";
-import { PoWClient } from "../websock/PoWClient";
-import { PoWSession, PoWSessionStatus } from "../websock/PoWSession";
-import { FaucetHttpResponse } from "./FaucetWebServer";
+import { FaucetHttpResponse } from "./FaucetHttpServer";
+import { SessionManager } from "../session/SessionManager";
+import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from "../session/FaucetSession";
+import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager";
+import { IFaucetResultSharingConfig } from "../config/ConfigShared";
+import { FaucetError } from "../common/FaucetError";
+import { ClaimTx, EthClaimManager } from "../services/EthClaimManager";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -29,101 +26,23 @@ export interface IClientFaucetConfig {
   faucetCoinType: string;
   faucetCoinContract: string;
   faucetCoinDecimals: number;
-  hcapProvider: string;
-  hcapSiteKey: string;
-  hcapSession: boolean;
-  hcapClaim: boolean;
-  shareReward: number;
-  rewardFactor: number;
   minClaim: number;
   maxClaim: number;
-  powTimeout: number;
-  claimTimeout: number;
-  powParams: any,
-  powNonceCount: number;
-  powHashrateLimit: number;
-  resolveEnsNames: boolean;
+  sessionTimeout: number;
   ethTxExplorerLink: string;
   time: number;
   resultSharing: IFaucetResultSharingConfig;
-  passportBoost: {
-    refreshTimeout: number;
-    manualVerification: boolean;
-    stampScoring: {[stamp: string]: number};
-    boostFactor: {[score: number]: number};
-  };
-}
-
-export interface IClientSessionStatus {
-  id: string;
-  start: number;
-  idle: number;
-  target: string;
-  ip: string;
-  ipInfo: IIPInfo;
-  balance: string;
-  nonce: number;
-  hashrate: number;
-  status: PoWSessionStatus;
-  claimable: boolean;
-  restr: IPoWRewardRestriction;
-  cliver: string;
-  boostF: number;
-  boostS: number;
-}
-
-export interface IClientClaimStatus {
-  time: number;
-  session: string;
-  target: string;
-  amount: string;
-  status: ClaimTxStatus;
-  error: string;
-  nonce: number;
-  hash: string;
-  txhex: string;
-}
-
-export interface IClientFaucetStatus {
-  status: {
-    walletBalance: string;
-    unclaimedBalance: string;
-    queuedBalance: string;
-    balanceRestriction: number;
-  };
-  refill: {
-    balance: string;
-    trigger: string;
-    amount: string;
-    cooldown: number;
-  };
-  outflowRestriction: {
-    now: number;
-    trackTime: number;
-    dustAmount: string;
-    balance: string;
-
-    restriction: number;
-    amount: number;
-    duration: number;
-    lowerLimit: number;
-    upperLimit: number;
-  };
-  sessions: IClientSessionStatus[];
-  claims: IClientClaimStatus[];
-}
-
-export interface IClientQueueStatus {
-  claims: IClientClaimStatus[];
+  modules: {
+    [module: string]: any;
+  },
 }
 
 const FAUCETSTATUS_CACHE_TIME = 10;
 
 export class FaucetWebApi {
-  private cachedFaucetStatus: {time: number, data: IClientFaucetStatus};
-  private faucetStatusPromise: Promise<IClientFaucetStatus>;
+  private apiEndpoints: {[endpoint: string]: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>} = {};
 
-  public async onApiRequest(req: IncomingMessage): Promise<any> {
+  public async onApiRequest(req: IncomingMessage, body?: Buffer): Promise<any> {
     let apiUrl = this.parseApiUrl(req.url);
     if (!apiUrl || apiUrl.path.length === 0)
       return new FaucetHttpResponse(404, "Not Found");
@@ -131,13 +50,29 @@ export class FaucetWebApi {
       case "getMaxReward".toLowerCase():
         return this.onGetMaxReward();
       case "getFaucetConfig".toLowerCase():
-        return this.onGetFaucetConfig(apiUrl.query['cliver'] as string);
-      case "getFaucetStatus".toLowerCase():
-        return await this.onGetFaucetStatus((req.headers['x-forwarded-for'] as string || req.socket.remoteAddress).split(", ")[0]);
-      case "getQueueStatus".toLowerCase():
-        return this.onGetQueueStatus();
+        return this.onGetFaucetConfig(apiUrl.query['cliver'] as string, apiUrl.query['session'] as string);
+      case "startSession".toLowerCase():
+        return this.onStartSession(req, body);
+      case "claimReward".toLowerCase():
+        return this.onClaimReward(req, body);
+      case "getClaimStatus".toLowerCase():
+        return this.onGetClaimStatus(apiUrl.query['session'] as string);
+      case "getSessionStatus".toLowerCase():
+        return this.onGetSessionStatus(apiUrl.query['session'] as string);
+      default:
+        let handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>;
+        if((handler = this.apiEndpoints[apiUrl.path[0].toLowerCase()]))
+          return handler(req, apiUrl, body);
     }
     return new FaucetHttpResponse(404, "Not Found");
+  }
+
+  public registerApiEndpoint(endpoint: string, handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>) {
+    this.apiEndpoints[endpoint.toLowerCase()] = handler;
+  }
+
+  public removeApiEndpoint(endpoint: string) {
+    delete this.apiEndpoints[endpoint.toLowerCase()];
   }
 
   private parseApiUrl(url: string): IFaucetApiUrl {
@@ -158,190 +93,173 @@ export class FaucetWebApi {
   }
 
   private onGetMaxReward(): number {
-    return faucetConfig.claimMaxAmount;
+    return faucetConfig.maxDropAmount;
   }
 
-  public getFaucetConfig(client?: PoWClient, clientVersion?: string): IClientFaucetConfig {
-    let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(client?.getClientVersion() || clientVersion, client?.getSession());
+  public getFaucetHomeHtml(): string {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let faucetHtml = faucetConfig.faucetHomeHtml || "";
     faucetHtml = faucetHtml.replace(/{faucetWallet}/, () => {
       return ethWalletManager.getFaucetAddress();
     });
-    let powParams;
-    switch(faucetConfig.powHashAlgo) {
-      case PoWHashAlgo.SCRYPT:
-        powParams = {
-          a: PoWHashAlgo.SCRYPT,
-          n: faucetConfig.powScryptParams.cpuAndMemory,
-          r: faucetConfig.powScryptParams.blockSize,
-          p: faucetConfig.powScryptParams.parallelization,
-          l: faucetConfig.powScryptParams.keyLength,
-          d: faucetConfig.powScryptParams.difficulty,
-        };
-        break;
-      case PoWHashAlgo.CRYPTONIGHT:
-        powParams = {
-          a: PoWHashAlgo.CRYPTONIGHT,
-          c: faucetConfig.powCryptoNightParams.algo,
-          v: faucetConfig.powCryptoNightParams.variant,
-          h: faucetConfig.powCryptoNightParams.height,
-          d: faucetConfig.powCryptoNightParams.difficulty,
-        };
-        break;
-      case PoWHashAlgo.ARGON2:
-        powParams = {
-          a: PoWHashAlgo.ARGON2,
-          t: faucetConfig.powArgon2Params.type,
-          v: faucetConfig.powArgon2Params.version,
-          i: faucetConfig.powArgon2Params.timeCost,
-          m: faucetConfig.powArgon2Params.memoryCost,
-          p: faucetConfig.powArgon2Params.parallelization,
-          l: faucetConfig.powArgon2Params.keyLength,
-          d: faucetConfig.powArgon2Params.difficulty,
-        };
-        break;
-    }
+    return faucetHtml;
+  }
+
+  public onGetFaucetConfig(clientVersion: string, sessionId: string): IClientFaucetConfig {
+    let faucetSession = sessionId ? ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING, FaucetSessionStatus.CLAIMABLE]) : null;
+    let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(clientVersion, faucetSession);
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    
+    let moduleConfig = {};
+    ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.ClientConfig, [moduleConfig, sessionId]);
+
     return {
       faucetTitle: faucetConfig.faucetTitle,
       faucetStatus: faucetStatus.status,
       faucetStatusHash: faucetStatus.hash,
       faucetImage: faucetConfig.faucetImage,
-      faucetHtml: faucetHtml,
+      faucetHtml: this.getFaucetHomeHtml(),
       faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
       faucetCoinType: faucetConfig.faucetCoinType,
       faucetCoinContract: faucetConfig.faucetCoinContract,
       faucetCoinDecimals: ethWalletManager.getFaucetDecimals(),
-      hcapProvider: faucetConfig.captchas ? faucetConfig.captchas.provider : null,
-      hcapSiteKey: faucetConfig.captchas ? faucetConfig.captchas.siteKey : null,
-      hcapSession: faucetConfig.captchas && faucetConfig.captchas.checkSessionStart,
-      hcapClaim: faucetConfig.captchas && faucetConfig.captchas.checkBalanceClaim,
-      shareReward: faucetConfig.powShareReward,
-      rewardFactor: ServiceManager.GetService(PoWRewardLimiter).getBalanceRestriction(),
-      minClaim: faucetConfig.claimMinAmount,
-      maxClaim: faucetConfig.claimMaxAmount,
-      powTimeout: faucetConfig.powSessionTimeout,
-      claimTimeout: faucetConfig.claimSessionTimeout,
-      powParams: powParams,
-      powNonceCount: faucetConfig.powNonceCount,
-      powHashrateLimit: faucetConfig.powHashrateSoftLimit,
-      resolveEnsNames: !!faucetConfig.ensResolver,
+      minClaim: faucetConfig.minDropAmount,
+      maxClaim: faucetConfig.maxDropAmount,
+      sessionTimeout: faucetConfig.sessionTimeout,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
       time: Math.floor((new Date()).getTime() / 1000),
       resultSharing: faucetConfig.resultSharing,
-      passportBoost: faucetConfig.passportBoost ? {
-        refreshTimeout: faucetConfig.passportBoost.refreshCooldown,
-        manualVerification: (faucetConfig.passportBoost.trustedIssuers && faucetConfig.passportBoost.trustedIssuers.length > 0),
-        stampScoring: faucetConfig.passportBoost.stampScoring,
-        boostFactor: faucetConfig.passportBoost.boostFactor,
-      } : null,
+      modules: moduleConfig,
     };
   }
 
-  private onGetFaucetConfig(clientVersion?: string): IClientFaucetConfig {
-    return this.getFaucetConfig(null, clientVersion);
-  }
-
-  private async buildFaucetStatus(): Promise<IClientFaucetStatus> {
-    let rewardLimiter = ServiceManager.GetService(PoWRewardLimiter);
-    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-
-    let statusRsp: IClientFaucetStatus = {
-      status: {
-        walletBalance: ethWalletManager.getFaucetBalance()?.toString(),
-        unclaimedBalance: rewardLimiter.getUnclaimedBalance().toString(),
-        queuedBalance: ServiceManager.GetService(EthClaimManager).getQueuedAmount().toString(),
-        balanceRestriction: rewardLimiter.getBalanceRestriction(),
-      },
-      outflowRestriction: ServiceManager.GetService(PoWOutflowLimiter).getOutflowDebugState(),
-      refill: faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract ? {
-        balance: (await ethWalletManager.getWalletBalance(faucetConfig.ethRefillContract.contract)).toString(),
-        trigger: faucetConfig.ethRefillContract.triggerBalance.toString(),
-        amount: faucetConfig.ethRefillContract.requestAmount.toString(),
-        cooldown: ServiceManager.GetService(EthWalletRefill).getFaucetRefillCooldown(),
-      } : null,
-      sessions: null,
-      claims: null,
-    };
-
-    let sessions = PoWSession.getAllSessions();
-    statusRsp.sessions = sessions.map((session) => {
-      let activeClient = session.getActiveClient();
-      let clientVersion = null;
-      if(activeClient) {
-        clientVersion = activeClient.getClientVersion();
-      }
-
-      let boostInfo = session.getBoostInfo();
-      return {
-        id: session.getSessionId(true),
-        start: Math.floor(session.getStartTime().getTime() / 1000),
-        idle: session.getIdleTime() ? Math.floor(session.getIdleTime().getTime() / 1000) : null,
-        target: session.getTargetAddr(),
-        ip: session.getLastRemoteIp(true),
-        ipInfo: session.getLastIpInfo(),
-        balance: session.getBalance().toString(),
-        nonce: session.getLastNonce(),
-        hashrate: session.getReportedHashRate(),
-        status: session.getSessionStatus(),
-        claimable: session.isClaimable(),
-        restr: rewardLimiter.getSessionRestriction(session),
-        cliver: clientVersion,
-        boostF: boostInfo?.factor || 1,
-        boostS: boostInfo?.score || 0,
-      }
-    });
-
-    let queueStatus = this.buildQueueStatus();
-    statusRsp.claims = queueStatus.claims;
-
-    return statusRsp;
-  }
-
-  public getFaucetStatus(): Promise<IClientFaucetStatus> {
-    if(this.faucetStatusPromise)
-      return this.faucetStatusPromise;
+  public async onStartSession(req: IncomingMessage, body: Buffer): Promise<any> {
+    if(req.method !== "POST")
+      return new FaucetHttpResponse(405, "Method Not Allowed");
     
-    let now = Math.floor((new Date()).getTime() / 1000);
-    if(this.cachedFaucetStatus && now - this.cachedFaucetStatus.time <= FAUCETSTATUS_CACHE_TIME)
-      return Promise.resolve(this.cachedFaucetStatus.data);
-    
-    this.faucetStatusPromise = this.buildFaucetStatus();
-    this.faucetStatusPromise.then((data) => {
-      this.cachedFaucetStatus = {time: now, data: data};
-      this.faucetStatusPromise = null;
-    });
-    return this.faucetStatusPromise;
-  }
-
-  private onGetFaucetStatus(remoteIp: string): Promise<IClientFaucetStatus> {
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Client requested faucet status (IP: " + remoteIp + ")");
-    return this.getFaucetStatus();
-  }
-
-  private buildQueueStatus(): IClientQueueStatus {
-    let claims = ServiceManager.GetService(EthClaimManager).getTransactionQueue();
-    let rspClaims = claims.map((claimTx) => {
-      return {
-        time: Math.floor(claimTx.time.getTime() / 1000),
-        session: getHashedSessionId(claimTx.session, faucetConfig.faucetSecret),
-        target: claimTx.target,
-        amount: claimTx.amount.toString(),
-        status: claimTx.status,
-        error: claimTx.failReason,
-        nonce: claimTx.nonce || null,
-        hash: claimTx.txhash || null,
-        txhex: claimTx.txhex || null,
+    let userInput = JSON.parse(body.toString("utf8"));
+    let responseData: any = {};
+    let session: FaucetSession;
+    try {
+      session = await ServiceManager.GetService(SessionManager).createSession(req.socket.remoteAddress, userInput, responseData);
+      if(session.getSessionStatus() === FaucetSessionStatus.FAILED) {
+        return {
+          status: FaucetSessionStatus.FAILED,
+          failedCode: session.getSessionData("failed.code"),
+          failedReason: session.getSessionData("failed.reason"),
+          balance: session.getDropAmount().toString(),
+          target: session.getTargetAddr(),
+        }
       }
+    } catch(ex) {
+      if(ex instanceof FaucetError) {
+        responseData = ex;
+        return {
+          status: FaucetSessionStatus.FAILED,
+          failedCode: ex.getCode(),
+          failedReason: ex.message,
+        }
+      }
+      else {
+        console.error(ex, ex.stack);
+        return {
+          status: FaucetSessionStatus.FAILED,
+          failedCode: "INTERNAL_ERROR",
+          failedReason: ex.toString(),
+        }
+      }
+    }
+
+    Object.assign(responseData, {
+      session: session.getSessionId(),
+      status: session.getSessionStatus(),
+      tasks: session.getBlockingTasks(),
+      balance: session.getDropAmount().toString(),
+      target: session.getTargetAddr(),
     });
+    return responseData;
+  }
+
+  public async onClaimReward(req: IncomingMessage, body: Buffer): Promise<any> {
+    if(req.method !== "POST")
+      return new FaucetHttpResponse(405, "Method Not Allowed");
+    
+    let userInput = JSON.parse(body.toString("utf8"));
+    let session: FaucetSession;
+    if(!userInput || !userInput.session || !(session = ServiceManager.GetService(SessionManager).getSession(userInput.session, [FaucetSessionStatus.CLAIMABLE])))
+      return new FaucetHttpResponse(404, "Session not found");
+    
+    try {
+      await session.claimSession(userInput);
+      if(session.getSessionStatus() === FaucetSessionStatus.FAILED) {
+        return {
+          status: FaucetSessionStatus.FAILED,
+          failedCode: session.getSessionData("failed.code"),
+          failedReason: session.getSessionData("failed.reason"),
+          balance: session.getDropAmount().toString(),
+          target: session.getTargetAddr(),
+        }
+      }
+    } catch(ex) {
+      if(ex instanceof FaucetError) {
+        return {
+          status: FaucetSessionStatus.FAILED,
+          failedCode: ex.getCode(),
+          failedReason: ex.message,
+        }
+      }
+      else {
+        console.error(ex, ex.stack);
+        return {
+          status: FaucetSessionStatus.FAILED,
+          failedCode: "INTERNAL_ERROR",
+          failedReason: ex.toString(),
+        }
+      }
+    }
+
+    let responseData = {};
+    Object.assign(responseData, {
+      session: session.getSessionId(),
+      status: session.getSessionStatus(),
+      balance: session.getDropAmount().toString(),
+      target: session.getTargetAddr(),
+    });
+    return responseData;
+  }
+
+  public async onGetClaimStatus(sessionId: string): Promise<any> {
+    let sessionData: FaucetSessionStoreData;
+    if(!sessionId || !(sessionData = ServiceManager.GetService(SessionManager).getSessionData(sessionId))) {
+      return {
+        status: "unknown",
+        error: "Session not found"
+      };
+    }
+    if(!sessionData.data["claim.status"]) {
+      return {
+        status: "unknown",
+        error: "Session not claiming"
+      };
+    }
 
     return {
-      claims: rspClaims,
+      status: sessionData.data["claim.status"],
+      queueIdx: sessionData.data["claim.queueIdx"],
+      txhash: sessionData.data["claim.txhash"],
+      txblock: sessionData.data["claim.txblock"],
+      lastIdx: ServiceManager.GetService(EthClaimManager).getLastProcessedClaimIdx(),
     };
   }
 
-  private onGetQueueStatus(): IClientQueueStatus {
-    return this.buildQueueStatus();
+  public async onGetSessionStatus(sessionId: string): Promise<any> {
+    let sessionData: FaucetSessionStoreData;
+    if(!sessionId || !(sessionData = ServiceManager.GetService(SessionManager).getSessionData(sessionId)))
+      return new FaucetHttpResponse(404, "Session not found");
+    
+    return sessionData;
   }
+
+
 
 }

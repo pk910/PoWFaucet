@@ -1,9 +1,9 @@
 import assert from 'node:assert';
-import { getScrypt, getScryptReadyPromise, Scrypt } from "../../libs/scrypt_wasm";
+import { getScrypt, getScryptReadyPromise, Scrypt } from "../../../../libs/scrypt_wasm";
 import { MessagePort } from "worker_threads";
-import { base64ToHex } from "../utils/ConvertHelpers";
+import { base64ToHex } from "../../../utils/ConvertHelpers";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator";
-import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from "../common/FaucetConfig";
+import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from '../PoWConfig';
 
 export type PoWHashFn = (nonceHex: string, preimgHex: string, params: PoWCryptoParams) => string;
 
@@ -31,7 +31,7 @@ export class PoWValidatorWorker {
     switch(algo) {
       case PoWHashAlgo.SCRYPT:
         hashFn = await (async () => {
-          let module = await import("../../libs/scrypt_wasm");
+          let module = await import("../../../../libs/scrypt_wasm");
           await module.getScryptReadyPromise();
           let scrypt = module.getScrypt();
           return (nonce, preimg, params: IPoWSCryptParams) => {
@@ -41,7 +41,7 @@ export class PoWValidatorWorker {
         break;
       case PoWHashAlgo.CRYPTONIGHT:
         hashFn = await (async () => {
-          let module = await import("../../libs/cryptonight_wasm");
+          let module = await import("../../../../libs/cryptonight_wasm");
           await module.getCryptoNightReadyPromise();
           let cryptonight = module.getCryptoNight();
           return (nonce, preimg, params: IPoWCryptoNightParams) => {
@@ -51,7 +51,7 @@ export class PoWValidatorWorker {
         break;
       case PoWHashAlgo.ARGON2:
         hashFn = await (async () => {
-          let module = await import("../../libs/argon2_wasm");
+          let module = await import("../../../../libs/argon2_wasm");
           await module.getArgon2ReadyPromise();
           let argon2 = module.getArgon2();
           return (nonce, preimg, params: IPoWArgon2Params) => {

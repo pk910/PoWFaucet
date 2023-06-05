@@ -1,11 +1,12 @@
 import * as SQLite3 from 'better-sqlite3';
 
-import { faucetConfig } from '../common/FaucetConfig';
+import { faucetConfig } from '../config/FaucetConfig';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
 import { IQueuedClaimTx } from './EthClaimManager';
-import { IIPInfo } from './IPInfoResolver';
-import { IPassportInfo } from './PassportVerifier';
+import { IIPInfo } from '../modules/ipinfo/IPInfoResolver';
+import { IPassportInfo } from '../modules/passport/PassportResolver';
+import { FaucetSessionStatus, FaucetSessionStoreData } from '../session/FaucetSession';
 
 export enum SessionMark {
   KILLED = "killed",
@@ -58,20 +59,7 @@ export class FaucetStoreDB {
     switch(schemaVersion) {
       case 0: // upgrade to version 1
         schemaVersion = 1;
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
         this.db.exec(`
-          CREATE TABLE "SessionMarks" (
-            "SessionId"	TEXT NOT NULL UNIQUE,
-            "Marks"	TEXT NOT NULL,
-            "Timeout"	INTEGER NOT NULL,
-            PRIMARY KEY("SessionId")
-          );
-          CREATE TABLE "AddressMarks" (
-            "Address"	TEXT NOT NULL UNIQUE,
-            "Marks"	TEXT NOT NULL,
-            "Timeout"	INTEGER NOT NULL,
-            PRIMARY KEY("Address")
-          );
           CREATE TABLE "IPInfoCache" (
             "IP" TEXT NOT NULL UNIQUE,
             "Json" TEXT NOT NULL,
@@ -93,7 +81,6 @@ export class FaucetStoreDB {
         `);
       case 1: // upgrade to version 2
         schemaVersion = 2;
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
         this.db.exec(`
           CREATE TABLE "KeyValueStore" (
             "Key"	TEXT NOT NULL UNIQUE,
@@ -103,7 +90,6 @@ export class FaucetStoreDB {
         `);
       case 2: // upgrade to version 3
         schemaVersion = 3;
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
         this.db.exec(`
           CREATE TABLE "PassportStamps" (
             "StampHash" TEXT NOT NULL UNIQUE,
@@ -114,14 +100,7 @@ export class FaucetStoreDB {
         `);
       case 3: // upgrade to version 4
         schemaVersion = 4;
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgrade FaucetStore schema to version " + schemaVersion);
         this.db.exec(`
-          CREATE INDEX "SessionMarksTimeIdx" ON "SessionMarks" (
-            "Timeout"	ASC
-          );
-          CREATE INDEX "AddressMarksTimeIdx" ON "AddressMarks" (
-            "Timeout"	ASC
-          );
           CREATE INDEX "IPInfoCacheTimeIdx" ON "IPInfoCache" (
             "Timeout"	ASC
           );
@@ -132,10 +111,34 @@ export class FaucetStoreDB {
             "Timeout"	ASC
           );
         `);
+      case 4: // upgrade to version 5
+        schemaVersion = 5;
+        this.db.exec(`
+          CREATE TABLE "Sessions" (
+            "SessionId" TEXT NOT NULL UNIQUE,
+            "Status" TEXT NOT NULL,
+            "StartTime" INTEGER NOT NULL,
+            "TargetAddr" TEXT NOT NULL,
+            "DropAmount" TEXT NOT NULL,
+            "RemoteIP" TEXT NOT NULL,
+            "Tasks" TEXT NOT NULL,
+            "Data" TEXT NOT NULL,
+            PRIMARY KEY("SessionId")
+          );
+          CREATE INDEX "SessionsTimeIdx" ON "Sessions" (
+            "StartTime"	ASC
+          );
+          CREATE INDEX "SessionsStatusIdx" ON "Sessions" (
+            "Status"	ASC
+          );
+        `);
     }
-    if(schemaVersion !== oldVersion)
+    if(schemaVersion !== oldVersion) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgraded FaucetStore schema from version " + oldVersion + " to version " + schemaVersion);
       this.db.prepare("UPDATE SchemaVersion SET SchemaVersion = ?").run(schemaVersion);
+    }
   }
+
 
   private now(): number {
     return Math.floor((new Date()).getTime() / 1000);
@@ -143,97 +146,81 @@ export class FaucetStoreDB {
 
   public cleanStore() {
     let now = this.now();
-    this.db.prepare("DELETE FROM SessionMarks WHERE Timeout < ?").run(now);
-    this.db.prepare("DELETE FROM AddressMarks WHERE Timeout < ?").run(now);
     this.db.prepare("DELETE FROM IPInfoCache WHERE Timeout < ?").run(now);
     this.db.prepare("DELETE FROM PassportCache WHERE Timeout < ?").run(now);
     this.db.prepare("DELETE FROM PassportStamps WHERE Timeout < ?").run(now);
+    //TODO: clean Sessions
   }
 
-  public getSessionMarks(sessionId: string, skipMarks?: SessionMark[]): SessionMark[] {
-    let row = this.db.prepare("SELECT Marks FROM SessionMarks WHERE SessionId = ? AND Timeout > ?")
-      .get(sessionId.toLowerCase(), this.now()) as {Marks: string};
-    if(!row)
+  public getSessions(states: FaucetSessionStatus[]): FaucetSessionStoreData[] {
+    let query = this.db.prepare("SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data FROM Sessions WHERE Status IN (" + states.map(() => "?").join(",") + ")");
+    let rows = query.all.apply(query, states) as {
+      SessionId: string;
+      Status: string;
+      StartTime: number;
+      TargetAddr: string;
+      DropAmount: string;
+      RemoteIP: string;
+      Tasks: string;
+      Data: string;
+    }[];
+
+    if(rows.length === 0)
       return [];
     
-    return row.Marks.split(",").filter((mark) => !skipMarks || skipMarks.indexOf(mark as SessionMark) === -1) as SessionMark[];
+    return rows.map((row) => {
+      return {
+        sessionId: row.SessionId,
+        status: row.Status as FaucetSessionStatus,
+        startTime: row.StartTime,
+        targetAddr: row.TargetAddr,
+        dropAmount: row.DropAmount,
+        remoteIP: row.RemoteIP,
+        tasks: JSON.parse(row.Tasks),
+        data: JSON.parse(row.Data),
+      };
+    });
   }
 
-  public setSessionMark(sessionId: string, mark: SessionMark | SessionMark[], duration?: number) {
-    let now = this.now();
-    let row = this.db.prepare("SELECT Marks, Timeout FROM SessionMarks WHERE SessionId = ?")
-      .get(sessionId.toLowerCase()) as {Marks: string, Timeout: number};
-    
-    let marks: SessionMark[];
-    if(row && row.Timeout > now)
-      marks = row.Marks.split(",") as SessionMark[];
-    else
-      marks = [];
-    
-    let timeout = now + (typeof duration === "number" ? duration : faucetConfig.claimSessionTimeout);
-    if(row && row.Timeout > timeout)
-      timeout = row.Timeout;
-    
-    if(!Array.isArray(mark))
-      mark = [ mark ];
-    for(let i = 0; i < mark.length; i++) {
-      if(!mark[i])
-        continue;
-      if(marks.indexOf(mark[i]) === -1)
-        marks.push(mark[i]);
-    }
+  public getSession(sessionId: string): FaucetSessionStoreData {
+    let query = this.db.prepare("SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data FROM Sessions WHERE SessionId = ?");
+    let row = query.get(sessionId) as {
+      SessionId: string;
+      Status: string;
+      StartTime: number;
+      TargetAddr: string;
+      DropAmount: string;
+      RemoteIP: string;
+      Tasks: string;
+      Data: string;
+    };
 
-    if(row) {
-      this.db.prepare("UPDATE SessionMarks SET Marks = ?, Timeout = ? WHERE SessionId = ?")
-        .run(marks.join(","), timeout, sessionId.toLowerCase());
-    }
-    else {
-      this.db.prepare("INSERT INTO SessionMarks (SessionId, Marks, Timeout) VALUES (?, ?, ?)")
-        .run(sessionId.toLowerCase(), marks.join(","), timeout);
-    }
-  }
-
-  public getAddressMarks(address: string, skipMarks?: AddressMark[]): AddressMark[] {
-    let row = this.db.prepare("SELECT Marks FROM AddressMarks WHERE Address = ? AND Timeout > ?")
-      .get(address.toLowerCase(), this.now()) as {Marks: string};
     if(!row)
-      return [];
+      return null;
     
-    return row.Marks.split(",").filter((mark) => !skipMarks || skipMarks.indexOf(mark as AddressMark) === -1) as AddressMark[];
+    return {
+      sessionId: row.SessionId,
+      status: row.Status as FaucetSessionStatus,
+      startTime: row.StartTime,
+      targetAddr: row.TargetAddr,
+      dropAmount: row.DropAmount,
+      remoteIP: row.RemoteIP,
+      tasks: JSON.parse(row.Tasks),
+      data: JSON.parse(row.Data),
+    };
   }
 
-  public setAddressMark(address: string, mark: AddressMark | AddressMark[], duration?: number) {
-    let now = this.now();
-    let row = this.db.prepare("SELECT Marks, Timeout FROM AddressMarks WHERE Address = ?")
-      .get(address.toLowerCase()) as {Marks: string, Timeout: number};
-    
-    let marks: AddressMark[];
-    if(row && row.Timeout > now)
-      marks = row.Marks.split(",") as AddressMark[];
-    else
-      marks = [];
-    
-    let timeout = now + (typeof duration === "number" ? duration : faucetConfig.claimAddrCooldown);
-    if(row && row.Timeout > timeout)
-      timeout = row.Timeout;
-    
-    if(!Array.isArray(mark))
-      mark = [ mark ];
-    for(let i = 0; i < mark.length; i++) {
-      if(!mark[i])
-        continue;
-      if(marks.indexOf(mark[i]) === -1)
-        marks.push(mark[i]);
-    }
-
-    if(row) {
-      this.db.prepare("UPDATE AddressMarks SET Marks = ?, Timeout = ? WHERE Address = ?")
-        .run(marks.join(","), timeout, address.toLowerCase());
-    }
-    else {
-      this.db.prepare("INSERT INTO AddressMarks (Address, Marks, Timeout) VALUES (?, ?, ?)")
-        .run(address.toLowerCase(), marks.join(","), timeout);
-    }
+  public updateSession(sessionData: FaucetSessionStoreData) {
+    this.db.prepare("INSERT OR REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data) VALUES (?,?,?,?,?,?,?,?)").run(
+      sessionData.sessionId,
+      sessionData.status,
+      sessionData.startTime,
+      sessionData.targetAddr,
+      sessionData.dropAmount,
+      sessionData.remoteIP,
+      JSON.stringify(sessionData.tasks),
+      JSON.stringify(sessionData.data)
+    );
   }
 
   public getIPInfo(ip: string): IIPInfo {
@@ -250,7 +237,7 @@ export class FaucetStoreDB {
     let row = this.db.prepare("SELECT Timeout FROM IPInfoCache WHERE IP = ?")
       .get(ip.toLowerCase());
     
-    let timeout = now + (typeof duration === "number" ? duration : faucetConfig.ipInfoCacheTime);
+    let timeout = now + (typeof duration === "number" ? duration : 86400);
     let infoJson = JSON.stringify(info);
 
     if(row) {
@@ -277,7 +264,7 @@ export class FaucetStoreDB {
     let row = this.db.prepare("SELECT Timeout FROM PassportCache WHERE Address = ?")
       .get(addr.toLowerCase());
     
-    let timeout = now + (typeof duration === "number" ? duration : faucetConfig.passportBoost?.cacheTime || 3600);
+    let timeout = now + (typeof duration === "number" ? duration : 86400);
     let infoJson = JSON.stringify(info);
 
     if(row) {
@@ -352,7 +339,7 @@ export class FaucetStoreDB {
       return;
 
     let now = this.now();
-    let timeout = now + (typeof duration === "number" ? duration : faucetConfig.passportBoost?.cacheTime || 3600);
+    let timeout = now + (typeof duration === "number" ? duration : 86400);
 
     let queryArgs: any[] = [];
     let queryRows = stampHashs.map((stampHash) => {

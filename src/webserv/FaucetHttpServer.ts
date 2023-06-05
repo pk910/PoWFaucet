@@ -1,12 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-
-import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } from 'http';
-import {Server as StaticServer, version, mime} from '@brettz9/node-static';
-import { WebSocketServer } from 'ws';
 import * as stream from 'node:stream';
-import { faucetConfig } from '../common/FaucetConfig';
-import { PoWClient } from '../websock/PoWClient';
+import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } from 'http';
+import { Server as StaticServer } from '@brettz9/node-static';
+import { WebSocket, WebSocketServer } from 'ws';
+import { faucetConfig } from '../config/FaucetConfig';
 import { encode } from 'html-entities';
 import { OutgoingHttpHeaders } from 'http2';
 import { FaucetWebApi } from './FaucetWebApi';
@@ -27,13 +25,26 @@ export class FaucetHttpResponse {
   }
 }
 
+export interface FaucetWssEndpoint {
+  pattern: RegExp;
+  handler: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => void;
+}
+
+const MAX_BODY_SITE = 1024 * 1024 * 10; // 10MB
+
 export class FaucetHttpServer {
+  private initialized: boolean;
   private httpServer: HttpServer;
   private wssServer: WebSocketServer;
+  private wssEndpoints: {[key: string]: FaucetWssEndpoint} = {};
   private staticServer: StaticServer;
   private cachedSeoIndex: string;
 
-  public constructor() {
+  public initialize() {
+    if(this.initialized)
+      return;
+    this.initialized = true;
+
     this.httpServer = createServer();
     this.httpServer.on("request", (req, rsp) => this.onHttpRequest(req, rsp));
     this.httpServer.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock, head));
@@ -63,12 +74,32 @@ export class FaucetHttpServer {
       return faucetConfig.serverPort;
   }
 
+  public addWssEndpoint(key: string, pattern: RegExp, handler: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => void) {
+    this.wssEndpoints[key] = {
+      pattern: pattern,
+      handler: handler,
+    };
+  }
+
+  public removeWssEndpoint(key: string) {
+    delete this.wssEndpoints[key];
+  }
+
   private onHttpRequest(req: IncomingMessage, rsp: ServerResponse) {
-    if(req.method === "GET") {
-      // serve static files
+    if(req.method === "GET" || req.method === "POST") {
+      let bodyParts = [];
+      let bodySize = 0;
+      req.on("data", (chunk: Buffer) => {
+        bodyParts.push(chunk);
+        bodySize += chunk.length;
+        if(bodySize > MAX_BODY_SITE) {
+          req.destroy(new Error("body too big"));
+        }
+      });
       req.on("end", () => {
         if((req.url + "").match(/^\/api\//i)) {
-          ServiceManager.GetService(FaucetWebApi).onApiRequest(req).then((res: object) => {
+          let body = req.method === "POST" ? Buffer.concat(bodyParts) : null;
+          ServiceManager.GetService(FaucetWebApi).onApiRequest(req, body).then((res: object) => {
             if(res && typeof res === "object" && res instanceof FaucetHttpResponse) {
               rsp.writeHead(res.code, res.reason, res.headers);
               rsp.end(res.body);
@@ -111,7 +142,15 @@ export class FaucetHttpServer {
   }
 
   private onHttpUpgrade(req: IncomingMessage, socket: stream.Duplex, head: Buffer) {
-    if(!req.url.match(/^\/pow/i)) {
+    let wssEndpoint: FaucetWssEndpoint;
+    let allEndpoints = Object.values(this.wssEndpoints);
+    for(let i = 0; i < allEndpoints.length; i++) {
+      if(allEndpoints[i].pattern.test(req.url)) {
+        wssEndpoint = allEndpoints[i];
+        break;
+      }
+    }
+    if(!wssEndpoint) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
@@ -125,7 +164,7 @@ export class FaucetHttpServer {
       }
       if(!remoteAddr)
         remoteAddr = req.socket.remoteAddress;
-      new PoWClient(ws, remoteAddr);
+      wssEndpoint.handler(req, ws, remoteAddr);
     });
   }
 
@@ -166,7 +205,7 @@ export class FaucetHttpServer {
     indexHtml = indexHtml.replace(/<title>.*?<\/title>/, '<title>' + encode(faucetConfig.faucetTitle) + '</title>');
     indexHtml = indexHtml.replace(/<!-- pow-faucet-content -->/, seoHtml);
     indexHtml = indexHtml.replace(/<!-- pow-faucet-header -->/, seoMeta);
-    indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, ServiceManager.GetService(FaucetWebApi).getFaucetConfig().faucetHtml);
+    indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, ServiceManager.GetService(FaucetWebApi).getFaucetHomeHtml());
     
     if(clientVersion) {
       indexHtml = indexHtml.replace(/"\/js\/powfaucet\.js"/, '"/js/powfaucet.js?' + clientVersion.build + '"');

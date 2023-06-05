@@ -1,11 +1,13 @@
-import { TypedEmitter } from "tiny-typed-emitter";
-import { faucetConfig } from "../common/FaucetConfig";
+import { TransactionReceipt } from 'web3-core';
+import { faucetConfig } from "../config/FaucetConfig";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
 import { ServiceManager } from "../common/ServiceManager";
-import { EthWalletManager } from "./EthWalletManager";
+import { EthWalletManager, TransactionResult } from "./EthWalletManager";
 import { FaucetStatsLog } from "./FaucetStatsLog";
 import { FaucetStoreDB } from "./FaucetStoreDB";
 import { EthWalletRefill } from "./EthWalletRefill";
+import { FaucetSession } from "../session/FaucetSession";
+import { SessionManager } from "../session/SessionManager";
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -29,40 +31,54 @@ export interface IQueuedClaimTx {
   session: string;
 }
 
-export class ClaimTx extends TypedEmitter<ClaimTxEvents> {
-  public queueIdx: number;
-  public status: ClaimTxStatus;
-  public readonly time: Date;
-  public readonly target: string;
-  public readonly amount: bigint;
-  public readonly session: string;
-  public nonce: number;
-  public txhex: string;
-  public txhash: string;
-  public txblock: number;
-  public txfee: bigint;
-  public retryCount: number;
-  public failReason: string;
-
-  public constructor(target: string, amount: bigint, sessId: string, date?: number) {
-    super();
-    this.status = ClaimTxStatus.QUEUE;
-    this.time = date ? new Date(date) : new Date();
-    this.target = target;
-    this.amount = amount;
-    this.session = sessId;
-    this.txfee = 0n;
-    this.retryCount = 0;
+export class ClaimTx {
+  public static getClaimTx(session: FaucetSession): ClaimTx {
+    let claimTx: ClaimTx;
+    if(!(claimTx = session.getSessionModuleRef("claim.txref"))) {
+      claimTx = new ClaimTx(session);
+      session.setSessionModuleRef("claim.txref", claimTx);
+    }
+    return claimTx;
   }
 
-  public serialize(): IQueuedClaimTx {
-    return {
-      time: this.time.getTime(),
-      target: this.target,
-      amount: this.amount.toString(),
-      session: this.session,
-    };
+  private session: FaucetSession;
+  
+  private constructor(session: FaucetSession) {
+    this.session = session;
   }
+
+  public setFailed(reason: string) {
+    this.session.setSessionFailed("CLAIM_FAILED", reason);
+  }
+
+  public setStatus(status: ClaimTxStatus) {
+    this.session.setSessionData("claim.status", status);
+    this.session.notifyClaimStatus(this);
+  }
+
+  public get amount(): bigint { return this.session.getDropAmount(); }
+  public get targetAddr(): string { return this.session.getTargetAddr(); }
+  public get sessionId(): string { return this.session.getSessionId(); }
+
+  public get queueIdx(): number { return this.session.getSessionData("claim.queueIdx") || 0; }
+  public set queueIdx(value: number) { this.session.setSessionData("claim.queueIdx", value); }
+
+  public get claimStatus(): ClaimTxStatus { return this.session.getSessionData("claim.status"); }
+
+  public get txhash(): string { return this.session.getSessionData("claim.txhash"); }
+  public set txhash(value: string) { this.session.setSessionData("claim.txhash", value); }
+
+  public get txnonce(): number { return this.session.getSessionData("claim.txnonce"); }
+  public set txnonce(value: number) { this.session.setSessionData("claim.txnonce", value); }
+
+  public get txblock(): number { return this.session.getSessionData("claim.txblock"); }
+  public set txblock(value: number) { this.session.setSessionData("claim.txblock", value); }
+
+  public get txfee(): bigint { return BigInt(this.session.getSessionData("claim.txfee")); }
+  public set txfee(value: bigint) { this.session.setSessionData("claim.txfee", value.toString()); }
+
+  public get txhex(): string { return this.session.getSessionModuleRef("claim.txhex"); }
+  public set txhex(value: string) { this.session.setSessionModuleRef("claim.txhex", value); }
 }
 
 export class EthClaimManager {
@@ -80,11 +96,27 @@ export class EthClaimManager {
     this.initialized = true;
 
     // restore saved claimTx queue
-    ServiceManager.GetService(FaucetStoreDB).getClaimTxQueue().forEach((claimTx) => {
-      let claim = new ClaimTx(claimTx.target, BigInt(claimTx.amount), claimTx.session, claimTx.time);
-      claim.queueIdx = this.lastClaimTxIdx++;
-      this.claimTxQueue.push(claim);
+    let maxQueueIdx = 0;
+    ServiceManager.GetService(SessionManager).getClaimingSessions().forEach((session) => {
+      let claimTx = ClaimTx.getClaimTx(session);
+      switch(claimTx.claimStatus) {
+        case ClaimTxStatus.QUEUE:
+        case ClaimTxStatus.PROCESSING:
+          this.claimTxQueue.push(claimTx);
+          break;
+        case ClaimTxStatus.PENDING:
+          this.pendingTxQueue[claimTx.txhash] = claimTx;
+          this.awaitTxReceipt(claimTx, ServiceManager.GetService(EthWalletManager).watchClaimTx(claimTx));
+          break;
+        default:
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Cannot restore claimTx: unexpected claim status '" + claimTx.claimStatus + "'");
+          return;
+      }
+      if(claimTx.queueIdx > maxQueueIdx)
+        maxQueueIdx = claimTx.queueIdx;
     });
+    this.claimTxQueue.sort((a, b) => a.queueIdx - b.queueIdx);
+    this.lastClaimTxIdx = maxQueueIdx + 1;
 
     // start queue processing interval
     setInterval(() => this.processQueue(), 2000);
@@ -112,33 +144,12 @@ export class EthClaimManager {
     return this.lastProcessedClaimTxIdx;
   }
 
-  public addClaimTransaction(target: string, amount: bigint, sessId: string): ClaimTx {
-    let claimTx = new ClaimTx(target, amount, sessId);
+  public createSessionClaim(session: FaucetSession): ClaimTx {
+    let claimTx = ClaimTx.getClaimTx(session);
     claimTx.queueIdx = this.lastClaimTxIdx++;
+    claimTx.setStatus(ClaimTxStatus.QUEUE);
     this.claimTxQueue.push(claimTx);
-    ServiceManager.GetService(FaucetStoreDB).addQueuedClaimTx(claimTx.serialize());
     return claimTx;
-  }
-
-  public getClaimTransaction(sessId: string): ClaimTx {
-    for(let i = 0; i < this.claimTxQueue.length; i++) {
-      if(this.claimTxQueue[i].session === sessId)
-        return this.claimTxQueue[i];
-    }
-    
-    let pendingTxs = Object.values(this.pendingTxQueue);
-    for(let i = 0; i < pendingTxs.length; i++) {
-      if(pendingTxs[i].session === sessId)
-        return pendingTxs[i];
-    }
-
-    let historyTxs = Object.values(this.historyTxDict);
-    for(let i = 0; i < historyTxs.length; i++) {
-      if(historyTxs[i].session === sessId)
-        return historyTxs[i];
-    }
-
-    return null;
   }
 
   public async processQueue() {
@@ -186,10 +197,7 @@ export class EthClaimManager {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let walletState = ethWalletManager.getWalletState();
     if(!walletState.ready) {
-      claimTx.failReason = "Network RPC is currently unreachable.";
-      claimTx.status = ClaimTxStatus.FAILED;
-      claimTx.emit("failed");
-      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
+      claimTx.setFailed("Network RPC is currently unreachable.");
       return;
     }
     if(
@@ -197,50 +205,49 @@ export class EthClaimManager {
       walletState.balance - BigInt(faucetConfig.spareFundsAmount) < claimTx.amount ||
       walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
     ) {
-      claimTx.failReason = "Faucet wallet is out of funds.";
-      claimTx.status = ClaimTxStatus.FAILED;
-      claimTx.emit("failed");
-      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
+      claimTx.setFailed("Faucet wallet is out of funds.");
       return;
     }
 
     try {
-      claimTx.status = ClaimTxStatus.PROCESSING;
-      claimTx.emit("processing");
+      claimTx.setStatus(ClaimTxStatus.PROCESSING);
 
       // send transaction
       let { txPromise } = await ethWalletManager.sendClaimTx(claimTx);
       this.pendingTxQueue[claimTx.txhash] = claimTx;
-      ServiceManager.GetService(FaucetStoreDB).removeQueuedClaimTx(claimTx.session);
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(claimTx.amount) + "] to: " + claimTx.target + ": " + claimTx.txhash);
-      claimTx.status = ClaimTxStatus.PENDING;
-      claimTx.emit("pending");
+      
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.sessionId + " [" + ethWalletManager.readableAmount(claimTx.amount) + "] to: " + claimTx.targetAddr + ": " + claimTx.txhash);
+      claimTx.setStatus(ClaimTxStatus.PENDING);
 
-      // await transaction receipt
-      txPromise.then((txData) => {
-        delete this.pendingTxQueue[claimTx.txhash];
-        claimTx.txblock = txData.block;
-        claimTx.txfee = txData.fee;
-        claimTx.status = ClaimTxStatus.CONFIRMED;
-        claimTx.emit("confirmed");
-        ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
-      }, (error) => {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
-        delete this.pendingTxQueue[claimTx.txhash];
-        claimTx.failReason = "Transaction Error: " + error.toString();
-        claimTx.status = ClaimTxStatus.FAILED;
-        claimTx.emit("failed");
-      }).then(() => {
-        this.historyTxDict[claimTx.nonce] = claimTx;
-        setTimeout(() => {
-          delete this.historyTxDict[claimTx.nonce];
-        }, 30 * 60 * 1000);
-      });
+      this.awaitTxReceipt(claimTx, txPromise);
     } catch(ex) {
-      claimTx.failReason = "Processing Exception: " + ex.toString();
-      claimTx.status = ClaimTxStatus.FAILED;
-      claimTx.emit("failed");
+      claimTx.setFailed("Processing Exception: " + ex.toString());
     }
+  }
+
+  private awaitTxReceipt(claimTx: ClaimTx, txPromise: Promise<{
+    status: boolean;
+    block: number;
+    fee: bigint;
+    receipt: TransactionReceipt;
+  }>) {
+    // await transaction receipt
+    txPromise.then((txData) => {
+      delete this.pendingTxQueue[claimTx.txhash];
+      claimTx.txblock = txData.block;
+      claimTx.txfee = txData.fee;
+      claimTx.setStatus(ClaimTxStatus.CONFIRMED);
+      ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimTx);
+    }, (error) => {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.targetAddr + " failed: " + error.toString());
+      delete this.pendingTxQueue[claimTx.txhash];
+      claimTx.setFailed("Transaction Error: " + error.toString());
+    }).then(() => {
+      this.historyTxDict[claimTx.txnonce] = claimTx;
+      setTimeout(() => {
+        delete this.historyTxDict[claimTx.txnonce];
+      }, 30 * 60 * 1000);
+    });
   }
 
 }

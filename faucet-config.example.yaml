@@ -1,4 +1,5 @@
 # PoWFaucet config (example)
+version: 2
 
 ### General Settings
 
@@ -92,190 +93,330 @@ ethQueueNoFunds: true
 ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
 
 
+# min/max drop amount (max is the default if no module lowers it)
+maxDropAmount: 1000000000000000000 # 1 ETH
+minDropAmount: 10000000000000000 # 0.01 ETH
 
-### Mining & Verification Options
-#  Avg. Mining Reward:
-#    reward_per_sec = 1/(2**powScryptParams.difficulty) * hashrate * powShareReward
-
-# reward amount per eligible hash (in wei)
-#powShareReward: 12500000000000000  # 0.0125
-powShareReward:   2000000000000000  # 0.002 ETH
-
-# minimum balance to payout (in wei)
-#claimMinAmount: 100000000000000000  # 0.1 ETH
-claimMinAmount:   25000000000000000  # 0.025 ETH
-
-# maximum balance to payout (in wei)
-#claimMaxAmount: 17000000000000000000  # 17 ETH
-claimMaxAmount:   6010000000000000000  # 6.01 ETH
-
-# penalty for not responding to a verification request (percent of powShareReward)
-# shouldn't be too high as this can happen regularily in case of connection loss or so
-verifyMinerMissPenaltyPerc: 10  # 10% of powShareReward
-
-# reward for responding to a verification request in time (percent of powShareReward)
-# some extra reward for slow miners
-# comment out to disable rewards for verification requests
-verifyMinerRewardPerc:   15  # 15% of powShareReward
-
-# maximum mining session time (in seconds)
-powSessionTimeout: 18000   # 5h
-
-# how long sessions can be paid out (in seconds)
-# should be higher than powSessionTimeout
-claimSessionTimeout: 43200  # 12h
-
-# maximum number of seconds a session can idle until it gets closed
-powIdleTimeout: 1800 # 30min
-
-# number of seconds to wait before allow to reuse the same address to start another mining session
-claimAddrCooldown: 600  # 10min
-
-# check balance and deny mining if balance exceeds the limit (in wei)
-claimAddrMaxBalance: 50000000000000000000 # 50 ETH
-
-# check and prevent mining if target address is a contract
-claimAddrDenyContract: true
-
-# number of concurrent mining sessions allowed per IP (0 = unlimited)
-concurrentSessions: 1
-
-# maximum allowed mining hashrate (will be throttled to this rate when faster)
-powHashrateSoftLimit: 1000 # soft limit (enforced client side)
-powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
-
-# websocket ping interval
-#powPingInterval: 10
-
-# kill websocket if no ping/pong for that number of seconds
-#powPingTimeout: 30
+# maximum session time (from start till payout)
+# only relevant if one of the enabled protection mechanisms introduces a session delay (eg. mining)
+sessionTimeout: 43200  # 12h
 
 
-# mining algorithm to use
-powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
+### Protection mechanisms
+modules:
 
-# scrypt mining parameters
-powScryptParams:
-  # N - iterations count: affects memory and CPU usage, must be a power of 2
-  cpuAndMemory: 4096
-  # r - block size: affects memory and CPU usage
-  blockSize: 8
-  # p - parallelism factor: threads to run in parallel, affects the memory & CPU usage, should be 1 as webworker is single threaded
-  parallelization: 1
-  # klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
-  keyLength: 16
-  # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
-  difficulty: 11
+  ## Captcha Protection
+  captcha:
+    # enable / disable captcha protection
+    enabled: true
 
-# cryptonight mining parameters
-powCryptoNightParams:
-  # crypto night hash algo & variant
-  algo: 0
-  variant: 0
-  height: 0
-  # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
-  difficulty: 11
+    # captcha provider
+    # hcaptcha:  HCaptcha (https://hcaptcha.com)
+    # recaptcha: ReCAPTCHA (https://developers.google.com/recaptcha)
+    provider: "hcaptcha"
 
-# argon2 mining parameters
-powArgon2Params:
-  type: 0
-  version: 13
-  timeCost: 4
-  memoryCost: 4096
-  parallelization: 1
-  keyLength: 16
-  difficulty: 11
+    # captcha site key
+    siteKey: "00000000-0000-0000-0000-000000000000"
 
-# number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)
-#powNonceCount: 1
+    # captcha secret key
+    secret: "0xCensoredHCaptchaSecretKey"
 
-# Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
-# As that can lead to a huge verification workload on the server, this faucet can redistribute shares back to other miners for verification.
-# These randomly selected miners need to check the share and return its validity to the server within 10 seconds or they're penalized.
-# If there's a mismatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
-# Bad shares always result in a slashing (termination of session and loss of all collected mining balance)
+    # require captcha to start a new session (default: false)
+    checkSessionStart: false
 
-# percentage of shares validated locally (0 - 100)
-verifyLocalPercent: 10
+    # require captcha to start claim payout (default: false)
+    checkBalanceClaim: false
+  
+  ## ENS Name
+  ensname:
+    enabled: true
 
-# max number of shares in local validation queue
-verifyLocalMaxQueue: 100
+    # RPC Host for ENS name resolver (mainnet)
+    rpcHost: "https://rpc.flashbots.net/"
+    # Custom ENS Resolver contract address
+    #ensAddr: "0x"
+    
+    # require ENS name
+    required: true
 
-# min number of mining sessions for verification redistribution
-# only local verification if not enough active sessions (should be higher than verifyMinerIndividuals)
-verifyMinerPeerCount: 4
+  ## IP-Info Protection
+  ipinfo:
+    # enable / disable IP-Info protection
+    enabled: true
 
-# percentage of shares validated locally if there are not enough sessions for verification redistribution (0 - 100)
-verifyLocalLowPeerPercent: 80
+    # ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
+    ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
 
-# percentage of shares to redistribute to miners for verification (0 - 100)
-verifyMinerPercent: 75
+    # ip info caching time
+    ipInfoCacheTime: 86400 # 1 day
 
-# number of other mining sessions to redistribute a share to for verification
-verifyMinerIndividuals: 2
+    # require valid ip info (throw error if lookup failed)
+    ipInfoRequired: false
 
-# max number of pending verifications per miner before not sending any more verification requests
-verifyMinerMaxPending: 5
+    # ip info based restrictions
+    ipRestrictedRewardShare:
+      # percentage of drop amount if IP is in a hosting range (default: 100), 0 to block entirely
+      hosting: 1
 
-# max number of missed verifications before not sending any more verification requests
-verifyMinerMaxMissed: 10
+      # percentage of drop amount if IP is in a proxy range (default: 100), 0 to block entirely
+      proxy: 1
 
-# timeout for verification requests 
-# client gets penalized if not responding within this timespan
-verifyMinerTimeout: 40
+      # percentage of drop amount if IP is from given country code (DE/US/...), 0 to block entirely
+      #US: 100
 
+    # ip info pattern based restrictions
+    ipInfoMatchRestrictedReward:
+      "^.*Tencent Cloud.*$": 1
+      "^.*UCLOUD.*$": 1
+      "^.*Server Hosting.*$": 1
+      "^.*SCloud.*$": 1
 
+  ethinfo:
+    # enable / disable max balance protection
+    enabled: true
 
-### Captcha Options
-# comment out to disable all hcaptchas
-captchas:
-  # captcha provider:
-  # hcaptcha:  HCaptcha (https://hcaptcha.com)
-  # recaptcha: ReCAPTCHA (https://developers.google.com/recaptcha)
-  provider: "hcaptcha"
+    # check balance and deny session if balance exceeds the limit (in wei)
+    maxBalance: 50000000000000000000 # 50 ETH
 
-  # captcha site key
-  siteKey: "00000000-0000-0000-0000-000000000000"
-
-  # captcha secret key
-  secret: "0xCensoredHCaptchaSecretKey"
-
-  # require captcha to start a new mining session (default: false)
-  checkSessionStart: false
-
-  # require captcha to claim mining rewards (default: false)
-  checkBalanceClaim: false
+    # deny sessions for contract addresses
+    denyContract: true
 
 
+  ## Faucet Balance protection
+  faucet-balance:
+    # enable / disable faucet balance protection
+    enabled: true
 
-### IP-based Restrictions
+    # reward restriction based on faucet wallet balance. lowest value applies
+    fixedRestriction:
+      1000: 90 # 90% if lower than 1000 ETH
+      500: 50  # 50% if lower than 500 ETH
+      200: 10  # 10% if lower than 200 ETH
+      100: 5   # 5% if lower than 100 ETH
 
-# ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
-ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
+    # dynamic reward restriction based on faucet balance
+    # alternative to fixedRestriction, if both are set, the lower factor gets applied
+    # limits the rewards linearly according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
+    dynamicRestriction:
+      targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
+  
+  ## Faucet Outflow protection
+  faucet-outflow:
+    # enable / disable faucet outflow protection
+    enabled: true
 
-# ip info caching time
-ipInfoCacheTime: 86400 # 1 day
+    # dynamic reward restriction based on faucet outflow
+    # alternative to static faucetBalanceRestrictedReward
+    # limits the rewards according to the faucet outflow
+    # the faucet keeps track of the outflow via a internal "outflow balance".
+    # amount/duration wei are added to that balance every second.
+    # whenever some reward is mined, it is subtracted from that balance.
+    # So, whenever the balance gets negative, there is more mining activity than the allowed outflow and the reward is reduced linearly down to 0% when it reaches lowerLimit.
+    # Whenever the balance gets positive, there is less mining activity than allowed. The positive balance is a 'buffer' for activity spikes, anything above upperLimit gets burned.
 
-# require valid ip info for session start / recovery (throw error if lookup failed)
-ipInfoRequired: false
+    # limit outflow to 1000ETH per day
+    amount: 1000000000000000000000 # 1000 ETH
+    duration: 86400 # 1 day
+    # outflow balance limits
+    lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
+    upperLimit: 500000000000000000000 # 500 ETH
 
-# ip info based restrictions
-ipRestrictedRewardShare:
-  # percentage of reward per share if IP is in a hosting range (default: 100)
-  hosting: 1
+  ## Proof of Work (mining) protection
+  pow:
+    # enable / disable PoW protection
+    enabled: true
 
-  # percentage of reward per share if IP is in a proxy range (default: 100)
-  proxy: 1
+    # reward amount per eligible hash (in wei)
+    #powShareReward: 12500000000000000  # 0.0125
+    powShareReward:   2000000000000000  # 0.002 ETH
 
-  # percentage of reward per share if IP is from given country code (DE/US/...)
-  #US: 100
+    # minimum balance to payout (in wei)
+    #powMinAmount: 100000000000000000  # 0.1 ETH
+    powMinAmount:   25000000000000000  # 0.025 ETH
 
-# ip info pattern based restrictions
-ipInfoMatchRestrictedReward:
-  "^.*Tencent Cloud.*$": 1
-  "^.*UCLOUD.*$": 1
-  "^.*Server Hosting.*$": 1
-  "^.*SCloud.*$": 1
+    # penalty for not responding to a verification request (percent of powShareReward)
+    # shouldn't be too high as this can happen regularily in case of connection loss or so
+    verifyMinerMissPenaltyPerc: 10  # 10% of powShareReward
+
+    # reward for responding to a verification request in time (percent of powShareReward)
+    # some extra reward for slow miners
+    # comment out to disable rewards for verification requests
+    verifyMinerRewardPerc:   15  # 15% of powShareReward
+
+    # maximum mining session time (in seconds)
+    powSessionTimeout: 18000   # 5h
+
+    # maximum number of seconds a session can idle until it gets closed
+    powIdleTimeout: 1800 # 30min
+
+    # number of concurrent mining sessions allowed per IP (0 = unlimited)
+    concurrentSessions: 1
+
+    # maximum allowed mining hashrate (will be throttled to this rate when faster)
+    powHashrateSoftLimit: 1000 # soft limit (enforced client side)
+    powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
+
+    # websocket ping interval
+    #powPingInterval: 10
+
+    # kill websocket if no ping/pong for that number of seconds
+    #powPingTimeout: 30
+
+    # mining algorithm to use
+    powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
+
+    # scrypt mining parameters
+    powScryptParams:
+      # N - iterations count: affects memory and CPU usage, must be a power of 2
+      cpuAndMemory: 4096
+      # r - block size: affects memory and CPU usage
+      blockSize: 8
+      # p - parallelism factor: threads to run in parallel, affects the memory & CPU usage, should be 1 as webworker is single threaded
+      parallelization: 1
+      # klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
+      keyLength: 16
+      # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
+      difficulty: 11
+
+    # cryptonight mining parameters
+    powCryptoNightParams:
+      # crypto night hash algo & variant
+      algo: 0
+      variant: 0
+      height: 0
+      # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
+      difficulty: 11
+
+    # argon2 mining parameters
+    powArgon2Params:
+      type: 0
+      version: 13
+      timeCost: 4
+      memoryCost: 4096
+      parallelization: 1
+      keyLength: 16
+      difficulty: 11
+
+    # number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)
+    #powNonceCount: 1
+
+    # Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
+    # As that can lead to a huge verification workload on the server, this faucet can redistribute shares back to other miners for verification.
+    # These randomly selected miners need to check the share and return its validity to the server within 10 seconds or they're penalized.
+    # If there's a mismatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
+    # Bad shares always result in a slashing (termination of session and loss of all collected mining balance)
+
+    # percentage of shares validated locally (0 - 100)
+    verifyLocalPercent: 10
+
+    # max number of shares in local validation queue
+    verifyLocalMaxQueue: 100
+
+    # min number of mining sessions for verification redistribution
+    # only local verification if not enough active sessions (should be higher than verifyMinerIndividuals)
+    verifyMinerPeerCount: 4
+
+    # percentage of shares validated locally if there are not enough sessions for verification redistribution (0 - 100)
+    verifyLocalLowPeerPercent: 80
+
+    # percentage of shares to redistribute to miners for verification (0 - 100)
+    verifyMinerPercent: 75
+
+    # number of other mining sessions to redistribute a share to for verification
+    verifyMinerIndividuals: 2
+
+    # max number of pending verifications per miner before not sending any more verification requests
+    verifyMinerMaxPending: 5
+
+    # max number of missed verifications before not sending any more verification requests
+    verifyMinerMaxMissed: 10
+
+    # timeout for verification requests 
+    # client gets penalized if not responding within this timespan
+    verifyMinerTimeout: 40
+
+  ## Passport protection
+  passport:
+    enabled: true
+    scorerApiKey: "" # Gitcoin Passport Scorer API Key
+    trustedIssuers:
+      - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
+    passportCachePath: "passport-cache"
+    
+    refreshCooldown: 300 # allow refreshing every 5mins
+    cacheTime: 86400 # cache passports for 1 day (does not affect manual refreshing)
+
+    stampDeduplicationTime: 604800 # allow reusing a stamp in another passport after 7 days
+
+    boostFactor:
+      1: 1.1 # x1.1 if score >= 1
+      5: 1.5 # x1.5 if score >= 5
+      10: 2 # x2 if score >= 10
+    stampScoring:
+      "Google": 1
+      "Twitter": 1
+      "Ens": 2
+      "GnosisSafe": 2
+      "Poh": 4
+      "POAP": 1
+      "GitPOAP": 1
+      "Facebook": 1
+      "FacebookFriends": 1
+      "FacebookProfilePicture": 1
+      "Brightid": 10
+      "Github": 1
+      "Coinbase": 1
+      "FiveOrMoreGithubRepos": 1
+      "TenOrMoreGithubFollowers": 2
+      "FiftyOrMoreGithubFollowers": 4
+      "ForkedGithubRepoProvider": 1
+      "StarredGithubRepoProvider": 1
+      "Linkedin": 1
+      "Discord": 1
+      "TwitterTweetGT10": 1
+      "TwitterFollowerGT100": 1
+      "TwitterFollowerGT500": 2
+      "TwitterFollowerGTE1000": 3
+      "TwitterFollowerGT5000": 5
+      "SelfStakingBronze": 1
+      "SelfStakingSilver": 1
+      "SelfStakingGold": 1
+      "CommunityStakingBronze": 1
+      "CommunityStakingSilver": 1
+      "CommunityStakingGold": 1
+      "ClearTextSimple": 1
+      "ClearTextTwitter": 1
+      "ClearTextGithubOrg": 1
+      "SnapshotProposalsProvider": 1
+      "SnapshotVotesProvider": 1
+      "EthGasProvider": 1
+      "FirstEthTxnProvider": 1
+      "EthGTEOneTxnProvider": 1
+      "GitcoinContributorStatistics#numGrantsContributeToGte#1": 1
+      "GitcoinContributorStatistics#numGrantsContributeToGte#10": 1
+      "GitcoinContributorStatistics#numGrantsContributeToGte#25": 2
+      "GitcoinContributorStatistics#numGrantsContributeToGte#100": 2
+      "GitcoinContributorStatistics#totalContributionAmountGte#10": 1
+      "GitcoinContributorStatistics#totalContributionAmountGte#100": 2
+      "GitcoinContributorStatistics#totalContributionAmountGte#1000": 2
+      "GitcoinContributorStatistics#numRoundsContributedToGte#1": 1
+      "GitcoinContributorStatistics#numGr14ContributionsGte#1": 1
+      "GitcoinGranteeStatistics#numOwnedGrants#1": 1
+      "GitcoinGranteeStatistics#numGrantContributors#10": 1
+      "GitcoinGranteeStatistics#numGrantContributors#25": 1
+      "GitcoinGranteeStatistics#numGrantContributors#100": 2
+      "GitcoinGranteeStatistics#totalContributionAmount#100": 1
+      "GitcoinGranteeStatistics#totalContributionAmount#1000": 2
+      "GitcoinGranteeStatistics#totalContributionAmount#10000": 4
+      "GitcoinGranteeStatistics#numGrantsInEcoAndCauseRound#1": 1
+      "gtcPossessionsGte#100": 2
+      "gtcPossessionsGte#10": 1
+      "ethPossessionsGte#32": 1
+      "ethPossessionsGte#10": 1
+      "ethPossessionsGte#1": 1
+      "NFT": 1
+      "Lens": 1
+      "ZkSync": 1
 
 
 
@@ -302,42 +443,8 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 # prevent creation of new sessions (used for maintenance)
 #denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
 
-# reward restriction based on faucet wallet balance. lowest value applies
-faucetBalanceRestrictedReward:
-  1000: 90 # 90% if lower than 1000 ETH
-  900: 80  # 80% if lower than 900 ETH
-  800: 70  # 70% if lower than 800 ETH
-  700: 60  # 60% if lower than 700 ETH
-  600: 50  # 50% if lower than 600 ETH
-  500: 40  # 40% if lower than 500 ETH
-  400: 30  # 30% if lower than 400 ETH
-  300: 20  # 20% if lower than 300 ETH
-  200: 10  # 10% if lower than 200 ETH
-  100: 5   # 5% if lower than 100 ETH
 
-# dynamic reward restriction based on faucet balance
-# alternative to static faucetBalanceRestrictedReward
-# limits the rewards linearly according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
-faucetBalanceRestriction:
-  enabled: false
-  targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
-
-# dynamic reward restriction based on faucet outflow
-# alternative to static faucetBalanceRestrictedReward
-# limits the rewards according to the faucet outflow
-# the faucet keeps track of the outflow via a internal "outflow balance".
-# amount/duration wei are added to that balance every second.
-# whenever some reward is mined, it is subtracted from that balance.
-# So, whenever the balance gets negative, there is more mining activity than the allowed outflow and the reward is reduced linearly down to 0% when it reaches lowerLimit.
-# Whenever the balance gets positive, there is less mining activity than allowed. The positive balance is a 'buffer' for activity spikes, anything above upperLimit gets burned.
-faucetOutflowRestriction:
-  enabled: false
-  # limit outflow to 1000ETH per day
-  amount: 1000000000000000000000 # 1000 ETH
-  duration: 86400 # 1 day
-  # outflow balance limits
-  lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
-  upperLimit: 500000000000000000000 # 500 ETH
+  
 
 
 ### Automatic wallet refill
@@ -357,16 +464,6 @@ ethRefillContract:
   #triggerBalance: 1100000000000000000000  # 1100 ETH
   #cooldownTime: 5430 # 1.5h + 30sec
   #requestAmount: 125000000000000000000 # 125 ETH
-
-
-
-### ENS Resolver
-# comment out to disable ENS names
-ensResolver:
-  # RPC Host for ENS name resolver (mainnet)
-  rpcHost: "https://rpc.flashbots.net/"
-  # Custom ENS Resolver contract address
-  #ensAddr: "0x"
 
 
 ### Other Settings
@@ -401,86 +498,3 @@ resultSharing:
   # result sharing buttons
   twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s) #goerli #faucet"
   mastodon: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s)"
-
-
-# allow reward boosting by gitcoin passport verification
-passportBoost:
-  scorerApiKey: "" # Gitcoin Passport Scorer API Key
-  trustedIssuers:
-    - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
-  passportCachePath: "passport-cache"
-  
-  refreshCooldown: 300 # allow refreshing every 5mins
-  cacheTime: 86400 # cache passports for 1 day (does not affect manual refreshing)
-
-  stampDeduplicationTime: 604800 # allow reusing a stamp in another passport after 7 days
-
-  boostFactor:
-    1: 1.1 # x1.1 if score >= 1
-    5: 1.5 # x1.5 if score >= 5
-    10: 2 # x2 if score >= 10
-  stampScoring:
-    "Google": 1
-    "Twitter": 1
-    "Ens": 2
-    "GnosisSafe": 2
-    "Poh": 4
-    "POAP": 1
-    "GitPOAP": 1
-    "Facebook": 1
-    "FacebookFriends": 1
-    "FacebookProfilePicture": 1
-    "Brightid": 10
-    "Github": 1
-    "Coinbase": 1
-    "FiveOrMoreGithubRepos": 1
-    "TenOrMoreGithubFollowers": 2
-    "FiftyOrMoreGithubFollowers": 4
-    "ForkedGithubRepoProvider": 1
-    "StarredGithubRepoProvider": 1
-    "Linkedin": 1
-    "Discord": 1
-    "TwitterTweetGT10": 1
-    "TwitterFollowerGT100": 1
-    "TwitterFollowerGT500": 2
-    "TwitterFollowerGTE1000": 3
-    "TwitterFollowerGT5000": 5
-    "SelfStakingBronze": 1
-    "SelfStakingSilver": 1
-    "SelfStakingGold": 1
-    "CommunityStakingBronze": 1
-    "CommunityStakingSilver": 1
-    "CommunityStakingGold": 1
-    "ClearTextSimple": 1
-    "ClearTextTwitter": 1
-    "ClearTextGithubOrg": 1
-    "SnapshotProposalsProvider": 1
-    "SnapshotVotesProvider": 1
-    "EthGasProvider": 1
-    "FirstEthTxnProvider": 1
-    "EthGTEOneTxnProvider": 1
-    "GitcoinContributorStatistics#numGrantsContributeToGte#1": 1
-    "GitcoinContributorStatistics#numGrantsContributeToGte#10": 1
-    "GitcoinContributorStatistics#numGrantsContributeToGte#25": 2
-    "GitcoinContributorStatistics#numGrantsContributeToGte#100": 2
-    "GitcoinContributorStatistics#totalContributionAmountGte#10": 1
-    "GitcoinContributorStatistics#totalContributionAmountGte#100": 2
-    "GitcoinContributorStatistics#totalContributionAmountGte#1000": 2
-    "GitcoinContributorStatistics#numRoundsContributedToGte#1": 1
-    "GitcoinContributorStatistics#numGr14ContributionsGte#1": 1
-    "GitcoinGranteeStatistics#numOwnedGrants#1": 1
-    "GitcoinGranteeStatistics#numGrantContributors#10": 1
-    "GitcoinGranteeStatistics#numGrantContributors#25": 1
-    "GitcoinGranteeStatistics#numGrantContributors#100": 2
-    "GitcoinGranteeStatistics#totalContributionAmount#100": 1
-    "GitcoinGranteeStatistics#totalContributionAmount#1000": 2
-    "GitcoinGranteeStatistics#totalContributionAmount#10000": 4
-    "GitcoinGranteeStatistics#numGrantsInEcoAndCauseRound#1": 1
-    "gtcPossessionsGte#100": 2
-    "gtcPossessionsGte#10": 1
-    "ethPossessionsGte#32": 1
-    "ethPossessionsGte#10": 1
-    "ethPossessionsGte#1": 1
-    "NFT": 1
-    "Lens": 1
-    "ZkSync": 1

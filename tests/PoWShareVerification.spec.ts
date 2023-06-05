@@ -2,14 +2,14 @@ import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
 import { bindTestStubs, FakeWebSocket, unbindTestStubs } from './common';
-import { PoWClient } from "../src/websock/PoWClient";
-import { PoWSession } from '../src/websock/PoWSession';
+import { PoWClient } from "../src/protection/pow/PoWClient";
+import { PoWSession } from '../src/protection/pow/PoWSession';
 import { faucetConfig, loadFaucetConfig, PoWHashAlgo } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
-import { PoWShareVerification } from '../src/websock/PoWShareVerification';
+import { PoWShareVerification } from '../src/protection/pow/PoWShareVerification';
 import { PoWValidator } from '../src/validator/PoWValidator';
 import { Worker, MessageChannel } from 'worker_threads';
-import { PoWValidatorWorker } from '../src/validator/PoWValidatorWorker';
+import { PoWValidatorWorker } from '../src/protection/pow/validator/PoWValidatorWorker';
 import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
 
 function createFakeValidatorWorker(): Worker {

@@ -4,14 +4,14 @@ import { WebSocket, RawData } from 'ws';
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { FaucetProcess } from '../src/common/FaucetProcess';
 import { ServiceManager } from '../src/common/ServiceManager';
-import { CaptchaVerifier } from '../src/services/CaptchaVerifier';
+import { CaptchaVerifier } from '../src/protection/captcha/CaptchaVerifier';
 import { EnsResolver } from '../src/services/EnsResolver';
 import { EthWalletManager } from '../src/services/EthWalletManager';
-import { IPInfoResolver } from '../src/services/IPInfoResolver';
-import { PassportVerifier } from '../src/services/PassportVerifier';
+import { IPInfoResolver } from '../src/protection/ipinfo/IPInfoResolver';
+import { PassportVerifier } from '../src/protection/passport/PassportVerifier';
 import { sleepPromise } from '../src/utils/SleepPromise';
-import { PoWSession } from '../src/websock/PoWSession';
-import { PoWClient } from '../src/websock/PoWClient';
+import { PoWSession } from '../src/protection/pow/PoWSession';
+import { PoWClient } from '../src/protection/pow/PoWClient';
 
 let fakeWebSockets: FakeWebSocket[] = [];
 

@@ -1,7 +1,8 @@
 import assert from 'node:assert';
 import { isMainThread, parentPort, Worker } from 'worker_threads';
-import { faucetConfig, PoWHashAlgo } from '../common/FaucetConfig';
-import { PromiseDfd } from '../utils/PromiseDfd';
+import { PromiseDfd } from '../../../utils/PromiseDfd';
+import { PoWHashAlgo } from '../PoWConfig';
+import { PoWModule } from '../PoWModule';
 import { IPoWValidatorValidateRequest } from './IPoWValidator';
 
 (() => {
@@ -12,14 +13,23 @@ import { IPoWValidatorValidateRequest } from './IPoWValidator';
 })();
 
 export class PoWValidator {
+  private module: PoWModule;
   private worker: Worker;
   private readyDfd: PromiseDfd<void>;
   private validateQueue: {[shareId: string]: PromiseDfd<boolean>} = {};
 
-  public constructor(worker?: Worker) {
+  public constructor(module: PoWModule, worker?: Worker) {
+    this.module = module;
     this.readyDfd = new PromiseDfd<void>();
     this.worker = worker || new Worker(__filename);
     this.worker.on("message", (msg) => this.onWorkerMessage(msg))
+  }
+
+  public dispose() {
+    if(this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
   }
 
   public getValidationQueueLength(): number {
@@ -28,20 +38,20 @@ export class PoWValidator {
 
   public validateShare(shareId: string, nonces: number[], preimg: string): Promise<boolean> {
     let resDfd = new PromiseDfd<boolean>();
-
+    let config = this.module.getModuleConfig();
     let req: IPoWValidatorValidateRequest = {
       shareId: shareId,
       nonces: nonces,
       preimage: preimg,
-      algo: faucetConfig.powHashAlgo,
+      algo: config.powHashAlgo,
       params: (() => {
-        switch(faucetConfig.powHashAlgo) {
+        switch(config.powHashAlgo) {
           case PoWHashAlgo.SCRYPT: 
-            return faucetConfig.powScryptParams;
+            return config.powScryptParams;
           case PoWHashAlgo.CRYPTONIGHT: 
-            return faucetConfig.powCryptoNightParams;
+            return config.powCryptoNightParams;
           case PoWHashAlgo.ARGON2: 
-            return faucetConfig.powArgon2Params;
+            return config.powArgon2Params;
         }
       })()
     };

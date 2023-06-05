@@ -7,7 +7,7 @@ import { TransactionReceipt } from 'web3-core';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
 import * as EthUtil from 'ethereumjs-util';
-import { faucetConfig } from '../common/FaucetConfig';
+import { faucetConfig } from '../config/FaucetConfig';
 import { ServiceManager } from '../common/ServiceManager';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { FaucetStatus, FaucetStatusLevel } from './FaucetStatus';
@@ -280,9 +280,9 @@ export class EthWalletManager {
 
   public getFaucetBalance(native?: boolean): bigint | null {
     if(native)
-      return this.walletState?.nativeBalance || null;
+      return this.walletState?.nativeBalance;
     else
-      return this.walletState?.balance || null;
+      return this.walletState?.balance;
   }
 
   public getContractInterface(addr: string, abi: AbiItem[]): Contract {
@@ -291,16 +291,36 @@ export class EthWalletManager {
     });
   }
 
+  public async watchClaimTx(claimTx: ClaimTx): Promise<{
+    status: boolean;
+    block: number;
+    fee: bigint;
+    receipt: TransactionReceipt;
+  }> {
+    return this.awaitTransactionReceipt(claimTx.txhash).then((receipt) => {
+      let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+      this.walletState.nativeBalance -= txfee;
+      if(!this.tokenState)
+        this.walletState.balance -= txfee;
+      return {
+        status: !!receipt.status,
+        block: receipt.blockNumber,
+        fee: txfee,
+        receipt: receipt,
+      };
+    });
+  }
+
   public async sendClaimTx(claimTx: ClaimTx): Promise<TransactionResult> {
     let txPromise: Promise<TransactionReceipt>;
     let retryCount = 0;
     let txError: Error;
     let buildTx = () => {
-      claimTx.nonce = this.walletState.nonce;
+      claimTx.txnonce = this.walletState.nonce;
       if(this.tokenState)
-        return this.buildEthTx(this.tokenState.address, 0n, claimTx.nonce, this.tokenState.getTransferData(claimTx.target, claimTx.amount));
+        return this.buildEthTx(this.tokenState.address, 0n, claimTx.txnonce, this.tokenState.getTransferData(claimTx.targetAddr, claimTx.amount));
       else
-        return this.buildEthTx(claimTx.target, claimTx.amount, claimTx.nonce);
+        return this.buildEthTx(claimTx.targetAddr, claimTx.amount, claimTx.txnonce);
     };
 
     do {
@@ -312,7 +332,7 @@ export class EthWalletManager {
       } catch(ex) {
         if(!txError)
           txError = ex;
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Sending TX for " + claimTx.target + " failed [try: " + retryCount + "]: " + ex.toString());
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Sending TX for " + claimTx.targetAddr + " failed [try: " + retryCount + "]: " + ex.toString());
         await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
         await this.loadWalletState();
       }

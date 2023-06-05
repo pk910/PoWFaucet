@@ -1,10 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 
-import { faucetConfig } from '../common/FaucetConfig';
-import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess";
-import { ServiceManager } from '../common/ServiceManager';
-import { FaucetStoreDB } from './FaucetStoreDB';
+import { faucetConfig, resolveRelativePath } from '../../config/FaucetConfig';
+import { FaucetProcess, FaucetLogLevel } from "../../common/FaucetProcess";
+import { ServiceManager } from '../../common/ServiceManager';
+import { FaucetStoreDB } from '../../services/FaucetStoreDB';
+import { BaseModule } from '../BaseModule';
+import { IPassportConfig } from './PassportConfig';
+import { ModuleHookAction } from '../ModuleManager';
+import { FaucetSession } from '../../session/FaucetSession';
+import { ISessionRewardFactor } from '../../session/SessionRewardFactor';
+import { FaucetWebApi } from '../../webserv/FaucetWebApi';
+import { PassportModule } from './PassportModule';
 
 type DIDKitLib = {
   verifyCredential: (vc: string, proofOptions: string) => Promise<string>;
@@ -66,22 +73,22 @@ export interface IPassportVerificationResult extends IPassportVerification {
   passportInfo?: IPassportInfo;
 }
 
-export class PassportVerifier {
+export class PassportResolver {
+  private module: PassportModule;
   private didkitPromise: Promise<DIDKitLib>;
   private passportCache: {[addr: string]: Promise<IPassportInfo>} = {};
   private passportScoreNonce = 1;
 
-  public constructor() {
+  public constructor(module: PassportModule) {
+    this.module = module;
     this.didkitPromise = import("@spruceid/didkit-wasm");
-    ServiceManager.GetService(FaucetProcess).addListener("reload", () => {
-      this.passportScoreNonce++; // refresh cached scores on config reload
-    });
   }
 
+  public increaseScoreNonce() {
+    this.passportScoreNonce++;
+  }
 
   public async getPassport(addr: string, refresh?: boolean): Promise<IPassportInfo> {
-    if(!faucetConfig.passportBoost)
-      return null;
     if(this.passportCache.hasOwnProperty(addr))
       return this.passportCache[addr];
     
@@ -90,7 +97,7 @@ export class PassportVerifier {
     let cachedPassportInfo = faucetStore.getPassportInfo(addr);
     let passportInfoPromise: Promise<IPassportInfo>;
 
-    if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (faucetConfig.passportBoost.cacheTime || 60)) {
+    if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (this.module.getModuleConfig().cacheTime || 60)) {
       passportInfoPromise = Promise.resolve(cachedPassportInfo);
     }
     else {
@@ -102,24 +109,11 @@ export class PassportVerifier {
       });
     }
 
-    passportInfoPromise.then((passportInfo) => {
-      if(!passportInfo.hasOwnProperty("_score")) {
-        Object.defineProperty(passportInfo, "_score", {
-          configurable: true,
-          enumerable: false,
-          writable: true,
-          value: null
-        });
-      }
-    })
-
     return passportInfoPromise;
   }
 
   public async verifyUserPassport(addr: string, passportJson: string): Promise<IPassportVerificationResult> {
-    if(!faucetConfig.passportBoost)
-      return {valid: false, errors: ["Passport Boost disabled"]};
-    if(!faucetConfig.passportBoost.trustedIssuers || faucetConfig.passportBoost.trustedIssuers.length == 0)
+    if(!this.module.getModuleConfig().trustedIssuers || this.module.getModuleConfig().trustedIssuers.length == 0)
       return {valid: false, errors: ["Manual passport verification disabled"]};
 
     let passport: IPassport;
@@ -172,7 +166,7 @@ export class PassportVerifier {
         // load passport from api
         let passportRsp = await fetch("https://api.scorer.gitcoin.co/registry/stamps/" + addr, {
           method: 'GET',
-          headers: {'X-API-KEY': faucetConfig.passportBoost.scorerApiKey}
+          headers: {'X-API-KEY': this.module.getModuleConfig().scorerApiKey}
         }).then((rsp) => rsp.json());
         let gotPassport = passportRsp && passportRsp.items && passportRsp.items.length > 0;
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Requested gitcoin passport for " + addr + ": " + (gotPassport ? "got " + passportRsp.items.length + " stamps" : "no passport"));
@@ -245,7 +239,7 @@ export class PassportVerifier {
       }
 
       // verify stamp issuer
-      if(faucetConfig.passportBoost.trustedIssuers.indexOf(stamp.credential.issuer) === -1) {
+      if(this.module.getModuleConfig().trustedIssuers.indexOf(stamp.credential.issuer) === -1) {
         verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: issuer not trusted")
         return;
       }
@@ -281,16 +275,9 @@ export class PassportVerifier {
   }
 
   private getPassportCacheFile(addr: string): string {
-    if(!faucetConfig.passportBoost || !faucetConfig.passportBoost.passportCachePath)
+    if(!this.module.getModuleConfig().passportCachePath)
       return null;
-    
-    let cacheFile: string;
-    if(faucetConfig.passportBoost.passportCachePath.match(/^\//))
-      cacheFile = faucetConfig.passportBoost.passportCachePath;
-    else
-      cacheFile = path.join(faucetConfig.appBasePath, faucetConfig.passportBoost.passportCachePath);
-    cacheFile = path.join(cacheFile, "passport-" + addr.replace(/[^a-f0-9x]+/gi, "").toLowerCase() + ".json");
-    return cacheFile;
+    return path.join(resolveRelativePath(this.module.getModuleConfig().passportCachePath), "passport-" + addr.replace(/[^a-f0-9x]+/gi, "").toLowerCase() + ".json");
   }
 
   private savePassportToCache(passport: IPassport, cacheFile: string) {
@@ -348,7 +335,7 @@ export class PassportVerifier {
       };
       faucetStore.updatePassportStamps(stampHashes.filter((stampHash) => {
         return stampAssignments[stampHash]?.toLowerCase() === addr.toLowerCase();
-      }), addr, faucetConfig.passportBoost.stampDeduplicationTime || faucetConfig.passportBoost.cacheTime || 86400);
+      }), addr, this.module.getModuleConfig().stampDeduplicationTime || this.module.getModuleConfig().cacheTime || 86400);
     }
     else {
       passportInfo = {
@@ -367,6 +354,16 @@ export class PassportVerifier {
   public getPassportScore(passportInfo: IPassportInfo): IPassportScore {
     if(!passportInfo)
       return null;
+    let passportConfig = this.module.getModuleConfig();
+    
+    if(!passportInfo.hasOwnProperty("_score")) {
+      Object.defineProperty(passportInfo, "_score", {
+        configurable: true,
+        enumerable: false,
+        writable: true,
+        value: null
+      });
+    }
     if(passportInfo._score && passportInfo._score.nonce == this.passportScoreNonce)
       return passportInfo._score;
     
@@ -380,7 +377,7 @@ export class PassportVerifier {
         if(stamp.duplicate)
           return;
         
-        let stampScore = faucetConfig.passportBoost.stampScoring[stamp.provider];
+        let stampScore = passportConfig.stampScoring[stamp.provider];
         if(typeof stampScore === "number") {
           totalScore += stampScore;
         }
@@ -389,9 +386,9 @@ export class PassportVerifier {
 
     // get highest boost factor for score
     let boostFactor = 1;
-    Object.keys(faucetConfig.passportBoost.boostFactor).forEach((minScore) => {
+    Object.keys(passportConfig.boostFactor).forEach((minScore) => {
       if(totalScore >= parseInt(minScore)) {
-        let factor = faucetConfig.passportBoost.boostFactor[minScore];
+        let factor = passportConfig.boostFactor[minScore];
         if(factor > boostFactor) {
           boostFactor = factor;
         }
@@ -404,5 +401,4 @@ export class PassportVerifier {
       factor: boostFactor,
     };
   }
-
 }

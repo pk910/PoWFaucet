@@ -1,4 +1,4 @@
-import { PoWCryptoParams, PoWHashAlgo } from "../common/FaucetConfig";
+import { PoWCryptoParams, PoWHashAlgo } from "../PoWConfig";
 
 export interface IPoWValidatorValidateRequest {
   shareId: string;

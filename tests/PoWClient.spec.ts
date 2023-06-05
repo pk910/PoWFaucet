@@ -2,13 +2,13 @@ import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
 import { awaitSleepPromise, bindTestStubs, FakePoWClient, FakeWebSocket, unbindTestStubs } from './common';
-import { PoWClient } from "../src/websock/PoWClient";
+import { PoWClient } from "../src/protection/pow/PoWClient";
 import { faucetConfig, loadFaucetConfig, PoWHashAlgo } from '../src/common/FaucetConfig';
 import { ServiceManager } from '../src/common/ServiceManager';
-import { PoWSession } from '../src/websock/PoWSession';
+import { PoWSession } from '../src/protection/pow/PoWSession';
 import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
 import { sleepPromise } from '../src/utils/SleepPromise';
-import { PoWShareVerification } from '../src/websock/PoWShareVerification';
+import { PoWShareVerification } from '../src/protection/pow/PoWShareVerification';
 
 describe("WebSocket Client Handling", () => {
   let globalStubs;

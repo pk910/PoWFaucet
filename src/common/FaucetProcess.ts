@@ -1,15 +1,11 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { EthWalletManager } from '../services/EthWalletManager';
-import { FaucetStore } from '../services/FaucetStore';
 import { FaucetStoreDB } from '../services/FaucetStoreDB';
-import { PoWOutflowLimiter } from '../services/PoWOutflowLimiter';
 import { renderDate } from '../utils/DateUtils';
 import { strPadRight } from '../utils/StringUtils';
-import { PoWSession } from '../websock/PoWSession';
-import { faucetConfig, loadFaucetConfig, resolveRelativePath } from './FaucetConfig';
+import { faucetConfig, loadFaucetConfig, resolveRelativePath } from '../config/FaucetConfig';
 import { ServiceManager } from './ServiceManager';
+import { SessionManager } from '../session/SessionManager';
 
 
 interface FaucetProcessEvents {
@@ -73,10 +69,8 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
 
   private shutdown(code: number) {
     try {
-      PoWSession.saveSessionData();
-      ServiceManager.GetService(PoWOutflowLimiter).saveOutflowState();
+      ServiceManager.GetService(SessionManager).saveAllSessions();
       ServiceManager.GetService(FaucetStoreDB).closeDatabase();
-      ServiceManager.GetService(FaucetStore).saveRecoveryStore();
     } catch(ex) {}
     process.exit(code);
   }
@@ -87,7 +81,7 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
     
     let logLine = renderDate(new Date(), true, true) + "  " + strPadRight(level, 7, " ") + "  " + message;
 
-    if(faucetConfig.faucetLogFile) {
+    if(faucetConfig?.faucetLogFile) {
       let logFile = resolveRelativePath(faucetConfig.faucetLogFile);
       fs.appendFileSync(logFile, logLine + "\r\n");
     }
