@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { FaucetStoreDB } from '../services/FaucetStoreDB';
+import { FaucetDatabase } from '../db/FaucetDatabase';
 import { renderDate } from '../utils/DateUtils';
 import { strPadRight } from '../utils/StringUtils';
 import { faucetConfig, loadFaucetConfig, resolveRelativePath } from '../config/FaucetConfig';
@@ -70,7 +70,7 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
   private shutdown(code: number) {
     try {
       ServiceManager.GetService(SessionManager).saveAllSessions();
-      ServiceManager.GetService(FaucetStoreDB).closeDatabase();
+      ServiceManager.GetService(FaucetDatabase).closeDatabase();
     } catch(ex) {}
     process.exit(code);
   }

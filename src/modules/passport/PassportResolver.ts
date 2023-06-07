@@ -1,16 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
-import { faucetConfig, resolveRelativePath } from '../../config/FaucetConfig';
+import { resolveRelativePath } from '../../config/FaucetConfig';
 import { FaucetProcess, FaucetLogLevel } from "../../common/FaucetProcess";
 import { ServiceManager } from '../../common/ServiceManager';
-import { FaucetStoreDB } from '../../services/FaucetStoreDB';
-import { BaseModule } from '../BaseModule';
-import { IPassportConfig } from './PassportConfig';
-import { ModuleHookAction } from '../ModuleManager';
-import { FaucetSession } from '../../session/FaucetSession';
-import { ISessionRewardFactor } from '../../session/SessionRewardFactor';
-import { FaucetWebApi } from '../../webserv/FaucetWebApi';
 import { PassportModule } from './PassportModule';
 
 type DIDKitLib = {
@@ -93,8 +86,7 @@ export class PassportResolver {
       return this.passportCache[addr];
     
     let now = Math.floor((new Date()).getTime() / 1000);
-    let faucetStore = ServiceManager.GetService(FaucetStoreDB);
-    let cachedPassportInfo = faucetStore.getPassportInfo(addr);
+    let cachedPassportInfo = this.module.getPassportDb().getPassportInfo(addr);
     let passportInfoPromise: Promise<IPassportInfo>;
 
     if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (this.module.getModuleConfig().cacheTime || 60)) {
@@ -296,12 +288,11 @@ export class PassportResolver {
 
   private buildPassportInfo(addr: string, passport: IPassport): IPassportInfo {
     let passportInfo: IPassportInfo;
-    let faucetStore = ServiceManager.GetService(FaucetStoreDB);
     let now = Math.floor((new Date()).getTime() / 1000);
 
     if(passport) {
       let stampHashes = passport.stamps.map((stamp) => stamp.credential.credentialSubject.hash);
-      let stampAssignments = faucetStore.getPassportStamps(stampHashes);
+      let stampAssignments = this.module.getPassportDb().getPassportStamps(stampHashes);
       
       let newestStamp = 0;
       let stamps: IPassportStampInfo[] = [];
@@ -333,7 +324,7 @@ export class PassportResolver {
         newest: newestStamp,
         stamps: stamps,
       };
-      faucetStore.updatePassportStamps(stampHashes.filter((stampHash) => {
+      this.module.getPassportDb().updatePassportStamps(stampHashes.filter((stampHash) => {
         return stampAssignments[stampHash]?.toLowerCase() === addr.toLowerCase();
       }), addr, this.module.getModuleConfig().stampDeduplicationTime || this.module.getModuleConfig().cacheTime || 86400);
     }
@@ -345,7 +336,7 @@ export class PassportResolver {
       };
     }
     
-    faucetStore.setPassportInfo(addr, passportInfo);
+    this.module.getPassportDb().setPassportInfo(addr, passportInfo);
 
     return passportInfo;
   }

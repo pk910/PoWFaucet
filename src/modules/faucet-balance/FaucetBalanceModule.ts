@@ -1,11 +1,11 @@
 import { ServiceManager } from "../../common/ServiceManager";
-import { EthWalletManager } from "../../services/EthWalletManager";
+import { EthWalletManager } from "../../eth/EthWalletManager";
 import { FaucetSession } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
 import { IFaucetBalanceConfig } from './FaucetBalanceConfig';
 import { ISessionRewardFactor } from "../../session/SessionRewardFactor";
-import { EthClaimManager } from "../../services/EthClaimManager";
+import { EthClaimManager } from "../../eth/EthClaimManager";
 import { faucetConfig } from "../../config/FaucetConfig";
 import { SessionManager } from "../../session/SessionManager";
 
@@ -56,6 +56,10 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
       this.getStaticBalanceRestriction(faucetBalance),
       this.getDynamicBalanceRestriction(faucetBalance)
     );
+  }
+
+  public getBalanceRestriction(): number {
+    return this.balanceRestriction;
   }
 
   private getStaticBalanceRestriction(balance: bigint): number {

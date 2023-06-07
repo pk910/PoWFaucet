@@ -9,6 +9,8 @@ import { IIPInfoConfig, IIPInfoRestrictionConfig } from "./IPInfoConfig";
 import { IIPInfo, IPInfoResolver } from "./IPInfoResolver";
 import { resolveRelativePath } from "../../config/FaucetConfig";
 import { ISessionRewardFactor } from '../../session/SessionRewardFactor';
+import { IPInfoDB } from './IPInfoDB';
+import { FaucetDatabase } from '../../db/FaucetDatabase';
 
 export interface IIPInfoRestriction {
   reward: number;
@@ -21,15 +23,14 @@ export interface IIPInfoRestriction {
 }
 
 export class IPInfoModule extends BaseModule<IIPInfoConfig> {
-  private static ipInfoResolver: IPInfoResolver;
+  private ipInfoDb: IPInfoDB;
+  private ipInfoResolver: IPInfoResolver;
   private ipInfoMatchRestrictions: [pattern: string, restriction: number | IIPInfoRestrictionConfig][];
   private ipInfoMatchRestrictionsRefresh: number;
 
   protected override startModule(): void {
-    if(!IPInfoModule.ipInfoResolver)
-      IPInfoModule.ipInfoResolver = new IPInfoResolver(this.moduleConfig.ipInfoApi);
-    else
-      IPInfoModule.ipInfoResolver.setApi(this.moduleConfig.ipInfoApi);
+    this.ipInfoDb = ServiceManager.GetService(FaucetDatabase).createModuleDb(IPInfoDB, this);
+    this.ipInfoResolver = new IPInfoResolver(this.ipInfoDb, this.moduleConfig.ipInfoApi);
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionStart, 6, "IP Info check", 
       (session: FaucetSession) => this.processSessionStart(session)
@@ -45,11 +46,11 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   }
 
   protected override stopModule(): void {
-    // nothing to do
+    this.ipInfoDb.dispose();
   }
 
   protected override onConfigReload(): void {
-    IPInfoModule.ipInfoResolver.setApi(this.moduleConfig.ipInfoApi);
+    this.ipInfoResolver.setApi(this.moduleConfig.ipInfoApi);
     this.ipInfoMatchRestrictionsRefresh = 0;
   }
 
@@ -57,7 +58,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     let remoteIp = session.getRemoteIP();
     let ipInfo: IIPInfo;
     try {
-      ipInfo = await IPInfoModule.ipInfoResolver.getIpInfo(remoteIp);
+      ipInfo = await this.ipInfoResolver.getIpInfo(remoteIp);
       if(ipInfo.status !== "success" && this.moduleConfig.ipInfoRequired)
         throw new FaucetError("INVALID_IPINFO", "Error while checking your IP: " + ipInfo.status);
     } catch(ex) {

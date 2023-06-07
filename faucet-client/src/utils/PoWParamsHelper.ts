@@ -1,4 +1,4 @@
-import { PoWHashAlgo, PoWParams } from "../common/IFaucetConfig";
+import { PoWHashAlgo, PoWParams } from "../common/FaucetConfig";
 
 export function getPoWParamsStr(params: PoWParams): string {
   switch(params.a) {

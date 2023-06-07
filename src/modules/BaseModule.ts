@@ -15,6 +15,10 @@ export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModule
     this.moduleName = name;
   }
 
+  public getModuleName(): string {
+    return this.moduleName;
+  }
+
   public enableModule(): void {
     if(this.enabled)
       throw "cannot enable module '" + this.moduleName + "': already enabled";

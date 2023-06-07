@@ -1,4 +1,4 @@
-import { FaucetCoinType } from "../services/EthWalletManager";
+import { FaucetCoinType } from "../eth/EthWalletManager";
 import { IConfigSchemaV2 } from "./ConfigSchemaV2";
 import { resolveRelativePath } from "./FaucetConfig";
 

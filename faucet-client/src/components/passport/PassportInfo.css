@@ -1,0 +1,70 @@
+
+
+.pow-boost-info .boost-descr {
+  font-weight: bold;
+}
+
+.pow-boost-info .boost-passport {
+  margin-top: 16px;
+}
+
+.pow-boost-info .passport-factor {
+  margin-left: 16px;
+}
+
+.pow-boost-info .passport-details {
+  margin-top: 16px;
+}
+
+.pow-boost-info .passport-factor-info {
+  display: inline-block;
+  margin-left: 4px;
+}
+
+.pow-boost-info .summary-val {
+  padding-left: 24px;
+}
+
+.pow-boost-info .passport-refresh {
+  margin-top: 16px;
+}
+
+.pow-boost-info .passport-refresh .refresh-auto button {
+  width: 100%;
+}
+
+.pow-boost-info .passport-refresh .refresh-btndv {
+  padding-right: 24px;
+}
+
+.pow-boost-info .passport-refresh-status .alert {
+  background-color: transparent;
+  border-color: transparent;
+  padding: 0;
+  margin-top: 4px;
+  margin-bottom: 0;
+  white-space: pre;
+}
+
+.pow-boost-info .passport-details .row.details-header > div {
+  padding: 0;
+  font-weight: 600;
+}
+
+.passport-factor-info .header-row > div {
+  white-space: nowrap;
+}
+
+.pow-boost-info .passport-manual-refresh {
+  margin-top: 16px;
+}
+
+.pow-boost-info .passport-manual-refresh .form-header {
+  font-weight: bold;
+}
+
+.pow-boost-info .passport-manual-refresh .passport-json {
+  width: 100%;
+  min-height: 150px;
+}
+

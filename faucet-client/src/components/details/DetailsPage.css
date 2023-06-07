@@ -1,0 +1,12 @@
+
+.faucet-page .details-advanced a {
+  font-size: 9pt;
+  margin: 4px 0;
+  color: darkgray;
+}
+
+.faucet-page .details-advanced .session-json {
+  border: 1px solid darkgray;
+  font-size: 11pt;
+  padding: 16px;
+}

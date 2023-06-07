@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import * as hcaptcha from "hcaptcha";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess";
 import { ServiceManager } from "../../common/ServiceManager";
-import { FaucetSession } from "../../session/FaucetSession";
+import { FaucetSession, FaucetSessionStoreData } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
 import { ICaptchaConfig } from "./CaptchaConfig";
@@ -28,7 +28,7 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
     );
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionClaim, 1, "captcha check", 
-      async (session: FaucetSession, userInput: any) => this.processSessionClaim(session, userInput)
+      async (sessionData: FaucetSessionStoreData, userInput: any) => this.processSessionClaim(sessionData, userInput)
     );
   }
 
@@ -49,16 +49,14 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
       throw new FaucetError("INVALID_CAPTCHA", "captcha check failed: invalid token");
   }
 
-  private async processSessionClaim(session: FaucetSession, userInput: any): Promise<void> {
+  private async processSessionClaim(sessionData: FaucetSessionStoreData, userInput: any): Promise<void> {
     if(!this.moduleConfig.checkBalanceClaim)
       return;
     if(!userInput.captchaToken)
       throw new FaucetError("INVALID_CAPTCHA", "captcha check failed: captcha token missing");
     
-    let result = await this.verifyToken(userInput.captchaToken, session.getRemoteIP(), "claim");
-    if(typeof result === "string")
-      session.setSessionData("captcha.ident", result);
-    else if(!result)
+    let result = await this.verifyToken(userInput.captchaToken, sessionData.remoteIP, "claim");
+    if(!result)
       throw new FaucetError("INVALID_CAPTCHA", "captcha check failed: invalid token");
   }
 

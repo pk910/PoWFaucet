@@ -2,8 +2,8 @@ import { FaucetError } from "../common/FaucetError";
 import { ServiceManager } from "../common/ServiceManager";
 import { faucetConfig } from "../config/FaucetConfig";
 import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager";
-import { ClaimTx, ClaimTxStatus, EthClaimManager } from "../services/EthClaimManager";
-import { FaucetStoreDB } from "../services/FaucetStoreDB";
+import { EthClaimData, EthClaimManager } from "../eth/EthClaimManager";
+import { FaucetDatabase } from "../db/FaucetDatabase";
 import { getNewGuid } from "../utils/GuidUtils";
 import { SessionManager } from "./SessionManager";
 import { ISessionRewardFactor } from "./SessionRewardFactor";
@@ -33,6 +33,19 @@ export interface FaucetSessionStoreData {
   remoteIP: string;
   tasks: any;
   data: any;
+  claim: EthClaimData;
+}
+
+export interface IClientSessionInfo {
+  session: string;
+  status: string;
+  start: number;
+  tasks?: FaucetSessionTask[];
+  balance: string;
+  target: string;
+  modules?: {[module: string]: any};
+  failedCode?: string;
+  failedReason?: string;
 }
 
 export class FaucetSession {
@@ -48,6 +61,7 @@ export class FaucetSession {
   private sessionModuleRefs: {[key: string]: any} = {};
   private sessionTimer: NodeJS.Timeout;
   private isDirty: boolean;
+  private isDisposed: boolean;
   private saveTimer: NodeJS.Timeout;
 
   public constructor(manager: SessionManager) {
@@ -67,10 +81,12 @@ export class FaucetSession {
     this.remoteIP = remoteIP;
     this.dropAmount = -1n;
 
+    console.log("session start");
     try {
       await ServiceManager.GetService(ModuleManager).processActionHooks([
         {prio: 5, hook: () => { // prio 5: get target address from userInput if not set provided by a module
           let targetAddr = this.targetAddr || userInput.addr;
+          console.log("target addr");
           if(typeof targetAddr !== "string")
             throw new FaucetError("INVALID_ADDR", "Missing target address.");
           if(!targetAddr.match(/^0x[0-9a-f]{40}$/i) || targetAddr.match(/^0x0{40}$/i))
@@ -96,6 +112,9 @@ export class FaucetSession {
   }
 
   public async restoreSession(sessionData: FaucetSessionStoreData): Promise<void> {
+    if(sessionData.status !== FaucetSessionStatus.RUNNING)
+      throw new FaucetError("INVALID_STATE", "Cannot restore non-running session: " + sessionData.status);
+
     this.sessionId = sessionData.sessionId;
     this.status = sessionData.status;
     this.startTime = sessionData.startTime;
@@ -121,6 +140,7 @@ export class FaucetSession {
       remoteIP: this.remoteIP,
       tasks: this.blockingTasks,
       data: this.sessionDataDict,
+      claim: null,
     };
   }
 
@@ -129,20 +149,21 @@ export class FaucetSession {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
-    if(!this.isDirty)
+    if(!this.isDirty || this.isDisposed)
       return;
     this.isDirty = false;
 
-    ServiceManager.GetService(FaucetStoreDB).updateSession(this.getStoreData());
+    ServiceManager.GetService(FaucetDatabase).updateSession(this.getStoreData());
   }
 
   private lazySaveSession() {
+    this.isDirty = true;
     if(this.saveTimer)
       return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
       this.saveSession();
-    }, 60 * 1000);
+    }, 30 * 1000);
   }
 
   public setSessionFailed(code: string, reason: string, stack?: string) {
@@ -153,9 +174,12 @@ export class FaucetSession {
     this.status = FaucetSessionStatus.FAILED;
     this.manager.notifySessionUpdate(this);
     this.resetSessionTimer();
-    this.saveSession();
     if(oldStatus === FaucetSessionStatus.RUNNING)
       ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
+    try {
+      this.saveSession();
+    } catch(ex) {}
+    this.isDisposed = true;
   }
 
   private resetSessionTimer() {
@@ -222,47 +246,9 @@ export class FaucetSession {
     this.status = FaucetSessionStatus.CLAIMABLE;
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
     this.manager.notifySessionUpdate(this);
+    this.setSessionData("close.time", Math.floor((new Date()).getTime() / 1000));
     this.saveSession();
-  }
-
-  public async claimSession(userInput: any): Promise<void> {
-    if(this.status !== FaucetSessionStatus.CLAIMABLE)
-      throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: not claimable (state: " + this.status + ")");
-    
-    if(this.dropAmount < BigInt(faucetConfig.minDropAmount))
-      return this.setSessionFailed("AMOUNT_TOO_LOW", "drop amount lower than minimum");
-    if(this.dropAmount > BigInt(faucetConfig.maxDropAmount))
-      this.dropAmount = BigInt(faucetConfig.maxDropAmount);
-
-    try {
-      await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionClaim, [this, userInput]);
-    } catch(ex) {
-      if(ex instanceof FaucetError)
-        this.setSessionFailed(ex.getCode(), ex.message);
-      else
-        this.setSessionFailed("INTERNAL_ERROR", "claimSession failed: " + ex.toString());
-      throw ex;
-    }
-
-    if(this.status !== FaucetSessionStatus.CLAIMABLE) // check again to prevent double claiming during async operations
-      throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: not claimable (state: " + this.status + ")");
-    this.status = FaucetSessionStatus.CLAIMING;
-    this.isDirty = true;
-    this.manager.notifySessionUpdate(this);
-
-    ServiceManager.GetService(EthClaimManager).createSessionClaim(this);
-    this.saveSession();
-  }
-
-  public async notifyClaimStatus(claimTx: ClaimTx): Promise<void> {
-    this.isDirty = true;
-
-    if(claimTx.claimStatus === ClaimTxStatus.CONFIRMED) {
-      this.status = FaucetSessionStatus.FINISHED;
-      ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionClaimed, [this, claimTx]);
-      this.manager.notifySessionUpdate(this);
-    }
-    this.saveSession();
+    this.isDisposed = true;
   }
 
   public getSessionId(): string {
@@ -366,7 +352,7 @@ export class FaucetSession {
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewardFactor, [this, rewardFactors]);
 
     let rewardFactor = 1;
-    console.log(rewardFactors);
+    //console.log(rewardFactors);
     rewardFactors.forEach((factor) => rewardFactor *= factor.factor);
 
     let rewardAmount = amount * BigInt(Math.floor(rewardFactor * 100000)) / 100000n;
@@ -390,6 +376,25 @@ export class FaucetSession {
     if(this.dropAmount < 0n)
       this.dropAmount = 0n;
     this.lazySaveSession();
+  }
+
+  public async getSessionInfo(): Promise<IClientSessionInfo> {
+    let moduleData: any = {};
+    await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionInfo, [this, moduleData]);
+    let sessionInfo: IClientSessionInfo = {
+      session: this.getSessionId(),
+      status: this.getSessionStatus(),
+      start: this.getStartTime(),
+      tasks: this.getBlockingTasks(),
+      balance: this.getDropAmount().toString(),
+      target: this.getTargetAddr(),
+      modules: moduleData
+    };
+    if(this.status === FaucetSessionStatus.FAILED) {
+      sessionInfo.failedCode = this.getSessionData("failed.code");
+      sessionInfo.failedReason = this.getSessionData("failed.reason");
+    }
+    return sessionInfo;
   }
 
 }

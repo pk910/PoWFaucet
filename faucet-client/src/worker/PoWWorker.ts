@@ -1,5 +1,5 @@
 import { getPoWParamsStr } from "../utils/PoWParamsHelper";
-import { PoWHashAlgo, PoWParams } from "../common/IFaucetConfig";
+import { PoWHashAlgo, PoWParams } from "../common/FaucetConfig";
 import { base64ToHex } from "../utils/ConvertHelpers";
 
 export type PoWWorkerHashFn = (nonceHex: string, preimgHex: string, params: PoWParams) => string;

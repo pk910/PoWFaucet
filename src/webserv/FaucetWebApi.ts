@@ -1,15 +1,16 @@
 import { IncomingMessage } from "http";
 import { faucetConfig } from "../config/FaucetConfig";
 import { ServiceManager } from "../common/ServiceManager";
-import { EthWalletManager } from "../services/EthWalletManager";
+import { EthWalletManager } from "../eth/EthWalletManager";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
 import { FaucetHttpResponse } from "./FaucetHttpServer";
 import { SessionManager } from "../session/SessionManager";
-import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from "../session/FaucetSession";
+import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData, FaucetSessionTask, IClientSessionInfo } from "../session/FaucetSession";
 import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager";
 import { IFaucetResultSharingConfig } from "../config/ConfigShared";
 import { FaucetError } from "../common/FaucetError";
-import { ClaimTx, EthClaimManager } from "../services/EthClaimManager";
+import { EthClaimInfo, EthClaimManager } from "../eth/EthClaimManager";
+import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -37,10 +38,35 @@ export interface IClientFaucetConfig {
   },
 }
 
+export interface IClientSessionStatus {
+  session: string;
+  status: string;
+  start: number;
+  tasks: FaucetSessionTask[];
+  balance: string;
+  target: string;
+  claimIdx?: number;
+  claimStatus?: string;
+  claimBlock?: number;
+  claimHash?: string;
+  claimMessage?: string;
+  failedCode?: string;
+  failedReason?: string;
+  details?: {
+    data: any;
+    claim: any;
+  };
+}
+
+
 const FAUCETSTATUS_CACHE_TIME = 10;
 
 export class FaucetWebApi {
   private apiEndpoints: {[endpoint: string]: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>} = {};
+  private cachedStatusData: {[key: string]: {
+    time: number;
+    data: any;
+  }} = {};
 
   public async onApiRequest(req: IncomingMessage, body?: Buffer): Promise<any> {
     let apiUrl = this.parseApiUrl(req.url);
@@ -53,12 +79,16 @@ export class FaucetWebApi {
         return this.onGetFaucetConfig(apiUrl.query['cliver'] as string, apiUrl.query['session'] as string);
       case "startSession".toLowerCase():
         return this.onStartSession(req, body);
+      case "getSession".toLowerCase():
+        return this.onGetSession(apiUrl.query['session'] as string);
       case "claimReward".toLowerCase():
         return this.onClaimReward(req, body);
-      case "getClaimStatus".toLowerCase():
-        return this.onGetClaimStatus(apiUrl.query['session'] as string);
       case "getSessionStatus".toLowerCase():
-        return this.onGetSessionStatus(apiUrl.query['session'] as string);
+        return this.onGetSessionStatus(apiUrl.query['session'] as string, !!apiUrl.query['details']);
+      case "getQueueStatus".toLowerCase():
+        return this.onGetQueueStatus();
+      case "getFaucetStatus".toLowerCase():
+        return this.onGetFaucetStatus();
       default:
         let handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>;
         if((handler = this.apiEndpoints[apiUrl.path[0].toLowerCase()]))
@@ -139,6 +169,7 @@ export class FaucetWebApi {
     
     let userInput = JSON.parse(body.toString("utf8"));
     let responseData: any = {};
+    let sessionInfo: IClientSessionInfo;
     let session: FaucetSession;
     try {
       session = await ServiceManager.GetService(SessionManager).createSession(req.socket.remoteAddress, userInput, responseData);
@@ -151,6 +182,8 @@ export class FaucetWebApi {
           target: session.getTargetAddr(),
         }
       }
+
+      sessionInfo = await session.getSessionInfo();
     } catch(ex) {
       if(ex instanceof FaucetError) {
         responseData = ex;
@@ -161,7 +194,6 @@ export class FaucetWebApi {
         }
       }
       else {
-        console.error(ex, ex.stack);
         return {
           status: FaucetSessionStatus.FAILED,
           failedCode: "INTERNAL_ERROR",
@@ -170,14 +202,40 @@ export class FaucetWebApi {
       }
     }
 
-    Object.assign(responseData, {
-      session: session.getSessionId(),
-      status: session.getSessionStatus(),
-      tasks: session.getBlockingTasks(),
-      balance: session.getDropAmount().toString(),
-      target: session.getTargetAddr(),
-    });
-    return responseData;
+    sessionInfo = Object.assign(sessionInfo || {}, responseData);
+    return sessionInfo;
+  }
+
+  public async onGetSession(sessionId: string): Promise<any> {
+    let session: FaucetSession;
+    if(!sessionId || !(session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]))) {
+      return {
+        status: "unknown",
+        error: "Session not found"
+      };
+    }
+
+    let sessionInfo: IClientSessionInfo;
+    try {
+      sessionInfo = await session.getSessionInfo();
+    } catch(ex) {
+      if(ex instanceof FaucetError) {
+        return {
+          status: FaucetSessionStatus.FAILED,
+          failedCode: ex.getCode(),
+          failedReason: ex.message,
+        }
+      }
+      else {
+        return {
+          status: FaucetSessionStatus.FAILED,
+          failedCode: "INTERNAL_ERROR",
+          failedReason: ex.toString(),
+        }
+      }
+    }
+
+    return sessionInfo;
   }
 
   public async onClaimReward(req: IncomingMessage, body: Buffer): Promise<any> {
@@ -185,21 +243,17 @@ export class FaucetWebApi {
       return new FaucetHttpResponse(405, "Method Not Allowed");
     
     let userInput = JSON.parse(body.toString("utf8"));
-    let session: FaucetSession;
-    if(!userInput || !userInput.session || !(session = ServiceManager.GetService(SessionManager).getSession(userInput.session, [FaucetSessionStatus.CLAIMABLE])))
-      return new FaucetHttpResponse(404, "Session not found");
+    let sessionData: FaucetSessionStoreData;
+    if(!userInput || !userInput.session || !(sessionData = ServiceManager.GetService(SessionManager).getSessionData(userInput.session))) {
+      return {
+        status: FaucetSessionStatus.FAILED,
+        failedCode: "INVALID_SESSION",
+        failedReason: "Session not found.",
+      }
+    }
     
     try {
-      await session.claimSession(userInput);
-      if(session.getSessionStatus() === FaucetSessionStatus.FAILED) {
-        return {
-          status: FaucetSessionStatus.FAILED,
-          failedCode: session.getSessionData("failed.code"),
-          failedReason: session.getSessionData("failed.reason"),
-          balance: session.getDropAmount().toString(),
-          target: session.getTargetAddr(),
-        }
-      }
+      await ServiceManager.GetService(EthClaimManager).createSessionClaim(sessionData, userInput);
     } catch(ex) {
       if(ex instanceof FaucetError) {
         return {
@@ -218,46 +272,73 @@ export class FaucetWebApi {
       }
     }
 
-    let responseData = {};
-    Object.assign(responseData, {
-      session: session.getSessionId(),
-      status: session.getSessionStatus(),
-      balance: session.getDropAmount().toString(),
-      target: session.getTargetAddr(),
-    });
-    return responseData;
+    return this.getSessionStatus(sessionData, false);
   }
 
-  public async onGetClaimStatus(sessionId: string): Promise<any> {
-    let sessionData: FaucetSessionStoreData;
-    if(!sessionId || !(sessionData = ServiceManager.GetService(SessionManager).getSessionData(sessionId))) {
-      return {
-        status: "unknown",
-        error: "Session not found"
-      };
-    }
-    if(!sessionData.data["claim.status"]) {
-      return {
-        status: "unknown",
-        error: "Session not claiming"
-      };
-    }
-
-    return {
-      status: sessionData.data["claim.status"],
-      queueIdx: sessionData.data["claim.queueIdx"],
-      txhash: sessionData.data["claim.txhash"],
-      txblock: sessionData.data["claim.txblock"],
-      lastIdx: ServiceManager.GetService(EthClaimManager).getLastProcessedClaimIdx(),
+  private getSessionStatus(sessionData: FaucetSessionStoreData, details: boolean): IClientSessionStatus {
+    let sessionStatus: IClientSessionStatus = {
+      session: sessionData.sessionId,
+      status: sessionData.status,
+      start: sessionData.startTime,
+      tasks: sessionData.tasks,
+      balance: sessionData.dropAmount,
+      target: sessionData.targetAddr,
     };
+    if(sessionData.status === FaucetSessionStatus.FAILED) {
+      sessionStatus.failedCode = sessionData.data ? sessionData.data['failed.code'] : null;
+      sessionStatus.failedReason = sessionData.data ? sessionData.data['failed.reason'] : null;
+    }
+    if(sessionData.claim) {
+      sessionStatus.claimIdx = sessionData.claim.claimIdx;
+      sessionStatus.claimStatus = sessionData.claim.claimStatus;
+      sessionStatus.claimBlock = sessionData.claim.txBlock;
+      sessionStatus.claimHash = sessionData.claim.txHash;
+      sessionStatus.claimMessage = sessionData.claim.txError;
+    }
+    if(details) {
+      sessionStatus.details = {
+        data: sessionData.data,
+        claim: sessionData.claim,
+      };
+    }
+
+    return sessionStatus;
   }
 
-  public async onGetSessionStatus(sessionId: string): Promise<any> {
+  public async onGetSessionStatus(sessionId: string, details: boolean): Promise<any> {
     let sessionData: FaucetSessionStoreData;
     if(!sessionId || !(sessionData = ServiceManager.GetService(SessionManager).getSessionData(sessionId)))
       return new FaucetHttpResponse(404, "Session not found");
     
-    return sessionData;
+    return this.getSessionStatus(sessionData, details);
+  }
+
+  public async onGetQueueStatus(): Promise<any> {
+    let now = Math.floor(new Date().getTime() / 1000);
+    let cachedRsp, cacheKey = "queue";
+    if(!(cachedRsp = this.cachedStatusData[cacheKey]) || cachedRsp.time < now - FAUCETSTATUS_CACHE_TIME) {
+      cachedRsp = this.cachedStatusData[cacheKey] = {
+        time: now,
+        data: buildQueueStatus(),
+      };
+    }
+    return cachedRsp.data;
+  }
+
+  public async onGetFaucetStatus(): Promise<any> {
+    let now = Math.floor(new Date().getTime() / 1000);
+    let cachedRsp, cacheKey = "faucet";
+    if(!(cachedRsp = this.cachedStatusData[cacheKey]) || cachedRsp.time < now - FAUCETSTATUS_CACHE_TIME) {
+      cachedRsp = this.cachedStatusData[cacheKey] = {
+        time: now,
+        data: Object.assign(
+          await buildFaucetStatus(),
+          buildQueueStatus(),
+          buildSessionStatus()
+        ),
+      };
+    }
+    return cachedRsp.data;  
   }
 
 

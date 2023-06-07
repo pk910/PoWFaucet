@@ -230,10 +230,6 @@ modules:
     #powShareReward: 12500000000000000  # 0.0125
     powShareReward:   2000000000000000  # 0.002 ETH
 
-    # minimum balance to payout (in wei)
-    #powMinAmount: 100000000000000000  # 0.1 ETH
-    powMinAmount:   25000000000000000  # 0.025 ETH
-
     # penalty for not responding to a verification request (percent of powShareReward)
     # shouldn't be too high as this can happen regularily in case of connection loss or so
     verifyMinerMissPenaltyPerc: 10  # 10% of powShareReward
@@ -298,7 +294,7 @@ modules:
       difficulty: 11
 
     # number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)
-    #powNonceCount: 1
+    powNonceCount: 1
 
     # Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
     # As that can lead to a huge verification workload on the server, this faucet can redistribute shares back to other miners for verification.

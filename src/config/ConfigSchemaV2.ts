@@ -1,6 +1,6 @@
 
 import { IBaseModuleConfig } from '../modules/BaseModule';
-import { FaucetCoinType } from '../services/EthWalletManager';
+import { FaucetCoinType } from '../eth/EthWalletManager';
 import { IFaucetStatsConfig } from '../services/FaucetStatsLog';
 import { IFaucetResultSharingConfig } from './ConfigShared';
 

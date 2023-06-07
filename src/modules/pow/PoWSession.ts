@@ -28,6 +28,14 @@ export class PoWSession {
     this.session.setSessionData("pow.lastNonce", value);
   }
 
+  public get shareCount(): number {
+    return this.session.getSessionData("pow.shareCount") || 0;
+  }
+
+  public set shareCount(value: number) {
+    this.session.setSessionData("pow.shareCount", value);
+  }
+
   public get missedVerifications(): number {
     return this.session.getSessionModuleRef("pow.missedVfy") || 0;
   }

@@ -1,0 +1,226 @@
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.faucet-wrapper {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+}
+
+.faucet-container {
+  padding: 8px;
+  margin: 8px;
+  background-color: white;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+  transition: 0.3s;
+}
+
+.faucet-loading .loading-spinner {
+  padding: 16px 0;
+}
+
+.faucet-loading .loading-spinner .spinner {
+  height: 30px;
+  margin: 0 16px;
+}
+
+.faucet-page .faucet-notifications {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+}
+
+.faucet-page .faucet-notifications .faucet-notification .alert {
+  padding: 8px;
+  min-width: 300px;
+}
+
+.faucet-page .faucet-footer {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  padding: 4px;
+  font-size: 12px;
+  color: #343a40;
+  pointer-events: none;
+}
+
+
+
+.faucet-page .faucet-frontimage {
+  text-align: center;
+}
+
+.faucet-page .faucet-frontimage .image {
+  max-width: 100%;
+}
+
+.faucet-page .faucet-image {
+  margin: 8px 8px 8px 8px;
+}
+ 
+@media screen and (max-height:700px) {
+  .faucet-page .faucet-image {
+    display:none;
+  }
+}
+
+
+.faucet-page {
+  min-width: 440px;
+}
+
+.faucet-page .page-mining, .faucet-page .page-frontpage {
+  width: 440px;
+}
+
+.faucet-page .page-claim, .faucet-page .page-details {
+  width: 600px;
+}
+
+
+.faucet-page .faucet-inputs {
+  margin: 24px 8px 0 8px;
+}
+
+.faucet-page .faucet-actions {
+  margin: 8px 0;
+}
+
+.faucet-page .faucet-actions button {
+  width: 100%;
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.faucet-page .faucet-actions button.start-action {
+  background-color: #4CAF50;
+}
+
+.faucet-page .faucet-actions button.stop-action {
+  background-color: #af4c4c;
+}
+
+.faucet-page .faucet-actions button:disabled {
+  background-color: gray;
+  color: #ccc;
+  cursor: wait;
+}
+
+.faucet-page .faucet-captcha {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.faucet-page .faucet-captcha > div {
+  display: inline-block;
+}
+
+.faucet-page .faucet-title {
+  position: relative;
+}
+
+.faucet-page .faucet-title .faucet-status-link {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 50px;
+  height: 50px;
+}
+
+.faucet-page .pow-header {
+  position: relative;
+}
+
+
+.faucet-page .txhash {
+  font-size: 9pt;
+  margin: 0 4px;
+}
+
+.faucet-page .action-btn {
+  width: 100%;
+}
+
+.faucet-page .pow-status {
+  height: 100%;
+  background-color: white;
+  border: 1px solid darkgray;
+  padding: 8px;
+}
+
+.faucet-page .pow-status .pow-status-top .status-title {
+  text-align: center;
+}
+
+.faucet-page .pow-status .pow-status-top .status-value {
+  text-align: center;
+  font-size: 28px;
+}
+
+.faucet-page .pow-status .pow-status-spacer {
+  height: 16px;
+}
+
+.faucet-page .pow-status .pow-status-other {
+  margin-top: 4px;
+}
+
+.faucet-page .pow-status .pow-worker-controls button {
+  width: 27px;
+  margin-right: 6px;
+  border-radius: 15px;
+  height: 20px;
+  padding: 0;
+}
+
+.faucet-page .pow-status .pow-passport-controls button {
+  width: 75px;
+  margin-right: 6px;
+  border-radius: 15px;
+  height: 20px;
+  padding: 0;
+}
+
+.spinner-alert .spinner-text {
+  vertical-align: top;
+  margin-left: 12px;
+}
+
+.faucet-page .faucet-status {
+  max-width: none;
+}
+
+.faucet-page .faucet-status .status-panel {
+  margin-bottom: 8px;
+}
+
+.faucet-page .faucet-status .ipaddr-icon {
+  margin-right: 8px;
+}
+
+.faucet-page .faucet-description {
+  font-size: 11pt;
+  color: #343a40;
+  margin-top: 16px;
+}
+
+.faucet-page .faucet-description .pow-info {
+  margin-top: 8px;
+}
+
+.modal-dialog.modal-700px {
+  max-width: 700px;
+}

@@ -1,6 +1,6 @@
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
 import { ServiceManager } from "../common/ServiceManager";
-import { FaucetStoreDB } from "../services/FaucetStoreDB";
+import { FaucetDatabase } from "../db/FaucetDatabase";
 import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from "./FaucetSession";
 
 export class SessionManager {
@@ -12,10 +12,8 @@ export class SessionManager {
       return;
     this.initialized = true;
 
-    let storedSessions = ServiceManager.GetService(FaucetStoreDB).getSessions([
+    let storedSessions = ServiceManager.GetService(FaucetDatabase).getSessions([
       FaucetSessionStatus.RUNNING,
-      FaucetSessionStatus.CLAIMABLE,
-      FaucetSessionStatus.CLAIMING,
     ]);
     if(storedSessions.length > 0) {
       await Promise.all(storedSessions.map((storedSession) => {
@@ -29,8 +27,6 @@ export class SessionManager {
   public notifySessionUpdate(session: FaucetSession) {
     switch(session.getSessionStatus()) {
       case FaucetSessionStatus.RUNNING:
-      case FaucetSessionStatus.CLAIMABLE:
-      case FaucetSessionStatus.CLAIMING:
         if(!this.faucetSessions[session.getSessionId()])
           this.faucetSessions[session.getSessionId()] = session;
         break;
@@ -54,15 +50,11 @@ export class SessionManager {
   public getSessionData(sessionId: string): FaucetSessionStoreData {
     if(this.faucetSessions[sessionId])
       return this.faucetSessions[sessionId].getStoreData()
-    return ServiceManager.GetService(FaucetStoreDB).getSession(sessionId);
+    return ServiceManager.GetService(FaucetDatabase).getSession(sessionId);
   }
 
   public getActiveSessions(): FaucetSession[] {
     return Object.values(this.faucetSessions).filter((session) => session.getSessionStatus() === FaucetSessionStatus.RUNNING);
-  }
-
-  public getClaimingSessions(): FaucetSession[] {
-    return Object.values(this.faucetSessions).filter((session) => session.getSessionStatus() === FaucetSessionStatus.CLAIMING);
   }
 
   public getUnclaimedBalance(): bigint {
@@ -71,6 +63,7 @@ export class SessionManager {
       if(session.getSessionStatus() !== FaucetSessionStatus.CLAIMING)
         totalBalance += session.getDropAmount();
     });
+    totalBalance += ServiceManager.GetService(FaucetDatabase).getClaimableAmount();
     return totalBalance;
   }
 

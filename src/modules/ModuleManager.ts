@@ -8,6 +8,7 @@ export enum ModuleHookAction {
   ClientConfig,
   SessionStart,
   SessionRestore,
+  SessionInfo,
   SessionRewardFactor,
   SessionRewarded,
   SessionIpChange,
@@ -70,6 +71,10 @@ export class ModuleManager {
       this.removeModuleHooks(module);
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Disabled module: " + modName);
     }
+  }
+
+  public getModule<TModule extends BaseModule = BaseModule>(moduleName: string): TModule {
+    return this.loadedModules[moduleName] as TModule;
   }
 
   public addActionHook(module: BaseModule, action: ModuleHookAction, priority: number, name: string, hook: Function) {

@@ -1,7 +1,7 @@
 
 import { PoWWorker } from "./PoWWorker";
 import { getCryptoNight, getCryptoNightReadyPromise, CryptoNight } from "../../../libs/cryptonight_wasm";
-import { PoWHashAlgo } from "../common/IFaucetConfig";
+import { PoWHashAlgo } from "../common/FaucetConfig";
 
 (() => {
   getCryptoNightReadyPromise().then(() => {

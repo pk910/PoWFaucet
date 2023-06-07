@@ -3,10 +3,10 @@ import * as fs from 'fs';
 import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
 import { ServiceManager } from '../common/ServiceManager';
-import { ClaimTx } from './EthClaimManager';
-import { EthWalletManager } from './EthWalletManager';
+import { EthWalletManager } from '../eth/EthWalletManager';
 import { FaucetSession } from '../session/FaucetSession';
 import { SessionManager } from '../session/SessionManager';
+import { EthClaimInfo } from '../eth/EthClaimManager';
 
 export interface IFaucetStatsConfig {
   logfile: string;
@@ -91,11 +91,11 @@ export class FaucetStatsLog {
     });
   }
 
-  public addClaimStats(claim: ClaimTx) {
+  public addClaimStats(claim: EthClaimInfo) {
     this.addStatsEntry("CLAIM", {
-      to: claim.targetAddr,
+      to: claim.target,
       val: claim.amount.toString(),
-      sess: claim.sessionId,
+      sess: claim.session,
     });
   }
 

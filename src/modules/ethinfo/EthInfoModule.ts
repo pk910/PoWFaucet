@@ -1,5 +1,5 @@
 import { ServiceManager } from "../../common/ServiceManager";
-import { EthWalletManager } from "../../services/EthWalletManager";
+import { EthWalletManager } from "../../eth/EthWalletManager";
 import { FaucetSession } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";

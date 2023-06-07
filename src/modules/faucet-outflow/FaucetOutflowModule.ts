@@ -1,7 +1,7 @@
 
 import { clearInterval } from "timers";
 import { ServiceManager } from "../../common/ServiceManager";
-import { FaucetStoreDB } from "../../services/FaucetStoreDB";
+import { FaucetDatabase } from "../../db/FaucetDatabase";
 import { BaseModule } from "../BaseModule";
 import { IFaucetOutflowConfig } from "./FaucetOutflowConfig";
 import { ModuleHookAction } from "../ModuleManager";
@@ -51,7 +51,7 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
   }
 
   private loadOutflowState() {
-    let stateJson = ServiceManager.GetService(FaucetStoreDB).getKeyValueEntry("PoWOutflowLimiter.state");
+    let stateJson = ServiceManager.GetService(FaucetDatabase).getKeyValueEntry("PoWOutflowLimiter.state");
     if(stateJson) {
       let stateObj = JSON.parse(stateJson);
       this.outflowState = {
@@ -69,13 +69,13 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
 
   public saveOutflowState() {
     if(this.outflowState) {
-      ServiceManager.GetService(FaucetStoreDB).setKeyValueEntry("PoWOutflowLimiter.state", JSON.stringify({
+      ServiceManager.GetService(FaucetDatabase).setKeyValueEntry("PoWOutflowLimiter.state", JSON.stringify({
         trackTime: this.outflowState.trackTime,
         dustAmount: this.outflowState.dustAmount.toString(),
       }));
     }
     else
-      ServiceManager.GetService(FaucetStoreDB).deleteKeyValueEntry("PoWOutflowLimiter.state");
+      ServiceManager.GetService(FaucetDatabase).deleteKeyValueEntry("PoWOutflowLimiter.state");
   }
 
   private updateState(minedAmount: bigint) {
@@ -123,7 +123,7 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
       return 100;
 
     let lowerLimit = BigInt(this.moduleConfig.lowerLimit);
-    let remainingAmount = lowerLimit - outflowBalance;
+    let remainingAmount = outflowBalance < lowerLimit ? 0n : lowerLimit - outflowBalance;
 
     return Number(10000n * remainingAmount / lowerLimit) / 100;
   }

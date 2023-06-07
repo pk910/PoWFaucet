@@ -1,4 +1,4 @@
-
+import * as crypto from "crypto";
 import { ServiceManager } from "../../common/ServiceManager";
 import { FaucetSession, FaucetSessionStatus } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
@@ -18,12 +18,20 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
   protected override startModule(): void {
     // register websocket endpoint (/pow)
-    ServiceManager.GetService(FaucetHttpServer).addWssEndpoint("pow", /^\/pow($|\?)/, (req, ws, ip) => this.processPoWClientWebSocket(req, ws, ip));
+    ServiceManager.GetService(FaucetHttpServer).addWssEndpoint("pow", /^\/ws\/pow($|\?)/, (req, ws, ip) => this.processPoWClientWebSocket(req, ws, ip));
 
     // start validator
     this.validator = new PoWValidator(this);
 
     // register faucet action hooks
+    this.moduleManager.addActionHook(
+      this, ModuleHookAction.ClientConfig, 1, "mining config", 
+      async (clientConfig: any) => this.processClientConfig(clientConfig)
+    );
+    this.moduleManager.addActionHook(
+      this, ModuleHookAction.SessionInfo, 1, "mining state", 
+      async (session: FaucetSession, moduleState: any) => this.processSessionInfo(session, moduleState)
+    );
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionStart, 10, "mining session",
       (session: FaucetSession, userInputs: any, responseData: any) => this.processSessionStart(session, responseData)
@@ -45,32 +53,120 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     
   }
 
+  private processClientConfig(clientConfig: any) {
+    let powParams;
+    switch(this.moduleConfig.powHashAlgo) {
+      case PoWHashAlgo.SCRYPT:
+        powParams = {
+          a: PoWHashAlgo.SCRYPT,
+          n: this.moduleConfig.powScryptParams.cpuAndMemory,
+          r: this.moduleConfig.powScryptParams.blockSize,
+          p: this.moduleConfig.powScryptParams.parallelization,
+          l: this.moduleConfig.powScryptParams.keyLength,
+          d: this.moduleConfig.powScryptParams.difficulty,
+        };
+        break;
+      case PoWHashAlgo.CRYPTONIGHT:
+        powParams = {
+          a: PoWHashAlgo.CRYPTONIGHT,
+          c: this.moduleConfig.powCryptoNightParams.algo,
+          v: this.moduleConfig.powCryptoNightParams.variant,
+          h: this.moduleConfig.powCryptoNightParams.height,
+          d: this.moduleConfig.powCryptoNightParams.difficulty,
+        };
+        break;
+      case PoWHashAlgo.ARGON2:
+        powParams = {
+          a: PoWHashAlgo.ARGON2,
+          t: this.moduleConfig.powArgon2Params.type,
+          v: this.moduleConfig.powArgon2Params.version,
+          i: this.moduleConfig.powArgon2Params.timeCost,
+          m: this.moduleConfig.powArgon2Params.memoryCost,
+          p: this.moduleConfig.powArgon2Params.parallelization,
+          l: this.moduleConfig.powArgon2Params.keyLength,
+          d: this.moduleConfig.powArgon2Params.difficulty,
+        };
+        break;
+    }
+
+    clientConfig[this.moduleName] = {
+      powTimeout: this.moduleConfig.powSessionTimeout,
+      powParams: powParams,
+      powNonceCount: this.moduleConfig.powNonceCount,
+      powHashrateLimit: this.moduleConfig.powHashrateSoftLimit,
+    };
+  }
+
+  private async processSessionInfo(session: FaucetSession, moduleState: any): Promise<void> {
+    if(session.getSessionStatus() !== FaucetSessionStatus.RUNNING)
+      return;
+    let powSession = this.getPoWSession(session);
+    moduleState[this.moduleName] = {
+      lastNonce: powSession.lastNonce,
+      preImage: powSession.preImage,
+      shareCount: powSession.shareCount,
+    }
+  }
+
   private async processSessionStart(session: FaucetSession, responseData: any): Promise<void> {
     session.addBlockingTask(this.moduleName, "mining", this.moduleConfig.powSessionTimeout); // this prevents the session from progressing to claimable before this module allows it
+    session.setDropAmount(0n);
 
     // start mining session
+    let powSession = this.getPoWSession(session);
+    powSession.preImage = crypto.randomBytes(8).toString('base64')
   }
 
   private async processSessionComplete(session: FaucetSession): Promise<void> {
-    let powSession = this.getPoWSession(session);
-    powSession.activeClient?.killClient("session closed");
+    setTimeout(() => {
+      let powSession = this.getPoWSession(session);
+      powSession.activeClient?.killClient("session closed");
+    }, 500);
   }
 
   public async processPoWSessionClose(session: FaucetSession): Promise<void> {
     session.resolveBlockingTask(this.moduleName, "mining");
-
+    await session.tryProceedSession();
   }
 
   private processPoWClientWebSocket(req: IncomingMessage, ws: WebSocket, remoteIp: string) {
-    let url = new URL(req.url);
-    let sessionId = url.searchParams.get("session");
+    let sessionId: string;
+    try {
+      let urlParts = req.url.split("?");
+      let url = new URLSearchParams(urlParts[1]);
+      sessionId = url.get("session");
+    } catch(ex) {
+      ws.send(JSON.stringify({
+        action: "error",
+        data: {
+          code: "INVALID_SESSION",
+          message: "session id missing"
+        }
+      }));
+      ws.close();
+      return;
+    }
     if(!sessionId) {
-      ws.close(1, "session id missing");
+      ws.send(JSON.stringify({
+        action: "error",
+        data: {
+          code: "INVALID_SESSION",
+          message: "session id missing"
+        }
+      }));
+      ws.close();
       return;
     }
     let session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]);
     if(!session) {
-      ws.close(1, "session not found");
+      ws.send(JSON.stringify({
+        action: "error",
+        data: {
+          code: "INVALID_SESSION",
+          message: "session not found"
+        }
+      }));
+      ws.close();
       return;
     }
     session.setRemoteIP(remoteIp);
@@ -83,7 +179,6 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
     powClient = new PoWClient(this, this.getPoWSession(session), ws);
     this.powClients.push(powClient);
-
   }
 
   public disposePoWClient(client: PoWClient) {

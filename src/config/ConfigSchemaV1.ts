@@ -5,7 +5,7 @@ import { IFaucetOutflowConfig } from '../modules/faucet-outflow/FaucetOutflowCon
 import { IIPInfoRestrictionConfig } from '../modules/ipinfo/IPInfoConfig';
 import { IPassportConfig } from '../modules/passport/PassportConfig';
 import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWSCryptParams, PoWHashAlgo } from '../modules/pow/PoWConfig';
-import { FaucetCoinType } from '../services/EthWalletManager';
+import { FaucetCoinType } from '../eth/EthWalletManager';
 import { IFaucetStatsConfig } from '../services/FaucetStatsLog';
 import { IConfigSchemaV2 } from './ConfigSchemaV2';
 import { IFaucetResultSharingConfig } from './ConfigShared';
