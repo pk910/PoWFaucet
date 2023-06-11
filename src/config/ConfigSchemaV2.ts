@@ -41,6 +41,7 @@ export interface IConfigSchemaV2 {
   maxDropAmount: number;
   minDropAmount: number;
   sessionTimeout: number;
+  sessionCleanup: number;
 
   modules: {
     [moduleName: string]: IBaseModuleConfig;

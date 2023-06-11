@@ -101,6 +101,10 @@ minDropAmount: 10000000000000000 # 0.01 ETH
 # only relevant if one of the enabled protection mechanisms introduces a session delay (eg. mining)
 sessionTimeout: 43200  # 12h
 
+# session cleanup time
+# session data will be removed from the faucet DB after that time
+sessionCleanup: 2592000 # 30 days
+
 
 ### Protection mechanisms
 modules:

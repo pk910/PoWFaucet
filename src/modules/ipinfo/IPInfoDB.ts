@@ -24,12 +24,14 @@ export class IPInfoDB extends FaucetModuleDB {
   }
 
   public override cleanStore(): void {
-    this.db.prepare("DELETE FROM IPInfoCache WHERE Timeout < ?").run(this.now());
+    this.db.run("DELETE FROM IPInfoCache WHERE Timeout < ?", [this.now()]);
   }
 
   public getIPInfo(ip: string): IIPInfo {
-    let row = this.db.prepare("SELECT Json FROM IPInfoCache WHERE IP = ? AND Timeout > ?")
-      .get(ip.toLowerCase(), this.now()) as {Json: string};
+    let row = this.db.get(
+      "SELECT Json FROM IPInfoCache WHERE IP = ? AND Timeout > ?", 
+      [ip.toLowerCase(), this.now()]
+    ) as {Json: string};
     if(!row)
       return null;
     
@@ -45,12 +47,10 @@ export class IPInfoDB extends FaucetModuleDB {
     let infoJson = JSON.stringify(info);
 
     if(row) {
-      this.db.prepare("UPDATE IPInfoCache SET Json = ?, Timeout = ? WHERE IP = ?")
-        .run(infoJson, timeout, ip.toLowerCase());
+      this.db.run("UPDATE IPInfoCache SET Json = ?, Timeout = ? WHERE IP = ?", [infoJson, timeout, ip.toLowerCase()]);
     }
     else {
-      this.db.prepare("INSERT INTO IPInfoCache (IP, Json, Timeout) VALUES (?, ?, ?)")
-        .run(ip.toLowerCase(), infoJson, timeout);
+      this.db.run("INSERT INTO IPInfoCache (IP, Json, Timeout) VALUES (?, ?, ?)", [ip.toLowerCase(), infoJson, timeout]);
     }
   }
 

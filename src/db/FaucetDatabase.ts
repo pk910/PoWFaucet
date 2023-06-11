@@ -1,4 +1,4 @@
-import * as SQLite3 from 'better-sqlite3';
+import sqlite from "node-sqlite3-wasm";
 
 import { faucetConfig } from '../config/FaucetConfig';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
@@ -10,7 +10,7 @@ import { FaucetModuleDB } from './FaucetModuleDB';
 
 export class FaucetDatabase {
   private initialized: boolean;
-  private db: SQLite3.Database;
+  private db: sqlite.Database;
   private moduleDBs: {[module: string]: FaucetModuleDB} = {};
 
   public initialize() {
@@ -25,10 +25,7 @@ export class FaucetDatabase {
   }
 
   private initDatabase() {
-    this.db = new SQLite3.default(faucetConfig.faucetDBFile, {
-      //verbose: console.log
-    });
-    this.db.pragma('journal_mode = WAL');
+    this.db = new sqlite.Database(faucetConfig.faucetDBFile);
     this.upgradeSchema();
   }
 
@@ -51,43 +48,43 @@ export class FaucetDatabase {
       delete this.moduleDBs[moduleDb.getModuleName()];
   }
 
-  public getDatabase(): SQLite3.Database {
+  public getDatabase(): sqlite.Database {
     return this.db;
   }
 
   public upgradeIfNeeded(module: string, latestVersion: number, upgrade: (version: number) => number) {
     let schemaVersion: number = 0;
     
-    let res = this.db.prepare("SELECT Version FROM SchemaVersion WHERE Module = ?").get(module) as {Version: number};
+    let res = this.db.get("SELECT Version FROM SchemaVersion WHERE Module = ?", [module]) as {Version: number};
     if(res)
       schemaVersion = res.Version;
     else
-      this.db.prepare("INSERT INTO SchemaVersion (Module, Version) VALUES (?, ?)").run(module, 0);
+      this.db.run("INSERT INTO SchemaVersion (Module, Version) VALUES (?, ?)", [module, 0]);
 
     let upgradedVersion = schemaVersion;
     if(schemaVersion != latestVersion) {
       upgradedVersion = upgrade(schemaVersion);
     }
     if(upgradedVersion != schemaVersion) {
-      this.db.prepare("UPDATE SchemaVersion SET Version = ? WHERE Module = ?").run(upgradedVersion, module);
+      this.db.run("UPDATE SchemaVersion SET Version = ? WHERE Module = ?", [upgradedVersion, module]);
     }
   }
 
   private upgradeSchema() {
     let schemaVersion: number = 0;
-    this.db.prepare(`
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS "SchemaVersion" (
         "Module" TEXT NULL UNIQUE,
         "Version" INTEGER NOT NULL,
         PRIMARY KEY("Module")
       )
-    `).run();
-    let res = this.db.prepare("SELECT Version FROM SchemaVersion WHERE Module IS NULL").get() as {Version: number};
+    `);
+    let res = this.db.get("SELECT Version FROM SchemaVersion WHERE Module IS NULL") as {Version: number};
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Current FaucetStore schema version: " + (res ? res.Version : "uninitialized"));
     if(res)
       schemaVersion = res.Version;
     else
-      this.db.prepare("INSERT INTO SchemaVersion (Module, Version) VALUES (NULL, ?)").run(0);
+      this.db.run("INSERT INTO SchemaVersion (Module, Version) VALUES (NULL, ?)", [0]);
     
     let oldVersion = schemaVersion;
     switch(schemaVersion) {
@@ -128,7 +125,7 @@ export class FaucetDatabase {
     }
     if(schemaVersion !== oldVersion) {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgraded FaucetStore schema from version " + oldVersion + " to version " + schemaVersion);
-      this.db.prepare("UPDATE SchemaVersion SET Version = ? WHERE Module IS NULL").run(schemaVersion);
+      this.db.run("UPDATE SchemaVersion SET Version = ? WHERE Module IS NULL", [schemaVersion]);
     }
   }
 
@@ -139,7 +136,7 @@ export class FaucetDatabase {
 
   public cleanStore() {
     let now = this.now();
-    //this.db.prepare("DELETE FROM PassportCache WHERE Timeout < ?").run(now);
+    //this.db.run("DELETE FROM PassportCache WHERE Timeout < ?", [now]);
     //TODO: clean Sessions
 
     Object.values(this.moduleDBs).forEach((modDb) => {
@@ -148,30 +145,29 @@ export class FaucetDatabase {
   }
 
   public getKeyValueEntry(key: string): string {
-    let row = this.db.prepare("SELECT Value FROM KeyValueStore WHERE Key = ?")
-      .get(key) as {Value: string};
+    let row = this.db.get("SELECT Value FROM KeyValueStore WHERE Key = ?", [key]) as {Value: string};
     return row?.Value;
   }
 
   public setKeyValueEntry(key: string, value: string) {
-    let row = this.db.prepare("SELECT Key FROM KeyValueStore WHERE Key = ?").get(key);
+    let row = this.db.get("SELECT Key FROM KeyValueStore WHERE Key = ?", [key]);
     if(row) {
-      this.db.prepare("UPDATE KeyValueStore SET Value = ? WHERE Key = ?")
-        .run(value, key);
+      this.db.run("UPDATE KeyValueStore SET Value = ? WHERE Key = ?", [value, key]);
     }
     else {
-      this.db.prepare("INSERT INTO KeyValueStore (Key, Value) VALUES (?, ?)")
-        .run(key, value);
+      this.db.run("INSERT INTO KeyValueStore (Key, Value) VALUES (?, ?)", [key, value]);
     }
   }
 
   public deleteKeyValueEntry(key: string) {
-    this.db.prepare("DELETE FROM KeyValueStore WHERE Key = ?").run(key);
+    this.db.run("DELETE FROM KeyValueStore WHERE Key = ?", [key]);
   }
 
   public getSessions(states: FaucetSessionStatus[]): FaucetSessionStoreData[] {
-    let query = this.db.prepare("SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData FROM Sessions WHERE Status IN (" + states.map(() => "?").join(",") + ")");
-    let rows = query.all.apply(query, states) as {
+    let rows = this.db.all(
+      "SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData FROM Sessions WHERE Status IN (" + states.map(() => "?").join(",") + ")",
+      states
+    ) as {
       SessionId: string;
       Status: string;
       StartTime: number;
@@ -204,8 +200,10 @@ export class FaucetDatabase {
   public getAllSessions(timeLimit: number): FaucetSessionStoreData[] {
     let now = Math.floor(new Date().getTime() / 1000);
 
-    let query = this.db.prepare("SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData FROM Sessions WHERE Status NOT IN ('finished', 'failed') OR StartTime > ?");
-    let rows = query.all(now - timeLimit) as {
+    let rows = this.db.all(
+      "SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData FROM Sessions WHERE Status NOT IN ('finished', 'failed') OR StartTime > ?",
+      [now - timeLimit]
+    ) as {
       SessionId: string;
       Status: string;
       StartTime: number;
@@ -236,8 +234,7 @@ export class FaucetDatabase {
   }
 
   public getSession(sessionId: string): FaucetSessionStoreData {
-    let query = this.db.prepare("SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData FROM Sessions WHERE SessionId = ?");
-    let row = query.get(sessionId) as {
+    let row = this.db.get("SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData FROM Sessions WHERE SessionId = ?", [sessionId]) as {
       SessionId: string;
       Status: string;
       StartTime: number;
@@ -266,16 +263,19 @@ export class FaucetDatabase {
   }
 
   public updateSession(sessionData: FaucetSessionStoreData) {
-    this.db.prepare("INSERT OR REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData) VALUES (?,?,?,?,?,?,?,?,?)").run(
-      sessionData.sessionId,
-      sessionData.status,
-      sessionData.startTime,
-      sessionData.targetAddr,
-      sessionData.dropAmount,
-      sessionData.remoteIP,
-      JSON.stringify(sessionData.tasks),
-      JSON.stringify(sessionData.data),
-      sessionData.claim ? JSON.stringify(sessionData.claim) : null
+    this.db.run(
+      "INSERT OR REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData) VALUES (?,?,?,?,?,?,?,?,?)",
+      [
+        sessionData.sessionId,
+        sessionData.status,
+        sessionData.startTime,
+        sessionData.targetAddr,
+        sessionData.dropAmount,
+        sessionData.remoteIP,
+        JSON.stringify(sessionData.tasks),
+        JSON.stringify(sessionData.data),
+        sessionData.claim ? JSON.stringify(sessionData.claim) : null,
+      ]
     );
   }
 
@@ -292,16 +292,15 @@ export class FaucetDatabase {
         status = FaucetSessionStatus.CLAIMING;
         break;
     }
-    this.db.prepare("UPDATE Sessions SET Status = ?, ClaimData = ? WHERE Status = 'claiming' AND SessionId = ?").run(
+    this.db.run("UPDATE Sessions SET Status = ?, ClaimData = ? WHERE Status = 'claiming' AND SessionId = ?", [
       status,
       JSON.stringify(claimData),
       sessionId
-    );
+    ]);
   }
 
   public getClaimableAmount(): bigint {
-    let query = this.db.prepare("SELECT SUM(DropAmount) AS TotalAmount FROM Sessions WHERE Status = 'claimable'");
-    let row = query.get() as {
+    let row = this.db.get("SELECT SUM(DropAmount) AS TotalAmount FROM Sessions WHERE Status = 'claimable'") as {
       TotalAmount: string;
     };
     if(!row || !row.TotalAmount)

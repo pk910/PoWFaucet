@@ -1,4 +1,4 @@
-import * as SQLite3 from 'better-sqlite3';
+import sqlite from "node-sqlite3-wasm";
 
 import { BaseModule } from "../modules/BaseModule";
 import { FaucetDatabase } from "./FaucetDatabase";
@@ -21,7 +21,7 @@ export abstract class FaucetModuleDB {
     return this.module.getModuleName();
   }
 
-  protected get db(): SQLite3.Database {
+  protected get db(): sqlite.Database {
     return this.faucetStore.getDatabase();
   }
 

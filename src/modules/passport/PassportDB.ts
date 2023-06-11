@@ -35,13 +35,15 @@ export class PassportDB extends FaucetModuleDB {
 
   public override cleanStore(): void {
     let now = this.now();
-    this.db.prepare("DELETE FROM PassportCache WHERE Timeout < ?").run(now);
-    this.db.prepare("DELETE FROM PassportStamps WHERE Timeout < ?").run(now);
+    this.db.run("DELETE FROM PassportCache WHERE Timeout < ?", [now]);
+    this.db.run("DELETE FROM PassportStamps WHERE Timeout < ?", [now]);
   }
 
   public getPassportInfo(addr: string): IPassportInfo {
-    let row = this.db.prepare("SELECT Json FROM PassportCache WHERE Address = ? AND Timeout > ?")
-      .get(addr.toLowerCase(), this.now()) as {Json: string};
+    let row = this.db.get(
+      "SELECT Json FROM PassportCache WHERE Address = ? AND Timeout > ?", 
+      [addr.toLowerCase(), this.now()]
+    ) as {Json: string};
     if(!row)
       return null;
     
@@ -50,24 +52,30 @@ export class PassportDB extends FaucetModuleDB {
 
   public setPassportInfo(addr: string, info: IPassportInfo, duration?: number) {
     let now = this.now();
-    let row = this.db.prepare("SELECT Timeout FROM PassportCache WHERE Address = ?")
-      .get(addr.toLowerCase());
+    let row = this.db.get(
+      "SELECT Timeout FROM PassportCache WHERE Address = ?",
+      addr.toLowerCase()
+    );
     
     let timeout = now + (typeof duration === "number" ? duration : 86400);
     let infoJson = JSON.stringify(info);
 
     if(row) {
-      this.db.prepare("UPDATE PassportCache SET Json = ?, Timeout = ? WHERE Address = ?")
-        .run(infoJson, timeout, addr.toLowerCase());
+      this.db.run(
+        "UPDATE PassportCache SET Json = ?, Timeout = ? WHERE Address = ?", 
+        [infoJson, timeout, addr.toLowerCase()]
+      );
     }
     else {
-      this.db.prepare("INSERT INTO PassportCache (Address, Json, Timeout) VALUES (?, ?, ?)")
-        .run(addr.toLowerCase(), infoJson, timeout);
+      this.db.run(
+        "INSERT INTO PassportCache (Address, Json, Timeout) VALUES (?, ?, ?)",
+        [addr.toLowerCase(), infoJson, timeout]
+      );
     }
   }
   
   public getPassportStamps(stampHashs: string[]): {[hash: string]: string} {
-    let query = this.db.prepare("SELECT StampHash, Address FROM PassportStamps WHERE StampHash IN (" + stampHashs.map(() => "?").join(",") + ") AND Timeout > ?");
+    let sql = "SELECT StampHash, Address FROM PassportStamps WHERE StampHash IN (" + stampHashs.map(() => "?").join(",") + ") AND Timeout > ?";
     let args: any[] = [];
     let stamps: {[hash: string]: string} = {};
     stampHashs.forEach((stampHash) => {
@@ -76,7 +84,7 @@ export class PassportDB extends FaucetModuleDB {
     });
     args.push(this.now());
 
-    (query.all.apply(query, args) as {StampHash: string, Address: string}[]).forEach((row) => {
+    (this.db.all(sql, args) as {StampHash: string, Address: string}[]).forEach((row) => {
       stamps[row.StampHash] = row.Address;
     });
 
@@ -98,8 +106,10 @@ export class PassportDB extends FaucetModuleDB {
       return "(?,?,?)";
     }).join(",");
     
-    let query = this.db.prepare("INSERT OR REPLACE INTO PassportStamps (StampHash, Address, Timeout) VALUES " + queryRows);
-    query.run.apply(query, queryArgs);
+    let query = this.db.run(
+      "INSERT OR REPLACE INTO PassportStamps (StampHash, Address, Timeout) VALUES " + queryRows,
+      queryArgs
+    );
   }
 
 }
