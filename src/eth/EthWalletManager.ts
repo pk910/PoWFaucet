@@ -58,7 +58,7 @@ export class EthWalletManager {
   private lastWalletRefresh: number;
   private txReceiptPollInterval = 30000;
 
-  public initialize() {
+  public async initialize(): Promise<void> {
     if(this.initialized)
       return;
     this.initialized = true;
@@ -77,7 +77,7 @@ export class EthWalletManager {
     this.walletKey = Buffer.from(faucetConfig.ethWalletKey, "hex");
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
 
-    this.loadWalletState();
+    await this.loadWalletState();
 
     // reload handler
     ServiceManager.GetService(FaucetProcess).addListener("reload", () => {

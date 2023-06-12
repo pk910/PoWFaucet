@@ -1,6 +1,5 @@
-import sqlite from "node-sqlite3-wasm";
-
 import { BaseModule } from "../modules/BaseModule";
+import { BaseDriver } from "./driver/BaseDriver";
 import { FaucetDatabase } from "./FaucetDatabase";
 
 export abstract class FaucetModuleDB {
@@ -21,7 +20,7 @@ export abstract class FaucetModuleDB {
     return this.module.getModuleName();
   }
 
-  protected get db(): sqlite.Database {
+  protected get db(): BaseDriver {
     return this.faucetStore.getDatabase();
   }
 
@@ -29,12 +28,12 @@ export abstract class FaucetModuleDB {
     return Math.floor((new Date()).getTime() / 1000);
   }
 
-  public initSchema() {
-    this.faucetStore.upgradeIfNeeded(this.getModuleName(), this.latestSchemaVersion, (version) => this.upgradeSchema(version));
+  public async initSchema(): Promise<void> {
+    await this.faucetStore.upgradeIfNeeded(this.getModuleName(), this.latestSchemaVersion, (version) => this.upgradeSchema(version));
   }
-  protected abstract upgradeSchema(version: number): number;
+  protected abstract upgradeSchema(version: number): Promise<number>;
 
-  public cleanStore() {
+  public async cleanStore(): Promise<void> {
   }
 
 }

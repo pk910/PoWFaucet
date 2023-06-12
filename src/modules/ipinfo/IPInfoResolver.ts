@@ -39,8 +39,8 @@ export class IPInfoResolver {
     this.ipInfoApi = api;
   }
 
-  public getIpInfo(ipAddr: string): Promise<IIPInfo> {
-    let cachedIpInfo = this.ipInfoDb.getIPInfo(ipAddr);
+  public async getIpInfo(ipAddr: string): Promise<IIPInfo> {
+    let cachedIpInfo = await this.ipInfoDb.getIPInfo(ipAddr);
     if(cachedIpInfo)
       return Promise.resolve(cachedIpInfo);
     if(this.ipInfoCache.hasOwnProperty(ipAddr))
@@ -84,7 +84,7 @@ export class IPInfoResolver {
       Math.floor((new Date()).getTime() / 1000),
       promise,
     ];
-    return promise;
+    return await promise;
   }
 
   private cleanIpInfoCache() {

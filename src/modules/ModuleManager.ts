@@ -30,15 +30,15 @@ export class ModuleManager {
   private loadedModules: {[module: string]: BaseModule} = {};
   private moduleHooks: {[action in ModuleHookAction]?: ModuleHookRegistration[]};
 
-  public initialize() {
+  public initialize(): Promise<void> {
     if(this.initialized)
       throw "already initialized";
     this.initialized = true;
     this.moduleHooks = {};
-    this.loadModules();
+    return this.loadModules();
   }
 
-  private loadModules() {
+  private async loadModules(): Promise<void> {
     let loadedDict = Object.assign({}, this.loadedModules);
     for(let modName in faucetConfig.modules) {
       if(!faucetConfig.modules.hasOwnProperty(modName))
@@ -60,13 +60,13 @@ export class ModuleManager {
       }
       module.setModuleConfig(faucetConfig.modules[modName]);
       if(!module.isEnabled()) {
-        module.enableModule();
+        await module.enableModule();
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Enabled module: " + modName);
       }
     }
     for(let modName in loadedDict) {
       let module = loadedDict[modName];
-      module.disableModule();
+      await module.disableModule();
       delete this.loadedModules[modName];
       this.removeModuleHooks(module);
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Disabled module: " + modName);

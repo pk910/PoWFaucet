@@ -19,18 +19,18 @@ export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModule
     return this.moduleName;
   }
 
-  public enableModule(): void {
+  public enableModule(): Promise<void> {
     if(this.enabled)
-      throw "cannot enable module '" + this.moduleName + "': already enabled";
+      return Promise.reject("cannot enable module '" + this.moduleName + "': already enabled");
     this.enabled = true;
-    this.startModule();
+    return this.startModule();
   }
   
-  public disableModule(): void {
+  public disableModule(): Promise<void> {
     if(this.enabled)
-      throw "cannot disable module '" + this.moduleName + "': not enabled";
+      return Promise.reject("cannot disable module '" + this.moduleName + "': not enabled");
     this.enabled = false;
-    this.stopModule();
+    return this.stopModule();
   }
 
   public getModuleConfig(): TModCfg {
@@ -47,7 +47,7 @@ export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModule
     return this.enabled;
   }
 
-  protected abstract startModule(): void;
-  protected abstract stopModule(): void;
+  protected abstract startModule(): Promise<void>;
+  protected abstract stopModule(): Promise<void>;
   protected onConfigReload(): void {};
 }

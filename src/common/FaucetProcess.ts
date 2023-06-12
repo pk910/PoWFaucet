@@ -67,10 +67,11 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
     });
   }
 
-  private shutdown(code: number) {
+  private async shutdown(code: number) {
     try {
-      ServiceManager.GetService(SessionManager).saveAllSessions();
-      ServiceManager.GetService(FaucetDatabase).closeDatabase();
+      setTimeout(() => process.exit(code), 10 * 1000);
+      await ServiceManager.GetService(SessionManager).saveAllSessions();
+      await ServiceManager.GetService(FaucetDatabase).closeDatabase();
     } catch(ex) {}
     process.exit(code);
   }

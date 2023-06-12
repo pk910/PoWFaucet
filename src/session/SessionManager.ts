@@ -12,7 +12,7 @@ export class SessionManager {
       return;
     this.initialized = true;
 
-    let storedSessions = ServiceManager.GetService(FaucetDatabase).getSessions([
+    let storedSessions = await ServiceManager.GetService(FaucetDatabase).getSessions([
       FaucetSessionStatus.RUNNING,
     ]);
     if(storedSessions.length > 0) {
@@ -47,23 +47,23 @@ export class SessionManager {
     return undefined;
   }
 
-  public getSessionData(sessionId: string): FaucetSessionStoreData {
+  public async getSessionData(sessionId: string): Promise<FaucetSessionStoreData> {
     if(this.faucetSessions[sessionId])
       return this.faucetSessions[sessionId].getStoreData()
-    return ServiceManager.GetService(FaucetDatabase).getSession(sessionId);
+    return await ServiceManager.GetService(FaucetDatabase).getSession(sessionId);
   }
 
   public getActiveSessions(): FaucetSession[] {
     return Object.values(this.faucetSessions).filter((session) => session.getSessionStatus() === FaucetSessionStatus.RUNNING);
   }
 
-  public getUnclaimedBalance(): bigint {
+  public async getUnclaimedBalance(): Promise<bigint> {
     let totalBalance = 0n;
     Object.values(this.faucetSessions).forEach((session) => {
       if(session.getSessionStatus() !== FaucetSessionStatus.CLAIMING)
         totalBalance += session.getDropAmount();
     });
-    totalBalance += ServiceManager.GetService(FaucetDatabase).getClaimableAmount();
+    totalBalance += await ServiceManager.GetService(FaucetDatabase).getClaimableAmount();
     return totalBalance;
   }
 
@@ -73,10 +73,8 @@ export class SessionManager {
     return session;
   }
 
-  public saveAllSessions() {
-    Object.values(this.faucetSessions).forEach((session) => {
-      session.saveSession();
-    });
+  public saveAllSessions(): Promise<void> {
+    return Promise.all(Object.values(this.faucetSessions).map((session) => session.saveSession())).then();
   }
 
 

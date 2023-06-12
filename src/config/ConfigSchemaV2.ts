@@ -3,6 +3,7 @@ import { IBaseModuleConfig } from '../modules/BaseModule';
 import { FaucetCoinType } from '../eth/EthWalletManager';
 import { IFaucetStatsConfig } from '../services/FaucetStatsLog';
 import { IFaucetResultSharingConfig } from './ConfigShared';
+import { FaucetDatabaseOptions } from '../db/FaucetDatabase';
 
 export interface IConfigSchemaV2 {
   version?: 2;
@@ -14,7 +15,7 @@ export interface IConfigSchemaV2 {
 
   buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
   buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
-  faucetDBFile: string;
+  database: FaucetDatabaseOptions;
 
   faucetTitle: string; // title of the faucet
   faucetImage: string; // faucet image displayed on the startpage

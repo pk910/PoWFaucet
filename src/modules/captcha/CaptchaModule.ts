@@ -10,7 +10,7 @@ import { FaucetError } from '../../common/FaucetError';
 
 export class CaptchaModule extends BaseModule<ICaptchaConfig> {
 
-  protected override startModule(): void {
+  protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(
       this, ModuleHookAction.ClientConfig, 1, "captcha config", 
       async (clientConfig: any) => {
@@ -30,10 +30,12 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
       this, ModuleHookAction.SessionClaim, 1, "captcha check", 
       async (sessionData: FaucetSessionStoreData, userInput: any) => this.processSessionClaim(sessionData, userInput)
     );
+    return Promise.resolve();
   }
 
-  protected override stopModule(): void {
+  protected override stopModule(): Promise<void> {
     // nothing to do
+    return Promise.resolve();
   }
   
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {

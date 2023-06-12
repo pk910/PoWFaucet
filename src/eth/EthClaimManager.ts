@@ -68,16 +68,17 @@ export class EthClaimManager {
   private lastConfirmedClaimTxIdx: number = 0;
   private lastClaimNotification: IEthClaimNotificationData;
 
-  public initialize() {
+  public async initialize(): Promise<void> {
     if(this.initialized)
       return;
     this.initialized = true;
 
     // restore saved claimTx queue
     let maxQueueIdx = 0;
-    ServiceManager.GetService(FaucetDatabase).getSessions([
+    let storedSession = await  ServiceManager.GetService(FaucetDatabase).getSessions([
       FaucetSessionStatus.CLAIMING,
-    ]).forEach((sessionData) => {
+    ]);
+    storedSession.forEach((sessionData) => {
       let claimInfo: EthClaimInfo = {
         session: sessionData.sessionId,
         target: sessionData.targetAddr,
@@ -113,7 +114,7 @@ export class EthClaimManager {
     setInterval(() => this.processQueue(), 2000);
   }
 
-  private processClaimNotificationWebSocket(req: IncomingMessage, ws: WebSocket, remoteIp: string) {
+  private async processClaimNotificationWebSocket(req: IncomingMessage, ws: WebSocket, remoteIp: string) {
     let sessionId: string;
     try {
       let urlParts = req.url.split("?");
@@ -131,7 +132,7 @@ export class EthClaimManager {
     }
 
     let sessionInfo: FaucetSessionStoreData
-    if(!sessionId || !(sessionInfo = ServiceManager.GetService(FaucetDatabase).getSession(sessionId))) {
+    if(!sessionId || !(sessionInfo = await ServiceManager.GetService(FaucetDatabase).getSession(sessionId))) {
       ws.send(JSON.stringify({
         action: "error",
         data: {
@@ -189,6 +190,8 @@ export class EthClaimManager {
   public async createSessionClaim(sessionData: FaucetSessionStoreData, userInput: any): Promise<EthClaimInfo> {
     if(sessionData.status !== FaucetSessionStatus.CLAIMABLE)
       throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: not claimable (state: " + sessionData.status + ")");
+    if(this.claimTxDict[sessionData.sessionId])
+      throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: already claiming");
     if(BigInt(sessionData.dropAmount) < BigInt(faucetConfig.minDropAmount))
       throw new FaucetError("AMOUNT_TOO_LOW", "drop amount lower than minimum");
     if(BigInt(sessionData.dropAmount) > BigInt(faucetConfig.maxDropAmount))
@@ -211,8 +214,8 @@ export class EthClaimManager {
     }
     
     // prevent multi claim via race condition
-    if(ServiceManager.GetService(FaucetDatabase).getSession(sessionData.sessionId).status !== FaucetSessionStatus.CLAIMABLE)
-      throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: not claimable (race condition)");
+    if(this.claimTxDict[sessionData.sessionId])
+      throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: already claiming (race condition)");
     
     claimInfo.claim = {
       claimIdx: this.lastClaimTxIdx++,

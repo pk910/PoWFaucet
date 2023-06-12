@@ -86,16 +86,14 @@ export class PassportResolver {
       return this.passportCache[addr];
     
     let now = Math.floor((new Date()).getTime() / 1000);
-    let cachedPassportInfo = this.module.getPassportDb().getPassportInfo(addr);
+    let cachedPassportInfo = await this.module.getPassportDb().getPassportInfo(addr);
     let passportInfoPromise: Promise<IPassportInfo>;
 
     if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (this.module.getModuleConfig().cacheTime || 60)) {
       passportInfoPromise = Promise.resolve(cachedPassportInfo);
     }
     else {
-      passportInfoPromise = this.passportCache[addr] = this.refreshPassport(addr).then((passport) => {
-        return this.buildPassportInfo(addr, passport);
-      });
+      passportInfoPromise = this.passportCache[addr] = this.refreshPassport(addr).then((passport) => this.buildPassportInfo(addr, passport));
       passportInfoPromise.finally(() => {
         delete this.passportCache[addr];
       });
@@ -130,7 +128,7 @@ export class PassportResolver {
     
     return {
       ...verifyResult,
-      passportInfo: this.buildPassportInfo(addr, passport)
+      passportInfo: await this.buildPassportInfo(addr, passport)
     };
   }
 
@@ -286,13 +284,13 @@ export class PassportResolver {
     fs.writeFileSync(cacheFile, JSON.stringify(trimmedPassport));
   }
 
-  private buildPassportInfo(addr: string, passport: IPassport): IPassportInfo {
+  private async buildPassportInfo(addr: string, passport: IPassport): Promise<IPassportInfo> {
     let passportInfo: IPassportInfo;
     let now = Math.floor((new Date()).getTime() / 1000);
 
     if(passport) {
       let stampHashes = passport.stamps.map((stamp) => stamp.credential.credentialSubject.hash);
-      let stampAssignments = this.module.getPassportDb().getPassportStamps(stampHashes);
+      let stampAssignments = await this.module.getPassportDb().getPassportStamps(stampHashes);
       
       let newestStamp = 0;
       let stamps: IPassportStampInfo[] = [];

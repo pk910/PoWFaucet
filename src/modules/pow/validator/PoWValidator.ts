@@ -1,16 +1,11 @@
 import assert from 'node:assert';
 import { isMainThread, parentPort, Worker } from 'worker_threads';
+import { FaucetWorkers } from '../../../common/FaucetWorker';
+import { ServiceManager } from '../../../common/ServiceManager';
 import { PromiseDfd } from '../../../utils/PromiseDfd';
 import { PoWHashAlgo } from '../PoWConfig';
 import { PoWModule } from '../PoWModule';
 import { IPoWValidatorValidateRequest } from './IPoWValidator';
-
-(() => {
-  if (!isMainThread) {
-    let worker = require("./PoWValidatorWorker");
-    new worker.PoWValidatorWorker(parentPort);
-  }
-})();
 
 export class PoWValidator {
   private module: PoWModule;
@@ -21,7 +16,7 @@ export class PoWValidator {
   public constructor(module: PoWModule, worker?: Worker) {
     this.module = module;
     this.readyDfd = new PromiseDfd<void>();
-    this.worker = worker || new Worker(__filename);
+    this.worker = worker || ServiceManager.GetService(FaucetWorkers).createWorker("pow-validator");
     this.worker.on("message", (msg) => this.onWorkerMessage(msg))
   }
 

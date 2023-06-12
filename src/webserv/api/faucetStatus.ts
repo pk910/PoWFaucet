@@ -83,7 +83,7 @@ export async function buildFaucetStatus(): Promise<IClientFaucetStatus> {
   let statusRsp: IClientFaucetStatus = {
     status: {
       walletBalance: ethWalletManager.getFaucetBalance()?.toString(),
-      unclaimedBalance: sessionManager.getUnclaimedBalance().toString(),
+      unclaimedBalance: await sessionManager.getUnclaimedBalance().toString(),
       queuedBalance: ethClaimManager.getQueuedAmount().toString(),
       balanceRestriction: moduleManager.getModule<FaucetBalanceModule>("faucet-balance")?.getBalanceRestriction() || 100,
     },
@@ -99,15 +99,15 @@ export async function buildFaucetStatus(): Promise<IClientFaucetStatus> {
   return statusRsp;
 }
 
-export function buildSessionStatus(): IClientSessionsStatus {
+export async function buildSessionStatus(): Promise<IClientSessionsStatus> {
   let sessionsRsp: IClientSessionsStatus = {
     sessions: null,
   };
 
-  let sessions = ServiceManager.GetService(FaucetDatabase).getAllSessions(86400);
+  let sessions = await ServiceManager.GetService(FaucetDatabase).getAllSessions(86400);
   sessionsRsp.sessions = sessions.map((session) => {
     return {
-      id: session.sessionId,
+      id: getHashedSessionId(session.sessionId, faucetConfig.faucetSecret),
       start: session.startTime,
       target: session.targetAddr,
       ip: getHashedIp(session.remoteIP, faucetConfig.faucetSecret),

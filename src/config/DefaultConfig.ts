@@ -13,7 +13,10 @@ export function getDefaultConfig(): IConfigSchemaV2 {
 
     buildSeoIndex: true,
     buildSeoMeta: {},
-    faucetDBFile: resolveRelativePath("faucet-store.db"),
+    database: {
+      driver: "sqlite",
+      file: resolveRelativePath("faucet-store.db"),
+    },
 
     faucetTitle: "Test Faucet",
     faucetImage: "/images/fauceth_420.jpg",

@@ -244,7 +244,7 @@ export class FaucetWebApi {
     
     let userInput = JSON.parse(body.toString("utf8"));
     let sessionData: FaucetSessionStoreData;
-    if(!userInput || !userInput.session || !(sessionData = ServiceManager.GetService(SessionManager).getSessionData(userInput.session))) {
+    if(!userInput || !userInput.session || !(sessionData = await ServiceManager.GetService(SessionManager).getSessionData(userInput.session))) {
       return {
         status: FaucetSessionStatus.FAILED,
         failedCode: "INVALID_SESSION",
@@ -307,7 +307,7 @@ export class FaucetWebApi {
 
   public async onGetSessionStatus(sessionId: string, details: boolean): Promise<any> {
     let sessionData: FaucetSessionStoreData;
-    if(!sessionId || !(sessionData = ServiceManager.GetService(SessionManager).getSessionData(sessionId)))
+    if(!sessionId || !(sessionData = await ServiceManager.GetService(SessionManager).getSessionData(sessionId)))
       return new FaucetHttpResponse(404, "Session not found");
     
     return this.getSessionStatus(sessionData, details);
@@ -334,7 +334,7 @@ export class FaucetWebApi {
         data: Object.assign(
           await buildFaucetStatus(),
           buildQueueStatus(),
-          buildSessionStatus()
+          await buildSessionStatus()
         ),
       };
     }

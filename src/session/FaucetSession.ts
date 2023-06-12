@@ -81,12 +81,10 @@ export class FaucetSession {
     this.remoteIP = remoteIP;
     this.dropAmount = -1n;
 
-    console.log("session start");
     try {
       await ServiceManager.GetService(ModuleManager).processActionHooks([
         {prio: 5, hook: () => { // prio 5: get target address from userInput if not set provided by a module
           let targetAddr = this.targetAddr || userInput.addr;
-          console.log("target addr");
           if(typeof targetAddr !== "string")
             throw new FaucetError("INVALID_ADDR", "Missing target address.");
           if(!targetAddr.match(/^0x[0-9a-f]{40}$/i) || targetAddr.match(/^0x0{40}$/i))
@@ -97,9 +95,9 @@ export class FaucetSession {
       ], ModuleHookAction.SessionStart, [this, userInput, responseData]);
     } catch(ex) {
       if(ex instanceof FaucetError)
-        this.setSessionFailed(ex.getCode(), ex.message);
+        await this.setSessionFailed(ex.getCode(), ex.message);
       else
-        this.setSessionFailed("INTERNAL_ERROR", "sessionStart failed: " + ex.toString());
+        await this.setSessionFailed("INTERNAL_ERROR", "sessionStart failed: " + ex.toString());
       throw ex;
     }
 
@@ -144,7 +142,7 @@ export class FaucetSession {
     };
   }
 
-  public saveSession() {
+  public async saveSession(): Promise<void> {
     if(this.saveTimer) {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
@@ -153,7 +151,7 @@ export class FaucetSession {
       return;
     this.isDirty = false;
 
-    ServiceManager.GetService(FaucetDatabase).updateSession(this.getStoreData());
+    await ServiceManager.GetService(FaucetDatabase).updateSession(this.getStoreData());
   }
 
   private lazySaveSession() {
@@ -166,7 +164,7 @@ export class FaucetSession {
     }, 30 * 1000);
   }
 
-  public setSessionFailed(code: string, reason: string, stack?: string) {
+  public async setSessionFailed(code: string, reason: string, stack?: string): Promise<void> {
     let oldStatus = this.status;
     this.setSessionData("failed.code", code);
     this.setSessionData("failed.reason", reason);
@@ -177,7 +175,7 @@ export class FaucetSession {
     if(oldStatus === FaucetSessionStatus.RUNNING)
       ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
     try {
-      this.saveSession();
+      await this.saveSession();
     } catch(ex) {}
     this.isDisposed = true;
   }
@@ -216,7 +214,7 @@ export class FaucetSession {
 
     if(this.status === FaucetSessionStatus.CLAIMABLE) {
       if(now >= sessionTimeout) {
-        this.setSessionFailed("SESSION_TIMEOUT", "session timeout");
+        await this.setSessionFailed("SESSION_TIMEOUT", "session timeout");
       }
     }
     else if(this.status === FaucetSessionStatus.RUNNING) {
@@ -240,7 +238,7 @@ export class FaucetSession {
     }
 
     if(this.dropAmount < BigInt(faucetConfig.minDropAmount)) {
-      return this.setSessionFailed("AMOUNT_TOO_LOW", "drop amount lower than minimum");
+      return await this.setSessionFailed("AMOUNT_TOO_LOW", "drop amount lower than minimum");
     }
     
     this.status = FaucetSessionStatus.CLAIMABLE;

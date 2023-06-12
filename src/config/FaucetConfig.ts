@@ -80,7 +80,6 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   if(config) {
     if(!config.faucetSecret) config.faucetSecret = randomBytes(40).toString("hex");
     if(config.staticPath) config.staticPath = resolveRelativePath(config.staticPath);
-    if(config.faucetDBFile) config.faucetDBFile = resolveRelativePath(config.faucetDBFile);
     if(config.faucetPidFile) config.faucetPidFile = resolveRelativePath(config.faucetPidFile);
     if(config.faucetLogFile) config.faucetLogFile = resolveRelativePath(config.faucetLogFile);
     if(config.faucetStats?.logfile) config.faucetStats.logfile = resolveRelativePath(config.faucetStats.logfile);

@@ -28,8 +28,8 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   private ipInfoMatchRestrictions: [pattern: string, restriction: number | IIPInfoRestrictionConfig][];
   private ipInfoMatchRestrictionsRefresh: number;
 
-  protected override startModule(): void {
-    this.ipInfoDb = ServiceManager.GetService(FaucetDatabase).createModuleDb(IPInfoDB, this);
+  protected override async startModule(): Promise<void> {
+    this.ipInfoDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(IPInfoDB, this);
     this.ipInfoResolver = new IPInfoResolver(this.ipInfoDb, this.moduleConfig.ipInfoApi);
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionStart, 6, "IP Info check", 
@@ -45,8 +45,9 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     );
   }
 
-  protected override stopModule(): void {
+  protected override stopModule(): Promise<void> {
     this.ipInfoDb.dispose();
+    return Promise.resolve();
   }
 
   protected override onConfigReload(): void {

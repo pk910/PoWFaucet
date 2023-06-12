@@ -18,9 +18,9 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
   private saveTimer: NodeJS.Timer;
   
 
-  protected override startModule(): void {
+  protected override async startModule(): Promise<void> {
     this.saveTimer = setInterval(() => this.saveOutflowState(), 60 * 1000);
-    this.loadOutflowState();
+    await this.loadOutflowState();
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionRewardFactor, 5, "faucet outflow",
       (session: FaucetSession, rewardFactors: ISessionRewardFactor[]) => this.processSessionRewardFactor(session, rewardFactors)
@@ -31,9 +31,10 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     );
   }
 
-  protected override stopModule(): void {
+  protected override stopModule(): Promise<void> {
     clearInterval(this.saveTimer);
     this.saveTimer = null;
+    return Promise.resolve();
   }
 
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]): Promise<void> {
@@ -50,8 +51,8 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     return Math.floor((new Date()).getTime() / 1000);
   }
 
-  private loadOutflowState() {
-    let stateJson = ServiceManager.GetService(FaucetDatabase).getKeyValueEntry("PoWOutflowLimiter.state");
+  private async loadOutflowState(): Promise<void> {
+    let stateJson = await ServiceManager.GetService(FaucetDatabase).getKeyValueEntry("PoWOutflowLimiter.state");
     if(stateJson) {
       let stateObj = JSON.parse(stateJson);
       this.outflowState = {

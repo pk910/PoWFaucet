@@ -9,7 +9,7 @@ import { FaucetError } from '../../common/FaucetError';
 export class EnsNameModule extends BaseModule<IEnsNameConfig> {
   private ens: ENS;
 
-  protected override startModule(): void {
+  protected override startModule(): Promise<void> {
     this.initEnsResolver();
     this.moduleManager.addActionHook(
       this, ModuleHookAction.ClientConfig, 1, "ens config", 
@@ -20,10 +20,12 @@ export class EnsNameModule extends BaseModule<IEnsNameConfig> {
       }
     );
     this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 3, "resolve ens name", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));
+    return Promise.resolve();
   }
 
-  protected override stopModule(): void {
+  protected override stopModule(): Promise<void> {
     // nothing to do
+    return Promise.resolve();
   }
 
   protected override onConfigReload(): void {

@@ -8,12 +8,14 @@ import { FaucetError } from '../../common/FaucetError';
 
 export class EthInfoModule extends BaseModule<IEthInfoConfig> {
 
-  protected override startModule(): void {
+  protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 6, "ETH Info check", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));
+    return Promise.resolve();
   }
 
-  protected override stopModule(): void {
+  protected override stopModule(): Promise<void> {
     // nothing to do
+    return Promise.resolve();
   }
 
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {

@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { getScrypt, getScryptReadyPromise, Scrypt } from "../../../../libs/scrypt_wasm";
 import { MessagePort } from "worker_threads";
 import { base64ToHex } from "../../../utils/ConvertHelpers";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator";

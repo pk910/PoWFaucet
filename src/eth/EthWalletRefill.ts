@@ -31,7 +31,8 @@ export class EthWalletRefill {
     this.lastWalletRefillTry = now;
 
     let walletState = ServiceManager.GetService(EthWalletManager).getWalletState();
-    let walletBalance = walletState.balance - ServiceManager.GetService(SessionManager).getUnclaimedBalance() - ServiceManager.GetService(EthClaimManager).getQueuedAmount();
+    let unclaimedBalance = await ServiceManager.GetService(SessionManager).getUnclaimedBalance();
+    let walletBalance = walletState.balance - unclaimedBalance - ServiceManager.GetService(EthClaimManager).getQueuedAmount();
     let refillAction: string = null;
     if(faucetConfig.ethRefillContract.overflowBalance && walletBalance > BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()))
       refillAction = "overflow";

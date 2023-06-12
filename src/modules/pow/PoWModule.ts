@@ -16,7 +16,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   private validator: PoWValidator;
   private powClients: PoWClient[] = [];
 
-  protected override startModule(): void {
+  protected override startModule(): Promise<void> {
     // register websocket endpoint (/pow)
     ServiceManager.GetService(FaucetHttpServer).addWssEndpoint("pow", /^\/ws\/pow($|\?)/, (req, ws, ip) => this.processPoWClientWebSocket(req, ws, ip));
 
@@ -40,13 +40,15 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       this, ModuleHookAction.SessionComplete, 10, "kill clients",
       (session: FaucetSession) => this.processSessionComplete(session)
     );
+    return Promise.resolve();
   }
 
-  protected override stopModule(): void {
+  protected override stopModule(): Promise<void> {
     ServiceManager.GetService(FaucetHttpServer).removeWssEndpoint("pow");
 
     this.validator.dispose();
     this.validator = null;
+    return Promise.resolve();
   }
 
   protected override onConfigReload(): void {

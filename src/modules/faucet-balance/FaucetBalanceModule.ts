@@ -13,15 +13,17 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
   private balanceRestriction: number;
   private balanceRestrictionRefresh = 0;
 
-  protected override startModule(): void {
+  protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionRewardFactor, 6, "faucet balance",
       (session: FaucetSession, rewardFactors: ISessionRewardFactor[]) => this.processSessionRewardFactor(session, rewardFactors)
     );
+    return Promise.resolve();
   }
 
-  protected override stopModule(): void {
+  protected override stopModule(): Promise<void> {
     // nothing to do
+    return Promise.resolve();
   }
 
   protected override onConfigReload(): void {
@@ -29,7 +31,7 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
   }
 
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]): Promise<void> {
-    this.refreshBalanceRestriction();
+    await this.refreshBalanceRestriction();
     if(this.balanceRestriction !== 100) {
       rewardFactors.push({
         factor: this.balanceRestriction / 100,
@@ -38,7 +40,7 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
     }
   }
 
-  private refreshBalanceRestriction() {
+  private async refreshBalanceRestriction(): Promise<void> {
     let now = Math.floor((new Date()).getTime() / 1000);
     if(this.balanceRestrictionRefresh > now - 30)
       return;
@@ -48,9 +50,8 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
       return;
     
     this.balanceRestrictionRefresh = now;
-    faucetBalance -= ServiceManager.GetService(SessionManager).getUnclaimedBalance(); // subtract balance from active & claimable sessions
+    faucetBalance -= await ServiceManager.GetService(SessionManager).getUnclaimedBalance(); // subtract balance from active & claimable sessions
     faucetBalance -= ServiceManager.GetService(EthClaimManager).getQueuedAmount(); // subtract pending transaction amounts
-
     
     this.balanceRestriction = Math.min(
       this.getStaticBalanceRestriction(faucetBalance),

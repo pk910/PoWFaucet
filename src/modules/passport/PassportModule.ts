@@ -18,8 +18,8 @@ export class PassportModule extends BaseModule<IPassportConfig> {
   private passportDb: PassportDB;
   private passportResolver: PassportResolver;
 
-  protected override startModule(): void {
-    this.passportDb = ServiceManager.GetService(FaucetDatabase).createModuleDb(PassportDB, this);
+  protected override async startModule(): Promise<void> {
+    this.passportDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(PassportDB, this);
     this.passportResolver = new PassportResolver(this);
     this.moduleManager.addActionHook(
       this, ModuleHookAction.ClientConfig, 1, "passport config", 
@@ -54,7 +54,7 @@ export class PassportModule extends BaseModule<IPassportConfig> {
     );
   }
 
-  protected override stopModule(): void {
+  protected override async stopModule(): Promise<void> {
     this.passportDb.dispose();
     ServiceManager.GetService(FaucetWebApi).removeApiEndpoint("refreshPassport");
     ServiceManager.GetService(FaucetWebApi).removeApiEndpoint("getPassportInfo");
