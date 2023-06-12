@@ -56,7 +56,6 @@
     "hcaptcha": "^0.1.1",
     "html-entities": "^2.3.3",
     "node-fetch": "^2.6.11",
-    "node-sqlite3-wasm": "^0.6.4",
     "randombytes": "^2.1.0",
     "tiny-typed-emitter": "^2.1.0",
     "web3": "^1.10.0",

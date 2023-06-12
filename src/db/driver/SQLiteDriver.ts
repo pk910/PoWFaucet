@@ -1,5 +1,5 @@
 import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver";
-import sqlite from "node-sqlite3-wasm";
+import sqlite from "../../../libs/sqlite3_wasm";
 
 export interface ISQLiteOptions {
   driver: "sqlite";
