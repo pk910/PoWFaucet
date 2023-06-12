@@ -48,7 +48,6 @@
     "@brettz9/node-static": "^0.1.1",
     "@ethereumjs/common": "^2.6.5",
     "@ethereumjs/tx": "^3.5.2",
-    "@spruceid/didkit-wasm": "^0.3.0-alpha0",
     "@types/node": "^17.0.45",
     "bignumber.js": "^9.1.1",
     "ethereum-ens": "^0.8.0",

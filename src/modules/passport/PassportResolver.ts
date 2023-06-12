@@ -74,7 +74,7 @@ export class PassportResolver {
 
   public constructor(module: PassportModule) {
     this.module = module;
-    this.didkitPromise = import("@spruceid/didkit-wasm");
+    this.didkitPromise = import("../../../libs/didkit_wasm");
   }
 
   public increaseScoreNonce() {

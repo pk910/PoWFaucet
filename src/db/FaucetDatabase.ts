@@ -46,8 +46,12 @@ export class FaucetDatabase {
     await this.upgradeSchema();
   }
 
-  public closeDatabase(): Promise<void> {
-    return this.db.close();
+  public async closeDatabase(): Promise<void> {
+    await this.db.close();
+    if(this.dbWorker) {
+      this.dbWorker.terminate();
+      this.dbWorker = null;
+    }
   }
 
   public async createModuleDb<TModDB extends FaucetModuleDB>(dbClass: new(module: BaseModule, faucetStore: FaucetDatabase) => TModDB, module: BaseModule): Promise<TModDB> {
