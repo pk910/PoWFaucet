@@ -2,9 +2,9 @@
 name: Build latest master version
 
 on:
-  push:
-    branches:
-      - 'master'
+  #push:
+  #  branches:
+  #    - 'master'
   workflow_dispatch:
 
 
