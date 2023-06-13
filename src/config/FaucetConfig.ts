@@ -33,10 +33,9 @@ if(cliArgs['datadir']) {
   if(!path.isAbsolute(basePath))
     basePath = resolveRelativePath(basePath, process.cwd());
 }
-else if((process as any).pkg) 
-  basePath = process.cwd();
 else
-  basePath = internalBasePath;
+  basePath = process.cwd();
+
 
 export let faucetConfigFile: string;
 if(cliArgs['config']) {
@@ -53,6 +52,7 @@ export let faucetConfig: IConfigSchemaV2 = null;
 export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   let config: IConfigSchemaV2;
   let configFile = faucetConfigFile;
+  debugger;
 
   if(!fs.existsSync(configFile) && !loadDefaultsOnly) {
     // create copy of faucet-config.example.yml

@@ -142,7 +142,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
         this.props.pageContext.showDialog({
           title: "Claim expired",
           body: (
-            <div className='altert alert-danger'>
+            <div className='alert alert-danger'>
               Sorry, your reward ({toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
             </div>
           ),
@@ -222,7 +222,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     }
     else if(this.state.isTimedOut) {
       return (
-        <div className='altert alert-danger'>
+        <div className='alert alert-danger'>
           Sorry, your reward ({toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
         </div>
       );
@@ -364,7 +364,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     return (
       <div className='claim-status'>
         <div className='alert alert-danger'>
-          Transaction failed: {this.state.sessionStatus.failedReason || this.state.sessionStatus.claimMessage} {this.state.sessionStatus.failedCode ? " [" + this.state.sessionStatus.failedCode + "]" : ""}
+          Claim failed: {this.state.sessionStatus.failedReason || this.state.sessionStatus.claimMessage} {this.state.sessionStatus.failedCode ? " [" + this.state.sessionStatus.failedCode + "]" : ""}
         </div>
       </div>
     )
@@ -487,7 +487,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       this.props.pageContext.showDialog({
         title: "Claim failed",
         body: (
-          <div className='altert alert-danger'>
+          <div className='alert alert-danger'>
             Could not claim rewards: {ex.toString()}
           </div>
         ),

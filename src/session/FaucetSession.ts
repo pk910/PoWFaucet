@@ -7,6 +7,7 @@ import { FaucetDatabase } from "../db/FaucetDatabase";
 import { getNewGuid } from "../utils/GuidUtils";
 import { SessionManager } from "./SessionManager";
 import { ISessionRewardFactor } from "./SessionRewardFactor";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
 
 export enum FaucetSessionStatus {
   UNKNOWN = "unknown",
@@ -61,6 +62,7 @@ export class FaucetSession {
   private sessionModuleRefs: {[key: string]: any} = {};
   private sessionTimer: NodeJS.Timeout;
   private isDirty: boolean;
+  private isSaved: boolean;
   private isDisposed: boolean;
   private saveTimer: NodeJS.Timeout;
 
@@ -121,6 +123,7 @@ export class FaucetSession {
     this.remoteIP = sessionData.remoteIP;
     this.blockingTasks = sessionData.tasks;
     this.sessionDataDict = sessionData.data;
+    this.isSaved = true;
 
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRestore, [this]);
     
@@ -151,6 +154,10 @@ export class FaucetSession {
       return;
     this.isDirty = false;
 
+    if(this.status === FaucetSessionStatus.FAILED && !this.isSaved)
+      return; // simply forget about failed session if they haven't been written to the db yet
+    this.isSaved = true;
+
     await ServiceManager.GetService(FaucetDatabase).updateSession(this.getStoreData());
   }
 
@@ -172,11 +179,11 @@ export class FaucetSession {
     this.status = FaucetSessionStatus.FAILED;
     this.manager.notifySessionUpdate(this);
     this.resetSessionTimer();
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Session " + this.sessionId + " failed: [" + code + "] " + reason);
     if(oldStatus === FaucetSessionStatus.RUNNING)
       ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
-    try {
+    if(this.isSaved)
       await this.saveSession();
-    } catch(ex) {}
     this.isDisposed = true;
   }
 

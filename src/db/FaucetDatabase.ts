@@ -135,6 +135,14 @@ export class FaucetDatabase {
           CREATE INDEX "SessionsStatusIdx" ON "Sessions" (
             "Status"	ASC
           );
+          CREATE INDEX "SessionsTargetAddrIdx" ON "Sessions" (
+            "TargetAddr"	ASC,
+            "StartTime"	ASC
+          );
+          CREATE INDEX "SessionsRemoteIPIdx" ON "Sessions" (
+            "RemoteIP"	ASC,
+            "StartTime"	ASC
+          );
         `);
       /*
       case 1: // upgrade to version 2
@@ -157,8 +165,7 @@ export class FaucetDatabase {
 
   public cleanStore() {
     let now = this.now();
-    //this.db.run("DELETE FROM PassportCache WHERE Timeout < ?", [now]);
-    //TODO: clean Sessions
+    this.db.run("DELETE FROM Sessions WHERE StartTime < ?", [now - faucetConfig.sessionCleanup]);
 
     Object.values(this.moduleDBs).forEach((modDb) => {
       modDb.cleanStore();
@@ -184,11 +191,14 @@ export class FaucetDatabase {
     await this.db.run("DELETE FROM KeyValueStore WHERE Key = ?", [key]);
   }
 
-  public async getSessions(states: FaucetSessionStatus[]): Promise<FaucetSessionStoreData[]> {
-    let rows = await this.db.all(
-      "SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData FROM Sessions WHERE Status IN (" + states.map(() => "?").join(",") + ")",
-      states
-    ) as {
+  private async selectSessions(whereSql: string, whereArgs: any[], skipData?: boolean): Promise<FaucetSessionStoreData[]> {
+    let sql = [
+      "SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks",
+      (skipData ? "" : ",Data,ClaimData"),
+      " FROM Sessions WHERE ",
+      whereSql
+    ].join("");
+    let rows = await this.db.all(sql, whereArgs) as {
       SessionId: string;
       Status: string;
       StartTime: number;
@@ -212,46 +222,43 @@ export class FaucetDatabase {
         dropAmount: row.DropAmount,
         remoteIP: row.RemoteIP,
         tasks: JSON.parse(row.Tasks),
-        data: JSON.parse(row.Data),
-        claim: row.ClaimData ? JSON.parse(row.ClaimData) : null,
+        data: skipData ? undefined : JSON.parse(row.Data),
+        claim: skipData ? undefined : (row.ClaimData ? JSON.parse(row.ClaimData) : null),
       };
     });
   }
 
+  public getSessions(states: FaucetSessionStatus[]): Promise<FaucetSessionStoreData[]> {
+    return this.selectSessions("Status IN (" + states.map(() => "?").join(",") + ")", states);
+  }
+
   public async getAllSessions(timeLimit: number): Promise<FaucetSessionStoreData[]> {
     let now = Math.floor(new Date().getTime() / 1000);
+    return this.selectSessions("Status NOT IN ('finished', 'failed') OR StartTime > ?", [now - timeLimit]);
+  }
 
-    let rows = await this.db.all(
-      "SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData FROM Sessions WHERE Status NOT IN ('finished', 'failed') OR StartTime > ?",
-      [now - timeLimit]
-    ) as {
-      SessionId: string;
-      Status: string;
-      StartTime: number;
-      TargetAddr: string;
-      DropAmount: string;
-      RemoteIP: string;
-      Tasks: string;
-      Data: string;
-      ClaimData: string;
-    }[];
+  public async getTimedOutSessions(timeout: number): Promise<FaucetSessionStoreData[]> {
+    let now = Math.floor(new Date().getTime() / 1000);
+    return this.selectSessions("Status NOT IN ('finished', 'failed') AND StartTime <= ?", [now - timeout]);
+  }
 
-    if(rows.length === 0)
-      return [];
+  public async getFinishedSessions(targetAddr: string, remoteIP: string, timeout: number, skipData?: boolean): Promise<FaucetSessionStoreData[]> {
+    let now = Math.floor(new Date().getTime() / 1000);
+    let whereSql: string[] = [];
+    let whereArgs: any[] = [];
+    if(targetAddr) {
+      whereSql.push("TargetAddr = ?");
+      whereArgs.push(targetAddr);
+    }
+    if(remoteIP) {
+      whereSql.push("RemoteIP = ?");
+      whereArgs.push(remoteIP);
+    }
+    if(whereSql.length === 0)
+      throw "invalid query";
     
-    return rows.map((row) => {
-      return {
-        sessionId: row.SessionId,
-        status: row.Status as FaucetSessionStatus,
-        startTime: row.StartTime,
-        targetAddr: row.TargetAddr,
-        dropAmount: row.DropAmount,
-        remoteIP: row.RemoteIP,
-        tasks: JSON.parse(row.Tasks),
-        data: JSON.parse(row.Data),
-        claim: row.ClaimData ? JSON.parse(row.ClaimData) : null,
-      };
-    });
+    whereArgs.push(now - timeout);
+    return this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claimable','claiming','finished')", whereArgs, skipData);
   }
 
   public async getSession(sessionId: string): Promise<FaucetSessionStoreData> {

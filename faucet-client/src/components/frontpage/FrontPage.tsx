@@ -104,7 +104,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
       if(sessionInfo.status === "failed") {
         this.props.faucetContext.showDialog({
           title: "Could not start session",
-          body: (<div className='alert alert-danger'>{sessionInfo.failedCode ? "[" + sessionInfo.failedCode + "] " : ""}{sessionInfo.failedReason}</div>),
+          body: (<div className='alert alert-danger'>{sessionInfo.failedReason}<br />{sessionInfo.failedCode ? "Code: " + sessionInfo.failedCode : ""}</div>),
           closeButton: { caption: "Close" },
         });
         return;

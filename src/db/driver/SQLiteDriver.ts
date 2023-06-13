@@ -1,5 +1,4 @@
 import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver";
-import sqlite from "../../../libs/sqlite3_wasm";
 
 export interface ISQLiteOptions {
   driver: "sqlite";
@@ -8,9 +7,19 @@ export interface ISQLiteOptions {
 }
 
 export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
-  private db: sqlite.Database;
+  private static sqlite: Promise<any>;
+
+  private static loadSQLite(): Promise<any> {
+    if(!this.sqlite) {
+      this.sqlite = import("../../../libs/sqlite3_wasm");
+    }
+    return this.sqlite;
+  }
+
+  private db: any;
 
   public override async open(options: ISQLiteOptions): Promise<void> {
+    let sqlite = await SQLiteDriver.loadSQLite();
     this.db = new sqlite.Database(options.file);
   }
   public override async close(): Promise<void> {

@@ -143,7 +143,7 @@ modules:
     # require ENS name
     required: true
 
-  ## IP-Info Protection
+  ## IP-Info module
   ipinfo:
     # enable / disable IP-Info protection
     enabled: true
@@ -186,7 +186,7 @@ modules:
     denyContract: true
 
 
-  ## Faucet Balance protection
+  ## Faucet Balance module
   faucet-balance:
     # enable / disable faucet balance protection
     enabled: true
@@ -204,7 +204,7 @@ modules:
     dynamicRestriction:
       targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
   
-  ## Faucet Outflow protection
+  ## Faucet Outflow module
   faucet-outflow:
     # enable / disable faucet outflow protection
     enabled: true
@@ -224,6 +224,35 @@ modules:
     # outflow balance limits
     lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
     upperLimit: 500000000000000000000 # 500 ETH
+
+  ## Mainnet Wallet module
+  mainnet-wallet:
+    # enable / disable mainnet wallet protection
+    enabled: true
+
+    # RPC host for mainnet
+    rpcHost: "https://rpc.flashbots.net/"
+
+    # require minimum balance on mainnet wallet
+    minBalance: 10000000000000000  # 0.01 ETH
+
+    # require minimum number of transactions from mainnet wallet (nonce count)
+    minTxCount: 5
+  
+  ## Recurring Limits module
+  recurring-limits:
+    # enable / disable recurring limits protection
+    enabled: true
+
+    limits: # array of individual limits, which all need to be passed
+      - limitCount: 10
+        limitAmount: 10000000000000000000 # 10 ETH
+        duration: 86400 # 1 day 
+      - limitCount: 20
+        limitAmount: 20000000000000000000 # 20 ETH
+        duration: 172800 # 2 days
+        byAddrOnly: true
+        
 
   ## Proof of Work (mining) protection
   pow:

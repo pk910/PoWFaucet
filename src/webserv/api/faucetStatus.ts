@@ -83,7 +83,7 @@ export async function buildFaucetStatus(): Promise<IClientFaucetStatus> {
   let statusRsp: IClientFaucetStatus = {
     status: {
       walletBalance: ethWalletManager.getFaucetBalance()?.toString(),
-      unclaimedBalance: await sessionManager.getUnclaimedBalance().toString(),
+      unclaimedBalance: (await sessionManager.getUnclaimedBalance()).toString(),
       queuedBalance: ethClaimManager.getQueuedAmount().toString(),
       balanceRestriction: moduleManager.getModule<FaucetBalanceModule>("faucet-balance")?.getBalanceRestriction() || 100,
     },
