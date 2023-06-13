@@ -2,6 +2,14 @@
 
 Proof of Work Faucet for EVM chains
 
+<b>Warning: The master branch of this repository is now pointing to the new v2 version of the faucet.</b>
+
+The v2 version is not compatible with the v1 configuration or database schema! When upgrading a v1 instance, you need to delete the old database file and recreate the configuration.
+
+Please note, that the v2 version is not fully stable yet. My own productive instances of the faucet for goerli/sepolia still run on v1. 
+
+The latest version ov the v1 faucet can be fetched via the v1 branch. I'll keep it updated in case any issues come up on v1, but don't expect any new features :)
+
 # Why
 
 Faucets for ETH Testnets are spammed by bots. This faucet tries to reduce the efficiency of these automated requests by requiring some mining work to be done in exchange for ETH.
