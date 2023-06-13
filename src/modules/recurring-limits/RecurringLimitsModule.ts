@@ -3,12 +3,13 @@ import { EthWalletManager } from "../../eth/EthWalletManager";
 import { FaucetSession, FaucetSessionStoreData } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
-import { IRecurringLimitConfig, IRecurringLimitsConfig } from './RecurringLimitsConfig';
+import { defaultConfig, IRecurringLimitConfig, IRecurringLimitsConfig } from './RecurringLimitsConfig';
 import { FaucetError } from '../../common/FaucetError';
 import { FaucetDatabase } from "../../db/FaucetDatabase";
 import { renderTimespan } from "../../utils/DateUtils";
 
 export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
 
   protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 6, "Recurring limits check", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));

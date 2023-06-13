@@ -5,6 +5,7 @@ export interface IBaseModuleConfig {
 }
 
 export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModuleConfig> {
+  protected abstract readonly moduleDefaultConfig: TModCfg;
   protected moduleManager: ModuleManager;
   protected moduleName: string;
   protected moduleConfig: TModCfg
@@ -38,7 +39,7 @@ export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModule
   }
 
   public setModuleConfig(config: TModCfg): void {
-    this.moduleConfig = config;
+    this.moduleConfig = Object.assign({}, this.moduleDefaultConfig, config);
     if(this.enabled)
       this.onConfigReload();
   }

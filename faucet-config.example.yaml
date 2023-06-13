@@ -149,16 +149,16 @@ modules:
     enabled: true
 
     # ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
-    ipInfoApi: "http://ip-api.com/json/{ip}?fields=21155839"
+    apiUrl: "http://ip-api.com/json/{ip}?fields=21155839"
 
     # ip info caching time
-    ipInfoCacheTime: 86400 # 1 day
+    cacheTime: 86400 # 1 day
 
     # require valid ip info (throw error if lookup failed)
-    ipInfoRequired: false
+    required: false
 
     # ip info based restrictions
-    ipRestrictedRewardShare:
+    restrictions:
       # percentage of drop amount if IP is in a hosting range (default: 100), 0 to block entirely
       hosting: 1
 
@@ -169,7 +169,7 @@ modules:
       #US: 100
 
     # ip info pattern based restrictions
-    ipInfoMatchRestrictedReward:
+    restrictionsPattern:
       "^.*Tencent Cloud.*$": 1
       "^.*UCLOUD.*$": 1
       "^.*Server Hosting.*$": 1

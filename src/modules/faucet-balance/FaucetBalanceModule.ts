@@ -3,13 +3,14 @@ import { EthWalletManager } from "../../eth/EthWalletManager";
 import { FaucetSession } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
-import { IFaucetBalanceConfig } from './FaucetBalanceConfig';
+import { defaultConfig, IFaucetBalanceConfig } from './FaucetBalanceConfig';
 import { ISessionRewardFactor } from "../../session/SessionRewardFactor";
 import { EthClaimManager } from "../../eth/EthClaimManager";
 import { faucetConfig } from "../../config/FaucetConfig";
 import { SessionManager } from "../../session/SessionManager";
 
 export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
   private balanceRestriction: number;
   private balanceRestrictionRefresh = 0;
 

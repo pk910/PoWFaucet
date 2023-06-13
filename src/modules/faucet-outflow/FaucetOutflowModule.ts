@@ -3,7 +3,7 @@ import { clearInterval } from "timers";
 import { ServiceManager } from "../../common/ServiceManager";
 import { FaucetDatabase } from "../../db/FaucetDatabase";
 import { BaseModule } from "../BaseModule";
-import { IFaucetOutflowConfig } from "./FaucetOutflowConfig";
+import { defaultConfig, IFaucetOutflowConfig } from "./FaucetOutflowConfig";
 import { ModuleHookAction } from "../ModuleManager";
 import { FaucetSession } from "../../session/FaucetSession";
 import { ISessionRewardFactor } from "../../session/SessionRewardFactor";
@@ -14,6 +14,7 @@ interface OutflowState {
 }
 
 export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
   private outflowState: OutflowState;
   private saveTimer: NodeJS.Timer;
   

@@ -3,10 +3,11 @@ import { EthWalletManager } from "../../eth/EthWalletManager";
 import { FaucetSession } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
-import { IEthInfoConfig } from './EthInfoConfig';
+import { defaultConfig, IEthInfoConfig } from './EthInfoConfig';
 import { FaucetError } from '../../common/FaucetError';
 
 export class EthInfoModule extends BaseModule<IEthInfoConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
 
   protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 6, "ETH Info check", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));

@@ -265,9 +265,9 @@ export class PassportResolver {
   }
 
   private getPassportCacheFile(addr: string): string {
-    if(!this.module.getModuleConfig().passportCachePath)
+    if(!this.module.getModuleConfig().cachePath)
       return null;
-    return path.join(resolveRelativePath(this.module.getModuleConfig().passportCachePath), "passport-" + addr.replace(/[^a-f0-9x]+/gi, "").toLowerCase() + ".json");
+    return path.join(resolveRelativePath(this.module.getModuleConfig().cachePath), "passport-" + addr.replace(/[^a-f0-9x]+/gi, "").toLowerCase() + ".json");
   }
 
   private savePassportToCache(passport: IPassport, cacheFile: string) {

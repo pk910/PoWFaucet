@@ -3,7 +3,7 @@ import { ServiceManager } from "../../common/ServiceManager";
 import { FaucetSession, FaucetSessionStatus } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
-import { IPoWConfig, PoWHashAlgo } from './PoWConfig';
+import { defaultConfig, IPoWConfig, PoWHashAlgo } from './PoWConfig';
 import { FaucetHttpServer } from "../../webserv/FaucetHttpServer";
 import { IncomingMessage } from "http";
 import { WebSocket } from 'ws';
@@ -13,6 +13,7 @@ import { PoWClient } from "./PoWClient";
 import { PoWSession } from "./PoWSession";
 
 export class PoWModule extends BaseModule<IPoWConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
   private validator: PoWValidator;
   private powClients: PoWClient[] = [];
 

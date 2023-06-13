@@ -6,3 +6,11 @@ export interface IFaucetOutflowConfig extends IBaseModuleConfig {
   lowerLimit: number;
   upperLimit: number;
 }
+
+export const defaultConfig: IFaucetOutflowConfig = {
+  enabled: false,
+  amount: 0,
+  duration: 86400,
+  lowerLimit: 0,
+  upperLimit: 0,
+}

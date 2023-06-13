@@ -5,10 +5,11 @@ import { ServiceManager } from "../../common/ServiceManager";
 import { FaucetSession, FaucetSessionStoreData } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
-import { ICaptchaConfig } from "./CaptchaConfig";
+import { defaultConfig, ICaptchaConfig } from "./CaptchaConfig";
 import { FaucetError } from '../../common/FaucetError';
 
 export class CaptchaModule extends BaseModule<ICaptchaConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
 
   protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(

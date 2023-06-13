@@ -3,10 +3,11 @@ import ENS from 'ethereum-ens';
 import { FaucetSession } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
-import { IEnsNameConfig } from './EnsNameConfig';
+import { defaultConfig, IEnsNameConfig } from './EnsNameConfig';
 import { FaucetError } from '../../common/FaucetError';
 
 export class EnsNameModule extends BaseModule<IEnsNameConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
   private ens: ENS;
 
   protected override startModule(): Promise<void> {

@@ -12,3 +12,8 @@ export interface IRecurringLimitConfig {
   byIPOnly?: true;
   message?: string;
 }
+
+export const defaultConfig: IRecurringLimitsConfig = {
+  enabled: false,
+  limits: [],
+}

@@ -1,7 +1,7 @@
 
 import { ServiceManager } from '../../common/ServiceManager';
 import { BaseModule } from '../BaseModule';
-import { IPassportConfig } from './PassportConfig';
+import { defaultConfig, IPassportConfig } from './PassportConfig';
 import { ModuleHookAction } from '../ModuleManager';
 import { FaucetSession, FaucetSessionStatus } from '../../session/FaucetSession';
 import { ISessionRewardFactor } from '../../session/SessionRewardFactor';
@@ -9,12 +9,12 @@ import { FaucetWebApi, IFaucetApiUrl } from '../../webserv/FaucetWebApi';
 import { IPassportInfo, PassportResolver } from './PassportResolver';
 import { IncomingMessage } from 'http';
 import { SessionManager } from '../../session/SessionManager';
-import { FaucetHttpResponse } from '../../webserv/FaucetHttpServer';
 import { PassportDB } from './PassportDB';
 import { FaucetDatabase } from '../../db/FaucetDatabase';
-import { faucetConfig } from '../../config/FaucetConfig';
 
 export class PassportModule extends BaseModule<IPassportConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
+  
   private passportDb: PassportDB;
   private passportResolver: PassportResolver;
 

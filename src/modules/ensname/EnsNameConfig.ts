@@ -5,3 +5,10 @@ export interface IEnsNameConfig extends IBaseModuleConfig {
   ensAddr: string | null; // ENS Resolver contract address or null for default resolver
   required: boolean;
 }
+
+export const defaultConfig: IEnsNameConfig = {
+  enabled: false,
+  rpcHost: null,
+  ensAddr: null,
+  required: false,
+}

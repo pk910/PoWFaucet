@@ -3,7 +3,6 @@ import { IBaseModuleConfig } from "../BaseModule";
 export interface IPoWConfig extends IBaseModuleConfig {
   /* PoW parameters */
   powShareReward: number; // reward amount per share (in wei)
-  powMinAmount: number; // minimum balance to payout (in wei)
   powSessionTimeout: number; // maximum mining session time in seconds
   powIdleTimeout: number; // maximum number of seconds a session can idle until it gets closed
   powPingInterval: number; // websocket ping interval
@@ -70,3 +69,50 @@ export interface IPoWArgon2Params {
 }
 
 export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params;
+
+export const defaultConfig: IPoWConfig = {
+  enabled: false,
+  powShareReward: 0,
+  powSessionTimeout: 7200,
+  powIdleTimeout: 1800,
+  powPingInterval: 60,
+  powPingTimeout: 120,
+  powHashAlgo: PoWHashAlgo.ARGON2,
+  powScryptParams: {
+    cpuAndMemory: 4096,
+    blockSize: 8,
+    parallelization: 1,
+    keyLength: 16,
+    difficulty: 11,
+  },
+  powCryptoNightParams: {
+    algo: 0,
+    variant: 0,
+    height: 0,
+    difficulty: 11,
+  },
+  powArgon2Params: {
+    type: 0,
+    version: 13,
+    timeCost: 4,
+    memoryCost: 4096,
+    parallelization: 1,
+    keyLength: 16,
+    difficulty: 11,
+  },
+  powNonceCount: 1,
+  powHashrateSoftLimit: 0,
+  powHashrateHardLimit: 0,
+  verifyLocalPercent: 10,
+  verifyLocalMaxQueue: 100,
+  verifyMinerPeerCount: 4,
+  verifyLocalLowPeerPercent: 20,
+  verifyMinerPercent: 50,
+  verifyMinerIndividuals: 2,
+  verifyMinerMaxPending: 3,
+  verifyMinerMaxMissed: 5,
+  verifyMinerTimeout: 20,
+  verifyMinerRewardPerc: 15,
+  verifyMinerMissPenaltyPerc: 10,
+  concurrentSessions: 0,
+}

@@ -5,10 +5,11 @@ import { EthWalletManager } from "../../eth/EthWalletManager";
 import { FaucetSession } from "../../session/FaucetSession";
 import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
-import { IMainnetWalletConfig } from './MainnetWalletConfig';
+import { defaultConfig, IMainnetWalletConfig } from './MainnetWalletConfig';
 import { FaucetError } from '../../common/FaucetError';
 
 export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
+  protected readonly moduleDefaultConfig = defaultConfig;
   private web3: Web3;
 
   protected override startModule(): Promise<void> {
