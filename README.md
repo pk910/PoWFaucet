@@ -8,7 +8,7 @@ The v2 version is not compatible with the v1 configuration or database schema! W
 
 Please note, that the v2 version is not fully stable yet. My own productive instances of the faucet for goerli/sepolia still run on v1. 
 
-The latest version ov the v1 faucet can be fetched via the v1 branch. I'll keep it updated in case any issues come up on v1, but don't expect any new features :)
+The latest version of the v1 faucet can be fetched via the v1 branch. I'll keep it updated in case any issues come up on v1, but don't expect any new features :)
 
 # Why
 
