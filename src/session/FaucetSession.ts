@@ -89,7 +89,7 @@ export class FaucetSession {
           let targetAddr = this.targetAddr || userInput.addr;
           if(typeof targetAddr !== "string")
             throw new FaucetError("INVALID_ADDR", "Missing target address.");
-          if(!targetAddr.match(/^0x[0-9a-f]{40}$/i) || targetAddr.match(/^0x0{40}$/i))
+          if(!targetAddr.match(/^0x[0-9a-fA-F]{40}$/) || targetAddr.match(/^0x0{40}$/i))
             throw new FaucetError("INVALID_ADDR", "Invalid target address: " + targetAddr);
           if(!this.targetAddr)
             this.setTargetAddr(targetAddr);
@@ -112,9 +112,6 @@ export class FaucetSession {
   }
 
   public async restoreSession(sessionData: FaucetSessionStoreData): Promise<void> {
-    if(sessionData.status !== FaucetSessionStatus.RUNNING)
-      throw new FaucetError("INVALID_STATE", "Cannot restore non-running session: " + sessionData.status);
-
     this.sessionId = sessionData.sessionId;
     this.status = sessionData.status;
     this.startTime = sessionData.startTime;
@@ -206,25 +203,17 @@ export class FaucetSession {
         timerDelay = 1;
       this.sessionTimer = setTimeout(() => this.tryProceedSession(), timerDelay * 1000);
     }
-    else if(this.status === FaucetSessionStatus.CLAIMABLE) {
-      let sessionTimeout = this.startTime + faucetConfig.sessionTimeout;
-      let timerDelay = (sessionTimeout - now) + 1;
-      if(timerDelay < 1)
-        timerDelay = 1;
-      this.sessionTimer = setTimeout(() => this.tryProceedSession(), timerDelay * 1000);
-    }
   }
 
   public async tryProceedSession(): Promise<void> {
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionTimeout = this.startTime + faucetConfig.sessionTimeout;
 
-    if(this.status === FaucetSessionStatus.CLAIMABLE) {
+    if(this.status === FaucetSessionStatus.RUNNING) {
       if(now >= sessionTimeout) {
-        await this.setSessionFailed("SESSION_TIMEOUT", "session timeout");
+        return await this.setSessionFailed("SESSION_TIMEOUT", "session timeout");
       }
-    }
-    else if(this.status === FaucetSessionStatus.RUNNING) {
+
       for(let i = this.blockingTasks.length - 1; i >= 0; i--) {
         if(this.blockingTasks[i].timeout > 0 && this.blockingTasks[i].timeout < now) {
           this.blockingTasks.splice(i, 1);

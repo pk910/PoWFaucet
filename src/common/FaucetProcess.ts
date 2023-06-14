@@ -22,6 +22,7 @@ export enum FaucetLogLevel {
 
 export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
   private initialized: boolean;
+  public hideLogOutput: boolean;
 
   public initialize() {
     if(this.initialized)
@@ -87,7 +88,8 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
       fs.appendFileSync(logFile, logLine + "\r\n");
     }
 
-    console.log(logLine);
+    if(!this.hideLogOutput)
+      console.log(logLine);
   }
 
 }

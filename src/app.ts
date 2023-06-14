@@ -1,4 +1,4 @@
-import { isMainThread } from "node:worker_threads";
+import { isMainThread, workerData } from "node:worker_threads";
 import { loadFaucetConfig } from "./config/FaucetConfig";
 import { FaucetWorkers } from "./common/FaucetWorker";
 import { EthWalletManager } from "./eth/EthWalletManager";

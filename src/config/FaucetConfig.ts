@@ -73,8 +73,10 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
 
     if(!yamlObj.version || yamlObj.version == 1)
       config = convertConfigV1(yamlObj);
-    else
+    else {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Loaded faucet config from yaml file: " + configFile);
       config = yamlObj;
+    }
   }
 
   if(config) {
@@ -96,12 +98,10 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   }
 
   Object.assign(faucetConfig, getDefaultConfig(), config);
-
-  ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Loaded faucet config from yaml file: " + configFile);
 }
 
 export function resolveRelativePath(inputPath: string, customBasePath?: string): string {
-  if(!inputPath || typeof inputPath !== "string")
+  if(!inputPath || typeof inputPath !== "string" || inputPath === ":memory:")
     return inputPath;
   let outputPath: string = inputPath;
   if(!customBasePath)

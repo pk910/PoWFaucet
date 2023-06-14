@@ -31,7 +31,7 @@ export class FaucetDatabase {
     }, (1000 * 60 * 60 * 2));
   }
 
-  private async initDatabase(worker?: Worker): Promise<void> {
+  private async initDatabase(): Promise<void> {
     switch(faucetConfig.database.driver) {
       case "sqlite":
         this.dbWorker = ServiceManager.GetService(FaucetWorkers).createWorker("database");

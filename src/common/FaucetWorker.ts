@@ -1,5 +1,5 @@
 
-import { Worker, workerData as workerDataPtr, parentPort } from "node:worker_threads";
+import { Worker, parentPort, workerData } from "node:worker_threads";
 import { DatabaseWorker } from "../db/DatabaseWorker";
 import { PoWValidatorWorker } from "../modules/pow/validator/PoWValidatorWorker";
 
@@ -14,13 +14,9 @@ interface IFaucetWorkerData {
 
 export class FaucetWorkers {
 
-  public static loadWorkerClass() {
-    let workerData: IFaucetWorkerData = workerDataPtr;
-    if(!workerData || !workerData.classKey)
-      throw "invalid worker invocation";
-    
-    let workerClass = WORKER_CLASSES[workerData.classKey];
-    new workerClass(parentPort);
+  public static loadWorkerClass(workerClassKey?: string, workerPort?: MessagePort) {
+    let workerClass = WORKER_CLASSES[workerClassKey || workerData?.classKey];
+    new workerClass(workerPort || parentPort);
   }
 
   private initialized: boolean;

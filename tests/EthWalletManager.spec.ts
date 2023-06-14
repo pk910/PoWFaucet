@@ -1,30 +1,36 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { unbindTestStubs, FakeProvider, awaitSleepPromise } from './common';
-import { faucetConfig, loadFaucetConfig } from '../src/common/FaucetConfig';
-import { EthWalletManager, FaucetCoinType } from '../src/services/EthWalletManager';
-import { FaucetProcess } from '../src/common/FaucetProcess';
+import { unbindTestStubs, awaitSleepPromise, bindTestStubs, loadDefaultTestConfig } from './common';
+import { faucetConfig } from '../src/config/FaucetConfig';
+import { EthWalletManager, FaucetCoinType } from '../src/eth/EthWalletManager';
 import { ServiceManager } from '../src/common/ServiceManager';
-import { ClaimTxStatus, EthClaimManager } from '../src/services/EthClaimManager';
-import { FaucetStoreDB } from '../src/services/FaucetStoreDB';
+import { ClaimTxStatus, EthClaimManager } from '../src/eth/EthClaimManager';
 import { sleepPromise } from '../src/utils/SleepPromise';
+import { FakeProvider } from './stubs/FakeProvider';
+import { FaucetDatabase } from '../src/db/FaucetDatabase';
+import { FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession';
+import { ModuleManager } from '../src/modules/ModuleManager';
 
 describe("ETH Wallet Manager", () => {
   let globalStubs;
   let fakeProvider;
 
-  beforeEach(() => {
-    globalStubs = {
-      "FaucetProcess.emitLog": sinon.stub(FaucetProcess.prototype, "emitLog"),
-    };
+  beforeEach(async () => {
+    globalStubs = bindTestStubs({
+    });
     fakeProvider = new FakeProvider();
-    loadFaucetConfig(true);
+    loadDefaultTestConfig();
     faucetConfig.faucetStats = null;
+    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethRpcHost = fakeProvider;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
+    await ServiceManager.GetService(ModuleManager).initialize();
   });
-  afterEach(() => {
-    return unbindTestStubs();
+  afterEach(async () => {
+    await ServiceManager.GetService(FaucetDatabase).closeDatabase();
+    await unbindTestStubs();
+    ServiceManager.ClearAllServices();
   });
 
   it("check wallet state initialization", async () => {
@@ -32,8 +38,7 @@ describe("ETH Wallet Manager", () => {
     fakeProvider.injectResponse("eth_chainId", 1337);
     fakeProvider.injectResponse("eth_getBalance", "1000");
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
@@ -44,6 +49,7 @@ describe("ETH Wallet Manager", () => {
     expect(ethWalletManager.getFaucetAddress()).equal("0xCA9456991E0AA5d5321e88Bba44d405aAb401193", "unexpected wallet address");
     expect(ethWalletManager.getFaucetBalance()).equal(1000n, "unexpected balance");
   });
+
   it("check wallet state initialization (pending not supported)", async () => {
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_chainId", 1337);
@@ -57,8 +63,7 @@ describe("ETH Wallet Manager", () => {
         throw '"pending" is not yet supported';
       return 42;
     });
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
@@ -69,6 +74,7 @@ describe("ETH Wallet Manager", () => {
     expect(ethWalletManager.getFaucetAddress()).equal("0xCA9456991E0AA5d5321e88Bba44d405aAb401193", "unexpected wallet address");
     expect(ethWalletManager.getFaucetBalance()).equal(1000n, "unexpected balance");
   });
+
   it("check wallet state initialization (fixed chainId)", async () => {
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_getBalance", (payload) => {
@@ -81,9 +87,8 @@ describe("ETH Wallet Manager", () => {
         throw '"pending" is not yet supported';
       return 42;
     });
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethChainId = 1337;
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
@@ -94,6 +99,7 @@ describe("ETH Wallet Manager", () => {
     expect(ethWalletManager.getFaucetAddress()).equal("0xCA9456991E0AA5d5321e88Bba44d405aAb401193", "unexpected wallet address");
     expect(ethWalletManager.getFaucetBalance()).equal(1000n, "unexpected balance");
   });
+
   it("check wallet state initialization (erc20 token)", async () => {
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_chainId", 1337);
@@ -111,7 +117,7 @@ describe("ETH Wallet Manager", () => {
     });
     faucetConfig.faucetCoinType = FaucetCoinType.ERC20;
     faucetConfig.faucetCoinContract = "0x0000000000000000000000000000000000001337";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
@@ -121,15 +127,15 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.nativeBalance).equal(1000n, "unexpected balance in wallet state");
     expect(ethWalletManager.getTokenAddress()).equal("0x0000000000000000000000000000000000001337", "unexpected token address");
   });
+
   it("send ClaimTx transaction", async () => {
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
     faucetConfig.ethTxGasLimit = 21000;
     faucetConfig.ethTxMaxFee = 100000000000; // 100 gwei
     faucetConfig.ethTxPrioFee = 2000000000; // 2 gwei
-    faucetConfig.faucetDBFile = ":memory:";
-    ServiceManager.InitService(FaucetStoreDB).initialize();
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
@@ -157,15 +163,23 @@ describe("ETH Wallet Manager", () => {
         "type": "0x2"
       };
     });
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
-    let claimTx = ethClaimManager.addClaimTransaction("0X0000000000000000000000000000000000001337", 1337n, "f081154a-3b93-4972-9ae7-b83f3307bb0f");
+    let testSessionData: FaucetSessionStoreData = {
+      sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+      status: FaucetSessionStatus.CLAIMABLE,
+      startTime: Math.floor(new Date().getTime() / 1000),
+      targetAddr: "0x0000000000000000000000000000000000001337",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [], data: {}, claim: null,
+    };
+    let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    await awaitSleepPromise(200, () => claimTx.status === ClaimTxStatus.CONFIRMED);
+    await awaitSleepPromise(200, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");
     expect(rawTxReq[0].params[0]).to.equal("0x02f86f8205392a847735940085174876e80082520894000000000000000000000000000000000000133782053980c001a04787689fdfc3803c758feaaa7989761900c274488f1f656ec7aa277ae37294efa038b6fc22a7a4c1f0bf537a989f00c907413f5c3e333807e1bbadfb08f74926f5", "unexpected transaction hex");    
-    expect(claimTx.status).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
     expect(walletState.ready).equal(true, "wallet state not ready");
@@ -173,15 +187,15 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.balance).equal(999978999999998663n, "unexpected balance in wallet state");
     expect(walletState.nativeBalance).equal(999978999999998663n, "unexpected balance in wallet state");
   });
+
   it("send ClaimTx transaction (long confirmation time)", async () => {
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
     faucetConfig.ethTxGasLimit = 21000;
     faucetConfig.ethTxMaxFee = 100000000000; // 100 gwei
     faucetConfig.ethTxPrioFee = 2000000000; // 2 gwei
-    faucetConfig.faucetDBFile = ":memory:";
-    ServiceManager.InitService(FaucetStoreDB).initialize();
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
@@ -217,21 +231,29 @@ describe("ETH Wallet Manager", () => {
         "type": "0x2"
       };
     });
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     (ethWalletManager as any).web3.eth.transactionPollingTimeout = 1;
     (ethWalletManager as any).txReceiptPollInterval = 10;
     await ethWalletManager.loadWalletState();
-    let claimTx = ethClaimManager.addClaimTransaction("0x0000000000000000000000000000000000001337", 1337n, "f081154a-3b93-4972-9ae7-b83f3307bb0f");
+    let testSessionData: FaucetSessionStoreData = {
+      sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+      status: FaucetSessionStatus.CLAIMABLE,
+      startTime: Math.floor(new Date().getTime() / 1000),
+      targetAddr: "0x0000000000000000000000000000000000001337",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [], data: {}, claim: null,
+    };
+    let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
     await sleepPromise(3000); // wait for timeout from web3js lib
     receiptResponseMode = "conn";
     await sleepPromise(100); // do a few "connection error"-polls
     receiptResponseMode = "receipt"; // now return the receipt
-    await awaitSleepPromise(1000, () => claimTx.status === ClaimTxStatus.CONFIRMED);
+    await awaitSleepPromise(1000, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");
     expect(rawTxReq[0].params[0]).to.equal("0x02f86f8205392a847735940085174876e80082520894000000000000000000000000000000000000133782053980c001a04787689fdfc3803c758feaaa7989761900c274488f1f656ec7aa277ae37294efa038b6fc22a7a4c1f0bf537a989f00c907413f5c3e333807e1bbadfb08f74926f5", "unexpected transaction hex");    
-    expect(claimTx.status).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
     expect(walletState.ready).equal(true, "wallet state not ready");
@@ -239,16 +261,16 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.balance).equal(999978999999998663n, "unexpected balance in wallet state");
     expect(walletState.nativeBalance).equal(999978999999998663n, "unexpected balance in wallet state");
   }).timeout(5000);
+
   it("send ClaimTx transaction (legacy transaction)", async () => {
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
     faucetConfig.ethTxGasLimit = 21000;
     faucetConfig.ethTxMaxFee = 100000000000; // 100 gwei
     faucetConfig.ethTxPrioFee = 2000000000; // 2 gwei
     faucetConfig.ethLegacyTx = true;
-    faucetConfig.faucetDBFile = ":memory:";
-    ServiceManager.InitService(FaucetStoreDB).initialize();
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
@@ -277,15 +299,23 @@ describe("ETH Wallet Manager", () => {
         "type": "0x2"
       };
     });
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
-    let claimTx = ethClaimManager.addClaimTransaction("0x0000000000000000000000000000000000001337", 1337n, "f081154a-3b93-4972-9ae7-b83f3307bb0f");
+    let testSessionData: FaucetSessionStoreData = {
+      sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+      status: FaucetSessionStatus.CLAIMABLE,
+      startTime: Math.floor(new Date().getTime() / 1000),
+      targetAddr: "0x0000000000000000000000000000000000001337",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [], data: {}, claim: null,
+    };
+    let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    await awaitSleepPromise(200, () => claimTx.status === ClaimTxStatus.CONFIRMED);
+    await awaitSleepPromise(200, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");
     expect(rawTxReq[0].params[0]).to.equal("0xf8682a85174876e80082520894000000000000000000000000000000000000133782053980820a96a0537845eca3779f6925b8ca8459bf20a72189ceb3746e62d50ae5b7cfec5c83e8a025ecaf297265b4a5e5fcdd3f66c0184c3c4f103cfd5bf5dc2ffc2da9c7fa8ee0", "unexpected transaction hex");
-    expect(claimTx.status).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
     expect(walletState.ready).equal(true, "wallet state not ready");
@@ -293,15 +323,15 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.balance).equal(999978999999998663n, "unexpected balance in wallet state");
     expect(walletState.nativeBalance).equal(999978999999998663n, "unexpected balance in wallet state");
   });
+
   it("send ClaimTx transaction (RPC error)", async () => {
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
     faucetConfig.ethTxGasLimit = 21000;
     faucetConfig.ethTxMaxFee = 100000000000; // 100 gwei
     faucetConfig.ethTxPrioFee = 2000000000; // 2 gwei
-    faucetConfig.faucetDBFile = ":memory:";
-    ServiceManager.InitService(FaucetStoreDB).initialize();
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
@@ -309,14 +339,22 @@ describe("ETH Wallet Manager", () => {
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       throw "test error 57572x";
     });
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
-    let claimTx = ethClaimManager.addClaimTransaction("0X0000000000000000000000000000000000001337", 1337n, "f081154a-3b93-4972-9ae7-b83f3307bb0f");
+    let testSessionData: FaucetSessionStoreData = {
+      sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+      status: FaucetSessionStatus.CLAIMABLE,
+      startTime: Math.floor(new Date().getTime() / 1000),
+      targetAddr: "0x0000000000000000000000000000000000001337",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [], data: {}, claim: null,
+    };
+    let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    await awaitSleepPromise(10000, () => claimTx.status === ClaimTxStatus.FAILED);
-    expect(claimTx.status).to.equal(ClaimTxStatus.FAILED, "unexpected claimTx status");
-    expect(claimTx.failReason).contains("test error 57572x", "test error not in failReason");
+    await awaitSleepPromise(10000, () => claimTx.claim.claimStatus === ClaimTxStatus.FAILED);
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "unexpected claimTx status");
+    expect(claimTx.claim.txError).contains("test error 57572x", "test error not in failReason");
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
     expect(walletState.ready).equal(true, "wallet state not ready");
@@ -324,15 +362,15 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.balance).equal(1000000000000000000n, "unexpected balance in wallet state");
     expect(walletState.nativeBalance).equal(1000000000000000000n, "unexpected balance in wallet state");
   }).timeout(10000);
+
   it("send ClaimTx transaction (reverted transaction)", async () => {
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
     faucetConfig.ethTxGasLimit = 21000;
     faucetConfig.ethTxMaxFee = 100000000000; // 100 gwei
     faucetConfig.ethTxPrioFee = 2000000000; // 2 gwei
-    faucetConfig.faucetDBFile = ":memory:";
-    ServiceManager.InitService(FaucetStoreDB).initialize();
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
@@ -354,13 +392,21 @@ describe("ETH Wallet Manager", () => {
       "transactionIndex": "0x3d",
       "type": "0x2"
     });
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
-    let claimTx = ethClaimManager.addClaimTransaction("0X0000000000000000000000000000000000001337", 1337n, "f081154a-3b93-4972-9ae7-b83f3307bb0f");
+    let testSessionData: FaucetSessionStoreData = {
+      sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+      status: FaucetSessionStatus.CLAIMABLE,
+      startTime: Math.floor(new Date().getTime() / 1000),
+      targetAddr: "0x0000000000000000000000000000000000001337",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [], data: {}, claim: null,
+    };
+    let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    await awaitSleepPromise(200, () => claimTx.status === ClaimTxStatus.FAILED);
-    expect(claimTx.status).to.equal(ClaimTxStatus.FAILED, "unexpected claimTx status");
+    await awaitSleepPromise(200, () => claimTx.claim.claimStatus === ClaimTxStatus.FAILED);
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "unexpected claimTx status");
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
     expect(walletState.ready).equal(true, "wallet state not ready");
@@ -368,15 +414,15 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.balance).equal(999999999999998663n, "unexpected balance in wallet state");
     expect(walletState.nativeBalance).equal(999999999999998663n, "unexpected balance in wallet state");
   });
+
   it("check wallet state initialization (erc20 token)", async () => {
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
     faucetConfig.ethTxGasLimit = 21000;
     faucetConfig.ethTxMaxFee = 100000000000; // 100 gwei
     faucetConfig.ethTxPrioFee = 2000000000; // 2 gwei
-    faucetConfig.faucetDBFile = ":memory:";
-    ServiceManager.InitService(FaucetStoreDB).initialize();
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_chainId", 1337);
@@ -417,12 +463,21 @@ describe("ETH Wallet Manager", () => {
     });
     faucetConfig.faucetCoinType = FaucetCoinType.ERC20;
     faucetConfig.faucetCoinContract = "0x0000000000000000000000000000000000004242";
-    ethWalletManager.initialize();
+    await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
-    let claimTx = ethClaimManager.addClaimTransaction("0x0000000000000000000000000000000000001337", 1337n, "f081154a-3b93-4972-9ae7-b83f3307bb0f");
+    let testSessionData: FaucetSessionStoreData = {
+      sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+      status: FaucetSessionStatus.CLAIMABLE,
+      startTime: Math.floor(new Date().getTime() / 1000),
+      targetAddr: "0x0000000000000000000000000000000000001337",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [], data: {}, claim: null,
+    };
+    let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    await awaitSleepPromise(200, () => claimTx.status === ClaimTxStatus.CONFIRMED);
-    expect(claimTx.status).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
+    await awaitSleepPromise(200, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");
     expect(rawTxReq[0].params[0]).to.equal("0x02f8b28205392a847735940085174876e80082520894000000000000000000000000000000000000424280b844a9059cbb00000000000000000000000000000000000000000000000000000000000013370000000000000000000000000000000000000000000000000000000000000539c001a002eca862f97badedde37bfbfd0ec047dc16e33bd1f73e20d24e284c6950c685ea03f975804b22ab748a52098907c87fcdb40520a9f7c11fe54721fa037c81e8055", "unexpected transaction hex");
     let walletState = ethWalletManager.getWalletState();
