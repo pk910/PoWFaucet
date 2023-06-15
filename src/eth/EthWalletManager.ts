@@ -48,6 +48,18 @@ export interface TransactionResult {
 }
 
 export class EthWalletManager {
+
+  public static getWeb3Provider(rpcHost: any): any {
+    if(rpcHost && typeof rpcHost === "object")
+      return rpcHost as any;
+    else if(rpcHost.match(/^wss?:\/\//))
+      return new Web3.providers.WebsocketProvider(rpcHost);
+    else if(rpcHost.match(/^\//))
+      return new Web3.providers.IpcProvider(rpcHost, net);
+    else
+      return new Web3.providers.HttpProvider(rpcHost);
+  }
+
   private initialized: boolean;
   private web3: Web3;
   private chainCommon: EthCom.default;
@@ -97,16 +109,7 @@ export class EthWalletManager {
   }
 
   private startWeb3() {
-    let provider: any;
-    if(faucetConfig.ethRpcHost && typeof faucetConfig.ethRpcHost === "object")
-      provider = faucetConfig.ethRpcHost as any;
-    else if(faucetConfig.ethRpcHost.match(/^wss?:\/\//))
-      provider = new Web3.providers.WebsocketProvider(faucetConfig.ethRpcHost);
-    else if(faucetConfig.ethRpcHost.match(/^\//))
-      provider = new Web3.providers.IpcProvider(faucetConfig.ethRpcHost, net);
-    else
-      provider = new Web3.providers.HttpProvider(faucetConfig.ethRpcHost);
-    
+    let provider = EthWalletManager.getWeb3Provider(faucetConfig.ethRpcHost);
     this.web3 = new Web3(provider);
 
     if(faucetConfig.faucetCoinType !== FaucetCoinType.NATIVE)

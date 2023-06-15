@@ -14,11 +14,7 @@ import { ModuleManager } from '../../src/modules/ModuleManager';
 import { SessionManager } from '../../src/session/SessionManager';
 import { faucetConfig } from '../../src/config/FaucetConfig';
 import { FaucetError } from '../../src/common/FaucetError';
-import { FakeProvider } from '../stubs/FakeProvider';
-import { IEthInfoConfig } from '../../src/modules/ethinfo/EthInfoConfig';
-import { EthWalletManager } from '../../src/eth/EthWalletManager';
 import { IIPInfoConfig } from '../../src/modules/ipinfo/IPInfoConfig';
-import { IIPInfo } from '../../src/modules/ipinfo/IPInfoResolver';
 
 
 describe("Faucet module: ipinfo", () => {

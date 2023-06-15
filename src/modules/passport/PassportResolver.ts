@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-
+import fetch from 'node-fetch';
 import { resolveRelativePath } from '../../config/FaucetConfig';
 import { FaucetProcess, FaucetLogLevel } from "../../common/FaucetProcess";
 import { ServiceManager } from '../../common/ServiceManager';
@@ -77,27 +77,30 @@ export class PassportResolver {
     this.didkitPromise = import("../../../libs/didkit_wasm");
   }
 
+  private getVerifyTime(): number {
+    return Math.floor((new Date()).getTime() / 1000);
+  }
+
   public increaseScoreNonce() {
     this.passportScoreNonce++;
   }
 
-  public async getPassport(addr: string, refresh?: boolean): Promise<IPassportInfo> {
+  public getPassport(addr: string, refresh?: boolean): Promise<IPassportInfo> {
     if(this.passportCache.hasOwnProperty(addr))
       return this.passportCache[addr];
-    
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let cachedPassportInfo = await this.module.getPassportDb().getPassportInfo(addr);
-    let passportInfoPromise: Promise<IPassportInfo>;
 
-    if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (this.module.getModuleConfig().cacheTime || 60)) {
-      passportInfoPromise = Promise.resolve(cachedPassportInfo);
-    }
-    else {
-      passportInfoPromise = this.passportCache[addr] = this.refreshPassport(addr).then((passport) => this.buildPassportInfo(addr, passport));
-      passportInfoPromise.finally(() => {
-        delete this.passportCache[addr];
-      });
-    }
+    let passportInfoPromise = this.passportCache[addr] = this.module.getPassportDb().getPassportInfo(addr).then((cachedPassportInfo) => {
+      let now = Math.floor((new Date()).getTime() / 1000);
+      if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (this.module.getModuleConfig().cacheTime || 60)) {
+        return cachedPassportInfo;
+      }
+      else {
+        return this.refreshPassport(addr).then((passport) => this.buildPassportInfo(addr, passport));
+      }
+    });
+    passportInfoPromise.finally(() => {
+      delete this.passportCache[addr];
+    });
 
     return passportInfoPromise;
   }
@@ -201,7 +204,6 @@ export class PassportResolver {
     
     // verify passport
 
-    let now = Math.floor((new Date()).getTime() / 1000);
     await Promise.all(passport.stamps.map(async (stamp) => {
       let issuanceTime = Math.floor((new Date(stamp.credential.issuanceDate)).getTime() / 1000);
       if(issuanceTime > verifyResult.newest) {
@@ -230,13 +232,18 @@ export class PassportResolver {
 
       // verify stamp issuer
       if(this.module.getModuleConfig().trustedIssuers.indexOf(stamp.credential.issuer) === -1) {
-        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: issuer not trusted")
+        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: issuer not trusted");
+        return;
+      }
+
+      if((stamp.credential.proof as any).verificationMethod.substring(0, stamp.credential.issuer.length) !== stamp.credential.issuer) {
+        verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: invalid proof verificationMethod");
         return;
       }
 
       // verify expiration date
       let expirationTime = Math.floor((new Date(stamp.credential.expirationDate)).getTime() / 1000);
-      if(expirationTime < now) {
+      if(expirationTime < this.getVerifyTime()) {
         verifyResult.errors.push("Stamp '" + stamp.provider + "' invalid: stamp expired")
         return;
       }
@@ -287,6 +294,7 @@ export class PassportResolver {
   private async buildPassportInfo(addr: string, passport: IPassport): Promise<IPassportInfo> {
     let passportInfo: IPassportInfo;
     let now = Math.floor((new Date()).getTime() / 1000);
+    let savePromises: Promise<void>[] = [];
 
     if(passport) {
       let stampHashes = passport.stamps.map((stamp) => stamp.credential.credentialSubject.hash);
@@ -322,9 +330,9 @@ export class PassportResolver {
         newest: newestStamp,
         stamps: stamps,
       };
-      this.module.getPassportDb().updatePassportStamps(stampHashes.filter((stampHash) => {
+      savePromises.push(this.module.getPassportDb().updatePassportStamps(stampHashes.filter((stampHash) => {
         return stampAssignments[stampHash]?.toLowerCase() === addr.toLowerCase();
-      }), addr, this.module.getModuleConfig().stampDeduplicationTime || this.module.getModuleConfig().cacheTime || 86400);
+      }), addr, this.module.getModuleConfig().stampDeduplicationTime || this.module.getModuleConfig().cacheTime || 86400));
     }
     else {
       passportInfo = {
@@ -334,7 +342,8 @@ export class PassportResolver {
       };
     }
     
-    this.module.getPassportDb().setPassportInfo(addr, passportInfo);
+    savePromises.push(this.module.getPassportDb().setPassportInfo(addr, passportInfo));
+    await Promise.all(savePromises);
 
     return passportInfo;
   }

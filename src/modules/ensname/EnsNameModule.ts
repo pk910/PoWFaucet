@@ -5,6 +5,7 @@ import { BaseModule } from "../BaseModule";
 import { ModuleHookAction } from "../ModuleManager";
 import { defaultConfig, IEnsNameConfig } from './EnsNameConfig';
 import { FaucetError } from '../../common/FaucetError';
+import { EthWalletManager } from '../../eth/EthWalletManager';
 
 export class EnsNameModule extends BaseModule<IEnsNameConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -34,7 +35,7 @@ export class EnsNameModule extends BaseModule<IEnsNameConfig> {
   }
 
   private initEnsResolver() {
-    let provider = typeof this.moduleConfig.rpcHost == "object" ? this.moduleConfig.rpcHost : new Web3.providers.HttpProvider(this.moduleConfig.rpcHost);
+    let provider = EthWalletManager.getWeb3Provider(this.moduleConfig.rpcHost);
     this.ens = new ENS(provider, this.moduleConfig.ensAddr || undefined, Web3);
   }
 

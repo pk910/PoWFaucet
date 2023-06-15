@@ -1,5 +1,4 @@
 import Web3 from 'web3';
-import net from 'net';
 import { ServiceManager } from "../../common/ServiceManager";
 import { EthWalletManager } from "../../eth/EthWalletManager";
 import { FaucetSession } from "../../session/FaucetSession";
@@ -23,16 +22,7 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
   }
 
   private startWeb3() {
-    let provider: any;
-    if(this.moduleConfig.rpcHost && typeof this.moduleConfig.rpcHost === "object")
-      provider = this.moduleConfig.rpcHost as any;
-    else if(this.moduleConfig.rpcHost.match(/^wss?:\/\//))
-      provider = new Web3.providers.WebsocketProvider(this.moduleConfig.rpcHost);
-    else if(this.moduleConfig.rpcHost.match(/^\//))
-      provider = new Web3.providers.IpcProvider(this.moduleConfig.rpcHost, net);
-    else
-      provider = new Web3.providers.HttpProvider(this.moduleConfig.rpcHost);
-    
+    let provider = EthWalletManager.getWeb3Provider(this.moduleConfig.rpcHost);
     this.web3 = new Web3(provider);
   }
 
