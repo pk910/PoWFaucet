@@ -415,7 +415,7 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.nativeBalance).equal(999999999999998663n, "unexpected balance in wallet state");
   });
 
-  it("check wallet state initialization (erc20 token)", async () => {
+  it("send ClaimTx transaction (erc20 token transfer)", async () => {
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
     faucetConfig.ethTxGasLimit = 21000;

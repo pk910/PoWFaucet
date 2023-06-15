@@ -8,6 +8,13 @@ import { ModuleHookAction } from "../ModuleManager";
 import { defaultConfig, ICaptchaConfig } from "./CaptchaConfig";
 import { FaucetError } from '../../common/FaucetError';
 
+export class HCaptchaApi {
+  public static verify(secret: string, token: string, remoteip?: string, sitekey?: string) {
+    return hcaptcha.verify(secret, token, remoteip, sitekey);
+  }
+}
+
+
 export class CaptchaModule extends BaseModule<ICaptchaConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
 
@@ -77,7 +84,7 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
   }
   
   private async verifyHCaptchaToken(token: string, remoteIp: string): Promise<boolean> {
-    let hcaptchaResponse = await hcaptcha.verify(this.moduleConfig.secret, token, remoteIp, this.moduleConfig.siteKey);
+    let hcaptchaResponse = await HCaptchaApi.verify(this.moduleConfig.secret, token, remoteIp, this.moduleConfig.siteKey);
     return hcaptchaResponse.success;
   }
 

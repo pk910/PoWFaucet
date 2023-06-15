@@ -5,9 +5,20 @@ export class FakeProvider extends TypedEmitter {
   private responseDict: {
     [method: string]: any
   } = {};
+  private requestDict: {
+    [method: string]: any[]
+  } = {};
+
 
   public injectResponse(method: string, response: any) {
     this.responseDict[method] = response;
+  }
+
+  private getLastRequest(method: string): any {
+    let methodCalls;
+    if(!(methodCalls = this.requestDict[method]))
+      return null;
+    return methodCalls[methodCalls.length - 1];
   }
 
   public send(payload) {
@@ -37,6 +48,10 @@ export class FakeProvider extends TypedEmitter {
   }
 
   private getResponse(payload) {
+    if(!this.requestDict[payload.method])
+      this.requestDict[payload.method] = [ payload ];
+    else
+      this.requestDict[payload.method].push(payload);
     //console.log("payload", JSON.stringify(payload, null, 2));
     let rsp = this.responseDict[payload.method];
     if(!rsp) {

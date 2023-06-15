@@ -193,16 +193,16 @@ modules:
 
     # reward restriction based on faucet wallet balance. lowest value applies
     fixedRestriction:
-      1000: 90 # 90% if lower than 1000 ETH
-      500: 50  # 50% if lower than 500 ETH
-      200: 10  # 10% if lower than 200 ETH
-      100: 5   # 5% if lower than 100 ETH
+      1000000000000000000000: 90 # 90% if lower than 1000 ETH
+      500000000000000000000: 50  # 50% if lower than 500 ETH
+      200000000000000000000: 10  # 10% if lower than 200 ETH
+      100000000000000000000: 5   # 5% if lower than 100 ETH
 
     # dynamic reward restriction based on faucet balance
     # alternative to fixedRestriction, if both are set, the lower factor gets applied
     # limits the rewards linearly according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
     dynamicRestriction:
-      targetBalance: 1100 # no restriction with faucet balance > 1100 ETH
+      targetBalance: 1100000000000000000000 # no restriction with faucet balance > 1100 ETH
   
   ## Faucet Outflow module
   faucet-outflow:

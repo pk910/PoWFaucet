@@ -8,6 +8,7 @@ import { getNewGuid } from "../utils/GuidUtils";
 import { SessionManager } from "./SessionManager";
 import { ISessionRewardFactor } from "./SessionRewardFactor";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
+import { FaucetStatsLog } from "../services/FaucetStatsLog";
 
 export enum FaucetSessionStatus {
   UNKNOWN = "unknown",
@@ -239,6 +240,7 @@ export class FaucetSession {
     
     this.status = FaucetSessionStatus.CLAIMABLE;
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
+    ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
     this.manager.notifySessionUpdate(this);
     this.setSessionData("close.time", Math.floor((new Date()).getTime() / 1000));
     this.saveSession();

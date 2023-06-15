@@ -11,6 +11,7 @@ import { resolveRelativePath } from "../../config/FaucetConfig";
 import { ISessionRewardFactor } from '../../session/SessionRewardFactor';
 import { IPInfoDB } from './IPInfoDB';
 import { FaucetDatabase } from '../../db/FaucetDatabase';
+import { FaucetLogLevel, FaucetProcess } from '../../common/FaucetProcess';
 
 export interface IIPInfoRestriction {
   reward: number;
@@ -66,6 +67,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     } catch(ex) {
       if(this.moduleConfig.required)
         throw new FaucetError("INVALID_IPINFO", "Error while checking your IP: " + ex.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Error while fetching IP-Info for " + remoteIp + ": " + ex.toString());
     }
     session.setSessionData("ipinfo.data", ipInfo);
 

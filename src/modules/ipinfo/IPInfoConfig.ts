@@ -33,6 +33,6 @@ export const defaultConfig: IIPInfoConfig = {
   cacheTime: 86400,
   required: false,
   restrictions: null,
-  restrictionsPattern: null,
+  restrictionsPattern: {},
   restrictionsFile: null,
 }

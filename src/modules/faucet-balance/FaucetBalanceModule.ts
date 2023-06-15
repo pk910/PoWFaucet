@@ -70,10 +70,9 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
 
     let restrictedReward = 100;
     let minbalances = Object.keys(this.moduleConfig.fixedRestriction).map((v) => parseInt(v)).sort((a, b) => a - b);
-    let faucetBalance = ServiceManager.GetService(EthWalletManager).decimalUnitAmount(balance);
-    if(faucetBalance <= minbalances[minbalances.length - 1]) {
+    if(balance <= minbalances[minbalances.length - 1]) {
       for(let i = 0; i < minbalances.length; i++) {
-        if(faucetBalance <= minbalances[i]) {
+        if(balance <= minbalances[i]) {
           let restriction = this.moduleConfig.fixedRestriction[minbalances[i]];
           if(restriction < restrictedReward)
             restrictedReward = restriction;
@@ -87,7 +86,7 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
   private getDynamicBalanceRestriction(balance: bigint): number {
     if(!this.moduleConfig.dynamicRestriction || !this.moduleConfig.dynamicRestriction.targetBalance)
       return 100;
-    let targetBalance = BigInt(this.moduleConfig.dynamicRestriction.targetBalance) * BigInt(Math.pow(10, ServiceManager.GetService(EthWalletManager).getFaucetDecimals()));
+    let targetBalance = BigInt(this.moduleConfig.dynamicRestriction.targetBalance);
     if(balance >= targetBalance)
       return 100;
     if(balance <= faucetConfig.spareFundsAmount)

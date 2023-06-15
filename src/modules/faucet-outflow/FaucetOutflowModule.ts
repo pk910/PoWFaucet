@@ -52,7 +52,7 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     return Math.floor((new Date()).getTime() / 1000);
   }
 
-  private async loadOutflowState(): Promise<void> {
+  public async loadOutflowState(): Promise<void> {
     let stateJson = await ServiceManager.GetService(FaucetDatabase).getKeyValueEntry("PoWOutflowLimiter.state");
     if(stateJson) {
       let stateObj = JSON.parse(stateJson);
@@ -69,29 +69,21 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     }
   }
 
-  public saveOutflowState() {
+  public async saveOutflowState() {
     if(this.outflowState) {
-      ServiceManager.GetService(FaucetDatabase).setKeyValueEntry("PoWOutflowLimiter.state", JSON.stringify({
+      await ServiceManager.GetService(FaucetDatabase).setKeyValueEntry("PoWOutflowLimiter.state", JSON.stringify({
         trackTime: this.outflowState.trackTime,
         dustAmount: this.outflowState.dustAmount.toString(),
       }));
     }
-    else
-      ServiceManager.GetService(FaucetDatabase).deleteKeyValueEntry("PoWOutflowLimiter.state");
   }
 
   private updateState(minedAmount: bigint) {
     if(minedAmount < 0)
       return;
-    let now = this.now();
-
-    // check upperLimit
-    if(this.getOutflowBalance() > this.moduleConfig.upperLimit) {
-      let upperTimeLimit = BigInt(this.moduleConfig.upperLimit) * BigInt(this.moduleConfig.duration) / BigInt(this.moduleConfig.amount);
-      this.outflowState.trackTime = now - Number(upperTimeLimit);
-      this.outflowState.dustAmount = 0n;
-    }
     
+    this.getOutflowBalance();
+
     // add minedAmount
     if(minedAmount <= this.outflowState.dustAmount) {
       this.outflowState.dustAmount -= minedAmount;
@@ -112,9 +104,19 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
   }
 
   private getOutflowBalance(): bigint {
-    let timeDiff = this.now() - this.outflowState.trackTime;
+    let now = this.now();
+    let timeDiff = now - this.outflowState.trackTime;
     let balance = BigInt(timeDiff) * BigInt(this.moduleConfig.amount) / BigInt(this.moduleConfig.duration);
     balance += this.outflowState.dustAmount;
+
+    // check upperLimit
+    if(balance > BigInt(this.moduleConfig.upperLimit)) {
+      let upperTimeLimit = BigInt(this.moduleConfig.upperLimit) * BigInt(this.moduleConfig.duration) / BigInt(this.moduleConfig.amount);
+      this.outflowState.trackTime = now - Number(upperTimeLimit);
+      this.outflowState.dustAmount = 0n;
+      balance = BigInt(this.moduleConfig.upperLimit);
+    }
+
     return balance;
   }
 

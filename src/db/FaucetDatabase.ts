@@ -59,7 +59,7 @@ export class FaucetDatabase {
     let modDb: TModDB;
     if(!(modDb = this.moduleDBs[modName] as TModDB)) {
       modDb = this.moduleDBs[modName] = new dbClass(module, this);
-      modDb.initSchema();
+      await modDb.initSchema();
     }
     return modDb;
   }
