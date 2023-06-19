@@ -180,21 +180,22 @@ jobs:
     needs: [run_tests]
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Set up QEMU
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.15.0
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
-      -
-        name: Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      -
-        name: Login to Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      -
-        name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          push: true
-          tags: pk910/powfaucet:v2-latest
+      - run: npm install
+      - run: npm run bundle
+      - name: Build v2-latest docker image
+        run: docker build . --file Dockerfile --tag pk910/powfaucet:v2-latest
+      - name: Push v2-latest docker image
+        run: docker push pk910/powfaucet:v2-latest

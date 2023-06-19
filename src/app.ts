@@ -1,5 +1,6 @@
+import path from "path";
 import { isMainThread, workerData } from "node:worker_threads";
-import { loadFaucetConfig } from "./config/FaucetConfig";
+import { loadFaucetConfig, setAppBasePath } from "./config/FaucetConfig";
 import { FaucetWorkers } from "./common/FaucetWorker";
 import { EthWalletManager } from "./eth/EthWalletManager";
 import { FaucetHttpServer } from "./webserv/FaucetHttpServer";
@@ -16,6 +17,7 @@ import { SessionManager } from "./session/SessionManager";
     FaucetWorkers.loadWorkerClass();
   }
   else {
+    setAppBasePath(path.join(__dirname, ".."))
     loadFaucetConfig()
     ServiceManager.GetService(FaucetProcess).initialize();
     ServiceManager.GetService(FaucetWorkers).initialize(__filename);

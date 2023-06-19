@@ -1,10 +1,8 @@
-FROM nikolaik/python-nodejs:python3.10-nodejs18-slim
+FROM node:18-slim
 WORKDIR /app
-COPY . /app
-RUN npm install
-RUN npm run build
-
-COPY . .
+COPY dist ./dist
+COPY static ./static
+COPY faucet-config.example.yaml .
 
 EXPOSE 8080
-ENTRYPOINT [ "node", "dist/app.js" ]
+ENTRYPOINT [ "node", "dist/powfaucet.js" ]

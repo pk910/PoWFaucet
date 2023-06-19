@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "PoW Faucet Server",
   "main": "dist/app.js",
-  "bin": "dist/app.js",
+  "bin": "dist/powfaucet.js",
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/app.js",

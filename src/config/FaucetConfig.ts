@@ -49,6 +49,10 @@ else
 
 export let faucetConfig: IConfigSchemaV2 = null;
 
+export function setAppBasePath(basePath: string) {
+  internalBasePath = basePath;
+}
+
 export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   let config: IConfigSchemaV2;
   let configFile = faucetConfigFile;
