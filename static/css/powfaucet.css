@@ -345,6 +345,10 @@ html, body {
   margin-top: 8px;
 }
 
+.faucet-page .page-frontpage .faucet-captcha {
+  text-align: center;
+}
+
 .faucet-page .faucet-captcha > div {
   display: inline-block;
 }
