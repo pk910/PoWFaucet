@@ -122,6 +122,17 @@ export class FaucetWebApi {
     return urlRes;
   }
 
+  private getRemoteAddr(req: IncomingMessage): string {
+    let remoteAddr: string = null;
+    if(req.headers['x-forwarded-for']) {
+      let proxyChain = (req.headers['x-forwarded-for'] as string).split(", ");
+      remoteAddr = proxyChain.pop();
+    }
+    if(!remoteAddr)
+      remoteAddr = req.socket.remoteAddress;
+    return remoteAddr;
+  }
+
   private onGetMaxReward(): number {
     return faucetConfig.maxDropAmount;
   }
@@ -172,7 +183,7 @@ export class FaucetWebApi {
     let sessionInfo: IClientSessionInfo;
     let session: FaucetSession;
     try {
-      session = await ServiceManager.GetService(SessionManager).createSession(req.socket.remoteAddress, userInput);
+      session = await ServiceManager.GetService(SessionManager).createSession(this.getRemoteAddr(req), userInput);
       if(session.getSessionStatus() === FaucetSessionStatus.FAILED) {
         return {
           status: FaucetSessionStatus.FAILED,
