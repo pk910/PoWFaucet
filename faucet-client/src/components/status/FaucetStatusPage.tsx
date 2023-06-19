@@ -127,7 +127,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       hashrate: 0,
     };
     this.state.activeSessions.forEach((session) => {
-      if(session.status === "mining") {
+      if(session.status === "running") {
         sessionStatus.mining++;
         sessionStatus.hashrate += session.hashrate;
       }
