@@ -23,8 +23,6 @@ export class ClaimInput extends React.PureComponent<IClaimInputProps, IClaimInpu
   }
 
 	public render(): React.ReactElement<IClaimInputProps> {
-    console.log("render ClaimInput");
-    
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForClaim;
 
     return (
