@@ -298,6 +298,10 @@ html, body {
   width: 600px;
 }
 
+.faucet-page:has(.faucet-status) {
+  width: auto;
+}
+
 
 .faucet-page .faucet-status-alerts {
   position: relative
