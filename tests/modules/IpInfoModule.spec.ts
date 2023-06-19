@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import crypto from 'crypto';
 import YAML from 'yaml'
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise, returnDelayedPromise } from '../common';
 import { ServiceManager } from '../../src/common/ServiceManager';
 import { FaucetDatabase } from '../../src/db/FaucetDatabase';
 import { ModuleManager } from '../../src/modules/ModuleManager';
@@ -69,7 +69,7 @@ describe("Faucet module: ipinfo", () => {
       restrictionsPattern: {},
       restrictionsFile: null,
     } as IIPInfoConfig;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve(testIPInfoResponse)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -93,7 +93,7 @@ describe("Faucet module: ipinfo", () => {
       restrictionsPattern: {},
       restrictionsFile: null,
     } as IIPInfoConfig;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve({status: "failed"})
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -121,7 +121,7 @@ describe("Faucet module: ipinfo", () => {
       restrictionsPattern: {},
       restrictionsFile: null,
     } as IIPInfoConfig;
-    globalStubs["fetch"].returns(Promise.reject("something bad happened"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "something bad happened"));
     await ServiceManager.GetService(ModuleManager).initialize();
     let sessionManager = ServiceManager.GetService(SessionManager);
     let error: FaucetError = null;
@@ -151,7 +151,7 @@ describe("Faucet module: ipinfo", () => {
       restrictionsPattern: {},
       restrictionsFile: null,
     } as IIPInfoConfig;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve(testIPInfoResponse)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -176,7 +176,7 @@ describe("Faucet module: ipinfo", () => {
       restrictionsPattern: {},
       restrictionsFile: null,
     } as IIPInfoConfig;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve(testIPInfoResponse)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -200,7 +200,7 @@ describe("Faucet module: ipinfo", () => {
       },
       restrictionsFile: null,
     } as IIPInfoConfig;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve(testIPInfoResponse)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -235,7 +235,7 @@ describe("Faucet module: ipinfo", () => {
       ]
     };
     fs.writeFileSync(patternFile, YAML.stringify(restrictions));
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve(testIPInfoResponse)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -266,7 +266,7 @@ describe("Faucet module: ipinfo", () => {
       "50: ^.*Google.*$"
     ];
     fs.writeFileSync(patternFile, restrictions.join("\n"));
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve(testIPInfoResponse)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();

@@ -51,3 +51,16 @@ export async function awaitSleepPromise(timeout: number, poll: () => boolean) {
     await sleepPromise(10);
   }
 }
+
+export function returnDelayedPromise(resolve: boolean, result: any, delay?: number): Promise<any> {
+  if(!delay)
+    delay = 10;
+  return new Promise((rs, rj) => {
+    setTimeout(() => {
+      if(resolve)
+        rs(result);
+      else
+        rj(result);
+    }, delay);
+  })
+}

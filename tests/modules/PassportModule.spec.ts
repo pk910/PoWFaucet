@@ -6,7 +6,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise, returnDelayedPromise } from '../common';
 import { ServiceManager } from '../../src/common/ServiceManager';
 import { FaucetDatabase } from '../../src/db/FaucetDatabase';
 import { ModuleHookAction, ModuleManager } from '../../src/modules/ModuleManager';
@@ -77,7 +77,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -108,7 +108,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     await ServiceManager.GetService(ModuleManager).initialize();
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
@@ -134,7 +134,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -164,7 +164,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -229,7 +229,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.reject("strange api error")
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -265,7 +265,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -302,7 +302,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -339,7 +339,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
@@ -374,7 +374,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
       session.addBlockingTask("test", "test", 1);
@@ -387,7 +387,7 @@ describe("Faucet module: passport", () => {
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found")
 
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
     let passportRefreshRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
@@ -420,7 +420,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
@@ -467,7 +467,7 @@ describe("Faucet module: passport", () => {
         2: 4,
       },
     } as any;
-    globalStubs["fetch"].returns(Promise.resolve({
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
     globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
@@ -507,7 +507,7 @@ describe("Faucet module: passport", () => {
       scorerApiKey: "test-api-key",
       refreshCooldown: 0,
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
@@ -536,7 +536,7 @@ describe("Faucet module: passport", () => {
       scorerApiKey: "test-api-key",
       refreshCooldown: 0,
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
@@ -565,7 +565,7 @@ describe("Faucet module: passport", () => {
       scorerApiKey: "test-api-key",
       refreshCooldown: 0,
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
@@ -595,7 +595,7 @@ describe("Faucet module: passport", () => {
       scorerApiKey: "test-api-key",
       refreshCooldown: 0,
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
@@ -625,7 +625,7 @@ describe("Faucet module: passport", () => {
       scorerApiKey: "test-api-key",
       refreshCooldown: 0,
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
@@ -656,7 +656,7 @@ describe("Faucet module: passport", () => {
       scorerApiKey: "test-api-key",
       refreshCooldown: 0,
     } as any;
-    globalStubs["fetch"].returns(Promise.reject("test api error"));
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
     globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
