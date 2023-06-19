@@ -86,6 +86,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     this.targetNoncePrefill = 200;
     this.latestStats = null;
     this.loadSettings();
+    this.options.session.setMiner(this);
   }
 
   public startMiner() {
