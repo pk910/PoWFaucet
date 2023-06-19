@@ -9,6 +9,7 @@ export interface IPoWMinerOptions {
   session: PoWSession;
   workerSrc: PoWMinerWorkerSrc;
   powParams: PoWParams;
+  difficulty: number;
   nonceCount: number;
   hashrateLimit: number;
 }
@@ -77,7 +78,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     super();
     this.options = options;
     this.workers = [];
-    this.powParamsStr = getPoWParamsStr(options.powParams);
+    this.powParamsStr = getPoWParamsStr(options.powParams, options.difficulty);
     this.totalShares = 0;
     this.lastShareTime = null;
     this.nonceQueue = [];
@@ -99,10 +100,10 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     }
   }
 
-  public setPoWParams(params: PoWParams, nonceCount: number) {
+  public setPoWParams(params: PoWParams, difficulty: number, nonceCount: number) {
     this.options.nonceCount = nonceCount;
 
-    let powParamsStr = getPoWParamsStr(params);
+    let powParamsStr = getPoWParamsStr(params, difficulty);
     if(this.powParamsStr === powParamsStr)
       return;
     let needRestart = (this.options.powParams.a !== params.a);
@@ -120,7 +121,10 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       if(this.verifyWorker) {
         this.verifyWorker.worker.postMessage({
           action: "setParams",
-          data: params
+          data: {
+            params: params,
+            difficulty: difficulty,
+          }
         });
       }
       this.workers.forEach((worker) => {
@@ -128,7 +132,10 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
           return;
         worker.worker.postMessage({
           action: "setParams",
-          data: params
+          data: {
+            params: params,
+            difficulty: difficulty,
+          }
         });
       });
     }
@@ -236,7 +243,10 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
       // don't assign any work to the verification worker to avoid verification delays
       worker.worker.postMessage({
         action: "setParams",
-        data: this.options.powParams
+        data: {
+          params: this.options.powParams,
+          difficulty: this.options.difficulty,
+        }
       });
     }
     else {
@@ -252,6 +262,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
           workerid: worker.id,
           preimage: this.options.session.getPreImage(),
           params: this.options.powParams,
+          difficulty: this.options.difficulty,
           nonceStart: nonceRange,
           nonceCount: refillCount,
         }

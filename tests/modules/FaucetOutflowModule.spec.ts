@@ -42,7 +42,7 @@ describe("Faucet module: faucet-outflow", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal(expectedStatus || "claimable", "unexpected session status");
     return testSession.getDropAmount();
   }

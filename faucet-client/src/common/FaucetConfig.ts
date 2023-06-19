@@ -43,6 +43,7 @@ export interface IPoWModuleConfig {
   powWsUrl: string;
   powTimeout: number;
   powParams: PoWParams;
+  powDifficulty: number;
   powNonceCount: number;
   powHashrateLimit: number;
 }
@@ -59,13 +60,11 @@ export type PoWParams = {
   r: number; // block size
   p: number; // parallelization
   l: number; // key length
-  d: number; // difficulty
 } | {
   a: PoWHashAlgo.CRYPTONIGHT,
   c: number; // cn-algo
   v: number; // variant
   h: number; // height
-  d: number; // difficulty
 } | {
   a: PoWHashAlgo.ARGON2;
   t: number; // type
@@ -74,7 +73,6 @@ export type PoWParams = {
   m: number; // memoryCost
   p: number; // parallelization,
   l: number; // keyLength
-  d: number; // difficulty
 }
 
 export interface IPassportModuleConfig {

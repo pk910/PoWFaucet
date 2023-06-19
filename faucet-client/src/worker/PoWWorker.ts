@@ -10,6 +10,7 @@ export interface IPoWWorkerOptions {
 
 interface IPoWWorkerParams {
   params: PoWParams;
+  difficulty: number;
   dmask: string;
   pstr: string;
 }
@@ -24,6 +25,7 @@ export class PoWWorker {
   private options: IPoWWorkerOptions;
   private workerId: number;
   private powParams: IPoWWorkerParams;
+  private powDifficulty: number;
   private powPreImage: string;
   private working = false;
   private workNonce: number;
@@ -63,7 +65,7 @@ export class PoWWorker {
 
   private onCtrlSetWork(data: any) {
     this.workerId = data.workerid;
-    this.powParams = this.getWorkerParams(data.params);
+    this.powParams = this.getWorkerParams(data.params, data.difficulty);
     this.powPreImage = base64ToHex(data.preimage);
     this.nonceRanges = [{
       first: data.nonceStart,
@@ -86,7 +88,7 @@ export class PoWWorker {
   }
 
   private onCtrlSetParams(data: any) {
-    this.powParams = this.getWorkerParams(data);
+    this.powParams = this.getWorkerParams(data.params, data.difficulty);
   }
 
   private onCtrlVerify(share: any) {
@@ -109,11 +111,12 @@ export class PoWWorker {
     });
   }
 
-  private getWorkerParams(params: PoWParams): IPoWWorkerParams {
+  private getWorkerParams(params: PoWParams, difficulty: number): IPoWWorkerParams {
     let workerParams: IPoWWorkerParams = {
       params: params,
-      dmask: this.getDifficultyMask(params.d),
-      pstr: getPoWParamsStr(params),
+      difficulty: difficulty,
+      dmask: this.getDifficultyMask(difficulty),
+      pstr: getPoWParamsStr(params, difficulty),
     };
 
     return workerParams;

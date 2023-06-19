@@ -48,7 +48,8 @@ export class PoWValidator {
           case PoWHashAlgo.ARGON2: 
             return config.powArgon2Params;
         }
-      })()
+      })(),
+      difficulty: config.powDifficulty,
     };
     this.validateQueue[req.shareId] = resDfd;
     this.readyDfd.promise.then(() => {

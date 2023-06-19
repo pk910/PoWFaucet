@@ -12,6 +12,7 @@
   "lib": ["es2015"],
   "exclude": [
     "tests",
+    "tests-old",
     "faucet-client",
     "faucet-wasm",
     "node_modules"

@@ -48,7 +48,7 @@ describe("Faucet module: ethinfo", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     let balanceReq = fakeProvider.getLastRequest("eth_getBalance");
     expect(balanceReq).to.not.equal(null, "no eth_getBalance request");
@@ -72,7 +72,7 @@ describe("Faucet module: ethinfo", () => {
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
-      }, {});
+      });
     } catch(ex) {
       error = ex;
     }
@@ -95,7 +95,7 @@ describe("Faucet module: ethinfo", () => {
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
-      }, {});
+      });
     } catch(ex) {
       error = ex;
     }

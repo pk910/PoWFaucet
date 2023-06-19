@@ -6,4 +6,5 @@ export interface IPoWValidatorValidateRequest {
   preimage: string;
   algo: PoWHashAlgo;
   params: PoWCryptoParams;
+  difficulty: number;
 }

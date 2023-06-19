@@ -53,7 +53,7 @@ describe("Faucet module: faucet-balance", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(1000n, "unexpected drop amount");
     expect(moduleManager.getModule<FaucetBalanceModule>("faucet-balance").getBalanceRestriction()).to.equal(100, "unexpected balance restriction");
@@ -76,7 +76,7 @@ describe("Faucet module: faucet-balance", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(500n, "unexpected drop amount");
     expect(moduleManager.getModule<FaucetBalanceModule>("faucet-balance").getBalanceRestriction()).to.equal(50, "unexpected balance restriction");
@@ -97,7 +97,7 @@ describe("Faucet module: faucet-balance", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(1000n, "unexpected drop amount");
     expect(moduleManager.getModule<FaucetBalanceModule>("faucet-balance").getBalanceRestriction()).to.equal(100, "unexpected balance restriction");
@@ -118,7 +118,7 @@ describe("Faucet module: faucet-balance", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(500n, "unexpected drop amount");
     expect(moduleManager.getModule<FaucetBalanceModule>("faucet-balance").getBalanceRestriction()).to.equal(50, "unexpected balance restriction");
@@ -140,7 +140,7 @@ describe("Faucet module: faucet-balance", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("failed", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(0n, "unexpected drop amount");
     expect(moduleManager.getModule<FaucetBalanceModule>("faucet-balance").getBalanceRestriction()).to.equal(0, "unexpected balance restriction");

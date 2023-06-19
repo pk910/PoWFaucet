@@ -75,9 +75,9 @@ export class SessionManager {
     return totalBalance;
   }
 
-  public async createSession(remoteIP: string, userInput: any, responseData: any): Promise<FaucetSession> {
+  public async createSession(remoteIP: string, userInput: any): Promise<FaucetSession> {
     let session = new FaucetSession(this);
-    await session.startSession(remoteIP, userInput, responseData);
+    await session.startSession(remoteIP, userInput);
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "New session for " + session.getTargetAddr() + " (IP: " + session.getRemoteIP() + ", ID: " + session.getSessionId() + ")");
     return session;
   }

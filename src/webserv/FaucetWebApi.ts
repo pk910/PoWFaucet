@@ -172,7 +172,7 @@ export class FaucetWebApi {
     let sessionInfo: IClientSessionInfo;
     let session: FaucetSession;
     try {
-      session = await ServiceManager.GetService(SessionManager).createSession(req.socket.remoteAddress, userInput, responseData);
+      session = await ServiceManager.GetService(SessionManager).createSession(req.socket.remoteAddress, userInput);
       if(session.getSessionStatus() === FaucetSessionStatus.FAILED) {
         return {
           status: FaucetSessionStatus.FAILED,
@@ -186,7 +186,6 @@ export class FaucetWebApi {
       sessionInfo = await session.getSessionInfo();
     } catch(ex) {
       if(ex instanceof FaucetError) {
-        responseData = ex;
         return {
           status: FaucetSessionStatus.FAILED,
           failedCode: ex.getCode(),
@@ -201,8 +200,7 @@ export class FaucetWebApi {
         }
       }
     }
-
-    sessionInfo = Object.assign(sessionInfo || {}, responseData);
+    
     return sessionInfo;
   }
 

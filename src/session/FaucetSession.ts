@@ -73,7 +73,7 @@ export class FaucetSession {
     this.isDirty = false;
   }
 
-  public async startSession(remoteIP: string, userInput: any, responseData: any): Promise<void> {
+  public async startSession(remoteIP: string, userInput: any): Promise<void> {
     if(this.status !== FaucetSessionStatus.UNKNOWN)
       throw new FaucetError("INVALID_STATE", "cannot start session: session already in '" + this.status + "' state");
     this.status = FaucetSessionStatus.STARTING;
@@ -95,7 +95,7 @@ export class FaucetSession {
           if(!this.targetAddr)
             this.setTargetAddr(targetAddr);
         }},
-      ], ModuleHookAction.SessionStart, [this, userInput, responseData]);
+      ], ModuleHookAction.SessionStart, [this, userInput]);
     } catch(ex) {
       if(ex instanceof FaucetError)
         await this.setSessionFailed(ex.getCode(), ex.message);

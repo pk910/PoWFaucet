@@ -160,7 +160,9 @@ export class PassportResolver {
         let passportRsp = await fetch("https://api.scorer.gitcoin.co/registry/stamps/" + addr, {
           method: 'GET',
           headers: {'X-API-KEY': this.module.getModuleConfig().scorerApiKey}
-        }).then((rsp) => rsp.json());
+        }).then((rsp) => rsp.json(), (ex) => {
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "API Error while fetching passport: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
+        });
         let gotPassport = passportRsp && passportRsp.items && passportRsp.items.length > 0;
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Requested gitcoin passport for " + addr + ": " + (gotPassport ? "got " + passportRsp.items.length + " stamps" : "no passport"));
         if(gotPassport) {

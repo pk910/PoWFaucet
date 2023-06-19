@@ -31,13 +31,17 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version: 18.15.0
-    - run: npm install -g pkg
 
     - run: npm install
-    - run: npm run build
+    - run: npm run bundle
 
     - run: pkg --compress Brotli .
 
+    - name: Upload powfaucet.js artifact
+      uses: actions/upload-artifact@v3
+      with:
+        path: ./dist/powfaucet.js
+        name: powfaucet.js
     - name: Upload linux binary artifact
       uses: actions/upload-artifact@v3
       with:

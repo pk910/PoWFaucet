@@ -12,8 +12,6 @@ import { FaucetDatabase } from '../../src/db/FaucetDatabase';
 import { ModuleHookAction, ModuleManager } from '../../src/modules/ModuleManager';
 import { SessionManager } from '../../src/session/SessionManager';
 import { faucetConfig } from '../../src/config/FaucetConfig';
-import { FaucetError } from '../../src/common/FaucetError';
-import { FakeProvider } from '../stubs/FakeProvider';
 import testData from './PassportModule.data.json';
 import { FaucetSession } from '../../src/session/FaucetSession';
 import { FaucetWebApi } from '../../src/webserv/FaucetWebApi';
@@ -86,7 +84,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count");
     let passportData = testSession.getSessionData("passport.data");
@@ -115,7 +113,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found")
@@ -146,7 +144,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let clientInfo = await testSession.getSessionInfo();
     expect(!!clientInfo.modules["passport"]).to.equal(true, "missing passport info in client session info");
@@ -176,7 +174,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     
     let passportDetailsRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
@@ -241,7 +239,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
 
     let passportDetailsRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
@@ -274,12 +272,12 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session1 status");
     expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count after session1 start");
     testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session2 status");
     expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count after session2 start");
     let passportData = testSession.getSessionData("passport.data");
@@ -311,12 +309,12 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session1 status");
     expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count after session1 start");
     testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session2 status");
     expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count after session2 start");
     let passportData = testSession.getSessionData("passport.data");
@@ -349,10 +347,10 @@ describe("Faucet module: passport", () => {
     let [testSession] = await Promise.all([
       sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-      }, {}),
+      }),
       sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-      }, {})
+      })
     ]);
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session1 status");
     expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count after session start");
@@ -384,7 +382,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found")
@@ -431,7 +429,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found")
@@ -480,7 +478,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(true, "no passport data found")
@@ -518,7 +516,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found");
@@ -547,7 +545,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found");
@@ -576,7 +574,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found");
@@ -606,7 +604,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found");
@@ -636,7 +634,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found");
@@ -667,7 +665,7 @@ describe("Faucet module: passport", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(false, "unexpected passport data found");

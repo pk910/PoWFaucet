@@ -91,9 +91,9 @@ export class PoWValidatorWorker {
     let hashFn = await this.getHashFn(req.algo);
     let preimg = base64ToHex(req.preimage);
 
-    let dmask = this.difficultyMasks[req.params.difficulty];
+    let dmask = this.difficultyMasks[req.difficulty];
     if(!dmask)
-      dmask = this.difficultyMasks[req.params.difficulty] = this.getDifficultyMask(req.params.difficulty);
+      dmask = this.difficultyMasks[req.difficulty] = this.getDifficultyMask(req.difficulty);
 
     let isValid = (req.nonces.length > 0);
     for(var i = 0; i < req.nonces.length && isValid; i++) {

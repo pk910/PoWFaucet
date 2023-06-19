@@ -2,9 +2,9 @@
 name: Build latest master version
 
 on:
-  #push:
-  #  branches:
-  #    - 'master'
+  push:
+    branches:
+      - 'master'
   workflow_dispatch:
 
 
@@ -37,7 +37,7 @@ jobs:
 
     # build server project
     - run: npm install
-    - run: npm run build
+    - run: npm run bundle
 
     # build binaries
     - run: pkg --compress Brotli .
@@ -112,7 +112,7 @@ jobs:
         release_name: "Latest Binaries"
         tag_name: "latest"
         body: |
-          Latest automatically built executables.
+          Latest automatically built v2 executables.
           Built from master branch (commit: ${{ github.sha }})
 
           Please read the [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) for setup / configuration instructions.
@@ -124,11 +124,21 @@ jobs:
           | ------------- | ------------- |
           | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-win.exe) | PoWFaucet server executable for windows (64bit) |
           | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-linux) | PoWFaucet server executable for linux (64bit) |
+          | [powfaucet.js](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet.js) | PoWFaucet server script bundle (for execution with local node) |
           | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
       env:
         GITHUB_TOKEN: ${{ github.token }}
 
     # upload release artifacts
+    - name: "Upload artifact: powfaucet.js"
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/powfaucet.js
+        asset_name: powfaucet.js
+        asset_content_type: application/octet-stream
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
     - name: "Upload artifact: powfaucet-server-linux"
       uses: actions/upload-release-asset@v1
       with:
@@ -187,4 +197,4 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: pk910/powfaucet:latest
+          tags: pk910/powfaucet:v2-latest

@@ -68,7 +68,7 @@ export class PoWSession {
   }
 
   public get preImage(): string {
-    return this.session.getSessionData("pow.preimage") || [];
+    return this.session.getSessionData("pow.preimage") || null;
   }
 
   public set preImage(value: string) {

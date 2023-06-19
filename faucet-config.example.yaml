@@ -291,6 +291,9 @@ modules:
     # kill websocket if no ping/pong for that number of seconds
     #powPingTimeout: 30
 
+    # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
+    powDifficulty: 11
+
     # mining algorithm to use
     powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
 

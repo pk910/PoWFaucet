@@ -56,7 +56,7 @@ describe("Faucet module: ensname", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "test.eth",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getTargetAddr()).to.equal("0x4B1488B7a6B320d2D721406204aBc3eeAa9AD329", "unexpected session status");
   });
@@ -75,7 +75,7 @@ describe("Faucet module: ensname", () => {
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
-      }, {});
+      });
     } catch(ex) {
       error = ex;
     }
@@ -99,7 +99,7 @@ describe("Faucet module: ensname", () => {
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "test.eth",
-      }, {});
+      });
     } catch(ex) {
       error = ex;
     }

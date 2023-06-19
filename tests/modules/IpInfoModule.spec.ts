@@ -76,7 +76,7 @@ describe("Faucet module: ipinfo", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     let ipInfo = testSession.getSessionData("ipinfo.data");
     expect(!!ipInfo).to.equal(true, "no ipinfo object found");
@@ -102,7 +102,7 @@ describe("Faucet module: ipinfo", () => {
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
-      }, {});
+      });
     } catch(ex) {
       error = ex;
     }
@@ -128,7 +128,7 @@ describe("Faucet module: ipinfo", () => {
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
-      }, {});
+      });
     } catch(ex) {
       error = ex;
     }
@@ -158,7 +158,7 @@ describe("Faucet module: ipinfo", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(100n, "unexpected drop amount");
   });
@@ -183,7 +183,7 @@ describe("Faucet module: ipinfo", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(50n, "unexpected drop amount");
   });
@@ -207,7 +207,7 @@ describe("Faucet module: ipinfo", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(50n, "unexpected drop amount");
   });
@@ -242,7 +242,7 @@ describe("Faucet module: ipinfo", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(50n, "unexpected drop amount");
   });
@@ -273,7 +273,7 @@ describe("Faucet module: ipinfo", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(50n, "unexpected drop amount");
   });

@@ -29,7 +29,7 @@ describe("Faucet Session Management", () => {
   it("Create normal session", async () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let now = Math.floor(new Date().getTime() / 1000);
-    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(testSession.getRemoteIP()).to.equal("8.8.8.8", "unexpected remoteIP");
     expect(testSession.getTargetAddr()).to.equal("0x0000000000000000000000000000000000001337", "unexpected targetAddr");
@@ -43,7 +43,7 @@ describe("Faucet Session Management", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let error: FaucetError = null;
     try {
-      await sessionManager.createSession("8.8.8.8", { }, {});
+      await sessionManager.createSession("8.8.8.8", { });
     } catch(ex) { error = ex; }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
@@ -54,7 +54,7 @@ describe("Faucet Session Management", () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let error: FaucetError = null;
     try {
-      await sessionManager.createSession("8.8.8.8", { addr: "not_a_eth_address" }, {});
+      await sessionManager.createSession("8.8.8.8", { addr: "not_a_eth_address" });
     } catch(ex) { error = ex; }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
@@ -68,7 +68,7 @@ describe("Faucet Session Management", () => {
     });
     let sessionManager = ServiceManager.GetService(SessionManager);
     let now = Math.floor(new Date().getTime() / 1000);
-    let testSession = await sessionManager.createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(testSession.getRemoteIP()).to.equal("8.8.8.8", "unexpected remoteIP");
     expect(testSession.getTargetAddr()).to.equal("0x0000000000000000000000000000000000001337", "unexpected targetAddr");
@@ -95,7 +95,7 @@ describe("Faucet Session Management", () => {
       session.setDropAmount(500n);
     });
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let testSession = await sessionManager.createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.FAILED, "unexpected session status");
     expect(testSession.getSessionData("failed.code")).to.equal("AMOUNT_TOO_LOW", "unexpected error code");
@@ -168,7 +168,7 @@ describe("Faucet Session Management", () => {
       changeAddrCalled++;
     });
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let testSession = await sessionManager.createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(testSession.getBlockingTasks().length).to.equal(2, "unexpected blockingTasks");
     expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.RUNNING, "unexpected session status");
@@ -201,7 +201,7 @@ describe("Faucet Session Management", () => {
       session.addBlockingTask("test", "test1", 1);
     });
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(testSession.getRemoteIP()).to.equal("8.8.8.8", "unexpected remoteIP");
     await testSession.subPenalty(1000n);
@@ -228,7 +228,7 @@ describe("Faucet Session Management", () => {
       session.addBlockingTask("test", "test1", 1);
     });
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(testSession.getRemoteIP()).to.equal("8.8.8.8", "unexpected remoteIP");
     await testSession.setSessionFailed("TEST_ERROR", "test");
@@ -242,7 +242,7 @@ describe("Faucet Session Management", () => {
       session.addBlockingTask("test", "test1", 1);
     });
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(sessionManager.getSession(testSession.getSessionId(), [FaucetSessionStatus.UNKNOWN])).to.equal(null, "unexpected getSession result for non-matching state");
     expect(sessionManager.getSession("4e63566e-e482-46f3-bb91-da11f511aae0", [FaucetSessionStatus.UNKNOWN])).to.equal(undefined, "unexpected getSession result for unknown session");
@@ -257,7 +257,7 @@ describe("Faucet Session Management", () => {
       session.addBlockingTask("test", "test1", 1);
     });
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     await testSession.addReward(1000n);
     expect(await sessionManager.getUnclaimedBalance()).to.equal(1000n, "unexpected getUnclaimedBalance result");
   });
@@ -300,7 +300,7 @@ describe("Faucet Session Management", () => {
     expect(session2).to.not.equal(null, "getSessionData failed");
     expect(session2.status).to.equal(FaucetSessionStatus.FAILED, "unexpected session status");
     expect(session2.data["failed.code"]).to.equal("SESSION_TIMEOUT", "unexpected error code");
-    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" }, {});
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
     await sessionManager.processSessionTimeouts();
     expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");
   });

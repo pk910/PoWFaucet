@@ -45,10 +45,6 @@ export class PoWClient {
     this.pingClientLoop();
   }
 
-  public isReady(): boolean {
-    return !!this.socket;
-  }
-
   public getPoWSession(): PoWSession {
     return this.session;
   }
@@ -126,7 +122,7 @@ export class PoWClient {
     this.sendMessage("error", resObj, reqMsg ? reqMsg.id : undefined);
   }
 
-  protected async onClientMessage(data: RawData, isBinary: boolean): Promise<void> {
+  private async onClientMessage(data: RawData, isBinary: boolean): Promise<void> {
     let message;
     try {
       message = JSON.parse(data.toString());
@@ -221,7 +217,7 @@ export class PoWClient {
     });
   }
   
-  private onCliVerifyResult(message: any) {
+  private async onCliVerifyResult(message: any) {
     if(typeof message.data !== "object" || !message.data)
       return this.sendErrorResponse("INVALID_VERIFYRESULT", "Invalid verification result data");
 
@@ -233,7 +229,7 @@ export class PoWClient {
     let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.getFaucetSession().getSessionId(), verifyRes.isValid);
     let verifyReward = BigInt(this.module.getModuleConfig().powShareReward) * BigInt(this.module.getModuleConfig().verifyMinerRewardPerc * 100) / 10000n;
     if(verifyValid && verifyReward > 0n) {
-      this.getFaucetSession().addReward(verifyReward);
+      await this.getFaucetSession().addReward(verifyReward);
 
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
       faucetStats.statVerifyReward += verifyReward;

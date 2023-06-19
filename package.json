@@ -7,17 +7,17 @@
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/app.js",
-    "test": "mocha --exit -r ts-node/register 'tests/**/*.ts'",
+    "bundle": "webpack --mode production",
+    "test": "mocha --exit -r ts-node/register --trace-warnings 'tests/**/*.ts'",
     "test-coverage": "nyc --reporter=text --reporter=lcov mocha --exit -r ts-node/register 'tests/**/*.ts'"
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",
   "pkg": {
-    "scripts": "dist/**/*.js",
+    "scripts": "dist/powfaucet.js",
     "assets": [
       "faucet-config.example.yaml",
-      "static/**/*",
-      "node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+      "static/**/*"
     ],
     "targets": [
       "node18-linux-x64",

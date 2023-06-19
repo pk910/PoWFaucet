@@ -68,7 +68,7 @@ describe("Faucet module: captcha", () => {
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
       captchaToken: "test-token",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(globalStubs["hcaptcha.verify"].calledWith("test-secret", "test-token", "8.8.8.8", "test-site-key")).to.equal(true, "hcaptcha.verify not called as expected");
     await ServiceManager.GetService(EthClaimManager).createSessionClaim(testSession.getStoreData(), {});
@@ -94,7 +94,7 @@ describe("Faucet module: captcha", () => {
     }));
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after start");
     await ServiceManager.GetService(EthClaimManager).createSessionClaim(testSession.getStoreData(), {
       captchaToken: "test-token",
@@ -124,7 +124,7 @@ describe("Faucet module: captcha", () => {
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
-      }, {});
+      });
     } catch(ex) {
       error = ex;
     }
@@ -152,7 +152,7 @@ describe("Faucet module: captcha", () => {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
         captchaToken: "test-token",
-      }, {});
+      });
     } catch(ex) {
       error = ex;
     }
@@ -179,7 +179,7 @@ describe("Faucet module: captcha", () => {
     }));
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after start");
     let error: FaucetError = null;
     try {
@@ -212,7 +212,7 @@ describe("Faucet module: captcha", () => {
     }));
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after start");
     let error: FaucetError = null;
     try {
@@ -249,7 +249,7 @@ describe("Faucet module: captcha", () => {
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
       captchaToken: "test-token",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getSessionData("captcha.ident")).to.equal("test-ident", "unexpected session ident");
     let reqBody = globalStubs["fetch"].getCall(0).args[1].body;
@@ -275,7 +275,7 @@ describe("Faucet module: captcha", () => {
     }));
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
-    }, {});
+    });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after start");
     let error: FaucetError = null;
     try {

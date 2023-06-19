@@ -41,15 +41,6 @@ export class PoWShareVerification {
     PoWShareVerification.verifyingShares[this.shareId] = this;
   }
 
-  public getVerificationType(): string {
-    let types: string[] = [];
-    if(this.verifyLocal)
-      types.push("local");
-    if(this.verifyMinerCount > 0)
-      types.push("miner[" + Object.keys(this.verifyMinerResults).length + "/" + this.verifyMinerCount + "]");
-    return types.length ? types.join(",") : "none";
-  }
-
   public getMinerVerifyCount(): number {
     return this.verifyMinerCount;
   }
@@ -135,7 +126,7 @@ export class PoWShareVerification {
       this.isInvalid = true;
     
     if(this.verifyMinerSessions.length === 0)
-      this.completeVerification();
+      setTimeout(() => this.completeVerification(), 0);
     
     return true;
   }

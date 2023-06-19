@@ -121,6 +121,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       hashrateLimit: this.props.faucetConfig.modules.pow.powHashrateLimit,
       nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
       powParams: this.props.faucetConfig.modules.pow.powParams,
+      difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
       workerSrc: {
         [PoWHashAlgo.SCRYPT]: "/js/powfaucet-worker-sc.js?" + FAUCET_CLIENT_BUILDTIME,
         [PoWHashAlgo.CRYPTONIGHT]: "/js/powfaucet-worker-cn.js?" + FAUCET_CLIENT_BUILDTIME,
@@ -196,6 +197,8 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
         </div>
       );
     }
+
+    this.powMiner.setPoWParams(this.props.faucetConfig.modules.pow.powParams, this.props.faucetConfig.modules.pow.powDifficulty, this.props.faucetConfig.modules.pow.powNonceCount);
 
     return (
       <div className='page-mining'>

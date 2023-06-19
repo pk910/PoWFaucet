@@ -66,7 +66,6 @@ export class PoWModule extends BaseModule<IPoWConfig> {
           r: this.moduleConfig.powScryptParams.blockSize,
           p: this.moduleConfig.powScryptParams.parallelization,
           l: this.moduleConfig.powScryptParams.keyLength,
-          d: this.moduleConfig.powScryptParams.difficulty,
         };
         break;
       case PoWHashAlgo.CRYPTONIGHT:
@@ -75,7 +74,6 @@ export class PoWModule extends BaseModule<IPoWConfig> {
           c: this.moduleConfig.powCryptoNightParams.algo,
           v: this.moduleConfig.powCryptoNightParams.variant,
           h: this.moduleConfig.powCryptoNightParams.height,
-          d: this.moduleConfig.powCryptoNightParams.difficulty,
         };
         break;
       case PoWHashAlgo.ARGON2:
@@ -87,7 +85,6 @@ export class PoWModule extends BaseModule<IPoWConfig> {
           m: this.moduleConfig.powArgon2Params.memoryCost,
           p: this.moduleConfig.powArgon2Params.parallelization,
           l: this.moduleConfig.powArgon2Params.keyLength,
-          d: this.moduleConfig.powArgon2Params.difficulty,
         };
         break;
     }
@@ -95,6 +92,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     clientConfig[this.moduleName] = {
       powTimeout: this.moduleConfig.powSessionTimeout,
       powParams: powParams,
+      powDifficulty: this.moduleConfig.powDifficulty,
       powNonceCount: this.moduleConfig.powNonceCount,
       powHashrateLimit: this.moduleConfig.powHashrateSoftLimit,
     };
@@ -123,8 +121,11 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   private async processSessionComplete(session: FaucetSession): Promise<void> {
     setTimeout(() => {
       let powSession = this.getPoWSession(session);
-      powSession.activeClient?.killClient("session closed");
-    }, 500);
+      if(session.getSessionStatus() === FaucetSessionStatus.FAILED)
+        powSession.activeClient?.killClient("session failed: [" + session.getSessionData("failed.code") + "] " + session.getSessionData("failed.reason"));
+      else
+        powSession.activeClient?.killClient("session closed");
+    }, 100);
   }
 
   public async processPoWSessionClose(session: FaucetSession): Promise<void> {
@@ -137,19 +138,10 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     try {
       let urlParts = req.url.split("?");
       let url = new URLSearchParams(urlParts[1]);
-      sessionId = url.get("session");
+      if(!(sessionId = url.get("session"))) {
+        throw "session id missing";
+      }
     } catch(ex) {
-      ws.send(JSON.stringify({
-        action: "error",
-        data: {
-          code: "INVALID_SESSION",
-          message: "session id missing"
-        }
-      }));
-      ws.close();
-      return;
-    }
-    if(!sessionId) {
       ws.send(JSON.stringify({
         action: "error",
         data: {
@@ -215,13 +207,13 @@ export class PoWModule extends BaseModule<IPoWConfig> {
         "|" + this.moduleConfig.powScryptParams.blockSize +
         "|" + this.moduleConfig.powScryptParams.parallelization +
         "|" + this.moduleConfig.powScryptParams.keyLength +
-        "|" + this.moduleConfig.powScryptParams.difficulty;
+        "|" + this.moduleConfig.powDifficulty;
       case PoWHashAlgo.CRYPTONIGHT:
         return PoWHashAlgo.CRYPTONIGHT.toString() +
         "|" + this.moduleConfig.powCryptoNightParams.algo +
         "|" + this.moduleConfig.powCryptoNightParams.variant +
         "|" + this.moduleConfig.powCryptoNightParams.height +
-        "|" + this.moduleConfig.powCryptoNightParams.difficulty;
+        "|" + this.moduleConfig.powDifficulty;
       case PoWHashAlgo.ARGON2:
         return PoWHashAlgo.ARGON2.toString() +
         "|" + this.moduleConfig.powArgon2Params.type +
@@ -230,7 +222,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
         "|" + this.moduleConfig.powArgon2Params.memoryCost +
         "|" + this.moduleConfig.powArgon2Params.parallelization +
         "|" + this.moduleConfig.powArgon2Params.keyLength +
-        "|" + this.moduleConfig.powArgon2Params.difficulty;
+        "|" + this.moduleConfig.powDifficulty;
     }
   }
 
