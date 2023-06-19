@@ -89,7 +89,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
 
       inputData.addr = this.state.targetAddr;
       if(this.props.faucetConfig.modules.captcha?.requiredForStart) {
-        inputData.token = await this.faucetCaptcha.current?.getToken();
+        inputData.captchaToken = await this.faucetCaptcha.current?.getToken();
       }
 
       await this.props.submitInputs(inputData);

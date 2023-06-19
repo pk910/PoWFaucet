@@ -10446,7 +10446,7 @@ var ClaimInput = /*#__PURE__*/function (_React$PureComponent) {
               _context.next = 6;
               return (_this$faucetCaptcha$c = this.faucetCaptcha.current) === null || _this$faucetCaptcha$c === void 0 ? void 0 : _this$faucetCaptcha$c.getToken();
             case 6:
-              inputData.token = _context.sent;
+              inputData.captchaToken = _context.sent;
             case 7:
               _context.next = 9;
               return this.props.submitInputs(inputData);
@@ -11671,7 +11671,7 @@ var FaucetInput = /*#__PURE__*/function (_React$PureComponent) {
               _context.next = 7;
               return (_this$faucetCaptcha$c = this.faucetCaptcha.current) === null || _this$faucetCaptcha$c === void 0 ? void 0 : _this$faucetCaptcha$c.getToken();
             case 7:
-              inputData.token = _context.sent;
+              inputData.captchaToken = _context.sent;
             case 8:
               _context.next = 10;
               return this.props.submitInputs(inputData);
@@ -12279,7 +12279,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
         powParams: this.props.faucetConfig.modules.pow.powParams,
         difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687210526384), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687210526384), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687210526384), _workerSrc)
+        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687212658394), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687212658394), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687212658394), _workerSrc)
       });
     }
   }, {

@@ -68,7 +68,7 @@ export class ClaimInput extends React.PureComponent<IClaimInputProps, IClaimInpu
       let inputData: any = {};
 
       if(this.props.faucetConfig.modules.captcha?.requiredForClaim) {
-        inputData.token = await this.faucetCaptcha.current?.getToken();
+        inputData.captchaToken = await this.faucetCaptcha.current?.getToken();
       }
 
       await this.props.submitInputs(inputData);
