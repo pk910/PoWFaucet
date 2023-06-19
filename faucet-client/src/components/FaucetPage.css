@@ -30,6 +30,11 @@ html, body {
   margin: 0 16px;
 }
 
+.faucet-page .inline-spinner .spinner {
+  height: 20px;
+  margin: 0 8px;
+}
+
 .faucet-page .faucet-notifications {
   position: fixed;
   bottom: 0;
@@ -55,10 +60,11 @@ html, body {
 
 .faucet-page .faucet-frontimage {
   text-align: center;
+  padding: 0 8px;
 }
 
 .faucet-page .faucet-frontimage .image {
-  max-width: 100%;
+  width: 100%;
 }
 
 .faucet-page .faucet-image {
@@ -73,20 +79,24 @@ html, body {
 
 
 .faucet-page {
-  min-width: 440px;
+  width: 450px;
 }
 
-.faucet-page .page-mining, .faucet-page .page-frontpage {
-  width: 440px;
+.faucet-page:has(.page-mining), .faucet-page:has(.page-frontpage) {
+  width: 450px;
 }
 
-.faucet-page .page-claim, .faucet-page .page-details {
+.faucet-page:has(.page-claim), .faucet-page:has(.page-details) {
   width: 600px;
 }
 
 
+.faucet-page .faucet-status-alerts {
+  position: relative
+}
+
 .faucet-page .faucet-inputs {
-  margin: 24px 8px 0 8px;
+  margin: 18px 8px 0 8px;
 }
 
 .faucet-page .faucet-actions {
@@ -159,6 +169,18 @@ html, body {
   background-color: white;
   border: 1px solid darkgray;
   padding: 8px;
+}
+
+.faucet-page .pow-status .pow-status-addr {
+  margin-bottom: 8px;
+}
+
+.faucet-page .pow-status .pow-status-addr .status-title {
+  margin-left: 24px;
+}
+
+.faucet-page .pow-status .pow-status-addr .status-value {
+  text-align: center;
 }
 
 .faucet-page .pow-status .pow-status-top .status-title {

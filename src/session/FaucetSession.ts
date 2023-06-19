@@ -263,15 +263,21 @@ export class FaucetSession {
     return this.remoteIP;
   }
 
-  public setRemoteIP(remoteIP: string): string {
+  public async updateRemoteIP(remoteIP: string): Promise<void> {
     if(remoteIP.match(/^::ffff:/))
       remoteIP = remoteIP.substring(7);
     if(this.remoteIP === remoteIP)
       return;
+    let oldRemoteIP = this.remoteIP;
     this.remoteIP = remoteIP;
 
-    ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionIpChange, [this]);
-    this.lazySaveSession();
+    try {
+      await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionIpChange, [this]);
+    } catch(ex) {
+      this.remoteIP = oldRemoteIP;
+      throw ex;
+    }
+    await this.saveSession();
   }
 
   public getTargetAddr(): string {

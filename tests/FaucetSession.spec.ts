@@ -179,9 +179,9 @@ describe("Faucet Session Management", () => {
       expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
       expect(error.getCode()).to.equal("INVALID_STATE", "unexpected error code");
     }
-    testSession.setRemoteIP("::ffff:8.8.8.8");
+    await testSession.updateRemoteIP("::ffff:8.8.8.8");
     expect(changeAddrCalled).to.equal(0, "SessionIpChange for non-changed ip");
-    testSession.setRemoteIP("8.8.4.4");
+    await testSession.updateRemoteIP("8.8.4.4");
     expect(changeAddrCalled).to.equal(1, "no SessionIpChange for changed ip");
     expect(testSession.getRemoteIP()).to.equal("8.8.4.4", "unexpected remoteIP");
     testSession.setDropAmount(0n);

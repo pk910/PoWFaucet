@@ -34,8 +34,6 @@ export interface IPoWConfig extends IBaseModuleConfig {
   verifyMinerTimeout: number; // timeout for verification requests (client gets penalized if not responding within this timespan)
   verifyMinerRewardPerc: number; // percent of powShareReward as reward for responding to a verification request in time
   verifyMinerMissPenaltyPerc: number; // percent of powShareReward as penalty for not responding to a verification request (shouldn't be too high as this can happen regularily in case of connection loss or so)
-
-  concurrentSessions: number; // number of concurrent mining sessions allowed per IP (0 = unlimited)
 }
 
 export enum PoWHashAlgo {
@@ -110,5 +108,4 @@ export const defaultConfig: IPoWConfig = {
   verifyMinerTimeout: 20,
   verifyMinerRewardPerc: 15,
   verifyMinerMissPenaltyPerc: 10,
-  concurrentSessions: 0,
 }

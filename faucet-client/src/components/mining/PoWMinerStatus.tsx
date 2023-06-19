@@ -146,6 +146,14 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
           </div>
         </div>
 
+        <div className='row pow-status-addr'>
+          <div className='col-6'>
+            <div className='status-title'>Target Address:</div>
+          </div>
+          <div className='col-12'>
+            <div className='status-value'>{this.props.powSession.getTargetAddr()}</div>
+          </div>
+        </div>
         <div className='row pow-status-top'>
           <div className='col-6'>
             <div className='status-title'>Your Mining Reward:</div>

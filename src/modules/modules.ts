@@ -1,4 +1,5 @@
 import { CaptchaModule } from "./captcha/CaptchaModule";
+import { ConcurrencyLimitModule } from "./concurrency-limit/ConcurrencyLimitModule";
 import { EnsNameModule } from "./ensname/EnsNameModule";
 import { EthInfoModule } from "./ethinfo/EthInfoModule";
 import { FaucetBalanceModule } from "./faucet-balance/FaucetBalanceModule";
@@ -11,6 +12,7 @@ import { RecurringLimitsModule } from "./recurring-limits/RecurringLimitsModule"
 
 export const MODULE_CLASSES = {
   "captcha": CaptchaModule,
+  "concurrency-limit": ConcurrencyLimitModule,
   "ensname": EnsNameModule,
   "ethinfo": EthInfoModule,
   "faucet-balance": FaucetBalanceModule,

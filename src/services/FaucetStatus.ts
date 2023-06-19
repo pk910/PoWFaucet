@@ -12,13 +12,13 @@ export enum FaucetStatusLevel {
 
 export interface IFaucetStatus {
   level: FaucetStatusLevel;
+  prio: number;
   text: string;
   ishtml?: boolean;
 }
 
 export interface IFaucetStatusEntry extends IFaucetStatus {
   key?: string;
-  prio?: number;
   filter?: {
     session?: boolean;
     country?: string | string[];
@@ -49,7 +49,7 @@ export class FaucetStatus {
         let faucetStatusJson = JSON.parse(faucetStatusStr);
 
         if(typeof faucetStatusJson === "string")
-          this.localStatusEntries = [{ level: FaucetStatusLevel.INFO, text: faucetStatusJson }];
+          this.localStatusEntries = [{ level: FaucetStatusLevel.INFO, text: faucetStatusJson, prio: 10 }];
         else if(typeof faucetStatusJson === "object" && faucetStatusJson && faucetStatusJson.text)
           this.localStatusEntries = [ faucetStatusJson ];
         else if(typeof faucetStatusJson === "object" && Array.isArray(faucetStatusJson))
@@ -66,11 +66,11 @@ export class FaucetStatus {
     }
   }
 
-  public setFaucetStatus(key: string, statusText: string, statusLevel: FaucetStatusLevel) {
+  public setFaucetStatus(key: string, statusText: string, statusLevel: FaucetStatusLevel, prio?: number) {
     if(statusText) {
       if(this.currentStatus[key] && this.currentStatus[key].text === statusText)
         return;
-      this.currentStatus[key] = {key: key, text: statusText, level: statusLevel};
+      this.currentStatus[key] = {key: key, text: statusText, level: statusLevel, prio: prio || 10};
     }
     else {
       if(!this.currentStatus[key])
@@ -93,6 +93,7 @@ export class FaucetStatus {
       statusHash.update((status.key || "*") + ":" + status.text + "\n");
       statusList.push({
         level: status.level,
+        prio: status.prio,
         text: status.text,
         ishtml: status.ishtml
       });
@@ -155,6 +156,7 @@ export class FaucetStatus {
           
           addStatus({
             level: (typeof message.notify === "string" ? message.notify as FaucetStatusLevel : FaucetStatusLevel.WARNING),
+            prio: 20,
             text: message.text,
           });
         });

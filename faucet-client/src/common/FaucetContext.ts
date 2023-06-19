@@ -6,6 +6,9 @@ export interface IFaucetContext {
   faucetApi: FaucetApi;
   activeSession?: FaucetSession;
 
+  showStatusAlert(level: string, prio: number, body: React.ReactElement): number;
+  hideStatusAlert(alertId: number): void
+
   showNotification(type: string, message: string, time?: number|boolean, timeout?: number): number;
   hideNotification(notificationId: number): void;
 

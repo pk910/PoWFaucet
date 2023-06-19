@@ -158,6 +158,10 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     return this.preImage;
   }
 
+  public getTargetAddr(): string {
+    return this.options.session.getTargetAddr();
+  }
+
   public getStartTime(): number {
     return this.options.session.getStartTime();
   }

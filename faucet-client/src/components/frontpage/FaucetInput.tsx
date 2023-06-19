@@ -67,6 +67,11 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
             className="btn btn-success start-action" 
             onClick={(evt) => this.onSubmitBtnClick()} 
             disabled={this.state.submitting}>
+              {this.state.submitting ?
+              <span className='inline-spinner'>
+                <img src="/images/spinner.gif" className="spinner" />
+              </span>
+              : null}
               {submitBtnCaption}
           </button>
         </div>

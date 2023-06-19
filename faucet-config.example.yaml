@@ -254,6 +254,16 @@ modules:
         duration: 172800 # 2 days
         byAddrOnly: true
         
+  ## Concurrency Limit module
+  concurrency-limit:
+    # enable / disable concurrency limit
+    enabled: true
+    
+    concurrencyLimit: 1 # only allow 1 concurrent session (sessions in 'running' state at the same time for the same ip / target addr)
+    byAddrOnly: false # only check concurrency by target address
+    byIPOnly: false # only check concurrency by IP address
+    #messageByAddr: "" # custom error message when limit is exceeded by same target address
+    #messageByIP: "" # custom error message when limit is exceeded by same IP address
 
   ## Proof of Work (mining) protection
   pow:

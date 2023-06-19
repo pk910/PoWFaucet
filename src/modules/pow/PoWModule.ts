@@ -11,6 +11,7 @@ import { PoWValidator } from "./validator/PoWValidator";
 import { SessionManager } from "../../session/SessionManager";
 import { PoWClient } from "./PoWClient";
 import { PoWSession } from "./PoWSession";
+import { FaucetError } from "../../common/FaucetError";
 
 export class PoWModule extends BaseModule<IPoWConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -35,7 +36,11 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     );
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionStart, 10, "mining session",
-      (session: FaucetSession, userInputs: any, responseData: any) => this.processSessionStart(session, responseData)
+      (session: FaucetSession) => this.processSessionStart(session)
+    );
+    this.moduleManager.addActionHook(
+      this, ModuleHookAction.SessionRestore, 10, "mining session restore",
+      (session: FaucetSession) => this.processSessionRestore(session)
     );
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionComplete, 10, "kill clients",
@@ -91,6 +96,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
     clientConfig[this.moduleName] = {
       powTimeout: this.moduleConfig.powSessionTimeout,
+      powIdleTimeout: this.moduleConfig.powIdleTimeout,
       powParams: powParams,
       powDifficulty: this.moduleConfig.powDifficulty,
       powNonceCount: this.moduleConfig.powNonceCount,
@@ -109,13 +115,19 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     }
   }
 
-  private async processSessionStart(session: FaucetSession, responseData: any): Promise<void> {
+  private async processSessionStart(session: FaucetSession): Promise<void> {
     session.addBlockingTask(this.moduleName, "mining", this.moduleConfig.powSessionTimeout); // this prevents the session from progressing to claimable before this module allows it
     session.setDropAmount(0n);
 
     // start mining session
     let powSession = this.getPoWSession(session);
-    powSession.preImage = crypto.randomBytes(8).toString('base64')
+    powSession.preImage = crypto.randomBytes(8).toString('base64');
+    this.resetSessionIdleTimer(powSession);
+  }
+
+  private async processSessionRestore(session: FaucetSession): Promise<void> {
+    let powSession = this.getPoWSession(session);
+    this.resetSessionIdleTimer(powSession);
   }
 
   private async processSessionComplete(session: FaucetSession): Promise<void> {
@@ -133,7 +145,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     await session.tryProceedSession();
   }
 
-  private processPoWClientWebSocket(req: IncomingMessage, ws: WebSocket, remoteIp: string) {
+  private async processPoWClientWebSocket(req: IncomingMessage, ws: WebSocket, remoteIp: string): Promise<void> {
     let sessionId: string;
     try {
       let urlParts = req.url.split("?");
@@ -164,7 +176,18 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       ws.close();
       return;
     }
-    session.setRemoteIP(remoteIp);
+
+    try {
+      await session.updateRemoteIP(remoteIp);
+    } catch(ex) {
+      let errData = ex instanceof FaucetError ? {code: ex.getCode(), message: ex.message} : {code: "INTERNAL_ERROR", message: "Could not update session IP: " + ex.toString()};
+      ws.send(JSON.stringify({
+        action: "error",
+        data: errData
+      }));
+      ws.close();
+      return;
+    }
 
     let powClient: PoWClient;
     if((powClient = session.getSessionModuleRef("pow.client"))) {
@@ -172,11 +195,15 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       powClient.killClient("reconnected from another client");
     }
 
-    powClient = new PoWClient(this, this.getPoWSession(session), ws);
+    let powSession = this.getPoWSession(session);
+    powClient = new PoWClient(this, powSession, ws);
     this.powClients.push(powClient);
+    this.resetSessionIdleTimer(powSession);
   }
 
   public disposePoWClient(client: PoWClient) {
+    this.resetSessionIdleTimer(client.getPoWSession());
+
     let clientIdx = this.powClients.indexOf(client);
     if(clientIdx !== -1)
       this.powClients.splice(clientIdx, 1);
@@ -226,5 +253,21 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     }
   }
 
+  private resetSessionIdleTimer(session: PoWSession) {
+    let hasActiveClient = !!session.activeClient;
+    let idleTimer = session.idleTimer;
+
+    if(hasActiveClient && idleTimer) {
+      clearTimeout(idleTimer);
+      session.idleTimer = null;
+    }
+    else if(!hasActiveClient && !idleTimer && session.idleTime && this.moduleConfig.powIdleTimeout) {
+      let now = Math.floor(new Date().getTime() / 1000);
+      let timeout = session.idleTime + this.moduleConfig.powIdleTimeout - now;
+      if(timeout < 0)
+        timeout = 0;
+      session.idleTimer = setTimeout(() => this.processPoWSessionClose(session.getFaucetSession()), timeout * 1000);
+    }
+  }
   
 }

@@ -42,6 +42,7 @@ export interface IEnsNameModuleConfig {
 export interface IPoWModuleConfig {
   powWsUrl: string;
   powTimeout: number;
+  powIdleTimeout: number;
   powParams: PoWParams;
   powDifficulty: number;
   powNonceCount: number;
@@ -86,5 +87,6 @@ export interface IPassportModuleConfig {
 export interface IFaucetStatus {
   text: string;
   level: string;
+  prio: number;
   ishtml: boolean;
 }

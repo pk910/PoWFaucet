@@ -10006,15 +10006,23 @@ var FaucetPage = /*#__PURE__*/function (_React$PureComponent) {
     _this = _super.call(this, props);
     _defineProperty(_assertThisInitialized(_this), "configRefreshInterval", void 0);
     _defineProperty(_assertThisInitialized(_this), "lastConfigRefresh", 0);
+    _defineProperty(_assertThisInitialized(_this), "statusAlertIdCounter", 0);
     _defineProperty(_assertThisInitialized(_this), "notificationIdCounter", 0);
     _defineProperty(_assertThisInitialized(_this), "dialogIdCounter", 0);
     _defineProperty(_assertThisInitialized(_this), "notifications", []);
     _defineProperty(_assertThisInitialized(_this), "dialogs", []);
+    _defineProperty(_assertThisInitialized(_this), "statusAlerts", []);
     _defineProperty(_assertThisInitialized(_this), "pageContext", void 0);
     _defineProperty(_assertThisInitialized(_this), "faucetStatucClickCount", 0);
     var faucetApi = new _common_FaucetApi__WEBPACK_IMPORTED_MODULE_1__.FaucetApi(props.apiUrl);
     _this.pageContext = {
       faucetApi: faucetApi,
+      showStatusAlert: function showStatusAlert(level, prio, body) {
+        return _this.showStatusAlert(level, prio, body);
+      },
+      hideStatusAlert: function hideStatusAlert(statusAlertId) {
+        return _this.hideStatusAlert(statusAlertId);
+      },
       showNotification: function showNotification(type, message, time, timeout) {
         return _this.showNotification(type, message, time, timeout);
       },
@@ -10032,6 +10040,7 @@ var FaucetPage = /*#__PURE__*/function (_React$PureComponent) {
       initializing: true,
       faucetConfig: null,
       faucetStatus: [],
+      statusAlerts: [],
       dialogs: [],
       notifications: []
     };
@@ -10136,9 +10145,15 @@ var FaucetPage = /*#__PURE__*/function (_React$PureComponent) {
   }, {
     key: "renderStatusAlerts",
     value: function renderStatusAlerts() {
+      var faucetStatusEntries = [];
+      Array.prototype.push.apply(faucetStatusEntries, this.state.faucetStatus);
+      Array.prototype.push.apply(faucetStatusEntries, this.state.statusAlerts);
+      faucetStatusEntries.sort(function (a, b) {
+        return (a.prio || 10) - (b.prio || 10);
+      });
       return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
         className: "faucet-status-alerts"
-      }, this.state.faucetStatus.map(function (status, idx) {
+      }, faucetStatusEntries.map(function (status, idx) {
         var faucetStatusClass = "";
         switch (status.level) {
           case "info":
@@ -10158,12 +10173,47 @@ var FaucetPage = /*#__PURE__*/function (_React$PureComponent) {
           key: "status" + idx,
           className: ["faucet-status-alert alert", faucetStatusClass].join(" "),
           role: "alert"
-        }, status.ishtml ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        }, status.body ? status.body : status.ishtml ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
           dangerouslySetInnerHTML: {
             __html: status.text
           }
         }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("span", null, status.text));
       }));
+    }
+  }, {
+    key: "showStatusAlert",
+    value: function showStatusAlert(level, prio, body) {
+      var statusAlertId = this.statusAlertIdCounter++;
+      var statusAlert = {
+        id: statusAlertId,
+        level: level,
+        prio: prio,
+        body: body
+      };
+      this.statusAlerts.push(statusAlert);
+      this.setState({
+        statusAlerts: this.statusAlerts.slice()
+      });
+      return statusAlertId;
+    }
+  }, {
+    key: "hideStatusAlert",
+    value: function hideStatusAlert(statusAlertId) {
+      var statusAlertIdx = -1;
+      var statusAlert;
+      for (var idx = 0; idx < this.state.statusAlerts.length; idx++) {
+        if (this.statusAlerts[idx].id === statusAlertId) {
+          statusAlertIdx = idx;
+          statusAlert = this.state.statusAlerts[idx];
+          break;
+        }
+      }
+      if (statusAlertIdx !== -1) {
+        this.statusAlerts.splice(statusAlertIdx, 1);
+        this.setState({
+          statusAlerts: this.statusAlerts.slice()
+        });
+      }
     }
   }, {
     key: "renderNotifications",
@@ -11313,6 +11363,24 @@ var DetailsPage = /*#__PURE__*/function (_React$PureComponent) {
       }
       var now = this.props.pageContext.faucetApi.getFaucetTime().getSyncedTime();
       var claimTimeout = this.state.sessionStatus.start + this.props.faucetConfig.sessionTimeout - now;
+      var restoreButton = null;
+      if (this.state.sessionStatus.status === "claimable") {
+        restoreButton = /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("button", {
+          className: "btn btn-primary action-btn",
+          onClick: function onClick() {
+            _this4.props.navigateFn("/claim/" + _this4.props.sessionId);
+          }
+        }, "Claim Rewards");
+      } else if (this.state.sessionStatus.status === "running" && this.state.sessionStatus.tasks.filter(function (task) {
+        return task.module === "pow";
+      }).length > 0) {
+        restoreButton = /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("button", {
+          className: "btn btn-primary action-btn",
+          onClick: function onClick() {
+            _this4.props.navigateFn("/mine/" + _this4.props.sessionId);
+          }
+        }, "Continue Mining");
+      }
       return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
         className: "row"
       }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
@@ -11359,7 +11427,7 @@ var DetailsPage = /*#__PURE__*/function (_React$PureComponent) {
         className: "row"
       }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
         className: "col"
-      }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
+      }, restoreButton), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
         className: "col-4"
       }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("button", {
         className: "btn btn-secondary action-btn",
@@ -11575,7 +11643,12 @@ var FaucetInput = /*#__PURE__*/function (_React$PureComponent) {
           return _this2.onSubmitBtnClick();
         },
         disabled: this.state.submitting
-      }, submitBtnCaption)));
+      }, this.state.submitting ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("span", {
+        className: "inline-spinner"
+      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("img", {
+        src: "/images/spinner.gif",
+        className: "spinner"
+      })) : null, submitBtnCaption)));
     }
   }, {
     key: "onSubmitBtnClick",
@@ -11959,6 +12032,105 @@ var RestoreSession = /*#__PURE__*/function (_React$PureComponent) {
 
 /***/ }),
 
+/***/ "./src/components/mining/ConnectionAlert.tsx":
+/*!***************************************************!*\
+  !*** ./src/components/mining/ConnectionAlert.tsx ***!
+  \***************************************************/
+/***/ (function(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ConnectionAlert": function() { return /* binding */ ConnectionAlert; }
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var _utils_DateUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../utils/DateUtils */ "./src/utils/DateUtils.ts");
+function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, _toPropertyKey(descriptor.key), descriptor); } }
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); Object.defineProperty(subClass, "prototype", { writable: false }); if (superClass) _setPrototypeOf(subClass, superClass); }
+function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
+function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } else if (call !== void 0) { throw new TypeError("Derived constructors may only return object or undefined"); } return _assertThisInitialized(self); }
+function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
+function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
+function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
+function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input === null) return input; var prim = input[Symbol.toPrimitive]; if (prim !== undefined) { var res = prim.call(input, hint || "default"); if (_typeof(res) !== "object") return res; throw new TypeError("@@toPrimitive must return a primitive value."); } return (hint === "string" ? String : Number)(input); }
+
+
+var ConnectionAlert = /*#__PURE__*/function (_React$PureComponent) {
+  _inherits(ConnectionAlert, _React$PureComponent);
+  var _super = _createSuper(ConnectionAlert);
+  function ConnectionAlert(props, state) {
+    var _this;
+    _classCallCheck(this, ConnectionAlert);
+    _this = _super.call(this, props);
+    _defineProperty(_assertThisInitialized(_this), "updateTimer", void 0);
+    _defineProperty(_assertThisInitialized(_this), "timeoutCbCalled", void 0);
+    _this.state = {
+      refreshIndex: 0
+    };
+    return _this;
+  }
+  _createClass(ConnectionAlert, [{
+    key: "componentDidMount",
+    value: function componentDidMount() {
+      if (!this.updateTimer) {
+        this.setUpdateTimer();
+      }
+    }
+  }, {
+    key: "componentWillUnmount",
+    value: function componentWillUnmount() {
+      if (this.updateTimer) {
+        clearTimeout(this.updateTimer);
+        this.updateTimer = null;
+      }
+    }
+  }, {
+    key: "setUpdateTimer",
+    value: function setUpdateTimer() {
+      var _this2 = this;
+      var now = new Date().getTime();
+      var timeLeft = 1000 - now % 1000 + 2;
+      this.updateTimer = setTimeout(function () {
+        _this2.updateTimer = null;
+        _this2.setState({
+          refreshIndex: _this2.state.refreshIndex + 1
+        });
+        _this2.setUpdateTimer();
+      }, timeLeft);
+    }
+  }, {
+    key: "render",
+    value: function render() {
+      var now = Math.floor(new Date().getTime() / 1000);
+      var timeout = this.props.faucetConfig.modules.pow.powIdleTimeout ? this.props.disconnectTime + this.props.faucetConfig.modules.pow.powIdleTimeout - now : 0;
+      if (timeout < 0 && !this.timeoutCbCalled) {
+        this.timeoutCbCalled = true;
+        if (this.props.timeoutCb) this.props.timeoutCb();
+      }
+      var errorCaption;
+      if (this.props.initialConnection) errorCaption = "Connecting to the faucet server...";else errorCaption = "Connection to faucet server has been lost. Reconnecting...";
+      return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "connection-status"
+      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "error-caption"
+      }, errorCaption), now - this.props.disconnectTime > 10 && timeout > 0 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "reconnect-info"
+      }, "Please check your internet connection. The connection needs to be restored within the next ", (0,_utils_DateUtils__WEBPACK_IMPORTED_MODULE_1__.renderTimespan)(timeout, 2), " or your session will be closed.") : null, timeout < 0 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "reconnect-info"
+      }, "Connection couln't be restored in time. Session timed out.") : null);
+    }
+  }]);
+  return ConnectionAlert;
+}(react__WEBPACK_IMPORTED_MODULE_0__.PureComponent);
+
+/***/ }),
+
 /***/ "./src/components/mining/MiningPage.tsx":
 /*!**********************************************!*\
   !*** ./src/components/mining/MiningPage.tsx ***!
@@ -11973,7 +12145,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../common/FaucetConfig */ "./src/common/FaucetConfig.ts");
 /* harmony import */ var _FaucetPage__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../FaucetPage */ "./src/components/FaucetPage.tsx");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
-/* harmony import */ var react_router_dom__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router/dist/index.js");
+/* harmony import */ var react_router_dom__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router/dist/index.js");
 /* harmony import */ var _common_FaucetSession__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../common/FaucetSession */ "./src/common/FaucetSession.ts");
 /* harmony import */ var _pow_PoWClient__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../pow/PoWClient */ "./src/pow/PoWClient.ts");
 /* harmony import */ var _pow_PoWSession__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../pow/PoWSession */ "./src/pow/PoWSession.ts");
@@ -11981,6 +12153,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _PoWMinerStatus__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./PoWMinerStatus */ "./src/components/mining/PoWMinerStatus.tsx");
 /* harmony import */ var _utils_ConvertHelpers__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../utils/ConvertHelpers */ "./src/utils/ConvertHelpers.ts");
 /* harmony import */ var _passport_PassportInfo__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../passport/PassportInfo */ "./src/components/passport/PassportInfo.tsx");
+/* harmony import */ var _ConnectionAlert__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./ConnectionAlert */ "./src/components/mining/ConnectionAlert.tsx");
 function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
 function _extends() { _extends = Object.assign ? Object.assign.bind() : function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; }; return _extends.apply(this, arguments); }
 function _regeneratorRuntime() { "use strict"; /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/facebook/regenerator/blob/main/LICENSE */ _regeneratorRuntime = function _regeneratorRuntime() { return exports; }; var exports = {}, Op = Object.prototype, hasOwn = Op.hasOwnProperty, defineProperty = Object.defineProperty || function (obj, key, desc) { obj[key] = desc.value; }, $Symbol = "function" == typeof Symbol ? Symbol : {}, iteratorSymbol = $Symbol.iterator || "@@iterator", asyncIteratorSymbol = $Symbol.asyncIterator || "@@asyncIterator", toStringTagSymbol = $Symbol.toStringTag || "@@toStringTag"; function define(obj, key, value) { return Object.defineProperty(obj, key, { value: value, enumerable: !0, configurable: !0, writable: !0 }), obj[key]; } try { define({}, ""); } catch (err) { define = function define(obj, key, value) { return obj[key] = value; }; } function wrap(innerFn, outerFn, self, tryLocsList) { var protoGenerator = outerFn && outerFn.prototype instanceof Generator ? outerFn : Generator, generator = Object.create(protoGenerator.prototype), context = new Context(tryLocsList || []); return defineProperty(generator, "_invoke", { value: makeInvokeMethod(innerFn, self, context) }), generator; } function tryCatch(fn, obj, arg) { try { return { type: "normal", arg: fn.call(obj, arg) }; } catch (err) { return { type: "throw", arg: err }; } } exports.wrap = wrap; var ContinueSentinel = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} var IteratorPrototype = {}; define(IteratorPrototype, iteratorSymbol, function () { return this; }); var getProto = Object.getPrototypeOf, NativeIteratorPrototype = getProto && getProto(getProto(values([]))); NativeIteratorPrototype && NativeIteratorPrototype !== Op && hasOwn.call(NativeIteratorPrototype, iteratorSymbol) && (IteratorPrototype = NativeIteratorPrototype); var Gp = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(IteratorPrototype); function defineIteratorMethods(prototype) { ["next", "throw", "return"].forEach(function (method) { define(prototype, method, function (arg) { return this._invoke(method, arg); }); }); } function AsyncIterator(generator, PromiseImpl) { function invoke(method, arg, resolve, reject) { var record = tryCatch(generator[method], generator, arg); if ("throw" !== record.type) { var result = record.arg, value = result.value; return value && "object" == _typeof(value) && hasOwn.call(value, "__await") ? PromiseImpl.resolve(value.__await).then(function (value) { invoke("next", value, resolve, reject); }, function (err) { invoke("throw", err, resolve, reject); }) : PromiseImpl.resolve(value).then(function (unwrapped) { result.value = unwrapped, resolve(result); }, function (error) { return invoke("throw", error, resolve, reject); }); } reject(record.arg); } var previousPromise; defineProperty(this, "_invoke", { value: function value(method, arg) { function callInvokeWithMethodAndArg() { return new PromiseImpl(function (resolve, reject) { invoke(method, arg, resolve, reject); }); } return previousPromise = previousPromise ? previousPromise.then(callInvokeWithMethodAndArg, callInvokeWithMethodAndArg) : callInvokeWithMethodAndArg(); } }); } function makeInvokeMethod(innerFn, self, context) { var state = "suspendedStart"; return function (method, arg) { if ("executing" === state) throw new Error("Generator is already running"); if ("completed" === state) { if ("throw" === method) throw arg; return doneResult(); } for (context.method = method, context.arg = arg;;) { var delegate = context.delegate; if (delegate) { var delegateResult = maybeInvokeDelegate(delegate, context); if (delegateResult) { if (delegateResult === ContinueSentinel) continue; return delegateResult; } } if ("next" === context.method) context.sent = context._sent = context.arg;else if ("throw" === context.method) { if ("suspendedStart" === state) throw state = "completed", context.arg; context.dispatchException(context.arg); } else "return" === context.method && context.abrupt("return", context.arg); state = "executing"; var record = tryCatch(innerFn, self, context); if ("normal" === record.type) { if (state = context.done ? "completed" : "suspendedYield", record.arg === ContinueSentinel) continue; return { value: record.arg, done: context.done }; } "throw" === record.type && (state = "completed", context.method = "throw", context.arg = record.arg); } }; } function maybeInvokeDelegate(delegate, context) { var methodName = context.method, method = delegate.iterator[methodName]; if (undefined === method) return context.delegate = null, "throw" === methodName && delegate.iterator["return"] && (context.method = "return", context.arg = undefined, maybeInvokeDelegate(delegate, context), "throw" === context.method) || "return" !== methodName && (context.method = "throw", context.arg = new TypeError("The iterator does not provide a '" + methodName + "' method")), ContinueSentinel; var record = tryCatch(method, delegate.iterator, context.arg); if ("throw" === record.type) return context.method = "throw", context.arg = record.arg, context.delegate = null, ContinueSentinel; var info = record.arg; return info ? info.done ? (context[delegate.resultName] = info.value, context.next = delegate.nextLoc, "return" !== context.method && (context.method = "next", context.arg = undefined), context.delegate = null, ContinueSentinel) : info : (context.method = "throw", context.arg = new TypeError("iterator result is not an object"), context.delegate = null, ContinueSentinel); } function pushTryEntry(locs) { var entry = { tryLoc: locs[0] }; 1 in locs && (entry.catchLoc = locs[1]), 2 in locs && (entry.finallyLoc = locs[2], entry.afterLoc = locs[3]), this.tryEntries.push(entry); } function resetTryEntry(entry) { var record = entry.completion || {}; record.type = "normal", delete record.arg, entry.completion = record; } function Context(tryLocsList) { this.tryEntries = [{ tryLoc: "root" }], tryLocsList.forEach(pushTryEntry, this), this.reset(!0); } function values(iterable) { if (iterable) { var iteratorMethod = iterable[iteratorSymbol]; if (iteratorMethod) return iteratorMethod.call(iterable); if ("function" == typeof iterable.next) return iterable; if (!isNaN(iterable.length)) { var i = -1, next = function next() { for (; ++i < iterable.length;) if (hasOwn.call(iterable, i)) return next.value = iterable[i], next.done = !1, next; return next.value = undefined, next.done = !0, next; }; return next.next = next; } } return { next: doneResult }; } function doneResult() { return { value: undefined, done: !0 }; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, defineProperty(Gp, "constructor", { value: GeneratorFunctionPrototype, configurable: !0 }), defineProperty(GeneratorFunctionPrototype, "constructor", { value: GeneratorFunction, configurable: !0 }), GeneratorFunction.displayName = define(GeneratorFunctionPrototype, toStringTagSymbol, "GeneratorFunction"), exports.isGeneratorFunction = function (genFun) { var ctor = "function" == typeof genFun && genFun.constructor; return !!ctor && (ctor === GeneratorFunction || "GeneratorFunction" === (ctor.displayName || ctor.name)); }, exports.mark = function (genFun) { return Object.setPrototypeOf ? Object.setPrototypeOf(genFun, GeneratorFunctionPrototype) : (genFun.__proto__ = GeneratorFunctionPrototype, define(genFun, toStringTagSymbol, "GeneratorFunction")), genFun.prototype = Object.create(Gp), genFun; }, exports.awrap = function (arg) { return { __await: arg }; }, defineIteratorMethods(AsyncIterator.prototype), define(AsyncIterator.prototype, asyncIteratorSymbol, function () { return this; }), exports.AsyncIterator = AsyncIterator, exports.async = function (innerFn, outerFn, self, tryLocsList, PromiseImpl) { void 0 === PromiseImpl && (PromiseImpl = Promise); var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList), PromiseImpl); return exports.isGeneratorFunction(outerFn) ? iter : iter.next().then(function (result) { return result.done ? result.value : iter.next(); }); }, defineIteratorMethods(Gp), define(Gp, toStringTagSymbol, "Generator"), define(Gp, iteratorSymbol, function () { return this; }), define(Gp, "toString", function () { return "[object Generator]"; }), exports.keys = function (val) { var object = Object(val), keys = []; for (var key in object) keys.push(key); return keys.reverse(), function next() { for (; keys.length;) { var key = keys.pop(); if (key in object) return next.value = key, next.done = !1, next; } return next.done = !0, next; }; }, exports.values = values, Context.prototype = { constructor: Context, reset: function reset(skipTempReset) { if (this.prev = 0, this.next = 0, this.sent = this._sent = undefined, this.done = !1, this.delegate = null, this.method = "next", this.arg = undefined, this.tryEntries.forEach(resetTryEntry), !skipTempReset) for (var name in this) "t" === name.charAt(0) && hasOwn.call(this, name) && !isNaN(+name.slice(1)) && (this[name] = undefined); }, stop: function stop() { this.done = !0; var rootRecord = this.tryEntries[0].completion; if ("throw" === rootRecord.type) throw rootRecord.arg; return this.rval; }, dispatchException: function dispatchException(exception) { if (this.done) throw exception; var context = this; function handle(loc, caught) { return record.type = "throw", record.arg = exception, context.next = loc, caught && (context.method = "next", context.arg = undefined), !!caught; } for (var i = this.tryEntries.length - 1; i >= 0; --i) { var entry = this.tryEntries[i], record = entry.completion; if ("root" === entry.tryLoc) return handle("end"); if (entry.tryLoc <= this.prev) { var hasCatch = hasOwn.call(entry, "catchLoc"), hasFinally = hasOwn.call(entry, "finallyLoc"); if (hasCatch && hasFinally) { if (this.prev < entry.catchLoc) return handle(entry.catchLoc, !0); if (this.prev < entry.finallyLoc) return handle(entry.finallyLoc); } else if (hasCatch) { if (this.prev < entry.catchLoc) return handle(entry.catchLoc, !0); } else { if (!hasFinally) throw new Error("try statement without catch or finally"); if (this.prev < entry.finallyLoc) return handle(entry.finallyLoc); } } } }, abrupt: function abrupt(type, arg) { for (var i = this.tryEntries.length - 1; i >= 0; --i) { var entry = this.tryEntries[i]; if (entry.tryLoc <= this.prev && hasOwn.call(entry, "finallyLoc") && this.prev < entry.finallyLoc) { var finallyEntry = entry; break; } } finallyEntry && ("break" === type || "continue" === type) && finallyEntry.tryLoc <= arg && arg <= finallyEntry.finallyLoc && (finallyEntry = null); var record = finallyEntry ? finallyEntry.completion : {}; return record.type = type, record.arg = arg, finallyEntry ? (this.method = "next", this.next = finallyEntry.finallyLoc, ContinueSentinel) : this.complete(record); }, complete: function complete(record, afterLoc) { if ("throw" === record.type) throw record.arg; return "break" === record.type || "continue" === record.type ? this.next = record.arg : "return" === record.type ? (this.rval = this.arg = record.arg, this.method = "return", this.next = "end") : "normal" === record.type && afterLoc && (this.next = afterLoc), ContinueSentinel; }, finish: function finish(finallyLoc) { for (var i = this.tryEntries.length - 1; i >= 0; --i) { var entry = this.tryEntries[i]; if (entry.finallyLoc === finallyLoc) return this.complete(entry.completion, entry.afterLoc), resetTryEntry(entry), ContinueSentinel; } }, "catch": function _catch(tryLoc) { for (var i = this.tryEntries.length - 1; i >= 0; --i) { var entry = this.tryEntries[i]; if (entry.tryLoc === tryLoc) { var record = entry.completion; if ("throw" === record.type) { var thrown = record.arg; resetTryEntry(entry); } return thrown; } } throw new Error("illegal catch attempt"); }, delegateYield: function delegateYield(iterable, resultName, nextLoc) { return this.delegate = { iterator: values(iterable), resultName: resultName, nextLoc: nextLoc }, "next" === this.method && (this.arg = undefined), ContinueSentinel; } }, exports; }
@@ -12010,6 +12183,7 @@ function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input ==
 
 
 
+
 var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
   _inherits(MiningPage, _React$PureComponent);
   var _super = _createSuper(MiningPage);
@@ -12022,24 +12196,21 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
     _defineProperty(_assertThisInitialized(_this), "powClient", void 0);
     _defineProperty(_assertThisInitialized(_this), "powMiner", void 0);
     _defineProperty(_assertThisInitialized(_this), "powSession", void 0);
+    _defineProperty(_assertThisInitialized(_this), "connectionAlertId", null);
     _this.initPoWControls();
     _this.eventListeners = {
       "clientOpen": {
         emmiter: _this.powClient,
         event: "open",
         listener: function listener() {
-          return _this.setState({
-            clientConnected: true
-          });
+          return _this.updateConnectionState(true);
         }
       },
       "clientClose": {
         emmiter: _this.powClient,
         event: "close",
         listener: function listener() {
-          return _this.setState({
-            clientConnected: false
-          });
+          return _this.updateConnectionState(false);
         }
       },
       "sessionBalance": {
@@ -12108,15 +12279,39 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
         powParams: this.props.faucetConfig.modules.pow.powParams,
         difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687135245324), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687135245324), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687135245324), _workerSrc)
+        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687210526384), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687210526384), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687210526384), _workerSrc)
       });
+    }
+  }, {
+    key: "updateConnectionState",
+    value: function updateConnectionState(connected, initial) {
+      var _this3 = this;
+      this.setState({
+        clientConnected: connected
+      });
+      console.log("updateConnectionState", connected);
+      if (connected && this.connectionAlertId !== null) {
+        this.props.pageContext.hideStatusAlert(this.connectionAlertId);
+        this.connectionAlertId = null;
+      } else if (!connected && this.connectionAlertId === null) {
+        var now = Math.floor(new Date().getTime() / 1000);
+        this.connectionAlertId = this.props.pageContext.showStatusAlert("error", 30, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement(_ConnectionAlert__WEBPACK_IMPORTED_MODULE_10__.ConnectionAlert, {
+          faucetConfig: this.props.faucetConfig,
+          initialConnection: !!initial,
+          disconnectTime: now,
+          timeoutCb: function timeoutCb() {
+            _common_FaucetSession__WEBPACK_IMPORTED_MODULE_3__.FaucetSession.persistSessionInfo(null);
+            _this3.props.navigateFn("/details/" + _this3.props.sessionId);
+          }
+        }));
+      }
     }
   }, {
     key: "componentDidMount",
     value: function componentDidMount() {
-      var _this3 = this;
+      var _this4 = this;
       Object.keys(this.eventListeners).forEach(function (listenerKey) {
-        var eventListener = _this3.eventListeners[listenerKey];
+        var eventListener = _this4.eventListeners[listenerKey];
         if (eventListener.bound) return;
         if (!eventListener.emmiter) return;
         eventListener.emmiter.on(eventListener.event, eventListener.listener);
@@ -12128,17 +12323,18 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
           if (sessionInfo.status === "running" && ((_sessionInfo$tasks = sessionInfo.tasks) === null || _sessionInfo$tasks === void 0 ? void 0 : _sessionInfo$tasks.filter(function (task) {
             return task.module === "pow";
           }).length) > 0) {
-            _this3.powClient.start();
-            _this3.powSession.resumeSession();
-            _this3.powMiner.startMiner();
-            _this3.setState({
+            _this4.updateConnectionState(false, true);
+            _this4.powClient.start();
+            _this4.powSession.resumeSession();
+            _this4.powMiner.startMiner();
+            _this4.setState({
               loadedSession: true,
-              isClaimable: _this3.powSession.getBalance() >= _this3.props.faucetConfig.minClaim
+              isClaimable: _this4.powSession.getBalance() >= _this4.props.faucetConfig.minClaim
             });
-            _common_FaucetSession__WEBPACK_IMPORTED_MODULE_3__.FaucetSession.persistSessionInfo(_this3.faucetSession);
-          } else _this3.processSessionStatusRedirects(sessionInfo);
+            _common_FaucetSession__WEBPACK_IMPORTED_MODULE_3__.FaucetSession.persistSessionInfo(_this4.faucetSession);
+          } else _this4.processSessionStatusRedirects(sessionInfo);
         }, function (err) {
-          _this3.setState({
+          _this4.setState({
             loadedSession: false,
             loadingError: err.error || err.toString()
           });
@@ -12148,9 +12344,9 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
   }, {
     key: "componentWillUnmount",
     value: function componentWillUnmount() {
-      var _this4 = this;
+      var _this5 = this;
       Object.keys(this.eventListeners).forEach(function (listenerKey) {
-        var eventListener = _this4.eventListeners[listenerKey];
+        var eventListener = _this5.eventListeners[listenerKey];
         if (!eventListener.bound) return;
         eventListener.emmiter.off(eventListener.event, eventListener.listener);
         eventListener.bound = false;
@@ -12161,11 +12357,15 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
       if (this.powMiner) {
         this.powMiner.stopMiner();
       }
+      if (this.connectionAlertId) {
+        this.props.pageContext.hideStatusAlert(this.connectionAlertId);
+        this.connectionAlertId = null;
+      }
     }
   }, {
     key: "render",
     value: function render() {
-      var _this5 = this;
+      var _this6 = this;
       if (this.state.loadingError) {
         return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
           className: "alert alert-danger"
@@ -12183,6 +12383,12 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("span", {
           className: "spinner-text"
         }, "Loading...")));
+      } else if (this.state.loadingError) {
+        return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
+          className: "alert alert-danger"
+        }, "Can't mine for this session: ", typeof this.state.loadingError == "string" ? this.state.loadingError : "", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("br", null), "See ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("a", {
+          href: '#/details/' + this.props.sessionId
+        }, "Session Details"));
       }
       this.powMiner.setPoWParams(this.props.faucetConfig.modules.pow.powParams, this.props.faucetConfig.modules.pow.powDifficulty, this.props.faucetConfig.modules.pow.powNonceCount);
       return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
@@ -12197,14 +12403,14 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         faucetConfig: this.props.faucetConfig,
         passportScoreInfo: this.faucetSession.getModuleState("passport"),
         openPassportInfo: function openPassportInfo() {
-          return _this5.onOpenPassportClick();
+          return _this6.onOpenPassportClick();
         }
       })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
         className: "faucet-actions center"
       }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("button", {
         className: "btn btn-danger stop-action",
         onClick: function onClick(evt) {
-          return _this5.onStopMiningClick(false);
+          return _this6.onStopMiningClick(false);
         },
         disabled: !this.state.clientConnected || this.state.closingSession
       }, this.state.isClaimable ? "Stop Mining & Claim Rewards" : "Stop Mining")));
@@ -12213,7 +12419,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
     key: "onStopMiningClick",
     value: function () {
       var _onStopMiningClick = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee(force) {
-        var _this6 = this;
+        var _this7 = this;
         return _regeneratorRuntime().wrap(function _callee$(_context) {
           while (1) switch (_context.prev = _context.next) {
             case 0:
@@ -12232,7 +12438,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
                 applyButton: {
                   caption: "Stop mining",
                   applyFn: function applyFn() {
-                    _this6.onStopMiningClick(true);
+                    _this7.onStopMiningClick(true);
                   }
                 }
               });
@@ -12278,7 +12484,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
     key: "onOpenPassportClick",
     value: function () {
       var _onOpenPassportClick = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
-        var _this7 = this;
+        var _this8 = this;
         return _regeneratorRuntime().wrap(function _callee2$(_context2) {
           while (1) switch (_context2.prev = _context2.next) {
             case 0:
@@ -12293,9 +12499,9 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
                   sessionId: this.props.sessionId,
                   targetAddr: this.faucetSession.getTargetAddr(),
                   refreshFn: function refreshFn(passportScore) {
-                    _this7.faucetSession.setModuleState("passport", passportScore);
-                    _this7.setState({
-                      refreshIdx: _this7.state.refreshIdx + 1
+                    _this8.faucetSession.setModuleState("passport", passportScore);
+                    _this8.setState({
+                      refreshIdx: _this8.state.refreshIdx + 1
                     });
                   }
                 })),
@@ -12320,7 +12526,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
       var _processSessionError = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3(error) {
         var _error$data,
           _error$data2,
-          _this8 = this;
+          _this9 = this;
         var _error$data3, _error$data4, _error$data5;
         return _regeneratorRuntime().wrap(function _callee3$(_context3) {
           while (1) switch (_context3.prev = _context3.next) {
@@ -12335,7 +12541,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
                     caption: "Close"
                   },
                   closeFn: function closeFn() {
-                    _this8.props.navigateFn("/");
+                    _this9.props.navigateFn("/");
                   }
                 });
               }
@@ -12368,11 +12574,11 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
   return MiningPage;
 }(react__WEBPACK_IMPORTED_MODULE_2__.PureComponent);
 /* harmony default export */ __webpack_exports__["default"] = (function (props) {
-  var params = (0,react_router_dom__WEBPACK_IMPORTED_MODULE_10__.useParams)();
+  var params = (0,react_router_dom__WEBPACK_IMPORTED_MODULE_11__.useParams)();
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement(MiningPage, _extends({}, props, {
     pageContext: (0,react__WEBPACK_IMPORTED_MODULE_2__.useContext)(_FaucetPage__WEBPACK_IMPORTED_MODULE_1__.FaucetPageContext),
     faucetConfig: (0,react__WEBPACK_IMPORTED_MODULE_2__.useContext)(_FaucetPage__WEBPACK_IMPORTED_MODULE_1__.FaucetConfigContext),
-    navigateFn: (0,react_router_dom__WEBPACK_IMPORTED_MODULE_10__.useNavigate)(),
+    navigateFn: (0,react_router_dom__WEBPACK_IMPORTED_MODULE_11__.useNavigate)(),
     sessionId: params.session
   }));
 });
@@ -12530,6 +12736,16 @@ var PoWMinerStatus = /*#__PURE__*/function (_React$PureComponent) {
       }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("img", {
         src: "/images/progress.gif"
       }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "row pow-status-addr"
+      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "col-6"
+      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "status-title"
+      }, "Target Address:")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "col-12"
+      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
+        className: "status-value"
+      }, this.props.powSession.getTargetAddr()))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
         className: "row pow-status-top"
       }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("div", {
         className: "col-6"
@@ -14986,6 +15202,11 @@ var PoWSession = /*#__PURE__*/function (_TypedEmitter) {
     key: "getPreImage",
     value: function getPreImage() {
       return this.preImage;
+    }
+  }, {
+    key: "getTargetAddr",
+    value: function getTargetAddr() {
+      return this.options.session.getTargetAddr();
     }
   }, {
     key: "getStartTime",

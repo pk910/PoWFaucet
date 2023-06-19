@@ -11,6 +11,7 @@ import { PoWMiner } from '../../pow/PoWMiner';
 import { PoWMinerStatus } from './PoWMinerStatus';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { PassportInfo } from '../passport/PassportInfo';
+import { ConnectionAlert } from './ConnectionAlert';
 
 export interface IMiningPageProps {
   pageContext: IFaucetContext;
@@ -39,6 +40,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
   private powClient: PoWClient;
   private powMiner: PoWMiner;
   private powSession: PoWSession;
+  private connectionAlertId: number = null;
 
   constructor(props: IMiningPageProps, state: IMiningPageState) {
     super(props);
@@ -48,12 +50,12 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       "clientOpen": {
         emmiter: this.powClient,
         event: "open",
-        listener: () => this.setState({ clientConnected: true }),
+        listener: () => this.updateConnectionState(true),
       },
       "clientClose": {
         emmiter: this.powClient,
         event: "close",
-        listener: () => this.setState({ clientConnected: false }),
+        listener: () => this.updateConnectionState(false),
       },
       "sessionBalance": {
         emmiter: this.powSession,
@@ -130,6 +132,31 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
     });
   }
 
+  private updateConnectionState(connected: boolean, initial?: boolean) {
+    this.setState({
+      clientConnected: connected
+    });
+    console.log("updateConnectionState", connected);
+    if(connected && this.connectionAlertId !== null) {
+      this.props.pageContext.hideStatusAlert(this.connectionAlertId);
+      this.connectionAlertId = null;
+    }
+    else if(!connected && this.connectionAlertId === null) {
+      let now = Math.floor((new Date()).getTime() / 1000);
+      this.connectionAlertId = this.props.pageContext.showStatusAlert("error", 30, (
+        <ConnectionAlert 
+          faucetConfig={this.props.faucetConfig}
+          initialConnection={!!initial}
+          disconnectTime={now}
+          timeoutCb={() => {
+            FaucetSession.persistSessionInfo(null);
+            this.props.navigateFn("/details/" + this.props.sessionId);
+          }}
+        />
+      ));
+    }
+  }
+
   public componentDidMount() {
     Object.keys(this.eventListeners).forEach((listenerKey) => {
       let eventListener = this.eventListeners[listenerKey];
@@ -141,6 +168,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
     if(!this.state.loadedSession) {
       this.faucetSession.loadSessionInfo().then((sessionInfo) => {
         if(sessionInfo.status === "running" && sessionInfo.tasks?.filter((task) => task.module === "pow").length > 0) {
+          this.updateConnectionState(false, true);
           this.powClient.start();
           this.powSession.resumeSession();
           this.powMiner.startMiner();
@@ -176,6 +204,10 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
     if(this.powMiner) {
       this.powMiner.stopMiner();
     }
+    if(this.connectionAlertId) {
+      this.props.pageContext.hideStatusAlert(this.connectionAlertId);
+      this.connectionAlertId = null;
+    }
   }
 
 	public render(): React.ReactElement<IMiningPageProps> {
@@ -194,6 +226,14 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
             <img src="/images/spinner.gif" className="spinner" />
             <span className="spinner-text">Loading...</span>
           </div>
+        </div>
+      );
+    }
+    else if(this.state.loadingError) {
+      return (
+        <div className='alert alert-danger'>
+          Can't mine for this session: {typeof this.state.loadingError == "string" ? this.state.loadingError : ""}<br />
+          See <a href={'#/details/' + this.props.sessionId}>Session Details</a>
         </div>
       );
     }

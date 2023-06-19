@@ -24,6 +24,7 @@ export interface IFaucetPageState {
   initializing: boolean;
   faucetConfig: IFaucetConfig;
   faucetStatus: IFaucetStatus[];
+  statusAlerts: IFaucetStatusAlert[];
   dialogs: IFaucetDialog[];
   notifications: IFaucetNotification[];
 }
@@ -43,16 +44,25 @@ export interface IFaucetDialog {
   closeFn: () => void;
 }
 
+export interface IFaucetStatusAlert {
+  id: number;
+  body: React.ReactElement;
+  level: string;
+  prio: number;
+}
+
 export const FaucetPageContext = React.createContext<IFaucetContext>(null);
 export const FaucetConfigContext = React.createContext<IFaucetConfig>(null);
 
 export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPageState> {
   private configRefreshInterval: NodeJS.Timer;
   private lastConfigRefresh = 0;
+  private statusAlertIdCounter = 0;
   private notificationIdCounter = 0;
   private dialogIdCounter = 0;
   private notifications: IFaucetNotification[] = [];
   private dialogs: IFaucetDialog[] = [];
+  private statusAlerts: IFaucetStatusAlert[] = [];
   private pageContext: IFaucetContext;
   private faucetStatucClickCount = 0;
 
@@ -62,6 +72,8 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
     let faucetApi = new FaucetApi(props.apiUrl);
     this.pageContext = {
       faucetApi: faucetApi,
+      showStatusAlert: (level: string, prio: number, body: React.ReactElement) => this.showStatusAlert(level, prio, body),
+      hideStatusAlert: (statusAlertId: number) => this.hideStatusAlert(statusAlertId),
       showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => this.showNotification(type, message, time, timeout),
       hideNotification: (notificationId: number) => this.hideNotification(notificationId),
       showDialog: (dialogProps: IFaucetDialogProps) => this.showDialog(dialogProps),
@@ -72,6 +84,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       initializing: true,
       faucetConfig: null,
       faucetStatus: [],
+      statusAlerts: [],
       dialogs: [],
       notifications: [],
 		};
@@ -185,9 +198,14 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
 	}
 
   private renderStatusAlerts(): React.ReactElement {
+    let faucetStatusEntries = [];
+    Array.prototype.push.apply(faucetStatusEntries, this.state.faucetStatus);
+    Array.prototype.push.apply(faucetStatusEntries, this.state.statusAlerts);
+    faucetStatusEntries.sort((a, b) => (a.prio || 10) - (b.prio || 10));
+
     return (
       <div className="faucet-status-alerts">
-        {this.state.faucetStatus.map((status, idx) => {
+        {faucetStatusEntries.map((status, idx) => {
           let faucetStatusClass: string = "";
           switch(status.level) {
             case "info":
@@ -205,14 +223,48 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
           }
           return (
             <div key={"status" + idx} className={["faucet-status-alert alert", faucetStatusClass].join(" ")} role="alert">
-              {status.ishtml ? 
-              <div dangerouslySetInnerHTML={{__html: status.text}} /> :
-              <span>{status.text}</span>}
+              {status.body ? status.body : status.ishtml ? 
+                <div dangerouslySetInnerHTML={{__html: status.text}} /> :
+                <span>{status.text}</span>
+              }
             </div>
           );
         })}
       </div>
     );
+  }
+
+  private showStatusAlert(level: string, prio: number, body: React.ReactElement): number {
+    let statusAlertId = this.statusAlertIdCounter++;
+    let statusAlert: IFaucetStatusAlert = {
+      id: statusAlertId,
+      level: level,
+      prio: prio,
+      body: body,
+    }
+    this.statusAlerts.push(statusAlert);
+    this.setState({
+      statusAlerts: this.statusAlerts.slice()
+    })
+    return statusAlertId;
+  }
+
+  private hideStatusAlert(statusAlertId: number): void {
+    let statusAlertIdx = -1;
+    let statusAlert: IFaucetStatusAlert;
+    for(let idx = 0; idx < this.state.statusAlerts.length; idx++) {
+      if(this.statusAlerts[idx].id === statusAlertId) {
+        statusAlertIdx = idx;
+        statusAlert = this.state.statusAlerts[idx];
+        break;
+      }
+    }
+    if(statusAlertIdx !== -1) {
+      this.statusAlerts.splice(statusAlertIdx, 1);
+      this.setState({
+        statusAlerts: this.statusAlerts.slice()
+      });
+    }
   }
 
   private renderNotifications(): React.ReactElement {

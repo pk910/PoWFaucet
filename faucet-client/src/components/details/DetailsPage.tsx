@@ -148,6 +148,30 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
     let now = this.props.pageContext.faucetApi.getFaucetTime().getSyncedTime();
     let claimTimeout = (this.state.sessionStatus.start + this.props.faucetConfig.sessionTimeout) - now;
 
+    let restoreButton: React.ReactElement = null;
+    if(this.state.sessionStatus.status === "claimable") {
+      restoreButton = (
+        <button 
+          className="btn btn-primary action-btn"
+          onClick={() => {
+            this.props.navigateFn("/claim/" + this.props.sessionId);
+          }}>
+            Claim Rewards
+        </button>
+      );
+    }
+    else if(this.state.sessionStatus.status === "running" && this.state.sessionStatus.tasks.filter(task => task.module === "pow").length > 0) {
+      restoreButton = (
+        <button 
+          className="btn btn-primary action-btn"
+          onClick={() => {
+            this.props.navigateFn("/mine/" + this.props.sessionId);
+          }}>
+            Continue Mining
+        </button>
+      );
+    }
+
     return (
       <div>
         <div className='row'>
@@ -205,6 +229,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
         
         <div className='row'>
           <div className='col'>
+            {restoreButton}
           </div>
           <div className='col-4'>
             <button 

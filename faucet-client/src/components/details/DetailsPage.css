@@ -1,4 +1,8 @@
 
+.faucet-page .details-advanced {
+  margin-bottom: 8px;
+}
+
 .faucet-page .details-advanced a {
   font-size: 9pt;
   margin: 4px 0;
