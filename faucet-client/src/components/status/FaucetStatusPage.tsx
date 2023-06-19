@@ -254,21 +254,21 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
     let sessionStatus: React.ReactElement[] = [];
     switch(session.status) {
       case "running":
-        sessionStatus.push(<span key="status" className="badge bg-primary">Running</span>);
+        sessionStatus.push(<span key="running" className="badge bg-primary">Running</span>);
         if(session.hashrate > 0)
-          sessionStatus.push(<span key="status" className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>);
+          sessionStatus.push(<span key="mining" className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>);
         break;
       case "claimable":
-        sessionStatus.push(<span key="status" className="badge bg-warning text-dark">Claimable</span>);
+        sessionStatus.push(<span key="claimable" className="badge bg-warning text-dark">Claimable</span>);
         break;
       case "claiming":
-        sessionStatus.push(<span key="status" className="badge bg-info text-dark">Claiming</span>);
+        sessionStatus.push(<span key="claiming" className="badge bg-info text-dark">Claiming</span>);
         break;
       case "finished":
-        sessionStatus.push(<span key="status" className="badge bg-success">Finished</span>);
+        sessionStatus.push(<span key="finished" className="badge bg-success">Finished</span>);
         break;
       case "failed":
-        sessionStatus.push(<span key="status" className="badge bg-danger">Failed</span>);
+        sessionStatus.push(<span key="failed" className="badge bg-danger">Failed</span>);
         break;
       default:
         sessionStatus.push(<span key="status" className="badge bg-light text-dark">{session.status}</span>);

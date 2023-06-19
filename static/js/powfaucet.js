@@ -12295,7 +12295,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
         powParams: this.props.faucetConfig.modules.pow.powParams,
         difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687217142979), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687217142979), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687217142979), _workerSrc)
+        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687218119110), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687218119110), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687218119110), _workerSrc)
       });
     }
   }, {
@@ -13995,35 +13995,35 @@ var FaucetStatusPage = /*#__PURE__*/function (_React$PureComponent) {
       switch (session.status) {
         case "running":
           sessionStatus.push( /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("span", {
-            key: "status",
+            key: "running",
             className: "badge bg-primary"
           }, "Running"));
           if (session.hashrate > 0) sessionStatus.push( /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("span", {
-            key: "status",
+            key: "mining",
             className: "badge bg-success"
           }, "Mining (", Math.round(session.hashrate * 100) / 100, " H/s)"));
           break;
         case "claimable":
           sessionStatus.push( /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("span", {
-            key: "status",
+            key: "claimable",
             className: "badge bg-warning text-dark"
           }, "Claimable"));
           break;
         case "claiming":
           sessionStatus.push( /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("span", {
-            key: "status",
+            key: "claiming",
             className: "badge bg-info text-dark"
           }, "Claiming"));
           break;
         case "finished":
           sessionStatus.push( /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("span", {
-            key: "status",
+            key: "finished",
             className: "badge bg-success"
           }, "Finished"));
           break;
         case "failed":
           sessionStatus.push( /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("span", {
-            key: "status",
+            key: "failed",
             className: "badge bg-danger"
           }, "Failed"));
           break;
