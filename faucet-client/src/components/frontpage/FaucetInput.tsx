@@ -93,6 +93,10 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       }
 
       await this.props.submitInputs(inputData);
+    } catch(ex) {
+      if(this.faucetCaptcha.current)
+        this.faucetCaptcha.current.resetToken();
+      throw ex;
     } finally {
       this.setState({
         submitting: false

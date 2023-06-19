@@ -10451,16 +10451,24 @@ var ClaimInput = /*#__PURE__*/function (_React$PureComponent) {
               _context.next = 9;
               return this.props.submitInputs(inputData);
             case 9:
-              _context.prev = 9;
+              _context.next = 15;
+              break;
+            case 11:
+              _context.prev = 11;
+              _context.t0 = _context["catch"](1);
+              if (this.faucetCaptcha.current) this.faucetCaptcha.current.resetToken();
+              throw _context.t0;
+            case 15:
+              _context.prev = 15;
               this.setState({
                 submitting: false
               });
-              return _context.finish(9);
-            case 12:
+              return _context.finish(15);
+            case 18:
             case "end":
               return _context.stop();
           }
-        }, _callee, this, [[1,, 9, 12]]);
+        }, _callee, this, [[1, 11, 15, 18]]);
       }));
       function onSubmitBtnClick() {
         return _onSubmitBtnClick.apply(this, arguments);
@@ -11676,16 +11684,24 @@ var FaucetInput = /*#__PURE__*/function (_React$PureComponent) {
               _context.next = 10;
               return this.props.submitInputs(inputData);
             case 10:
-              _context.prev = 10;
+              _context.next = 16;
+              break;
+            case 12:
+              _context.prev = 12;
+              _context.t0 = _context["catch"](1);
+              if (this.faucetCaptcha.current) this.faucetCaptcha.current.resetToken();
+              throw _context.t0;
+            case 16:
+              _context.prev = 16;
               this.setState({
                 submitting: false
               });
-              return _context.finish(10);
-            case 13:
+              return _context.finish(16);
+            case 19:
             case "end":
               return _context.stop();
           }
-        }, _callee, this, [[1,, 10, 13]]);
+        }, _callee, this, [[1, 12, 16, 19]]);
       }));
       function onSubmitBtnClick() {
         return _onSubmitBtnClick.apply(this, arguments);
@@ -12279,7 +12295,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
         powParams: this.props.faucetConfig.modules.pow.powParams,
         difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687212658394), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687212658394), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687212658394), _workerSrc)
+        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687213518551), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687213518551), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687213518551), _workerSrc)
       });
     }
   }, {
