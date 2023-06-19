@@ -3,9 +3,10 @@ version: 2
 
 ### General Settings
 
-# Path to faucet db file (defaults to faucet-store.json)
-faucetStore: "faucet-store.json"
-faucetDBFile: "faucet-store.db"
+# faucet database (defaults to local sqlite)
+database:
+  driver: "sqlite"
+  file: "faucet-store.db"
 
 # logfile for faucet events (comment out for no logging)
 faucetLogFile: "faucet-events.log"
