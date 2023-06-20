@@ -340,18 +340,23 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       showDialog = true;
     }
     if(showDialog) {
+      this.powClient.stop();
       this.powMiner.stopMiner();
+      let viewDetailsClicked = false;
       this.props.pageContext.showDialog({
         title: "Session error",
         body: (<div className='alert alert-danger'>{error.data?.code ? "[" + error.data?.code + "] " : ""} {error.data?.message}</div>),
         applyButton: { 
           caption: "View Details",
           applyFn: () => {
+            viewDetailsClicked = true;
             this.props.navigateFn("/details/" + this.props.sessionId);
           },
         },
         closeButton: { caption: "Close" },
         closeFn: () => {
+          if(viewDetailsClicked)
+            return;
           this.props.navigateFn("/");
         }
       });
