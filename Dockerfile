@@ -5,4 +5,4 @@ COPY static ./static
 COPY faucet-config.example.yaml .
 
 EXPOSE 8080
-ENTRYPOINT [ "node", "dist/powfaucet.js" ]
+ENTRYPOINT [ "node", "--no-deprecation", "dist/powfaucet.js" ]
