@@ -7,6 +7,9 @@ on:
       - 'master'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   run_tests:
@@ -24,7 +27,7 @@ jobs:
 
   build_binaries:
     name: Build Binaries
-    needs: [run_tests]
+    needs: [ run_tests ]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
