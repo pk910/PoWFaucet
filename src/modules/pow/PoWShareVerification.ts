@@ -6,6 +6,7 @@ import { PoWModule } from "./PoWModule";
 import { SessionManager } from "../../session/SessionManager";
 import { FaucetSessionStatus } from "../../session/FaucetSession";
 import { PoWClient } from "./PoWClient";
+import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -105,7 +106,13 @@ export class PoWShareVerification {
   private getVerifierSessions(): PoWSession[] {
     let powConfig = this.module.getModuleConfig();
     let minBalance = BigInt(powConfig.powShareReward) * BigInt(powConfig.verifyMinerMissPenaltyPerc * 100) / 10000n;
-    return this.module.getActiveClients().map((client) => client.getPoWSession()).filter((session) => {
+    let activeClients = this.module.getActiveClients();
+    return activeClients.map((client) => client.getPoWSession()).filter((session, index) => {
+      if(!session.activeClient) {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "PoWModule.getActiveClients returned a inactive client: " + session.getFaucetSession().getSessionId());
+        console.log(activeClients[index]);
+        return false;
+      }
       return (
         session !== this.session && 
         session.getFaucetSession().getDropAmount() > minBalance &&

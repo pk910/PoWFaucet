@@ -12,11 +12,12 @@ import { SessionManager } from "../../session/SessionManager";
 import { PoWClient } from "./PoWClient";
 import { PoWSession } from "./PoWSession";
 import { FaucetError } from "../../common/FaucetError";
+import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess";
 
 export class PoWModule extends BaseModule<IPoWConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
   private validator: PoWValidator;
-  private powClients: PoWClient[] = [];
+  private powClients: {[sessionId: string]: PoWClient} = {};
 
   protected override startModule(): Promise<void> {
     // register websocket endpoint (/pow)
@@ -197,21 +198,27 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
     let powSession = this.getPoWSession(session);
     powClient = new PoWClient(this, powSession, ws);
-    if(powSession.activeClient === powClient)
-      this.powClients.push(powClient);
+    if(powSession.activeClient === powClient) {
+      this.powClients[session.getSessionId()] = powClient;
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "connected PoWClient: " + session.getSessionId());
+    }
     this.resetSessionIdleTimer(powSession);
   }
 
-  public disposePoWClient(client: PoWClient) {
+  public disposePoWClient(client: PoWClient, reason: string) {
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "closed PoWClient: " + client.getFaucetSession().getSessionId() + " (" + reason + ")");
     this.resetSessionIdleTimer(client.getPoWSession());
 
-    let clientIdx = this.powClients.indexOf(client);
-    if(clientIdx !== -1)
-      this.powClients.splice(clientIdx, 1);
+    if(this.powClients[client.getFaucetSession().getSessionId()] === client) {
+      delete this.powClients[client.getFaucetSession().getSessionId()];
+    }
+    else {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "disposePoWClient: client not in active clients list: " + client.getFaucetSession().getSessionId());
+    }
   }
 
   public getActiveClients(): PoWClient[] {
-    return this.powClients.slice();
+    return Object.values(this.powClients);
   }
 
   public getPoWSession(session: FaucetSession): PoWSession {

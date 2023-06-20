@@ -53,7 +53,7 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
       if(totalAmount >= BigInt(limit.limitAmount)) {
         let errMsg = limit.message || [
           "You have already requested ",
-          ServiceManager.GetService(EthWalletManager).readableAmount(BigInt(limit.limitAmount)),
+          ServiceManager.GetService(EthWalletManager).readableAmount(totalAmount),
           " in the last ",
           renderTimespan(limit.duration)
         ].join("");

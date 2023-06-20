@@ -54,12 +54,14 @@ export class PoWClient {
   }
 
   private dispose(reason: string) {
+    if(!this.socket)
+      return;
     this.socket = null;
 
-    if(this.session)
+    if(this.session && this.session.activeClient === this)
       this.session.activeClient = null;
 
-    this.module.disposePoWClient(this);
+    this.module.disposePoWClient(this, reason);
 
     if(this.pingTimer) {
       clearInterval(this.pingTimer);
