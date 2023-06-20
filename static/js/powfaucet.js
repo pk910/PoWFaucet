@@ -12294,7 +12294,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
         powParams: this.props.faucetConfig.modules.pow.powParams,
         difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687219619522), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687219619522), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687219619522), _workerSrc)
+        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687227305017), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687227305017), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687227305017), _workerSrc)
       });
     }
   }, {
@@ -12542,16 +12542,29 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         var _error$data,
           _error$data2,
           _this9 = this;
-        var _error$data3, _error$data4, _error$data5;
+        var showDialog, _error$data3, _error$data4, _error$data5;
         return _regeneratorRuntime().wrap(function _callee3$(_context3) {
           while (1) switch (_context3.prev = _context3.next) {
             case 0:
-              if (((_error$data = error.data) === null || _error$data === void 0 ? void 0 : _error$data.code) === "CLIENT_KILLED" || ((_error$data2 = error.data) === null || _error$data2 === void 0 ? void 0 : _error$data2.code) === "INVALID_SESSION") {} else {
+              showDialog = false;
+              if (((_error$data = error.data) === null || _error$data === void 0 ? void 0 : _error$data.code) === "CLIENT_KILLED" || ((_error$data2 = error.data) === null || _error$data2 === void 0 ? void 0 : _error$data2.code) === "INVALID_SESSION") {
+                if (error.data.message.match(/reconnected from another client/)) showDialog = true;
+              } else {
+                showDialog = true;
+              }
+              if (showDialog) {
+                this.powMiner.stopMiner();
                 this.props.pageContext.showDialog({
                   title: "Session error",
                   body: /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2__.createElement("div", {
                     className: "alert alert-danger"
                   }, (_error$data3 = error.data) !== null && _error$data3 !== void 0 && _error$data3.code ? "[" + ((_error$data4 = error.data) === null || _error$data4 === void 0 ? void 0 : _error$data4.code) + "] " : "", " ", (_error$data5 = error.data) === null || _error$data5 === void 0 ? void 0 : _error$data5.message),
+                  applyButton: {
+                    caption: "View Details",
+                    applyFn: function applyFn() {
+                      _this9.props.navigateFn("/details/" + _this9.props.sessionId);
+                    }
+                  },
                   closeButton: {
                     caption: "Close"
                   },
@@ -12560,7 +12573,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
                   }
                 });
               }
-            case 1:
+            case 3:
             case "end":
               return _context3.stop();
           }

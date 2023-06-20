@@ -331,13 +331,25 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
   }
 
   private async processSessionError(error: any) {
+    let showDialog: boolean = false;
     if(error.data?.code === "CLIENT_KILLED" || error.data?.code === "INVALID_SESSION") {
-      
+      if(error.data.message.match(/reconnected from another client/))
+        showDialog = true;
     }
     else {
+      showDialog = true;
+    }
+    if(showDialog) {
+      this.powMiner.stopMiner();
       this.props.pageContext.showDialog({
         title: "Session error",
         body: (<div className='alert alert-danger'>{error.data?.code ? "[" + error.data?.code + "] " : ""} {error.data?.message}</div>),
+        applyButton: { 
+          caption: "View Details",
+          applyFn: () => {
+            this.props.navigateFn("/details/" + this.props.sessionId);
+          },
+        },
         closeButton: { caption: "Close" },
         closeFn: () => {
           this.props.navigateFn("/");
