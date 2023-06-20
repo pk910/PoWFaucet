@@ -197,7 +197,8 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
     let powSession = this.getPoWSession(session);
     powClient = new PoWClient(this, powSession, ws);
-    this.powClients.push(powClient);
+    if(powSession.activeClient === powClient)
+      this.powClients.push(powClient);
     this.resetSessionIdleTimer(powSession);
   }
 
