@@ -31,15 +31,27 @@ export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
   }
 
   public override async run(sql: string, values?: BindValues): Promise<RunResult> {
-    return this.db.run(sql, values);
+    try {
+      return this.db.run(sql, values);
+    } catch(ex) {
+      console.log("sqlite error: " + sql, values, ex.toString());
+    }
   }
   
   public override async all(sql: string, values?: BindValues): Promise<QueryResult[]> {
-    return this.db.all(sql, values);
+    try {
+      return this.db.all(sql, values);
+    } catch(ex) {
+      console.log("sqlite error: " + sql, values, ex.toString());
+    }
   }
 
   public override async get(sql: string, values?: BindValues): Promise<QueryResult | null> {
-    return this.db.get(sql, values);
+    try {
+      return this.db.get(sql, values);
+    } catch(ex) {
+      console.log("sqlite error: " + sql, values, ex.toString());
+    }
   }
 
 }
