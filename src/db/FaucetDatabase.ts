@@ -328,7 +328,7 @@ export class FaucetDatabase {
   }
 
   public async getClaimableAmount(): Promise<bigint> {
-    let row = await this.db.get("SELECT SUM(DropAmount) AS TotalAmount FROM Sessions WHERE Status = 'claimable'") as {
+    let row = await this.db.get("SELECT SUM(CAST(DropAmount AS FLOAT)) AS TotalAmount FROM Sessions WHERE Status = 'claimable'") as {
       TotalAmount: string;
     };
     if(!row || !row.TotalAmount)
