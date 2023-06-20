@@ -34,9 +34,9 @@ export class EthWalletRefill {
     let unclaimedBalance = await ServiceManager.GetService(SessionManager).getUnclaimedBalance();
     let walletBalance = walletState.balance - unclaimedBalance - ServiceManager.GetService(EthClaimManager).getQueuedAmount();
     let refillAction: string = null;
-    if(faucetConfig.ethRefillContract.overflowBalance && walletBalance > BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()))
+    if(faucetConfig.ethRefillContract.overflowBalance && walletBalance > BigInt(faucetConfig.ethRefillContract.overflowBalance))
       refillAction = "overflow";
-    else if(walletBalance < BigInt(faucetConfig.ethRefillContract.triggerBalance.toString()))
+    else if(walletBalance < BigInt(faucetConfig.ethRefillContract.triggerBalance))
       refillAction = "refill";
     
     if(!refillAction)
@@ -47,11 +47,11 @@ export class EthWalletRefill {
       if(refillAction == "refill")
         txResult = await this.refillWallet();
       else if(refillAction == "overflow")
-        txResult = await this.overflowWallet(walletBalance - BigInt(faucetConfig.ethRefillContract.overflowBalance.toString()));
+        txResult = await this.overflowWallet(walletBalance - BigInt(faucetConfig.ethRefillContract.overflowBalance));
       
       this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
 
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult[0]);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult.txHash);
 
       try {
         let txReceipt = await txResult.txPromise;
@@ -104,7 +104,7 @@ export class EthWalletRefill {
     if(faucetConfig.ethRefillContract.checkContractBalance) {
       let checkAddr = (typeof faucetConfig.ethRefillContract.checkContractBalance === "string" ? faucetConfig.ethRefillContract.checkContractBalance : faucetConfig.ethRefillContract.contract);
       let contractBalance = await ethWalletManager.getWalletBalance(checkAddr);
-      let dustBalance = faucetConfig.ethRefillContract.contractDustBalance ? BigInt(faucetConfig.ethRefillContract.contractDustBalance.toString()) : 1000000000n;
+      let dustBalance = faucetConfig.ethRefillContract.contractDustBalance ? BigInt(faucetConfig.ethRefillContract.contractDustBalance) : 1000000000n;
       if(contractBalance <= dustBalance)
         throw "refill contract is out of funds";
       if(refillAmount > contractBalance)
