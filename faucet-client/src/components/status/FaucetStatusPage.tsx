@@ -129,7 +129,8 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
     this.state.activeSessions.forEach((session) => {
       if(session.status === "running") {
         sessionStatus.mining++;
-        sessionStatus.hashrate += session.hashrate;
+        if(session.hashrate > 0)
+          sessionStatus.hashrate += session.hashrate;
       }
     });
     
@@ -328,43 +329,45 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       <Tooltip id="ipinfo-tooltip" {...props}>
         <div className='ipaddr-info'>
           <table>
-            {session.ipInfo.status !== "success" ?
+            <tbody>
+              {session.ipInfo.status !== "success" ?
+                <tr>
+                  <td colSpan={2} className='ipinfo-value'>{session.ipInfo.status}</td>
+                </tr>
+              : null}
               <tr>
-                <td colSpan={2} className='ipinfo-value'>{session.ipInfo.status}</td>
+                <td className='ipinfo-title'>Country:</td>
+                <td className='ipinfo-value'>{session.ipInfo.country} ({session.ipInfo.countryCode})</td>
               </tr>
-            : null}
-            <tr>
-              <td className='ipinfo-title'>Country:</td>
-              <td className='ipinfo-value'>{session.ipInfo.country} ({session.ipInfo.countryCode})</td>
-            </tr>
-            <tr>
-              <td className='ipinfo-title'>Region:</td>
-              <td className='ipinfo-value'>{session.ipInfo.region} ({session.ipInfo.regionCode})</td>
-            </tr>
-            <tr>
-              <td className='ipinfo-title'>City:</td>
-              <td className='ipinfo-value'>{session.ipInfo.city} ({session.ipInfo.cityCode})</td>
-            </tr>
-            <tr>
-              <td className='ipinfo-title'>ISP:</td>
-              <td className='ipinfo-value'>{session.ipInfo.isp}</td>
-            </tr>
-            <tr>
-              <td className='ipinfo-title'>Org:</td>
-              <td className='ipinfo-value'>{session.ipInfo.org}</td>
-            </tr>
-            <tr>
-              <td className='ipinfo-title'>AS:</td>
-              <td className='ipinfo-value'>{session.ipInfo.as}</td>
-            </tr>
-            <tr>
-              <td className='ipinfo-title'>Proxy:</td>
-              <td className='ipinfo-value'>{session.ipInfo.proxy ? "yes" : "no"}</td>
-            </tr>
-            <tr>
-              <td className='ipinfo-title'>Hosting:</td>
-              <td className='ipinfo-value'>{session.ipInfo.hosting ? "yes" : "no"}</td>
-            </tr>
+              <tr>
+                <td className='ipinfo-title'>Region:</td>
+                <td className='ipinfo-value'>{session.ipInfo.region} ({session.ipInfo.regionCode})</td>
+              </tr>
+              <tr>
+                <td className='ipinfo-title'>City:</td>
+                <td className='ipinfo-value'>{session.ipInfo.city} ({session.ipInfo.cityCode})</td>
+              </tr>
+              <tr>
+                <td className='ipinfo-title'>ISP:</td>
+                <td className='ipinfo-value'>{session.ipInfo.isp}</td>
+              </tr>
+              <tr>
+                <td className='ipinfo-title'>Org:</td>
+                <td className='ipinfo-value'>{session.ipInfo.org}</td>
+              </tr>
+              <tr>
+                <td className='ipinfo-title'>AS:</td>
+                <td className='ipinfo-value'>{session.ipInfo.as}</td>
+              </tr>
+              <tr>
+                <td className='ipinfo-title'>Proxy:</td>
+                <td className='ipinfo-value'>{session.ipInfo.proxy ? "yes" : "no"}</td>
+              </tr>
+              <tr>
+                <td className='ipinfo-title'>Hosting:</td>
+                <td className='ipinfo-value'>{session.ipInfo.hosting ? "yes" : "no"}</td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </Tooltip>
@@ -379,23 +382,25 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       <Tooltip id="ipinfo-tooltip" {...props}>
         <div className='ipaddr-info'>
           <table>
-            <tr>
-              <td className='ipinfo-title'>Reward:</td>
-              <td className='ipinfo-value'>{session.restr.reward} %</td>
-            </tr>
-            {session.restr.blocked ?
+            <tbody>
               <tr>
-                <td className='ipinfo-title'>Blocked:</td>
-                <td className='ipinfo-value'>{session.restr.blocked}</td>
+                <td className='ipinfo-title'>Reward:</td>
+                <td className='ipinfo-value'>{session.restr.reward} %</td>
               </tr>
-            : null}
-            {session.restr.messages.map((message, idx) => {
-              return (
+              {session.restr.blocked ?
                 <tr>
-                  <td key={idx} colSpan={2} className='ipinfo-value'>{message.text}</td>
+                  <td className='ipinfo-title'>Blocked:</td>
+                  <td className='ipinfo-value'>{session.restr.blocked}</td>
                 </tr>
-              );
-            })}
+              : null}
+              {session.restr.messages.map((message, idx) => {
+                return (
+                  <tr>
+                    <td key={idx} colSpan={2} className='ipinfo-value'>{message.text}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
         </div>
       </Tooltip>

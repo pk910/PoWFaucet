@@ -12294,7 +12294,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
         powParams: this.props.faucetConfig.modules.pow.powParams,
         difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687218882084), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687218882084), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687218882084), _workerSrc)
+        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687219619522), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687219619522), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687219619522), _workerSrc)
       });
     }
   }, {
@@ -13836,7 +13836,7 @@ var FaucetStatusPage = /*#__PURE__*/function (_React$PureComponent) {
       this.state.activeSessions.forEach(function (session) {
         if (session.status === "running") {
           sessionStatus.mining++;
-          sessionStatus.hashrate += session.hashrate;
+          if (session.hashrate > 0) sessionStatus.hashrate += session.hashrate;
         }
       });
       return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
@@ -14076,7 +14076,7 @@ var FaucetStatusPage = /*#__PURE__*/function (_React$PureComponent) {
         id: "ipinfo-tooltip"
       }, props), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
         className: "ipaddr-info"
-      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("table", null, session.ipInfo.status !== "success" ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("td", {
+      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("table", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("tbody", null, session.ipInfo.status !== "success" ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("td", {
         colSpan: 2,
         className: "ipinfo-value"
       }, session.ipInfo.status)) : null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("td", {
@@ -14111,7 +14111,7 @@ var FaucetStatusPage = /*#__PURE__*/function (_React$PureComponent) {
         className: "ipinfo-title"
       }, "Hosting:"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("td", {
         className: "ipinfo-value"
-      }, session.ipInfo.hosting ? "yes" : "no")))));
+      }, session.ipInfo.hosting ? "yes" : "no"))))));
     }
   }, {
     key: "renderRestrictionInfo",
@@ -14121,7 +14121,7 @@ var FaucetStatusPage = /*#__PURE__*/function (_React$PureComponent) {
         id: "ipinfo-tooltip"
       }, props), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
         className: "ipaddr-info"
-      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("table", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("td", {
+      }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("table", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("tbody", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("td", {
         className: "ipinfo-title"
       }, "Reward:"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("td", {
         className: "ipinfo-value"
@@ -14135,7 +14135,7 @@ var FaucetStatusPage = /*#__PURE__*/function (_React$PureComponent) {
           colSpan: 2,
           className: "ipinfo-value"
         }, message.text));
-      }))));
+      })))));
     }
   }, {
     key: "renderActiveClaims",
