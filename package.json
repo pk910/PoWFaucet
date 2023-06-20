@@ -23,10 +23,7 @@
       "node18-linux-x64",
       "node18-win-x64"
     ],
-    "outputPath": "dist",
-    "options": [
-      "no-warnings"
-    ]
+    "outputPath": "dist"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.4",

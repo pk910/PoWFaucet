@@ -1,10 +1,7 @@
 
-name: Build latest master version
+name: Release latest v2 version
 
 on:
-  push:
-    branches:
-      - 'master'
   workflow_dispatch:
 
 
@@ -70,70 +67,16 @@ jobs:
         echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
       id: version
 
-    # (re)create latest binary release
-    - name: Update latest tag & remove previous latest release
-      uses: actions/github-script@v3
-      with:
-        github-token: ${{secrets.GITHUB_TOKEN}}          
-        script: |
-          try {
-            var latestTag = "latest";
-            var latestRelease = await github.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: latestTag
-            });
-            if(latestRelease && latestRelease.data && latestRelease.data.tag_name == latestTag) {
-              console.log("delete previous latest release");
-              await github.repos.deleteRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: latestRelease.data.id
-              });
-            }
-
-            var latestRef = await github.git.getRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: "tags/" + latestTag
-            });
-            if(latestRef && latestRef.data && latestRef.data.ref) {
-              if(latestRef.data.object.sha !== context.sha) {
-                await github.git.updateRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: "tags/" + latestTag,
-                  sha: context.sha,
-                });
-              }
-            }
-            else {
-              await github.git.createRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: "tags/" + latestTag,
-                sha: context.sha,
-              });
-            }
-          } catch (e) {
-            console.log(e)
-          }
+    # create draft release
     - name: Create latest release
       uses: actions/create-release@v1
       id: create_release
       with:
-        draft: false
-        prerelease: true
-        release_name: "Latest Binaries"
-        tag_name: "latest"
+        draft: true
+        prerelease: false
+        release_name: "v${{ steps.version.outputs.server_version }}"
+        tag_name: "v${{ steps.version.outputs.server_version }}"
         body: |
-          Latest automatically built v2 executables.
-          Built from master branch (commit: ${{ github.sha }})
-
-          Please read the [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) for setup / configuration instructions.
-
-          Server Version: ${{ steps.version.outputs.server_version }}
-          Client Version: ${{ steps.version.outputs.client_version }}
           
           | Release File  | Description |
           | ------------- | ------------- |
@@ -219,7 +162,16 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - run: npm install
       - run: npm run bundle
-      - name: Build v2-latest docker image
-        run: docker build . --file Dockerfile --tag pk910/powfaucet:v2-latest
-      - name: Push v2-latest docker image
-        run: docker push pk910/powfaucet:v2-latest
+      - name: Get project versions
+        run: |
+          echo "server_version=$(cat package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
+          echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
+        id: version
+      - name: Build version specific docker image
+        run: docker build . --file Dockerfile --tag pk910/powfaucet:v${{ steps.version.outputs.server_version }}
+      - name: Push version specific docker image
+        run: docker push pk910/powfaucet:v${{ steps.version.outputs.server_version }}
+      - name: Build v2-stable docker image
+        run: docker build . --file Dockerfile --tag pk910/powfaucet:v2-stable
+      - name: Push v2-stable docker image
+        run: docker push pk910/powfaucet:v2-stable

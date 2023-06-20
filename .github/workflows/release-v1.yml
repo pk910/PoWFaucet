@@ -1,5 +1,5 @@
 
-name: Build latest v1 relase
+name: Build latest v1 release
 
 on:
   workflow_dispatch:
