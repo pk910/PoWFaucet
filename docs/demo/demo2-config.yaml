@@ -1,0 +1,227 @@
+# PoWFaucet config (example)
+version: 2
+
+### General Settings
+
+# faucet database (defaults to local sqlite)
+database:
+  driver: "sqlite"
+  file: "faucet-store.db"
+
+# logfile for faucet events (comment out for no logging)
+faucetLogFile: "faucet-events.log"
+
+# path to file to write the process pid to (comment out to disable)
+faucetPidFile: "faucet-pid.txt"
+
+# faucet http/ws server port
+serverPort: 8092
+
+# title of the faucet
+faucetTitle: "PoWFaucet Demo 2"
+
+# url to image displayed on the startpage
+faucetImage: "/images/fauceth_420.jpg"
+
+# some additional html to show on the startpage
+faucetHomeHtml: |
+  <div class='pow-info'>
+    <h5>What is a PoW Faucet?</h5>
+    This is a Demo Ethereum Faucet running on the Goerli Testnet.<br>
+    The faucet is for demonstration purposes only and drops a wothless ERC20 token.
+  </div>
+  <div class='pow-info'>
+    <h5>Instance Configuration</h5>
+    captcha:<br>
+    &nbsp;&nbsp;for session start: false<br>
+    &nbsp;&nbsp;for reward claim: true<br>
+    ensname:<br>
+    &nbsp;&nbsp;required: true<br>
+    recurring-limits:<br>
+    &nbsp;&nbsp;max 50 PoWC per day by IP & ETH Addr<br>
+    &nbsp;&nbsp;max 200 PoWC per 2 days by ETH Addr<br>
+  </div>
+
+# random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
+# use a random string and do not share / reuse it anywhere. Everyone knowing this secret is theoretically able to claim rewards from the faucet without mining.
+faucetSecret: "***censored***"
+
+# ETH execution layer RPC host
+ethRpcHost: "https://goerli.infura.io/v3/***censored***"
+#ethRpcHost: "https://ethereum-goerli.publicnode.com"
+
+# faucet wallet private key (hex, without 0x prefix)
+ethWalletKey: "***censored***"
+
+# EVM chain id (null for auto-detect from RPC)
+ethChainId: null
+
+# symbol (short name) of the coin that can be mined
+faucetCoinSymbol: "PoWC"
+
+# type of coin that can be mined
+# native = native coin (ETH)
+# erc20 = ERC20 token
+faucetCoinType: "erc20"
+
+# coin contract address (only for faucetCoinType = erc20)
+faucetCoinContract: "0x1eF15b05E6cF521632a8E3a4d86e9B78B19dA894"
+
+# transaction gas limit
+# use 21000 to prevent transactions to contracts
+ethTxGasLimit: 100000
+
+# use legacy (non-eip1559) transaction type
+# true: Type 0 (Legacy Transactions), false: Type 2 (EIP1559 Transactions)
+ethLegacyTx: false
+
+# max transaction gas fee (in wei)
+# used as limit for legacy transactions (faucet won't build transactions with higher gas price)
+ethTxMaxFee: 100000000000  # 100 gwei
+
+# max transaction priority fee (in wei)
+ethTxPrioFee: 2000000000  # 2 gwei
+
+# max number of unconfirmed transactions to create simultaneously
+ethMaxPending: 12
+
+# queue transactions and wait for funding when faucet is out of funds (show "No Funds" error when false)
+ethQueueNoFunds: true
+
+# link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
+ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
+
+
+# min/max drop amount (max is the default if no module lowers it)
+maxDropAmount: 10000000000000000000 # 10 PoWC
+minDropAmount: 100000000000000000 # 0.1 PoWC
+
+# maximum session time (from start till payout)
+# only relevant if one of the enabled protection mechanisms introduces a session delay (eg. mining)
+sessionTimeout: 43200  # 12h
+
+# session cleanup time
+# session data will be removed from the faucet DB after that time
+sessionCleanup: 2592000 # 30 days
+
+
+### Protection mechanisms
+modules:
+
+  ## Captcha Protection
+  captcha:
+    # enable / disable captcha protection
+    enabled: true
+
+    # captcha provider
+    # hcaptcha:  HCaptcha (https://hcaptcha.com)
+    # recaptcha: ReCAPTCHA (https://developers.google.com/recaptcha)
+    provider: "hcaptcha"
+
+    # captcha site key
+    siteKey: "a62dab4f-e790-42ab-acbf-47f1c029870a"
+
+    # captcha secret key
+    secret: "0x***censored***"
+
+    # require captcha to start a new session (default: false)
+    checkSessionStart: false
+
+    # require captcha to start claim payout (default: false)
+    checkBalanceClaim: true
+  
+  ## ENS Name
+  ensname:
+    enabled: true
+
+    # RPC Host for ENS name resolver (mainnet)
+    rpcHost: "https://rpc.flashbots.net/"
+    # Custom ENS Resolver contract address
+    #ensAddr: "0x"
+    
+    # require ENS name
+    required: true
+
+  
+  ## Recurring Limits module
+  recurring-limits:
+    # enable / disable recurring limits protection
+    enabled: true
+
+    limits: # array of individual limits, which all need to be passed
+      - limitAmount: 50000000000000000000 # 50 PoWC
+        duration: 86400 # 1 day
+      - limitAmount: 200000000000000000000 # 200 PoWC
+        duration: 172800 # 2 days
+        byAddrOnly: true
+
+
+### Fund Management
+
+# minimum balance to keep in the faucet wallet (in wei)
+spareFundsAmount: 100000000000000000  # 0.1 PoWC
+
+# minimum balance to show the empty faucet error message
+noFundsBalance:   1000000000000000000  # 1 PoWC
+
+# minimum balance to show the low funds warning
+lowFundsBalance: 10000000000000000000  # 10 PoWC
+
+# low faucet balance warning message / false to disable the warning
+lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
+
+# empty faucet error message / false to disable the error
+noFundsError: "Sorry, the faucet is out of funds :("
+
+# RPC unreachable error message / true to show the generic message / false to disable the error
+rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
+
+# prevent creation of new sessions (used for maintenance)
+#denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
+
+
+### Automatic wallet refill
+
+# refill contract options
+# advanced configuration to secure the faucet funds via a separate vault contract
+# the faucet tries to refill its wallet balance from the vault contract when it gets empty
+# see contract code in docs folder
+ethRefillContract:
+  contract: "0x1eF15b05E6cF521632a8E3a4d86e9B78B19dA894"
+  abi: '[{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+  allowanceFn: null
+  withdrawFn: "mint"
+  withdrawGasLimit: 300000
+  checkContractBalance: false
+  triggerBalance: 1000000000000000000000  # 1000 PoWC
+  cooldownTime: 600 # 10 min
+  requestAmount: 10000000000000000000000 # 10000 PoWC
+
+### Other Settings
+
+# print faucet stats to log interval (10min default)
+#faucetLogStatsInterval: 600
+
+# faucet stats config (comment out to disable stats)
+faucetStats:
+  # faucet stats file
+  logfile: "faucet-stats.log"
+
+# build SEO optimized index.seo.html and deliver as index page
+# the blank loader page just looks bad when parsed by search engines
+buildSeoIndex: true
+
+# some additional meta tags to add to the SEO optimized page
+buildSeoMeta:
+  keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow"
+
+resultSharing:
+  preHtml: |
+    <div class="sh-opt">
+      Did you like the faucet? Give that project a 
+      <iframe src="https://ghbtns.com/github-btn.html?user=pk910&repo=PoWFaucet&type=star&count=true" frameborder="0" scrolling="0" width="150" height="20" title="GitHub"></iframe>
+    </div>
+  #postHtml: |
+  #  <div class="sh-opt">
+  #  </div>
+  caption: ""

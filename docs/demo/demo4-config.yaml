@@ -1,0 +1,314 @@
+# PoWFaucet config (example)
+version: 2
+
+### General Settings
+
+# faucet database (defaults to local sqlite)
+database:
+  driver: "sqlite"
+  file: "faucet-store.db"
+
+# logfile for faucet events (comment out for no logging)
+faucetLogFile: "faucet-events.log"
+
+# path to file to write the process pid to (comment out to disable)
+faucetPidFile: "faucet-pid.txt"
+
+# faucet http/ws server port
+serverPort: 8094
+
+# title of the faucet
+faucetTitle: "PoWFaucet Demo 4"
+
+# url to image displayed on the startpage
+faucetImage: "/images/fauceth_420.jpg"
+
+# some additional html to show on the startpage
+faucetHomeHtml: |
+  <div class='pow-info'>
+    <h5>What is a PoW Faucet?</h5>
+    This is a Demo Ethereum Faucet running on the Goerli Testnet.<br>
+    The faucet is for demonstration purposes only and drops a wothless ERC20 token.
+  </div>
+  <div class='pow-info'>
+    <h5>Instance Configuration</h5>
+    faucet-outflow:<br>
+    &nbsp;&nbsp;target outflow: 100 PoWC / 2h<br>
+    &nbsp;&nbsp;outflow balance limits: -200 PoWC / 100 PoWC<br>
+    concurrency-limit:<br>
+    &nbsp;&nbsp;max 2 running sessions per address / IP<br>
+    pow:<br>
+    &nbsp;&nbsp;reward per share: 0.1 PoWC<br>
+    &nbsp;&nbsp;difficulty: 11<br>
+    passport:<br>
+    &nbsp;&nbsp;x2 with score > 10<br>
+    &nbsp;&nbsp;x4 with score > 15<br>
+  </div>
+
+# random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
+# use a random string and do not share / reuse it anywhere. Everyone knowing this secret is theoretically able to claim rewards from the faucet without mining.
+faucetSecret: "***censored***"
+
+# ETH execution layer RPC host
+ethRpcHost: "https://goerli.infura.io/v3/***censored***"
+#ethRpcHost: "https://ethereum-goerli.publicnode.com"
+
+# faucet wallet private key (hex, without 0x prefix)
+ethWalletKey: "***censored***"
+
+# EVM chain id (null for auto-detect from RPC)
+ethChainId: null
+
+# symbol (short name) of the coin that can be mined
+faucetCoinSymbol: "PoWC"
+
+# type of coin that can be mined
+# native = native coin (ETH)
+# erc20 = ERC20 token
+faucetCoinType: "erc20"
+
+# coin contract address (only for faucetCoinType = erc20)
+faucetCoinContract: "0x1eF15b05E6cF521632a8E3a4d86e9B78B19dA894"
+
+# transaction gas limit
+# use 21000 to prevent transactions to contracts
+ethTxGasLimit: 100000
+
+# use legacy (non-eip1559) transaction type
+# true: Type 0 (Legacy Transactions), false: Type 2 (EIP1559 Transactions)
+ethLegacyTx: false
+
+# max transaction gas fee (in wei)
+# used as limit for legacy transactions (faucet won't build transactions with higher gas price)
+ethTxMaxFee: 100000000000  # 100 gwei
+
+# max transaction priority fee (in wei)
+ethTxPrioFee: 2000000000  # 2 gwei
+
+# max number of unconfirmed transactions to create simultaneously
+ethMaxPending: 12
+
+# queue transactions and wait for funding when faucet is out of funds (show "No Funds" error when false)
+ethQueueNoFunds: true
+
+# link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
+ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
+
+
+# min/max drop amount (max is the default if no module lowers it)
+maxDropAmount: 10000000000000000000 # 10 PoWC
+minDropAmount: 100000000000000000 # 0.1 PoWC
+
+# maximum session time (from start till payout)
+# only relevant if one of the enabled protection mechanisms introduces a session delay (eg. mining)
+sessionTimeout: 43200  # 12h
+
+# session cleanup time
+# session data will be removed from the faucet DB after that time
+sessionCleanup: 2592000 # 30 days
+
+
+### Protection mechanisms
+modules:
+
+  ## Faucet Outflow module
+  faucet-outflow:
+    # enable / disable faucet outflow protection
+    enabled: true
+
+    # dynamic reward restriction based on faucet outflow
+    # alternative to static faucetBalanceRestrictedReward
+    # limits the rewards according to the faucet outflow
+    # the faucet keeps track of the outflow via a internal "outflow balance".
+    # amount/duration wei are added to that balance every second.
+    # whenever some reward is mined, it is subtracted from that balance.
+    # So, whenever the balance gets negative, there is more mining activity than the allowed outflow and the reward is reduced linearly down to 0% when it reaches lowerLimit.
+    # Whenever the balance gets positive, there is less mining activity than allowed. The positive balance is a 'buffer' for activity spikes, anything above upperLimit gets burned.
+
+    # limit outflow to 1000PoWC per day
+    amount: 100000000000000000000 # 100 PoWC
+    duration: 7200 # 2h
+    # outflow balance limits
+    lowerLimit: -200000000000000000000 # -200 PoWC (when outflow balance gets smaller or equal to this, the reward will be 0%)
+    upperLimit: 100000000000000000000 # 100 PoWC
+
+        
+  ## Concurrency Limit module
+  concurrency-limit:
+    # enable / disable concurrency limit
+    enabled: true
+    
+    concurrencyLimit: 2 # only allow 1 concurrent session (sessions in 'running' state at the same time for the same ip / target addr)
+    byAddrOnly: false # only check concurrency by target address
+    byIPOnly: false # only check concurrency by IP address
+    #messageByAddr: "" # custom error message when limit is exceeded by same target address
+    #messageByIP: "" # custom error message when limit is exceeded by same IP address
+
+  ## Proof of Work (mining) protection
+  pow:
+    # enable / disable PoW protection
+    enabled: true
+
+    # reward amount per eligible hash (in wei)
+    powShareReward: 100000000000000000  # 0.1 PoWC
+
+    # maximum mining session time (in seconds)
+    powSessionTimeout: 7200   # 2h
+
+    # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
+    powDifficulty: 10
+
+  ## Passport protection
+  passport:
+    enabled: true
+    scorerApiKey: "***censored***" # Gitcoin Passport Scorer API Key
+    trustedIssuers:
+      - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
+    
+    refreshCooldown: 300 # allow refreshing every 5mins
+    cacheTime: 86400 # cache passports for 1 day (does not affect manual refreshing)
+
+    stampDeduplicationTime: 604800 # allow reusing a stamp in another passport after 7 days
+
+    boostFactor:
+      10: 2 # x2 if score >= 10
+      15: 4 # x4 if score >= 15
+    stampScoring:
+      "Google": 1
+      "Twitter": 1
+      "Ens": 2
+      "GnosisSafe": 2
+      "Poh": 4
+      "POAP": 1
+      "GitPOAP": 1
+      "Facebook": 1
+      "FacebookFriends": 1
+      "FacebookProfilePicture": 1
+      "Brightid": 10
+      "Github": 1
+      "Coinbase": 1
+      "FiveOrMoreGithubRepos": 1
+      "TenOrMoreGithubFollowers": 2
+      "FiftyOrMoreGithubFollowers": 4
+      "ForkedGithubRepoProvider": 1
+      "StarredGithubRepoProvider": 1
+      "Linkedin": 1
+      "Discord": 1
+      "TwitterTweetGT10": 1
+      "TwitterFollowerGT100": 1
+      "TwitterFollowerGT500": 2
+      "TwitterFollowerGTE1000": 3
+      "TwitterFollowerGT5000": 5
+      "SelfStakingBronze": 1
+      "SelfStakingSilver": 1
+      "SelfStakingGold": 1
+      "CommunityStakingBronze": 1
+      "CommunityStakingSilver": 1
+      "CommunityStakingGold": 1
+      "ClearTextSimple": 1
+      "ClearTextTwitter": 1
+      "ClearTextGithubOrg": 1
+      "SnapshotProposalsProvider": 1
+      "SnapshotVotesProvider": 1
+      "EthGasProvider": 1
+      "FirstEthTxnProvider": 1
+      "EthGTEOneTxnProvider": 1
+      "GitcoinContributorStatistics#numGrantsContributeToGte#1": 1
+      "GitcoinContributorStatistics#numGrantsContributeToGte#10": 1
+      "GitcoinContributorStatistics#numGrantsContributeToGte#25": 2
+      "GitcoinContributorStatistics#numGrantsContributeToGte#100": 2
+      "GitcoinContributorStatistics#totalContributionAmountGte#10": 1
+      "GitcoinContributorStatistics#totalContributionAmountGte#100": 2
+      "GitcoinContributorStatistics#totalContributionAmountGte#1000": 2
+      "GitcoinContributorStatistics#numRoundsContributedToGte#1": 1
+      "GitcoinContributorStatistics#numGr14ContributionsGte#1": 1
+      "GitcoinGranteeStatistics#numOwnedGrants#1": 1
+      "GitcoinGranteeStatistics#numGrantContributors#10": 1
+      "GitcoinGranteeStatistics#numGrantContributors#25": 1
+      "GitcoinGranteeStatistics#numGrantContributors#100": 2
+      "GitcoinGranteeStatistics#totalContributionAmount#100": 1
+      "GitcoinGranteeStatistics#totalContributionAmount#1000": 2
+      "GitcoinGranteeStatistics#totalContributionAmount#10000": 4
+      "GitcoinGranteeStatistics#numGrantsInEcoAndCauseRound#1": 1
+      "gtcPossessionsGte#100": 2
+      "gtcPossessionsGte#10": 1
+      "ethPossessionsGte#32": 1
+      "ethPossessionsGte#10": 1
+      "ethPossessionsGte#1": 1
+      "NFT": 1
+      "Lens": 1
+      "ZkSync": 1
+
+
+
+### Fund Management
+
+# minimum balance to keep in the faucet wallet (in wei)
+spareFundsAmount: 100000000000000000  # 0.1 PoWC
+
+# minimum balance to show the empty faucet error message
+noFundsBalance:   1000000000000000000  # 1 PoWC
+
+# minimum balance to show the low funds warning
+lowFundsBalance: 10000000000000000000  # 10 PoWC
+
+# low faucet balance warning message / false to disable the warning
+lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
+
+# empty faucet error message / false to disable the error
+noFundsError: "Sorry, the faucet is out of funds :("
+
+# RPC unreachable error message / true to show the generic message / false to disable the error
+rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
+
+# prevent creation of new sessions (used for maintenance)
+#denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
+
+
+### Automatic wallet refill
+
+# refill contract options
+# advanced configuration to secure the faucet funds via a separate vault contract
+# the faucet tries to refill its wallet balance from the vault contract when it gets empty
+# see contract code in docs folder
+ethRefillContract:
+  contract: "0x1eF15b05E6cF521632a8E3a4d86e9B78B19dA894"
+  abi: '[{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+  allowanceFn: null
+  withdrawFn: "mint"
+  withdrawGasLimit: 300000
+  checkContractBalance: false
+  triggerBalance: 1000000000000000000000  # 1000 PoWC
+  cooldownTime: 600 # 10 min
+  requestAmount: 10000000000000000000000 # 10000 PoWC
+
+
+### Other Settings
+
+# print faucet stats to log interval (10min default)
+#faucetLogStatsInterval: 600
+
+# faucet stats config (comment out to disable stats)
+faucetStats:
+  # faucet stats file
+  logfile: "faucet-stats.log"
+
+# build SEO optimized index.seo.html and deliver as index page
+# the blank loader page just looks bad when parsed by search engines
+buildSeoIndex: true
+
+# some additional meta tags to add to the SEO optimized page
+buildSeoMeta:
+  keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow"
+
+resultSharing:
+  preHtml: |
+    <div class="sh-opt">
+      Did you like the faucet? Give that project a 
+      <iframe src="https://ghbtns.com/github-btn.html?user=pk910&repo=PoWFaucet&type=star&count=true" frameborder="0" scrolling="0" width="150" height="20" title="GitHub"></iframe>
+    </div>
+  #postHtml: |
+  #  <div class="sh-opt">
+  #  </div>
+  caption: ""
+

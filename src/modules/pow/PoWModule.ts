@@ -190,23 +190,23 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       return;
     }
 
+    let powSession = this.getPoWSession(session);
     let powClient: PoWClient;
-    if((powClient = session.getSessionModuleRef("pow.client"))) {
+    if((powClient = powSession.activeClient)) {
       // kill other client
       powClient.killClient("reconnected from another client");
     }
 
-    let powSession = this.getPoWSession(session);
     powClient = new PoWClient(this, powSession, ws);
     if(powSession.activeClient === powClient) {
       this.powClients[session.getSessionId()] = powClient;
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "connected PoWClient: " + session.getSessionId());
+      //ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "connected PoWClient: " + session.getSessionId());
     }
     this.resetSessionIdleTimer(powSession);
   }
 
   public disposePoWClient(client: PoWClient, reason: string) {
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "closed PoWClient: " + client.getFaucetSession().getSessionId() + " (" + reason + ")");
+    //ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "closed PoWClient: " + client.getFaucetSession().getSessionId() + " (" + reason + ")");
     this.resetSessionIdleTimer(client.getPoWSession());
 
     if(this.powClients[client.getFaucetSession().getSessionId()] === client) {
