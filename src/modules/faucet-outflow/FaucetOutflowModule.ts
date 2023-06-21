@@ -38,6 +38,16 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     return Promise.resolve();
   }
 
+  protected override onConfigReload(): void {
+    let balance = this.getOutflowBalance();
+    // check lowerLimit
+    if(balance < BigInt(this.moduleConfig.lowerLimit)) {
+      let lowerTimeLimit = BigInt(this.moduleConfig.lowerLimit * -1) * BigInt(this.moduleConfig.duration) / BigInt(this.moduleConfig.amount);
+      this.outflowState.trackTime = this.now() + Number(lowerTimeLimit);
+      this.outflowState.dustAmount = 0n;
+    }
+  }
+
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]): Promise<void> {
     let outflowRestriction = this.getOutflowRestriction();
     if(outflowRestriction < 100) {
