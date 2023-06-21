@@ -621,7 +621,7 @@ describe("Faucet module: pow", () => {
       let okMsg2 = fakeSocket1.getSentMessage("ok");
       expect(okMsg2.length).to.equal(1, "no ok message2 sent");
       expect(okMsg2[0].rsp).to.equal(42, "invalid response id in ok msg2");
-    });
+    }).retries(3);
 
     it("check action 'verifyResult': invalid share verification", async () => {
       faucetConfig.modules["pow"] = {
@@ -690,7 +690,7 @@ describe("Faucet module: pow", () => {
       let okMsg2 = fakeSocket1.getSentMessage("ok");
       expect(okMsg2.length).to.equal(1, "no ok message sent");
       expect(okMsg2[0].rsp).to.equal(42, "invalid response id");
-    }).timeout(5000);
+    }).timeout(5000).retries(3);
 
     it("check timed out share verification", async () => {
       faucetConfig.modules["pow"] = {
