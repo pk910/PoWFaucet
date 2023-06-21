@@ -30,6 +30,7 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
       this, ModuleHookAction.SessionRewarded, 5, "faucet outflow",
       (session: FaucetSession, amount: bigint) => this.updateState(amount)
     );
+    this.enforceBalanceBoundaries();
   }
 
   protected override stopModule(): Promise<void> {
@@ -39,13 +40,7 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
   }
 
   protected override onConfigReload(): void {
-    let balance = this.getOutflowBalance();
-    // check lowerLimit
-    if(balance < BigInt(this.moduleConfig.lowerLimit)) {
-      let lowerTimeLimit = BigInt(this.moduleConfig.lowerLimit * -1) * BigInt(this.moduleConfig.duration) / BigInt(this.moduleConfig.amount);
-      this.outflowState.trackTime = this.now() + Number(lowerTimeLimit);
-      this.outflowState.dustAmount = 0n;
-    }
+    this.enforceBalanceBoundaries();
   }
 
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]): Promise<void> {
@@ -128,6 +123,16 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     }
 
     return balance;
+  }
+
+  private enforceBalanceBoundaries() {
+    let balance = this.getOutflowBalance();
+    // check lowerLimit
+    if(balance < BigInt(this.moduleConfig.lowerLimit)) {
+      let lowerTimeLimit = BigInt(this.moduleConfig.lowerLimit * -1) * BigInt(this.moduleConfig.duration) / BigInt(this.moduleConfig.amount);
+      this.outflowState.trackTime = this.now() + Number(lowerTimeLimit);
+      this.outflowState.dustAmount = 0n;
+    }
   }
 
   private getOutflowRestriction(): number {
