@@ -27,14 +27,18 @@ export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
   }
 
   public override async exec(sql: string): Promise<void> {
-    this.db.exec(sql);
+    try {
+      this.db.exec(sql);
+    } catch(ex) {
+      return Promise.reject("sqlite exec() error: " + sql + " [] " + ex.toString());
+    }
   }
 
   public override async run(sql: string, values?: BindValues): Promise<RunResult> {
     try {
       return this.db.run(sql, values);
     } catch(ex) {
-      console.log("sqlite error: " + sql, values, ex.toString());
+      return Promise.reject("sqlite run() error: " + sql + " [] " + ex.toString());
     }
   }
   
@@ -42,7 +46,7 @@ export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
     try {
       return this.db.all(sql, values);
     } catch(ex) {
-      console.log("sqlite error: " + sql, values, ex.toString());
+      return Promise.reject("sqlite all() error: " + sql + " [] " + ex.toString());
     }
   }
 
@@ -50,7 +54,7 @@ export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
     try {
       return this.db.get(sql, values);
     } catch(ex) {
-      console.log("sqlite error: " + sql, values, ex.toString());
+      return Promise.reject("sqlite get() error: " + sql + " [] " + ex.toString());
     }
   }
 

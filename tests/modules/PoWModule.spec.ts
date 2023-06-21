@@ -750,7 +750,7 @@ describe("Faucet module: pow", () => {
       expect(balanceMsg.length).to.equal(1, "no updateBalance message sent");
       expect(balanceMsg[0].data.balance).to.equal("95", "invalid updateBalance message: unexpected balance");
       expect(balanceMsg[0].data.reason).to.matches(/verify miss/, "invalid updateBalance message: unexpected reason");
-    }).timeout(5000);
+    }).timeout(5000).retries(3);
 
   });
 

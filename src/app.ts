@@ -17,19 +17,24 @@ import { SessionManager } from "./session/SessionManager";
     FaucetWorkers.loadWorkerClass();
   }
   else {
-    setAppBasePath(path.join(__dirname, ".."))
-    loadFaucetConfig()
-    ServiceManager.GetService(FaucetProcess).initialize();
-    ServiceManager.GetService(FaucetWorkers).initialize(__filename);
-    ServiceManager.GetService(FaucetStatsLog).initialize();
-    await ServiceManager.GetService(FaucetDatabase).initialize();
-    await ServiceManager.GetService(EthWalletManager).initialize();
-    await ServiceManager.GetService(ModuleManager).initialize();
-    await ServiceManager.GetService(SessionManager).initialize();
-    await ServiceManager.GetService(EthClaimManager).initialize();
-    ServiceManager.GetService(FaucetHttpServer).initialize();
+    try {
+      setAppBasePath(path.join(__dirname, ".."))
+      loadFaucetConfig()
+      ServiceManager.GetService(FaucetProcess).initialize();
+      ServiceManager.GetService(FaucetWorkers).initialize(__filename);
+      ServiceManager.GetService(FaucetStatsLog).initialize();
+      await ServiceManager.GetService(FaucetDatabase).initialize();
+      await ServiceManager.GetService(EthWalletManager).initialize();
+      await ServiceManager.GetService(ModuleManager).initialize();
+      await ServiceManager.GetService(SessionManager).initialize();
+      await ServiceManager.GetService(EthClaimManager).initialize();
+      ServiceManager.GetService(FaucetHttpServer).initialize();
 
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
+    } catch(ex) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Faucet initialization failed: " + ex.toString());
+      process.exit(0);
+    }
   }
 })();
 
