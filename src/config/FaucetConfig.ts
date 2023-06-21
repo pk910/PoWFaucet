@@ -69,6 +69,10 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     exampleYamlSrc = exampleYamlSrc.replace(/^faucetSecret:.*$/m, 'faucetSecret: "' + randomBytes(40).toString("hex") + '"');
 
     fs.writeFileSync(configFile, exampleYamlSrc);
+    console.log("Created default config at " + configFile);
+  }
+  if(cliArgs['create-config']) {
+    process.exit(0);
   }
 
   if(!loadDefaultsOnly) {
