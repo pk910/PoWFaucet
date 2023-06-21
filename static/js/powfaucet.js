@@ -11116,7 +11116,7 @@ var ClaimPage = /*#__PURE__*/function (_React$PureComponent) {
     key: "submitClaim",
     value: function () {
       var _submitClaim = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2(claimData) {
-        var sessionStatus;
+        var sessionStatus, errMsg;
         return _regeneratorRuntime().wrap(function _callee2$(_context2) {
           while (1) switch (_context2.prev = _context2.next) {
             case 0:
@@ -11139,21 +11139,22 @@ var ClaimPage = /*#__PURE__*/function (_React$PureComponent) {
                 sessionStatus: sessionStatus
               });
               _common_FaucetSession__WEBPACK_IMPORTED_MODULE_2__.FaucetSession.persistSessionInfo(null);
-              _context2.next = 15;
+              _context2.next = 16;
               break;
             case 12:
               _context2.prev = 12;
               _context2.t0 = _context2["catch"](0);
+              if (_context2.t0 && _context2.t0.failedCode) errMsg = "[" + _context2.t0.failedCode + "] " + _context2.t0.failedReason;else errMsg = _context2.t0.toString();
               this.props.pageContext.showDialog({
                 title: "Claim failed",
                 body: /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1__.createElement("div", {
                   className: "alert alert-danger"
-                }, "Could not claim rewards: ", _context2.t0.toString()),
+                }, "Could not claim rewards: ", errMsg),
                 closeButton: {
                   caption: "Close"
                 }
               });
-            case 15:
+            case 16:
             case "end":
               return _context2.stop();
           }
@@ -12294,7 +12295,7 @@ var MiningPage = /*#__PURE__*/function (_React$PureComponent) {
         nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
         powParams: this.props.faucetConfig.modules.pow.powParams,
         difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687270628514), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687270628514), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687270628514), _workerSrc)
+        workerSrc: (_workerSrc = {}, _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.SCRYPT, "/js/powfaucet-worker-sc.js?" + 1687320040195), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.CRYPTONIGHT, "/js/powfaucet-worker-cn.js?" + 1687320040195), _defineProperty(_workerSrc, _common_FaucetConfig__WEBPACK_IMPORTED_MODULE_0__.PoWHashAlgo.ARGON2, "/js/powfaucet-worker-a2.js?" + 1687320040195), _workerSrc)
       });
     }
   }, {

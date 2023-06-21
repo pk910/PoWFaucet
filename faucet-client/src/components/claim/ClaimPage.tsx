@@ -484,11 +484,16 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       });
       FaucetSession.persistSessionInfo(null);
     } catch(ex) {
+      let errMsg: string;
+      if(ex && ex.failedCode)
+        errMsg = "[" + ex.failedCode + "] " + ex.failedReason;
+      else
+        errMsg = ex.toString();
       this.props.pageContext.showDialog({
         title: "Claim failed",
         body: (
           <div className='alert alert-danger'>
-            Could not claim rewards: {ex.toString()}
+            Could not claim rewards: {errMsg}
           </div>
         ),
         closeButton: {
