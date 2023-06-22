@@ -22,9 +22,9 @@ export interface IFaucetConfig {
   modules: {
     captcha?: ICaptchaModuleConfig;
     ensname?: IEnsNameModuleConfig;
+    github?: IGithubModuleConfig;
     pow?: IPoWModuleConfig;
     passport?: IPassportModuleConfig;
-
   };
 }
 
@@ -37,6 +37,11 @@ export interface ICaptchaModuleConfig {
 
 export interface IEnsNameModuleConfig {
   required: boolean;
+}
+
+export interface IGithubModuleConfig {
+  clientId: string;
+  authTimeout: number;
 }
 
 export interface IPoWModuleConfig {

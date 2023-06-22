@@ -4,6 +4,7 @@ import { EnsNameModule } from "./ensname/EnsNameModule";
 import { EthInfoModule } from "./ethinfo/EthInfoModule";
 import { FaucetBalanceModule } from "./faucet-balance/FaucetBalanceModule";
 import { FaucetOutflowModule } from "./faucet-outflow/FaucetOutflowModule";
+import { GithubModule } from "./github/GithubModule";
 import { IPInfoModule } from "./ipinfo/IPInfoModule";
 import { MainnetWalletModule } from "./mainnet-wallet/MainnetWalletModule";
 import { PassportModule } from "./passport/PassportModule";
@@ -17,6 +18,7 @@ export const MODULE_CLASSES = {
   "ethinfo": EthInfoModule,
   "faucet-balance": FaucetBalanceModule,
   "faucet-outflow": FaucetOutflowModule,
+  "github": GithubModule,
   "ipinfo": IPInfoModule,
   "mainnet-wallet": MainnetWalletModule,
   "passport": PassportModule,

@@ -86,6 +86,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
         </div>
         <FaucetInput 
           ref={this.faucetInput} 
+          faucetContext={this.props.faucetContext} 
           faucetConfig={this.props.faucetConfig} 
           submitInputs={(inputData) => this.onSubmitInputs(inputData)}/>
         

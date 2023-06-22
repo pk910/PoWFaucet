@@ -1,8 +1,11 @@
 import React from 'react';
 import { IFaucetConfig } from '../../common/FaucetConfig';
+import { IFaucetContext } from '../../common/FaucetContext';
 import { FaucetCaptcha } from '../shared/FaucetCaptcha';
+import { GithubLogin } from './GithubLogin';
 
 export interface IFaucetInputProps {
+  faucetContext: IFaucetContext;
   faucetConfig: IFaucetConfig
   defaultAddr?: string;
   submitInputs(inputs: any): Promise<void>;
@@ -15,6 +18,7 @@ export interface IFaucetInputState {
 
 export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetInputState> {
   private faucetCaptcha = React.createRef<FaucetCaptcha>();
+  private githubLogin = React.createRef<GithubLogin>();
 
   constructor(props: IFaucetInputProps, state: IFaucetInputState) {
     super(props);
@@ -26,6 +30,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
   }
 
 	public render(): React.ReactElement<IFaucetInputProps> {
+    let needGithubAuth = true;
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForStart;
     let inputTypes: string[] = [];
     if(this.props.faucetConfig.modules.ensname?.required) {
@@ -53,6 +58,13 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
           placeholder={"Please enter " + (inputTypes.join(" or "))} 
           onChange={(evt) => this.setState({ targetAddr: evt.target.value })} 
         />
+        {needGithubAuth ? 
+          <GithubLogin 
+            faucetConfig={this.props.faucetConfig} 
+            time={this.props.faucetContext.faucetApi.getFaucetTime()} 
+            ref={this.githubLogin}
+          />
+        : null}
         {requestCaptcha ? 
           <div className='faucet-captcha'>
             <FaucetCaptcha 
@@ -90,6 +102,9 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       inputData.addr = this.state.targetAddr;
       if(this.props.faucetConfig.modules.captcha?.requiredForStart) {
         inputData.captchaToken = await this.faucetCaptcha.current?.getToken();
+      }
+      if(this.props.faucetConfig.modules.github) {
+        inputData.githubToken = await this.githubLogin.current?.getToken();
       }
 
       await this.props.submitInputs(inputData);
