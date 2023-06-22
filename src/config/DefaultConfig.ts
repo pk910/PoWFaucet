@@ -1,8 +1,8 @@
 import { FaucetCoinType } from "../eth/EthWalletManager";
-import { IConfigSchemaV2 } from "./ConfigSchemaV2";
+import { IConfigSchema } from "./ConfigSchema";
 import { resolveRelativePath } from "./FaucetConfig";
 
-export function getDefaultConfig(): IConfigSchemaV2 {
+export function getDefaultConfig(): IConfigSchema {
   return {
     version: 2,
 

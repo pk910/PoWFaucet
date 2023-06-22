@@ -5,7 +5,7 @@ import { IFaucetStatsConfig } from '../services/FaucetStatsLog';
 import { IFaucetResultSharingConfig } from './ConfigShared';
 import { FaucetDatabaseOptions } from '../db/FaucetDatabase';
 
-export interface IConfigSchemaV2 {
+export interface IConfigSchema {
   version?: 2;
 
   appBasePath: string; // base path (set automatically)
