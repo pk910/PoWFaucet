@@ -83,7 +83,7 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     }
   }
 
-  private updateState(minedAmount: bigint) {
+  public updateState(minedAmount: bigint) {
     if(minedAmount < 0)
       return;
     

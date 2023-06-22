@@ -13,6 +13,7 @@ import { ModuleHookAction, ModuleManager } from '../modules/ModuleManager';
 import { FaucetHttpServer } from '../webserv/FaucetHttpServer';
 import { IncomingMessage } from 'http';
 import { EthClaimNotificationClient, IEthClaimNotificationData } from './EthClaimNotificationClient';
+import { FaucetOutflowModule } from '../modules/faucet-outflow/FaucetOutflowModule';
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -181,7 +182,9 @@ export class EthClaimManager {
 
   private updateClaimStatus(claimInfo: EthClaimInfo) {
     if(claimInfo.claim.claimStatus === ClaimTxStatus.CONFIRMED) {
-      ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionClaimed, [claimInfo]);
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      moduleManager.processActionHooks([], ModuleHookAction.SessionClaimed, [claimInfo]);
+      moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(BigInt(claimInfo.claim.txFee));
       ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimInfo);
     }
     ServiceManager.GetService(FaucetDatabase).updateClaimData(claimInfo.session, claimInfo.claim);
