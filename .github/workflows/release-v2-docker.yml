@@ -10,7 +10,6 @@ on:
 jobs:
   build_docker:
     name: Build Docker Image
-    needs: [run_tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
