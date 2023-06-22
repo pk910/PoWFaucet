@@ -73,39 +73,43 @@ jobs:
         echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
       id: version
 
-    # (re)create latest binary release
-    - name: Update latest tag & remove previous latest release
+    - name: "Build Changelog"
+      id: build_changelog
+      uses: mikepenz/release-changelog-builder-action@v4.0.0-b02
+
+    # (re)create snapshot binary release
+    - name: Update snapshot tag & remove previous snapshot release
       uses: actions/github-script@v3
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}          
         script: |
           try {
-            var latestTag = "latest";
-            var latestRelease = await github.repos.getReleaseByTag({
+            var snapshotTag = "snapshot";
+            var snapshotRelease = await github.repos.getReleaseByTag({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag: latestTag
+              tag: snapshotTag
             });
-            if(latestRelease && latestRelease.data && latestRelease.data.tag_name == latestTag) {
-              console.log("delete previous latest release");
+            if(snapshotRelease && snapshotRelease.data && snapshotRelease.data.tag_name == snapshotTag) {
+              console.log("delete previous snapshot release");
               await github.repos.deleteRelease({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                release_id: latestRelease.data.id
+                release_id: snapshotRelease.data.id
               });
             }
 
-            var latestRef = await github.git.getRef({
+            var snapshotRef = await github.git.getRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: "tags/" + latestTag
+              ref: "tags/" + snapshotTag
             });
-            if(latestRef && latestRef.data && latestRef.data.ref) {
-              if(latestRef.data.object.sha !== context.sha) {
+            if(snapshotRef && snapshotRef.data && snapshotRef.data.ref) {
+              if(snapshotRef.data.object.sha !== context.sha) {
                 await github.git.updateRef({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  ref: "tags/" + latestTag,
+                  ref: "tags/" + snapshotTag,
                   sha: context.sha,
                 });
               }
@@ -114,36 +118,40 @@ jobs:
               await github.git.createRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: "tags/" + latestTag,
+                ref: "tags/" + snapshotTag,
                 sha: context.sha,
               });
             }
           } catch (e) {
             console.log(e)
           }
-    - name: Create latest release
+    - name: Create snapshot release
       uses: actions/create-release@v1
       id: create_release
       with:
         draft: false
         prerelease: true
-        release_name: "Latest Binaries"
-        tag_name: "latest"
+        release_name: "Dev Snapshot"
+        tag_name: "snapshot"
         body: |
-          Latest automatically built v2 executables.
+          ## Latest automatically built v2 executables. (Unstable development snapshot)
           Built from master branch (commit: ${{ github.sha }})
 
           Please read the [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) for setup / configuration instructions.
 
           Server Version: ${{ steps.version.outputs.server_version }}
           Client Version: ${{ steps.version.outputs.client_version }}
-          
+
+          ### Change Log
+          ${{steps.build_changelog.outputs.changelog}}
+
+          ### Release Artifacts
           | Release File  | Description |
           | ------------- | ------------- |
-          | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (64bit) |
-          | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (64bit) |
-          | powfaucet-server-all [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-all.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs |
-          | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
+          | powfaucet-server-all [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-server-all.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs (recommended) |
+          | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (NodeJS 18, 64bit) |
+          | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (NodeJS 18, 64bit) |
+          | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
       env:
         GITHUB_TOKEN: ${{ github.token }}
 
