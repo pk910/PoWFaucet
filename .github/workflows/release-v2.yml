@@ -84,8 +84,8 @@ jobs:
           | Release File  | Description |
           | ------------- | ------------- |
           | powfaucet-server-all [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-all.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs (recommended) |
-          | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (64bit) |
-          | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (64bit) |
+          | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (NodeJS 18, 64bit) |
+          | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (NodeJS 18, 64bit) |
           | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
       env:
         GITHUB_TOKEN: ${{ github.token }}
