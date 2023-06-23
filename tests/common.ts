@@ -7,6 +7,7 @@ import { FaucetWorkers } from '../src/common/FaucetWorker';
 import { sleepPromise } from '../src/utils/SleepPromise';
 import { faucetConfig, loadFaucetConfig } from '../src/config/FaucetConfig';
 import { FakeProvider } from './stubs/FakeProvider';
+import { FaucetDbDriver } from '../src/db/FaucetDatabase';
 
 
 export function bindTestStubs(stubs?) {
@@ -35,9 +36,10 @@ export function loadDefaultTestConfig() {
   loadFaucetConfig(true);
   faucetConfig.faucetSecret = "test";
   faucetConfig.faucetStats = null;
-  faucetConfig.database.driver = "sqlite";
-  faucetConfig.database.file = ":memory:";
-
+  faucetConfig.database = {
+    driver: FaucetDbDriver.SQLITE,
+    file: ":memory:",
+  };
 }
 
 export async function awaitSleepPromise(timeout: number, poll: () => boolean) {
