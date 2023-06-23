@@ -77,13 +77,16 @@ jobs:
         release_name: "v${{ steps.version.outputs.server_version }}"
         tag_name: "v${{ steps.version.outputs.server_version }}"
         body: |
-          
+          ### Major Changes
+          ...
+
+          ### Release Artifacts
           | Release File  | Description |
           | ------------- | ------------- |
-          | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (64bit) |
-          | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (64bit) |
-          | powfaucet-server-all [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-all.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs |
-          | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/latest/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
+          | powfaucet-server-all [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-all.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs (recommended) |
+          | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (NodeJS 18, 64bit) |
+          | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (NodeJS 18, 64bit) |
+          | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
       env:
         GITHUB_TOKEN: ${{ github.token }}
 
@@ -142,36 +145,4 @@ jobs:
         asset_content_type: application/zip
       env:
         GITHUB_TOKEN: ${{ github.token }}
-  build_docker:
-    name: Build Docker Image
-    needs: [run_tests]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18.15.0
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: npm install
-      - run: npm run bundle
-      - name: Get project versions
-        run: |
-          echo "server_version=$(cat package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
-          echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
-        id: version
-      - name: Build version specific docker image
-        run: docker build . --file Dockerfile --tag pk910/powfaucet:v${{ steps.version.outputs.server_version }}
-      - name: Push version specific docker image
-        run: docker push pk910/powfaucet:v${{ steps.version.outputs.server_version }}
-      - name: Build v2-stable docker image
-        run: docker build . --file Dockerfile --tag pk910/powfaucet:v2-stable
-      - name: Push v2-stable docker image
-        run: docker push pk910/powfaucet:v2-stable
+  

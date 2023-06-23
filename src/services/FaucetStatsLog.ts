@@ -92,6 +92,8 @@ export class FaucetStatsLog {
   }
 
   public addClaimStats(claim: EthClaimInfo) {
+    this.statClaimCount++;
+    this.statClaimRewards += BigInt(claim.amount);
     this.addStatsEntry("CLAIM", {
       to: claim.target,
       val: claim.amount.toString(),

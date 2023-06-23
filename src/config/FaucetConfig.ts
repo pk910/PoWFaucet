@@ -5,8 +5,7 @@ import randomBytes from 'randombytes'
 
 import { ServiceManager } from '../common/ServiceManager';
 import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess';
-import { IConfigSchemaV2 } from './ConfigSchemaV2';
-import { convertConfigV1 } from './ConfigSchemaV1';
+import { IConfigSchema } from './ConfigSchema';
 import { getDefaultConfig } from './DefaultConfig';
 
 let cliArgs = (function() {
@@ -47,14 +46,14 @@ if(cliArgs['config']) {
 else
   faucetConfigFile = path.join(basePath, "faucet-config.yaml");
 
-export let faucetConfig: IConfigSchemaV2 = null;
+export let faucetConfig: IConfigSchema = null;
 
 export function setAppBasePath(basePath: string) {
   internalBasePath = basePath;
 }
 
 export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
-  let config: IConfigSchemaV2;
+  let config: IConfigSchema;
   let configFile = faucetConfigFile;
   debugger;
 
@@ -79,8 +78,9 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     let yamlSrc = fs.readFileSync(configFile, "utf8");
     let yamlObj = YAML.parse(yamlSrc);
 
-    if(!yamlObj.version || yamlObj.version == 1)
-      config = convertConfigV1(yamlObj);
+    if(!yamlObj.version || yamlObj.version == 1) {
+      throw "V1 configuration is incompatible with V2."
+    }
     else {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Loaded faucet config from yaml file: " + configFile);
       config = yamlObj;

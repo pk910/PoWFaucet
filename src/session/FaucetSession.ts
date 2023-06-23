@@ -86,6 +86,12 @@ export class FaucetSession {
 
     try {
       await ServiceManager.GetService(ModuleManager).processActionHooks([
+        {prio: 1, hook: () => { // prio 1: check if faucet is in maintenance mode
+          if(faucetConfig.denyNewSessions) {
+            let denyMessage = typeof faucetConfig.denyNewSessions === "string" ? faucetConfig.denyNewSessions : "The faucet is currently not allowing new sessions";
+            throw new FaucetError("FAUCET_DISABLED", denyMessage);
+          }
+        }},
         {prio: 5, hook: () => { // prio 5: get target address from userInput if not set provided by a module
           let targetAddr = this.targetAddr || userInput.addr;
           if(typeof targetAddr !== "string")
@@ -166,7 +172,7 @@ export class FaucetSession {
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
       this.saveSession();
-    }, 30 * 1000);
+    }, faucetConfig.sessionSaveTime * 1000);
   }
 
   public async setSessionFailed(code: string, reason: string, stack?: string): Promise<void> {

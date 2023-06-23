@@ -5,7 +5,7 @@ import { IFaucetStatsConfig } from '../services/FaucetStatsLog';
 import { IFaucetResultSharingConfig } from './ConfigShared';
 import { FaucetDatabaseOptions } from '../db/FaucetDatabase';
 
-export interface IConfigSchemaV2 {
+export interface IConfigSchema {
   version?: 2;
 
   appBasePath: string; // base path (set automatically)
@@ -43,6 +43,7 @@ export interface IConfigSchemaV2 {
   minDropAmount: number;
   sessionTimeout: number;
   sessionCleanup: number;
+  sessionSaveTime: number;
 
   modules: {
     [moduleName: string]: IBaseModuleConfig;

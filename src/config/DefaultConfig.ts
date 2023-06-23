@@ -1,8 +1,9 @@
+import { FaucetDbDriver } from "../db/FaucetDatabase";
 import { FaucetCoinType } from "../eth/EthWalletManager";
-import { IConfigSchemaV2 } from "./ConfigSchemaV2";
+import { IConfigSchema } from "./ConfigSchema";
 import { resolveRelativePath } from "./FaucetConfig";
 
-export function getDefaultConfig(): IConfigSchemaV2 {
+export function getDefaultConfig(): IConfigSchema {
   return {
     version: 2,
 
@@ -14,7 +15,7 @@ export function getDefaultConfig(): IConfigSchemaV2 {
     buildSeoIndex: true,
     buildSeoMeta: {},
     database: {
-      driver: "sqlite",
+      driver: FaucetDbDriver.SQLITE,
       file: resolveRelativePath("faucet-store.db"),
     },
 
@@ -44,6 +45,7 @@ export function getDefaultConfig(): IConfigSchemaV2 {
     minDropAmount: 10000000000000000, // 0.01 ETH
     sessionTimeout: 86400,
     sessionCleanup: 2592000,
+    sessionSaveTime: 120,
 
     modules: {},
 

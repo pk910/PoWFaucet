@@ -12,7 +12,7 @@ database:
 faucetLogFile: "faucet-events.log"
 
 # path to file to write the process pid to (comment out to disable)
-#faucetPidFile: "faucet-pid.txt"
+faucetPidFile: "faucet-pid.txt"
 
 # faucet http/ws server port
 serverPort: 8080
@@ -106,6 +106,10 @@ sessionTimeout: 43200  # 12h
 # session data will be removed from the faucet DB after that time
 sessionCleanup: 2592000 # 30 days
 
+# session save time
+# how often session updates will be written to DB
+sessionSaveTime: 120
+
 
 ### Protection mechanisms
 modules:
@@ -142,7 +146,7 @@ modules:
     #ensAddr: "0x"
     
     # require ENS name
-    required: true
+    required: false
 
   ## IP-Info module
   ipinfo:
@@ -161,20 +165,20 @@ modules:
     # ip info based restrictions
     restrictions:
       # percentage of drop amount if IP is in a hosting range (default: 100), 0 to block entirely
-      hosting: 1
+      hosting: 10
 
       # percentage of drop amount if IP is in a proxy range (default: 100), 0 to block entirely
-      proxy: 1
+      proxy: 10
 
       # percentage of drop amount if IP is from given country code (DE/US/...), 0 to block entirely
       #US: 100
 
     # ip info pattern based restrictions
     restrictionsPattern:
-      "^.*Tencent Cloud.*$": 1
-      "^.*UCLOUD.*$": 1
-      "^.*Server Hosting.*$": 1
-      "^.*SCloud.*$": 1
+      "^.*Tencent Cloud.*$": 10
+      "^.*UCLOUD.*$": 10
+      "^.*Server Hosting.*$": 10
+      "^.*SCloud.*$": 10
 
   ethinfo:
     # enable / disable max balance protection
@@ -195,9 +199,7 @@ modules:
     # reward restriction based on faucet wallet balance. lowest value applies
     fixedRestriction:
       1000000000000000000000: 90 # 90% if lower than 1000 ETH
-      500000000000000000000: 50  # 50% if lower than 500 ETH
-      200000000000000000000: 10  # 10% if lower than 200 ETH
-      100000000000000000000: 5   # 5% if lower than 100 ETH
+      100000000000000000000: 10  # 10% if lower than 100 ETH
 
     # dynamic reward restriction based on faucet balance
     # alternative to fixedRestriction, if both are set, the lower factor gets applied
@@ -229,7 +231,7 @@ modules:
   ## Mainnet Wallet module
   mainnet-wallet:
     # enable / disable mainnet wallet protection
-    enabled: true
+    enabled: false
 
     # RPC host for mainnet
     rpcHost: "https://rpc.flashbots.net/"
@@ -289,18 +291,9 @@ modules:
     # maximum number of seconds a session can idle until it gets closed
     powIdleTimeout: 1800 # 30min
 
-    # number of concurrent mining sessions allowed per IP (0 = unlimited)
-    concurrentSessions: 1
-
     # maximum allowed mining hashrate (will be throttled to this rate when faster)
     powHashrateSoftLimit: 1000 # soft limit (enforced client side)
     powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
-
-    # websocket ping interval
-    #powPingInterval: 10
-
-    # kill websocket if no ping/pong for that number of seconds
-    #powPingTimeout: 30
 
     # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
     powDifficulty: 11
@@ -308,79 +301,12 @@ modules:
     # mining algorithm to use
     powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
 
-    # scrypt mining parameters
-    powScryptParams:
-      # N - iterations count: affects memory and CPU usage, must be a power of 2
-      cpuAndMemory: 4096
-      # r - block size: affects memory and CPU usage
-      blockSize: 8
-      # p - parallelism factor: threads to run in parallel, affects the memory & CPU usage, should be 1 as webworker is single threaded
-      parallelization: 1
-      # klen - how many bytes to generate as output, e.g. 16 bytes (128 bits)
-      keyLength: 16
-      # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
-      difficulty: 11
-
-    # cryptonight mining parameters
-    powCryptoNightParams:
-      # crypto night hash algo & variant
-      algo: 0
-      variant: 0
-      height: 0
-      # number of 0-bits the scrypt hash needs to start with to be egliable for a reward
-      difficulty: 11
-
-    # argon2 mining parameters
-    powArgon2Params:
-      type: 0
-      version: 13
-      timeCost: 4
-      memoryCost: 4096
-      parallelization: 1
-      keyLength: 16
-      difficulty: 11
-
-    # number of scrypt hashs to pack into a share (should be 1, higher value just increases verification load on server side)
-    powNonceCount: 1
-
-    # Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
-    # As that can lead to a huge verification workload on the server, this faucet can redistribute shares back to other miners for verification.
-    # These randomly selected miners need to check the share and return its validity to the server within 10 seconds or they're penalized.
-    # If there's a mismatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
-    # Bad shares always result in a slashing (termination of session and loss of all collected mining balance)
-
-    # percentage of shares validated locally (0 - 100)
-    verifyLocalPercent: 10
-
-    # max number of shares in local validation queue
-    verifyLocalMaxQueue: 100
-
-    # min number of mining sessions for verification redistribution
-    # only local verification if not enough active sessions (should be higher than verifyMinerIndividuals)
-    verifyMinerPeerCount: 4
-
-    # percentage of shares validated locally if there are not enough sessions for verification redistribution (0 - 100)
-    verifyLocalLowPeerPercent: 80
-
-    # percentage of shares to redistribute to miners for verification (0 - 100)
-    verifyMinerPercent: 75
-
-    # number of other mining sessions to redistribute a share to for verification
-    verifyMinerIndividuals: 2
-
-    # max number of pending verifications per miner before not sending any more verification requests
-    verifyMinerMaxPending: 5
-
-    # max number of missed verifications before not sending any more verification requests
-    verifyMinerMaxMissed: 10
-
-    # timeout for verification requests 
-    # client gets penalized if not responding within this timespan
-    verifyMinerTimeout: 40
+    # pow module settings have been trimmed for readability.
+    # you can find all available settings on https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki#module-pow
 
   ## Passport protection
   passport:
-    enabled: true
+    enabled: false
     scorerApiKey: "" # Gitcoin Passport Scorer API Key
     trustedIssuers:
       - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
@@ -406,7 +332,7 @@ modules:
       "Facebook": 1
       "FacebookFriends": 1
       "FacebookProfilePicture": 1
-      "Brightid": 10
+      "Brightid": 8
       "Github": 1
       "Coinbase": 1
       "FiveOrMoreGithubRepos": 1

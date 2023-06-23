@@ -1,4 +1,6 @@
+import { FaucetDbDriver } from '../../db/FaucetDatabase';
 import { FaucetModuleDB } from '../../db/FaucetModuleDB';
+import { SQL } from '../../db/SQL';
 import { IPassportInfo } from './PassportResolver';
 
 export class PassportDB extends FaucetModuleDB {
@@ -8,27 +10,46 @@ export class PassportDB extends FaucetModuleDB {
     switch(version) {
       case 0:
         version = 1;
-        await this.db.exec(`
-          CREATE TABLE "PassportCache" (
-            "Address" TEXT NOT NULL UNIQUE,
-            "Json" TEXT NOT NULL,
-            "Timeout" INTEGER NOT NULL,
-            PRIMARY KEY("Address")
-          );
-          CREATE TABLE "PassportStamps" (
-            "StampHash" TEXT NOT NULL UNIQUE,
-            "Address" TEXT NOT NULL,
-            "Timeout" INTEGER NOT NULL,
-            PRIMARY KEY("StampHash")
-          );
-          
-          CREATE INDEX "PassportCacheTimeIdx" ON "PassportCache" (
-            "Timeout"	ASC
-          );
-          CREATE INDEX "PassportStampsTimeIdx" ON "PassportStamps" (
-            "Timeout"	ASC
-          );
-        `);
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `
+            CREATE TABLE "PassportCache" (
+              "Address" TEXT NOT NULL UNIQUE,
+              "Json" TEXT NOT NULL,
+              "Timeout" INTEGER NOT NULL,
+              PRIMARY KEY("Address")
+            );`,
+          [FaucetDbDriver.MYSQL]: `
+            CREATE TABLE PassportCache (
+              Address CHAR(42) NOT NULL UNIQUE,
+              Json TEXT NOT NULL,
+              Timeout INT(11) NOT NULL,
+              PRIMARY KEY(Address)
+            );`,
+        }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `
+            CREATE TABLE "PassportStamps" (
+              "StampHash" TEXT NOT NULL UNIQUE,
+              "Address" TEXT NOT NULL,
+              "Timeout" INTEGER NOT NULL,
+              PRIMARY KEY("StampHash")
+            );`,
+          [FaucetDbDriver.MYSQL]: `
+            CREATE TABLE PassportStamps (
+              StampHash VARCHAR(250) NOT NULL UNIQUE,
+              Address CHAR(42) NOT NULL,
+              Timeout INT(11) NOT NULL,
+              PRIMARY KEY(StampHash)
+            );`,
+        }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX "PassportCacheTimeIdx" ON "PassportCache" ("Timeout"	ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE PassportCache ADD INDEX PassportCacheTimeIdx (Timeout);`,
+        }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX "PassportStampsTimeIdx" ON "PassportStamps" ("Timeout"	ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE PassportStamps ADD INDEX PassportStampsTimeIdx (Timeout);`,
+        }));
     }
     return version;
   }
@@ -108,7 +129,10 @@ export class PassportDB extends FaucetModuleDB {
     }).join(",");
     
     let query = await this.db.run(
-      "INSERT OR REPLACE INTO PassportStamps (StampHash, Address, Timeout) VALUES " + queryRows,
+      SQL.driverSql({
+        [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO PassportStamps (StampHash, Address, Timeout) VALUES " + queryRows,
+        [FaucetDbDriver.MYSQL]: "REPLACE INTO PassportStamps (StampHash, Address, Timeout) VALUES " + queryRows,
+      }),
       queryArgs
     );
   }

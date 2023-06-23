@@ -35,6 +35,8 @@ export interface IClientSessionStatus {
   restr: any;
   cliver: string;
   boost: any;
+  connected: boolean;
+  idle: number;
 }
 
 export interface IClientFaucetStatus {
@@ -105,7 +107,9 @@ export async function buildSessionStatus(): Promise<IClientSessionsStatus> {
   };
 
   let sessions = await ServiceManager.GetService(FaucetDatabase).getAllSessions(86400);
+  let sessionManager = ServiceManager.GetService(SessionManager);
   sessionsRsp.sessions = sessions.map((session) => {
+    let runningSession = sessionManager.getSession(session.sessionId);
     return {
       id: getHashedSessionId(session.sessionId, faucetConfig.faucetSecret),
       start: session.startTime,
@@ -119,6 +123,8 @@ export async function buildSessionStatus(): Promise<IClientSessionsStatus> {
       restr: session.data["ipinfo.restriction.data"],
       cliver: session.data["cliver"],
       boost: session.data["passport.score"],
+      connected: runningSession ? !!runningSession.getSessionModuleRef("pow.client") : null,
+      idle: session.data["pow.idleTime"],
     }
   });
 

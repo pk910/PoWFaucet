@@ -11,10 +11,18 @@ import { BaseDriver } from './driver/BaseDriver';
 import { ISQLiteOptions } from './driver/SQLiteDriver';
 import { WorkerDriver } from './driver/WorkerDriver';
 import { FaucetWorkers } from '../common/FaucetWorker';
+import { IMySQLOptions, MySQLDriver } from "./driver/MySQLDriver";
+import { SQL } from "./SQL";
 
-export type FaucetDatabaseOptions = ISQLiteOptions;
+export type FaucetDatabaseOptions = ISQLiteOptions | IMySQLOptions;
+
+export enum FaucetDbDriver {
+  SQLITE = "sqlite",
+  MYSQL = "mysql",
+}
 
 export class FaucetDatabase {
+
   private initialized: boolean;
   private db: BaseDriver;
   private dbWorker: Worker;
@@ -40,8 +48,12 @@ export class FaucetDatabase {
           file: resolveRelativePath(faucetConfig.database.file),
         }))
         break;
+      case "mysql":
+        this.db = new MySQLDriver();
+        await this.db.open(Object.assign({}, faucetConfig.database));
+        break;
       default:
-        throw "unknown database driver: " + faucetConfig.database.driver;
+        throw "unknown database driver: " + (faucetConfig.database as any).driver;
     }
     await this.upgradeSchema();
   }
@@ -93,13 +105,20 @@ export class FaucetDatabase {
 
   private async upgradeSchema(): Promise<void> {
     let schemaVersion: number = 0;
-    await this.db.run(`
-      CREATE TABLE IF NOT EXISTS "SchemaVersion" (
-        "Module" TEXT NULL UNIQUE,
-        "Version" INTEGER NOT NULL,
-        PRIMARY KEY("Module")
-      )
-    `);
+    await this.db.run(SQL.driverSql({
+      [FaucetDbDriver.SQLITE]: `
+        CREATE TABLE IF NOT EXISTS SchemaVersion (
+          Module TEXT NULL UNIQUE,
+          Version INTEGER NOT NULL,
+          PRIMARY KEY(Module)
+        )`,
+        [FaucetDbDriver.MYSQL]: `
+        CREATE TABLE IF NOT EXISTS SchemaVersion (
+          Module VARCHAR(50) NULL,
+          Version INT(11) NOT NULL
+        )`,
+    }));
+    
     let res = await this.db.get("SELECT Version FROM SchemaVersion WHERE Module IS NULL") as {Version: number};
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Current FaucetStore schema version: " + (res ? res.Version : "uninitialized"));
     if(res)
@@ -111,39 +130,64 @@ export class FaucetDatabase {
     switch(schemaVersion) {
       case 0: // upgrade to version 1
         schemaVersion = 1;
-        await this.db.exec(`
-          CREATE TABLE "KeyValueStore" (
-            "Key"	TEXT NOT NULL UNIQUE,
-            "Value"	TEXT NOT NULL,
-            PRIMARY KEY("Key")
-          );
-          CREATE TABLE "Sessions" (
-            "SessionId" TEXT NOT NULL UNIQUE,
-            "Status" TEXT NOT NULL,
-            "StartTime" INTEGER NOT NULL,
-            "TargetAddr" TEXT NOT NULL,
-            "DropAmount" TEXT NOT NULL,
-            "RemoteIP" TEXT NOT NULL,
-            "Tasks" TEXT NOT NULL,
-            "Data" TEXT NOT NULL,
-            "ClaimData" TEXT NULL,
-            PRIMARY KEY("SessionId")
-          );
-          CREATE INDEX "SessionsTimeIdx" ON "Sessions" (
-            "StartTime"	ASC
-          );
-          CREATE INDEX "SessionsStatusIdx" ON "Sessions" (
-            "Status"	ASC
-          );
-          CREATE INDEX "SessionsTargetAddrIdx" ON "Sessions" (
-            "TargetAddr"	ASC,
-            "StartTime"	ASC
-          );
-          CREATE INDEX "SessionsRemoteIPIdx" ON "Sessions" (
-            "RemoteIP"	ASC,
-            "StartTime"	ASC
-          );
-        `);
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `
+            CREATE TABLE KeyValueStore (
+              Key	TEXT NOT NULL UNIQUE,
+              Value	TEXT NOT NULL,
+              PRIMARY KEY(Key)
+            );`,
+          [FaucetDbDriver.MYSQL]: `
+            CREATE TABLE KeyValueStore (
+              \`Key\`	VARCHAR(250) NOT NULL,
+              Value	TEXT NOT NULL,
+              PRIMARY KEY(\`Key\`)
+            );`,
+          }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `
+            CREATE TABLE Sessions (
+              SessionId TEXT NOT NULL UNIQUE,
+              Status TEXT NOT NULL,
+              StartTime INTEGER NOT NULL,
+              TargetAddr TEXT NOT NULL,
+              DropAmount TEXT NOT NULL,
+              RemoteIP TEXT NOT NULL,
+              Tasks TEXT NOT NULL,
+              Data TEXT NOT NULL,
+              ClaimData TEXT NULL,
+              PRIMARY KEY(SessionId)
+            );`,
+          [FaucetDbDriver.MYSQL]: `
+            CREATE TABLE Sessions (
+              SessionId CHAR(36) NOT NULL,
+              Status VARCHAR(30) NOT NULL,
+              StartTime INT(11) NOT NULL,
+              TargetAddr CHAR(42) NOT NULL,
+              DropAmount VARCHAR(50) NOT NULL,
+              RemoteIP VARCHAR(40) NOT NULL,
+              Tasks TEXT NOT NULL,
+              Data TEXT NOT NULL,
+              ClaimData TEXT NULL,
+              PRIMARY KEY(SessionId)
+            );`,
+          }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsTimeIdx ON Sessions (StartTime	ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsTimeIdx (StartTime);`,
+        }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsStatusIdx ON Sessions (Status	ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsStatusIdx (Status);`,
+        }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsTargetAddrIdx ON Sessions (TargetAddr	ASC, StartTime	ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsTargetAddrIdx (TargetAddr, StartTime);`,
+        }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsRemoteIPIdx ON Sessions (RemoteIP	ASC, StartTime	ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsRemoteIPIdx (RemoteIP, StartTime);`,
+          }));
       /*
       case 1: // upgrade to version 2
         schemaVersion = 2;
@@ -173,22 +217,25 @@ export class FaucetDatabase {
   }
 
   public async getKeyValueEntry(key: string): Promise<string> {
-    let row = await this.db.get("SELECT Value FROM KeyValueStore WHERE Key = ?", [key]) as {Value: string};
+    let row = await this.db.get("SELECT " + SQL.field("Value") + " FROM KeyValueStore WHERE " + SQL.field("Key") + " = ?", [key]) as {Value: string};
     return row?.Value;
   }
 
   public async setKeyValueEntry(key: string, value: string): Promise<void> {
-    let row = await this.db.get("SELECT Key FROM KeyValueStore WHERE Key = ?", [key]);
-    if(row) {
-      await this.db.run("UPDATE KeyValueStore SET Value = ? WHERE Key = ?", [value, key]);
-    }
-    else {
-      await this.db.run("INSERT INTO KeyValueStore (Key, Value) VALUES (?, ?)", [key, value]);
-    }
+    await this.db.run(
+      SQL.driverSql({
+        [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO KeyValueStore (Key,Value) VALUES (?,?)",
+        [FaucetDbDriver.MYSQL]: "REPLACE INTO KeyValueStore (`Key`,Value) VALUES (?,?)",
+      }),
+      [
+        key,
+        value,
+      ]
+    );
   }
 
   public async deleteKeyValueEntry(key: string): Promise<void> {
-    await this.db.run("DELETE FROM KeyValueStore WHERE Key = ?", [key]);
+    await this.db.run("DELETE FROM KeyValueStore WHERE " + SQL.field("Key") + " = ?", [key]);
   }
 
   private async selectSessions(whereSql: string, whereArgs: any[], skipData?: boolean): Promise<FaucetSessionStoreData[]> {
@@ -292,7 +339,10 @@ export class FaucetDatabase {
 
   public async updateSession(sessionData: FaucetSessionStoreData): Promise<void> {
     await this.db.run(
-      "INSERT OR REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData) VALUES (?,?,?,?,?,?,?,?,?)",
+      SQL.driverSql({
+        [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData) VALUES (?,?,?,?,?,?,?,?,?)",
+        [FaucetDbDriver.MYSQL]: "REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData) VALUES (?,?,?,?,?,?,?,?,?)",
+      }),
       [
         sessionData.sessionId,
         sessionData.status,

@@ -129,7 +129,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
     this.state.activeSessions.forEach((session) => {
       if(session.status === "running") {
         sessionStatus.mining++;
-        if(session.hashrate > 0)
+        if(session.hashrate > 0 && session.connected)
           sessionStatus.hashrate += session.hashrate;
       }
     });
@@ -256,6 +256,8 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
     switch(session.status) {
       case "running":
         sessionStatus.push(<span key="running" className="badge bg-primary">Running</span>);
+        if(!session.connected)
+          sessionStatus.push(<span key="idle" className="badge bg-secondary">Idle{session.idle ? " (" + renderTime(new Date(session.idle * 1000)) + ")" : ""}</span>);
         if(session.hashrate > 0)
           sessionStatus.push(<span key="mining" className="badge bg-success">Mining ({Math.round(session.hashrate * 100) / 100} H/s)</span>);
         break;

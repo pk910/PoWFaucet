@@ -1,0 +1,42 @@
+
+
+name: Build docker image for latest release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build_docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.15.0
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - run: npm install
+      - run: npm run bundle
+      - name: Get project versions
+        run: |
+          echo "server_version=$(cat package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
+          echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
+        id: version
+      - name: Build version specific docker image
+        run: docker build . --file Dockerfile --tag pk910/powfaucet:v${{ steps.version.outputs.server_version }}
+      - name: Push version specific docker image
+        run: docker push pk910/powfaucet:v${{ steps.version.outputs.server_version }}
+      - name: Build v2-stable docker image
+        run: docker build . --file Dockerfile --tag pk910/powfaucet:v2-stable
+      - name: Push v2-stable docker image
+        run: docker push pk910/powfaucet:v2-stable

@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { BaseDriver } from "./driver/BaseDriver";
 import { FaucetDatabaseOptions } from "./FaucetDatabase";
 import { SQLiteDriver } from "./driver/SQLiteDriver";
+import { MySQLDriver } from "./driver/MySQLDriver";
 
 export class DatabaseWorker {
   private port: MessagePort;
@@ -58,8 +59,12 @@ export class DatabaseWorker {
         this.driver = new SQLiteDriver();
         await this.driver.open(driverOpts);
         break;
+      case "mysql":
+        this.driver = new MySQLDriver();
+        await this.driver.open(driverOpts);
+        break;
       default:
-        throw "unknown database driver: " + driverOpts.driver;
+        throw "unknown database driver: " + (driverOpts as any).driver;
     }
   }
 
