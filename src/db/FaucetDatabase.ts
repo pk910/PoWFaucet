@@ -222,13 +222,16 @@ export class FaucetDatabase {
   }
 
   public async setKeyValueEntry(key: string, value: string): Promise<void> {
-    let row = await this.db.get("SELECT " + SQL.field("Key") + " FROM KeyValueStore WHERE " + SQL.field("Key") + " = ?", [key]);
-    if(row) {
-      await this.db.run("UPDATE KeyValueStore SET " + SQL.field("Value") + " = ? WHERE " + SQL.field("Key") + " = ?", [value, key]);
-    }
-    else {
-      await this.db.run("INSERT INTO KeyValueStore (" + SQL.field("Key") + ", " + SQL.field("Value") + ") VALUES (?, ?)", [key, value]);
-    }
+    await this.db.run(
+      SQL.driverSql({
+        [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO KeyValueStore (Key,Value) VALUES (?,?)",
+        [FaucetDbDriver.MYSQL]: "REPLACE INTO KeyValueStore (`Key`,Value) VALUES (?,?)",
+      }),
+      [
+        key,
+        value,
+      ]
+    );
   }
 
   public async deleteKeyValueEntry(key: string): Promise<void> {

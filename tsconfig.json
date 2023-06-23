@@ -10,6 +10,10 @@
     "resolveJsonModule": true
   },
   "lib": ["es2015"],
+  "include": [
+    "src/app.ts",
+    "src/tools/migrateDB.ts"
+  ],
   "exclude": [
     "tests",
     "tests-old",
