@@ -106,6 +106,10 @@ sessionTimeout: 43200  # 12h
 # session data will be removed from the faucet DB after that time
 sessionCleanup: 2592000 # 30 days
 
+# session save time
+# how often session updates will be written to DB
+sessionSaveTime: 120
+
 
 ### Protection mechanisms
 modules:

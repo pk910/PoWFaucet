@@ -45,6 +45,7 @@ export function getDefaultConfig(): IConfigSchema {
     minDropAmount: 10000000000000000, // 0.01 ETH
     sessionTimeout: 86400,
     sessionCleanup: 2592000,
+    sessionSaveTime: 120,
 
     modules: {},
 

@@ -43,6 +43,7 @@ export interface IConfigSchema {
   minDropAmount: number;
   sessionTimeout: number;
   sessionCleanup: number;
+  sessionSaveTime: number;
 
   modules: {
     [moduleName: string]: IBaseModuleConfig;

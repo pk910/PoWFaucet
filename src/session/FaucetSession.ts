@@ -172,7 +172,7 @@ export class FaucetSession {
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
       this.saveSession();
-    }, 30 * 1000);
+    }, faucetConfig.sessionSaveTime * 1000);
   }
 
   public async setSessionFailed(code: string, reason: string, stack?: string): Promise<void> {
