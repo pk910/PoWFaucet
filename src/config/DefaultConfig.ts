@@ -1,3 +1,4 @@
+import { FaucetDbDriver } from "../db/FaucetDatabase";
 import { FaucetCoinType } from "../eth/EthWalletManager";
 import { IConfigSchema } from "./ConfigSchema";
 import { resolveRelativePath } from "./FaucetConfig";
@@ -14,7 +15,7 @@ export function getDefaultConfig(): IConfigSchema {
     buildSeoIndex: true,
     buildSeoMeta: {},
     database: {
-      driver: "sqlite",
+      driver: FaucetDbDriver.SQLITE,
       file: resolveRelativePath("faucet-store.db"),
     },
 

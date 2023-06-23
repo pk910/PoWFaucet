@@ -1,4 +1,6 @@
+import { FaucetDbDriver } from '../../db/FaucetDatabase';
 import { FaucetModuleDB } from '../../db/FaucetModuleDB';
+import { SQL } from '../../db/SQL';
 import { IIPInfo } from './IPInfoResolver';
 
 export class IPInfoDB extends FaucetModuleDB {
@@ -8,17 +10,26 @@ export class IPInfoDB extends FaucetModuleDB {
     switch(version) {
       case 0:
         version = 1;
-        await this.db.exec(`
-          CREATE TABLE "IPInfoCache" (
-            "IP" TEXT NOT NULL UNIQUE,
-            "Json" TEXT NOT NULL,
-            "Timeout" INTEGER NOT NULL,
-            PRIMARY KEY("IP")
-          );
-          CREATE INDEX "IPInfoCacheTimeIdx" ON "IPInfoCache" (
-            "Timeout"	ASC
-          );
-        `);
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `
+            CREATE TABLE "IPInfoCache" (
+              "IP" TEXT NOT NULL UNIQUE,
+              "Json" TEXT NOT NULL,
+              "Timeout" INTEGER NOT NULL,
+              PRIMARY KEY("IP")
+            );`,
+          [FaucetDbDriver.MYSQL]: `
+            CREATE TABLE IPInfoCache (
+              IP VARCHAR(40) NOT NULL,
+              Json TEXT NOT NULL,
+              Timeout INT(11) NOT NULL,
+              PRIMARY KEY(IP)
+            );`,
+        }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX "IPInfoCacheTimeIdx" ON "IPInfoCache" ("Timeout"	ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE IPInfoCache ADD INDEX IPInfoCacheTimeIdx (Timeout);`,
+        }));
     }
     return version;
   }

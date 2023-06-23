@@ -1,7 +1,8 @@
+import { FaucetDbDriver } from "../FaucetDatabase";
 import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver";
 
 export interface ISQLiteOptions {
-  driver: "sqlite";
+  driver: FaucetDbDriver.SQLITE;
 
   file: string;
 }
