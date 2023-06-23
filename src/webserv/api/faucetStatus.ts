@@ -124,7 +124,7 @@ export async function buildSessionStatus(): Promise<IClientSessionsStatus> {
       cliver: session.data["cliver"],
       boost: session.data["passport.score"],
       connected: runningSession ? !!runningSession.getSessionModuleRef("pow.client") : null,
-      idle: runningSession ? runningSession.getSessionModuleRef("pow.idleTime") : null,
+      idle: session.data["pow.idleTime"],
     }
   });
 

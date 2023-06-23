@@ -15,10 +15,10 @@ faucetLogFile: "faucet-events.log"
 faucetPidFile: "faucet-pid.txt"
 
 # faucet http/ws server port
-serverPort: 8085
+serverPort: 8080
 
 # title of the faucet
-faucetTitle: "Ephemery Faucet"
+faucetTitle: "Goerli PoW Faucet"
 
 # url to image displayed on the startpage
 faucetImage: "/images/fauceth_420.jpg"
@@ -332,7 +332,7 @@ modules:
       "Facebook": 1
       "FacebookFriends": 1
       "FacebookProfilePicture": 1
-      "Brightid": 10
+      "Brightid": 8
       "Github": 1
       "Coinbase": 1
       "FiveOrMoreGithubRepos": 1
