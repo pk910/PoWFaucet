@@ -24,6 +24,8 @@ export interface IClientSessionStatus {
   restr: IClientSessionRestrictionStatus;
   cliver: string;
   boost: any;
+  connected: boolean;
+  idle: number;
 }
 
 export interface IClientClaimStatusRsp {
