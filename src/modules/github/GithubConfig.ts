@@ -4,8 +4,20 @@ export interface IGithubConfig extends IBaseModuleConfig {
   appClientId: string;
   appSecret: string;
   authTimeout: number;
-
+  cacheTime: number;
+  checks: IGithubCheckConfig[];
   restrictions: IGithubRestrictionConfig[];
+}
+
+export interface IGithubCheckConfig {
+  minAccountAge?: number;
+  minRepoCount?: number;
+  minFollowers?: number;
+  minOwnRepoCount?: number;
+  minOwnRepoStars?: number;
+  required?: boolean;
+  message?: string;
+  rewardFactor?: number;
 }
 
 export interface IGithubRestrictionConfig {
@@ -22,5 +34,7 @@ export const defaultConfig: IGithubConfig = {
   appClientId: null,
   appSecret: null,
   authTimeout: 86400,
+  cacheTime: 86400,
+  checks: [],
   restrictions: [],
 }

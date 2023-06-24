@@ -361,7 +361,11 @@ export class FaucetSession {
 
     let rewardFactor = 1;
     //console.log(rewardFactors);
-    rewardFactors.forEach((factor) => rewardFactor *= factor.factor);
+    rewardFactors.forEach((factor) => {
+      if(!factor || typeof factor.factor !== "number")
+        return;
+      rewardFactor *= factor?.factor
+    });
 
     let rewardAmount = amount * BigInt(Math.floor(rewardFactor * 100000)) / 100000n;
     ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewarded, [this, rewardAmount, rewardFactors]);

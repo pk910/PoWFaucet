@@ -238,14 +238,28 @@ export class FaucetDatabase {
     await this.db.run("DELETE FROM KeyValueStore WHERE " + SQL.field("Key") + " = ?", [key]);
   }
 
-  private async selectSessions(whereSql: string, whereArgs: any[], skipData?: boolean): Promise<FaucetSessionStoreData[]> {
+
+
+  private selectSessions(whereSql: string, whereArgs: any[], skipData?: boolean): Promise<FaucetSessionStoreData[]> {
     let sql = [
-      "SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks",
-      (skipData ? "" : ",Data,ClaimData"),
-      " FROM Sessions WHERE ",
+      "FROM Sessions WHERE ",
       whereSql
     ].join("");
-    let rows = await this.db.all(sql, whereArgs) as {
+    return this.selectSessionsSql(sql, whereArgs, skipData);
+  }
+
+  public async selectSessionsSql(selectSql: string, args: any[], skipData?: boolean): Promise<FaucetSessionStoreData[]> {
+    let fields = ["SessionId","Status","StartTime","TargetAddr","DropAmount","RemoteIP","Tasks"];
+    if(!skipData)
+      fields.push("Data","ClaimData");
+
+    let sql = [
+      "SELECT ",
+      fields.map((f) => "Sessions." + f).join(","),
+      " ",
+      selectSql
+    ].join("");
+    let rows = await this.db.all(sql, args) as {
       SessionId: string;
       Status: string;
       StartTime: number;
