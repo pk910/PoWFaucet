@@ -6,9 +6,10 @@ import './GithubLogin.css';
 import { toQuery } from '../../utils/QueryUtils';
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { FaucetTime } from '../../common/FaucetTime';
+import { IFaucetContext } from '../../common/FaucetContext';
 
 export interface IGithubLoginProps {
-  time: FaucetTime;
+  faucetContext: IFaucetContext;
   faucetConfig: IFaucetConfig
 }
 
@@ -120,7 +121,8 @@ export class GithubLogin extends React.PureComponent<IGithubLoginProps, IGithubL
   private onLoginClick() {
     let authUrl = "https://github.com/login/oauth/authorize?" + toQuery({
       client_id: "056812ab38f99f509f08",
-      redirect_uri: ""
+      redirect_uri: this.props.faucetConfig.modules.github.redirectUrl || this.props.faucetContext.faucetApi.getApiUrl("/githubCallback", true),
+      state: this.props.faucetConfig.modules.github.callbackState || undefined,
     });
     this.loginPopop = window.open(authUrl, 'github-oauth-authorize', toQuery({
       height: 800,
@@ -168,6 +170,7 @@ export class GithubLogin extends React.PureComponent<IGithubLoginProps, IGithubL
   }
 
   private processLoginResult(authResult: any) {
+    console.log("github auth: ", authResult);
     if(this.loginPopop)
       this.loginPopop.close();
     if(authResult.data) {
@@ -178,7 +181,7 @@ export class GithubLogin extends React.PureComponent<IGithubLoginProps, IGithubL
 
   private loadAuthInfo(authInfo: IGithubAuthInfo) {
     let authTimeout = this.props.faucetConfig.modules.github?.authTimeout;
-    let age = this.props.time.getSyncedTime() - authInfo.time;
+    let age = this.props.faucetContext.faucetApi.getFaucetTime().getSyncedTime() - authInfo.time;
     if(age > authTimeout - 60)
       return;
 

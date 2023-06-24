@@ -3,6 +3,8 @@ import { IBaseModuleConfig } from "../BaseModule";
 export interface IGithubConfig extends IBaseModuleConfig {
   appClientId: string;
   appSecret: string;
+  callbackState: string;
+  redirectUrl: string;
   authTimeout: number;
   cacheTime: number;
   checks: IGithubCheckConfig[];
@@ -33,6 +35,8 @@ export const defaultConfig: IGithubConfig = {
   enabled: false,
   appClientId: null,
   appSecret: null,
+  callbackState: null,
+  redirectUrl: null,
   authTimeout: 86400,
   cacheTime: 86400,
   checks: [],

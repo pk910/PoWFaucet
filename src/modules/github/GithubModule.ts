@@ -30,6 +30,8 @@ export class GithubModule extends BaseModule<IGithubConfig> {
         clientConfig[this.moduleName] = {
           clientId: this.moduleConfig.appClientId,
           authTimeout: this.moduleConfig.authTimeout,
+          redirectUrl: this.moduleConfig.redirectUrl,
+          callbackState: this.moduleConfig.callbackState,
         };
       }
     );

@@ -61,7 +61,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
         {needGithubAuth ? 
           <GithubLogin 
             faucetConfig={this.props.faucetConfig} 
-            time={this.props.faucetContext.faucetApi.getFaucetTime()} 
+            faucetContext={this.props.faucetContext} 
             ref={this.githubLogin}
           />
         : null}

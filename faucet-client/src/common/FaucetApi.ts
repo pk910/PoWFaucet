@@ -19,6 +19,20 @@ export class FaucetApi {
     return this.faucetTime;
   }
 
+  public getApiUrl(endpoint?: string, fqdn?: boolean): string {
+    if(!endpoint)
+      endpoint = "";
+    else if(!endpoint.match(/^\//))
+      endpoint = "/" + endpoint;
+    let apiUrl = this.apiBaseUrl + endpoint;
+    if(fqdn && apiUrl.match(/^\//)) {
+      // add current host
+      let hostUrl = location.protocol + "//" + location.host;
+      apiUrl = hostUrl + apiUrl;
+    }
+    return apiUrl;
+  }
+
   private apiGet(endpoint: string, args?: {[arg: string]: string|number}): Promise<any> {
     if(!endpoint.match(/^\//))
       endpoint = "/" + endpoint;

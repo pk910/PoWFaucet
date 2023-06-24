@@ -42,6 +42,8 @@ export interface IEnsNameModuleConfig {
 export interface IGithubModuleConfig {
   clientId: string;
   authTimeout: number;
+  redirectUrl: string;
+  callbackState: string;
 }
 
 export interface IPoWModuleConfig {
