@@ -30,7 +30,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
   }
 
 	public render(): React.ReactElement<IFaucetInputProps> {
-    let needGithubAuth = true;
+    let needGithubAuth = !!this.props.faucetConfig.modules.github;
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForStart;
     let inputTypes: string[] = [];
     if(this.props.faucetConfig.modules.ensname?.required) {
