@@ -228,6 +228,40 @@ modules:
     lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
     upperLimit: 500000000000000000000 # 500 ETH
 
+  ## Github login protection
+  github:
+    # enable / disable github login protection
+    enabled: false
+
+    # github api credentials
+    appClientId: "" # client id from github app
+    appSecret: "" # app secret from github app
+
+    # authentication timeout
+    authTimeout: 86400
+
+    # github account checks
+    checks:
+      - minAccountAge: 604800 # min account age (7 days)
+        minRepoCount: 10 # min number of repositories (includes forked ones)
+        minFollowers: 10 # min number of followers
+        minOwnRepoCount: 5 # min number of own repos (non-forked)
+        minOwnRepoStars: 5 # min number of stars on own repos (non-forked)
+        required: true # require passing this check or throw error
+        message: "Your github account does not meet the minimum requirements" # custom error message
+
+      - minFollowers: 50
+        minOwnRepoCount: 10
+        minOwnRepoStars: 1000
+        rewardFactor: 2 # double reward if account looks trustful
+
+    # recurring restrictions based on github account
+    restrictions:
+      # max 10 sessions / 10 ETH per day for each github account
+      - limitCount: 10
+        limitAmount: 10000000000000000000 # 10 ETH
+        duration: 86400 # 1 day
+
   ## Mainnet Wallet module
   mainnet-wallet:
     # enable / disable mainnet wallet protection
