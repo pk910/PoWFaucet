@@ -102,14 +102,8 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
   private async onSubmitInputs(inputData: any): Promise<void> {
     try {
       let sessionInfo = await this.props.faucetContext.faucetApi.startSession(inputData);
-      if(sessionInfo.status === "failed") {
-        this.props.faucetContext.showDialog({
-          title: "Could not start session",
-          body: (<div className='alert alert-danger'>{sessionInfo.failedReason}<br />{sessionInfo.failedCode ? "Code: " + sessionInfo.failedCode : ""}</div>),
-          closeButton: { caption: "Close" },
-        });
-        return;
-      }
+      if(sessionInfo.status === "failed")
+        throw (sessionInfo.failedCode ? "[" + sessionInfo.failedCode + "] " : "") + sessionInfo.failedReason;
 
       let session = new FaucetSession(this.props.faucetContext, sessionInfo.session, sessionInfo);
       this.props.faucetContext.activeSession = session;
@@ -137,9 +131,10 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
     } catch(ex) {
       this.props.faucetContext.showDialog({
         title: "Could not start session",
-        body: (<div className='alert alert-danger'>Internal Error: {ex.toString()}</div>),
+        body: (<div className='alert alert-danger'>{ex.toString()}</div>),
         closeButton: { caption: "Close" },
       });
+      throw ex;
     }
   }
 

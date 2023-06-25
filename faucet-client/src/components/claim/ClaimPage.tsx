@@ -500,6 +500,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
           caption: "Close"
         }
       });
+      throw errMsg;
     }
   }
 
