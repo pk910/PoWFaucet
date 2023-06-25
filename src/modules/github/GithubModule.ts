@@ -123,7 +123,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
           errMsg,
         );
       }
-      if(typeof check.rewardFactor === "number" && (rewardFactor === null || check.rewardFactor < rewardFactor)) {
+      if(typeof check.rewardFactor === "number" && (rewardFactor === null || check.rewardFactor > rewardFactor)) {
         rewardFactor = check.rewardFactor;
       }
     }
