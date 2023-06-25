@@ -104,7 +104,7 @@ export class GithubLogin extends React.PureComponent<IGithubLoginProps, IGithubL
   private renderLoginState(): React.ReactElement {
     return (
       <div className='auth-field auth-profile'>
-        <div className='auth-info'>Authenticated with github profile <a href={this.state.authInfo.url} target="_blank">{this.state.authInfo.user}</a></div>
+        <div className='auth-info'>Authenticated with github profile <a href={this.state.authInfo.url} target="_blank" rel='noopener noreferrer'>{this.state.authInfo.user}</a></div>
         <div>
           <a href="#" onClick={(evt) => {evt.preventDefault(); this.onLogoutClick()}}>
             Logout
