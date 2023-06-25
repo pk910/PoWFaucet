@@ -96,6 +96,35 @@ Modules:
   - x2 with score > 10
   - x4 with score > 15
 
+
+### Demo 5
+
+Medium protection configuration, mainly based on github login protection.\
+\+ Concurrency limit to limit number of simultaneous sessions per IP / ETH Addr.\
+\+ Passport module, that applies a reward factor based on gitcoin passport score.\
+\+ Faucet Outflow module, that introduces a global fund outflow limit (session rewards are automatically lowered to meet that limit globally)
+
+URL: [https://demo5.faucets.pk910.de/](https://demo5.faucets.pk910.de/)\
+Status Page: [https://demo5.faucets.pk910.de/#/status](https://demo5.faucets.pk910.de/#/status)\
+Configuration: [demo5-config.yaml](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/demo5-config.yaml)
+
+Modules:
+* captcha:
+  - for session start: true
+  - for reward claim: false
+* ensname:
+  - required: false
+* github:
+  - checks:
+    - required: true\
+      minAccountAge: 5184000 # 60 days\
+      minRepoCount: 2
+  - restrictions:
+    - 5 sessions / max 50 PoWC per day
+* ethinfo:
+  - max balance: 50 PoWC
+  - deny contracts: true
+
 ### Productive Instances
 
 To be clear: The examples above are just examples to demonstrate different scenarios with different protection methods.\
