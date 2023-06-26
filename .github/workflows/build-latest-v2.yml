@@ -23,7 +23,12 @@ jobs:
         node-version: 18.15.0
 
     - run: npm install
-    - run: npm run test
+    - run: npm run test-coverage
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build_binaries:
     name: Build Binaries
