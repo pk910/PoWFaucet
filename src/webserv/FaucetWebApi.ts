@@ -73,6 +73,8 @@ export class FaucetWebApi {
     if (!apiUrl || apiUrl.path.length === 0)
       return new FaucetHttpResponse(404, "Not Found");
     switch (apiUrl.path[0].toLowerCase()) {
+      case "getVersion".toLowerCase():
+        return this.onGetVersion();
       case "getMaxReward".toLowerCase():
         return this.onGetMaxReward();
       case "getFaucetConfig".toLowerCase():
@@ -131,6 +133,10 @@ export class FaucetWebApi {
     if(!remoteAddr)
       remoteAddr = req.socket.remoteAddress;
     return remoteAddr;
+  }
+
+  private onGetVersion(): string {
+    return faucetConfig.faucetVersion;
   }
 
   private onGetMaxReward(): number {

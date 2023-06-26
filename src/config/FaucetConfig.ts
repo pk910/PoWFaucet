@@ -98,14 +98,12 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     config = {} as any;
   }
 
-  if(!faucetConfig) {
-    faucetConfig = {
-      appBasePath: basePath,
-      faucetVersion: packageJson.version,
-    } as any;
-  }
-
-  Object.assign(faucetConfig, getDefaultConfig(), config);
+  if(!faucetConfig)
+    faucetConfig = {} as any;
+  Object.assign(faucetConfig, getDefaultConfig(), config, {
+    appBasePath: basePath,
+    faucetVersion: packageJson.version,
+  } as any);
 }
 
 export function resolveRelativePath(inputPath: string, customBasePath?: string): string {
