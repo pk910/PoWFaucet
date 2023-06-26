@@ -23,11 +23,41 @@ For a more detailed description, take a look into the [Project Wiki](https://git
 
 # Instances
 
-Goerli Testnet: [https://goerli-faucet.pk910.de](https://goerli-faucet.pk910.de)
-
-Sepolia Testnet: [https://sepolia-faucet.pk910.de](https://sepolia-faucet.pk910.de)
-
-[Ephemery](https://github.com/ephemery-testnet/ephemery-resources) Testnet: [https://ephemery-faucet.pk910.de](https://ephemery-faucet.pk910.de)
+<table>
+  <thead>
+    <tr>
+      <th>Testnet</th>
+      <th>Link</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Goerli Testnet</td>
+      <td><a href="https://goerli-faucet.pk910.de">https://goerli-faucet.pk910.de</a></td>
+      <td>
+        <a href="#"><img alt="Faucet Version" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ffaucets.pk910.de%2Fbadges%2Fversion.php%3Ffaucet%3Dgoerli-faucet" /></a>
+        <a href="https://stats.uptimerobot.com/lW1jltO2k0/794659716"><img alt="Uptime Robot ratio (30 days)" src="https://img.shields.io/uptimerobot/ratio/m794659716-25637f4701eec63fca289bbf" /></a>
+      </td>
+    </tr>
+    <tr>
+      <td>Sepolia Testnet</td>
+      <td><a href="https://sepolia-faucet.pk910.de">https://sepolia-faucet.pk910.de</a></td>
+      <td>
+        <a href="#"><img alt="Faucet Version" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ffaucets.pk910.de%2Fbadges%2Fversion.php%3Ffaucet%3Dsepolia-faucet" /></a>
+        <a href="https://stats.uptimerobot.com/lW1jltO2k0/794659718"><img alt="Uptime Robot ratio (30 days)" src="https://img.shields.io/uptimerobot/ratio/m794659718-c8c94ebdcae5283c5df1a5ad" /></a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="https://github.com/ephemery-testnet/ephemery-resources">Ephemery Testnet</a></td>
+      <td><a href="https://ephemery-faucet.pk910.de">https://ephemery-faucet.pk910.de</a></td>
+      <td>
+        <a href="#"><img alt="Faucet Version" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ffaucets.pk910.de%2Fbadges%2Fversion.php%3Ffaucet%3Dephemery-faucet" /></a>
+        <a href="https://stats.uptimerobot.com/lW1jltO2k0/794659832"><img alt="Uptime Robot ratio (30 days)" src="https://img.shields.io/uptimerobot/ratio/m794659832-bc531ed47aa35b919d3f8d98" /></a>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 # Run Yourself
 
