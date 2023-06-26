@@ -1,5 +1,9 @@
 # PoWFaucet
 
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/pk910/PoWFaucet?label=Github)](https://github.com/pk910/PoWFaucet/releases/latest)
+[![codecov](https://codecov.io/gh/pk910/PoWFaucet/branch/master/graph/badge.svg)](https://codecov.io/gh/pk910/PoWFaucet)
+
+
 Modularized faucet for EVM chains with different protection methods (Captcha, Mining, IP, Mainnet Balance, Gitcoin Passport and more)
 
 <b>Warning: The master branch of this repository is now pointing to the new modularized v2 version of the faucet.</b>
@@ -80,4 +84,4 @@ This faucet contains parts of code from the following projects:
 
 # License
 
-AGPLv3
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
