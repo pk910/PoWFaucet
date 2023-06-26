@@ -30,7 +30,7 @@ export interface FaucetWssEndpoint {
   handler: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => void;
 }
 
-const MAX_BODY_SITE = 1024 * 1024 * 10; // 10MB
+const MAX_BODY_SIZE = 1024 * 1024 * 10; // 10MB
 
 export class FaucetHttpServer {
   private initialized: boolean;
@@ -92,7 +92,7 @@ export class FaucetHttpServer {
       req.on("data", (chunk: Buffer) => {
         bodyParts.push(chunk);
         bodySize += chunk.length;
-        if(bodySize > MAX_BODY_SITE) {
+        if(bodySize > MAX_BODY_SIZE) {
           req.destroy(new Error("body too big"));
         }
       });

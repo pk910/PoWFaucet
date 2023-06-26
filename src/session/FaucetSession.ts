@@ -110,6 +110,9 @@ export class FaucetSession {
       throw ex;
     }
 
+    if(this.status as FaucetSessionStatus === FaucetSessionStatus.FAILED)
+      return;
+     
     this.status = FaucetSessionStatus.RUNNING;
     this.isDirty = true;
     this.manager.notifySessionUpdate(this);
