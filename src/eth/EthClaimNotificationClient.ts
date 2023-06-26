@@ -8,12 +8,21 @@ export interface IEthClaimNotificationData {
 }
 
 export class EthClaimNotificationClient {
+  public static cfgPingInterval = 30;
+  public static cfgPingTimeout = 120;
+
   private static activeClients: EthClaimNotificationClient[] = [];
   private static lastNotificationData: IEthClaimNotificationData;
 
   public static broadcastClaimNotification(data: IEthClaimNotificationData) {
     this.lastNotificationData = data;
-    this.activeClients.forEach((client) => client.sendClaimNotification(data));
+    for(let i = this.activeClients.length - 1; i >= 0; i--) {
+      this.activeClients[i].sendClaimNotification(data);
+    }
+  }
+
+  public static resetClaimNotification() {
+    this.lastNotificationData = null;
   }
 
   private socket: WebSocket;
@@ -28,8 +37,7 @@ export class EthClaimNotificationClient {
 
     this.socket.on("ping", (data) => {
       this.lastPingPong = new Date();
-      if(this.socket)
-        this.socket.pong(data)
+      this.socket?.pong(data)
     });
     this.socket.on("pong", (data) => {
       this.lastPingPong = new Date();
@@ -37,8 +45,7 @@ export class EthClaimNotificationClient {
     this.socket.on("error", (err) => {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "WebSocket error: " + err.toString());
       try {
-        if(this.socket)
-          this.socket.close();
+        this.socket?.close();
       } catch(ex) {}
       this.dispose();
     });
@@ -51,10 +58,6 @@ export class EthClaimNotificationClient {
     if(EthClaimNotificationClient.lastNotificationData) {
       this.sendClaimNotification(EthClaimNotificationClient.lastNotificationData);
     }
-  }
-
-  public isReady(): boolean {
-    return !!this.socket;
   }
 
   private dispose() {
@@ -72,45 +75,32 @@ export class EthClaimNotificationClient {
   }
 
   public killClient(reason?: string) {
-    if(!this.socket)
-      return;
     try {
       this.sendMessage("error", {
         reason: reason,
       });
-      this.socket.close();
+      this.socket?.close();
     } catch(ex) {}
     this.dispose();
   }
 
   private pingClientLoop() {
     this.pingTimer = setInterval(() => {
-      if(!this.socket)
-        return;
-      
       let pingpongTime = Math.floor(((new Date()).getTime() - this.lastPingPong.getTime()) / 1000);
-      if(pingpongTime > 120) {
+      if(pingpongTime > EthClaimNotificationClient.cfgPingTimeout) {
         this.killClient("ping timeout");
         return;
       }
       
-      this.socket.ping();
-    }, 60 * 1000);
+      this.socket?.ping();
+    }, EthClaimNotificationClient.cfgPingInterval * 1000);
   }
 
-  private sendMessage(action: string, data?: any, rsp?: any) {
-    if(!this.socket)
-      return;
-    
-    let message: any = {
-      action: action
-    };
-    if(data !== undefined)
-      message.data = data;
-    if(rsp !== undefined)
-      message.rsp = rsp;
-    
-    this.socket.send(JSON.stringify(message));
+  private sendMessage(action: string, data: any) {
+    this.socket?.send(JSON.stringify({
+      action: action,
+      data: data,
+    }));
   }
 
   private sendClaimNotification(data: IEthClaimNotificationData) {

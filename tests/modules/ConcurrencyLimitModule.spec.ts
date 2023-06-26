@@ -22,9 +22,10 @@ describe("Faucet module: concurrency-limit", () => {
     await ServiceManager.GetService(FaucetDatabase).initialize();
   });
   afterEach(async () => {
-    await ServiceManager.GetService(FaucetDatabase).closeDatabase();
-    await unbindTestStubs();
-    ServiceManager.ClearAllServices();
+    let dbService = ServiceManager.GetService(FaucetDatabase);
+    await ServiceManager.DisposeAllServices();
+    await dbService.closeDatabase();
+    await unbindTestStubs(globalStubs);
   });
 
   async function runTestSession(ip: string, addr: string, expectedStatus?: string): Promise<FaucetSession> {

@@ -21,9 +21,10 @@ describe("Faucet Session Management", () => {
     await ServiceManager.GetService(ModuleManager).initialize();
   });
   afterEach(async () => {
-    await ServiceManager.GetService(FaucetDatabase).closeDatabase();
-    await unbindTestStubs();
-    ServiceManager.ClearAllServices();
+    let dbService = ServiceManager.GetService(FaucetDatabase);
+    await ServiceManager.DisposeAllServices();
+    await dbService.closeDatabase();
+    await unbindTestStubs(globalStubs);
   });
 
   it("Create normal session", async () => {

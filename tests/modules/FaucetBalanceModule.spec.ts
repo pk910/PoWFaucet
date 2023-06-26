@@ -32,9 +32,10 @@ describe("Faucet module: faucet-balance", () => {
     await ServiceManager.GetService(EthWalletManager).initialize();
   });
   afterEach(async () => {
-    await ServiceManager.GetService(FaucetDatabase).closeDatabase();
-    await unbindTestStubs();
-    ServiceManager.ClearAllServices();
+    let dbService = ServiceManager.GetService(FaucetDatabase);
+    await ServiceManager.DisposeAllServices();
+    await dbService.closeDatabase();
+    await unbindTestStubs(globalStubs);
   });
 
   it("Start session with static restriction (100%)", async () => {

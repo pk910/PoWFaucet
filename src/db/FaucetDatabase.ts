@@ -24,6 +24,7 @@ export enum FaucetDbDriver {
 export class FaucetDatabase {
 
   private initialized: boolean;
+  private cleanupTimer: NodeJS.Timer;
   private db: BaseDriver;
   private dbWorker: Worker;
   private moduleDBs: {[module: string]: FaucetModuleDB} = {};
@@ -34,9 +35,17 @@ export class FaucetDatabase {
     this.initialized = true;
 
     await this.initDatabase();
-    setInterval(() => {
+    this.cleanupTimer = setInterval(() => {
       this.cleanStore();
     }, (1000 * 60 * 60 * 2));
+  }
+
+  public dispose() {
+    if(!this.initialized)
+      return;
+    this.initialized = false;
+
+    clearInterval(this.cleanupTimer);
   }
 
   private async initDatabase(): Promise<void> {

@@ -1,8 +1,6 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { IncomingMessage } from 'http';
-import { WebSocket } from 'ws';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
 import { ServiceManager } from '../../src/common/ServiceManager';
 import { FaucetDatabase } from '../../src/db/FaucetDatabase';
@@ -12,7 +10,7 @@ import { faucetConfig } from '../../src/config/FaucetConfig';
 import { FaucetError } from '../../src/common/FaucetError';
 import { IPoWConfig, PoWHashAlgo } from '../../src/modules/pow/PoWConfig';
 import { FaucetWebApi } from '../../src/webserv/FaucetWebApi';
-import { disposeFakeWebSockets, FakeWebSocket } from '../stubs/FakeWebSocket';
+import { disposeFakeWebSockets, FakeWebSocket, injectFakeWebSocket } from '../stubs/FakeWebSocket';
 import { FaucetHttpServer } from '../../src/webserv/FaucetHttpServer';
 import { PoWModule } from '../../src/modules/pow/PoWModule';
 import { PoWClient } from '../../src/modules/pow/PoWClient';
@@ -27,21 +25,12 @@ describe("Faucet module: pow", () => {
     await ServiceManager.GetService(FaucetDatabase).initialize();
   });
   afterEach(async () => {
-    await ServiceManager.GetService(FaucetDatabase).closeDatabase();
-    await unbindTestStubs();
+    let dbService = ServiceManager.GetService(FaucetDatabase);
+    await ServiceManager.DisposeAllServices();
+    await dbService.closeDatabase();
+    await unbindTestStubs(globalStubs);
     disposeFakeWebSockets();
-    ServiceManager.ClearAllServices();
   });
-
-  async function injectTestWebSocket(url: string, ip: string): Promise<FakeWebSocket> {
-    let fakeWs = new FakeWebSocket();
-    let faucetHttpServer: any = ServiceManager.GetService(FaucetHttpServer);
-    let powWsHandler: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => Promise<void> = faucetHttpServer.wssEndpoints["pow"].handler;
-    await powWsHandler({
-      url: url,
-    } as any, fakeWs, ip)
-    return fakeWs;
-  }
 
   it("Check client config exports (scrypt)", async () => {
     faucetConfig.modules["pow"] = {
@@ -173,7 +162,7 @@ describe("Faucet module: pow", () => {
       addr: "0x0000000000000000000000000000000000001337",
     });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-    let fakeWs = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+    let fakeWs = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
     expect(fakeWs.isReady).to.equal(true, "websocket was closed");
     let errorMsg = fakeWs.getSentMessage("error");
     expect(errorMsg.length).to.equal(0, "a unexpected error message has been sent: " + (errorMsg.length ? errorMsg[0].data.code : ""));
@@ -185,7 +174,7 @@ describe("Faucet module: pow", () => {
     } as IPoWConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
     await moduleManager.initialize();
-    let fakeWs = await injectTestWebSocket("/ws/pow", "8.8.8.8");
+    let fakeWs = await injectFakeWebSocket("/ws/pow", "8.8.8.8");
     expect(fakeWs.isReady).to.equal(false, "websocket not closed");
     let errorMsg = fakeWs.getSentMessage("error");
     expect(errorMsg.length).to.equal(1, "no error message sent");
@@ -198,7 +187,7 @@ describe("Faucet module: pow", () => {
     } as IPoWConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
     await moduleManager.initialize();
-    let fakeWs = await injectTestWebSocket("/ws/pow?session=e36ec5e6-12ee-4015-951f-b018b37de451", "8.8.8.8");
+    let fakeWs = await injectFakeWebSocket("/ws/pow?session=e36ec5e6-12ee-4015-951f-b018b37de451", "8.8.8.8");
     expect(fakeWs.isReady).to.equal(false, "websocket not closed");
     let errorMsg = fakeWs.getSentMessage("error");
     expect(errorMsg.length).to.equal(1, "no error message sent");
@@ -215,8 +204,8 @@ describe("Faucet module: pow", () => {
       addr: "0x0000000000000000000000000000000000001337",
     });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-    let fakeWs = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
-    await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+    let fakeWs = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+    await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
     expect(fakeWs.isReady).to.equal(false, "websocket not closed");
     let errorMsg = fakeWs.getSentMessage("error");
     expect(errorMsg.length).to.equal(1, "no error message sent");
@@ -239,7 +228,7 @@ describe("Faucet module: pow", () => {
         addr: "0x0000000000000000000000000000000000001337",
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("pong");
       fakeSocket.emit("ping");
       expect(globalStubs["FakeWebSocket.pong"].called).to.equal(true, "pong not called");
@@ -262,7 +251,7 @@ describe("Faucet module: pow", () => {
         addr: "0x0000000000000000000000000000000000001337",
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", "invalid stuff (not json)");
       //expect(fakeSocket.isReady).to.equal(false, "client is still ready");
       let errorMsg = fakeSocket.getSentMessage("error");
@@ -280,7 +269,7 @@ describe("Faucet module: pow", () => {
         addr: "0x0000000000000000000000000000000000001337",
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
         action: "unknownAction"
@@ -302,7 +291,7 @@ describe("Faucet module: pow", () => {
         addr: "0x0000000000000000000000000000000000001337",
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -334,7 +323,7 @@ describe("Faucet module: pow", () => {
         addr: "0x0000000000000000000000000000000000001337",
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -371,7 +360,7 @@ describe("Faucet module: pow", () => {
         addr: "0x0000000000000000000000000000000000001337",
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -409,7 +398,7 @@ describe("Faucet module: pow", () => {
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
       testSession.setSessionData("pow.lastNonce", 1337);
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -447,7 +436,7 @@ describe("Faucet module: pow", () => {
         addr: "0x0000000000000000000000000000000000001337",
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -488,7 +477,7 @@ describe("Faucet module: pow", () => {
       });
       testSession.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -532,7 +521,7 @@ describe("Faucet module: pow", () => {
       });
       testSession.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectTestWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -579,13 +568,13 @@ describe("Faucet module: pow", () => {
       let testSession1 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
       });
-      let fakeSocket1 = await injectTestWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
+      let fakeSocket1 = await injectFakeWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
       testSession1.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession1.getSessionStatus()).to.equal("running", "unexpected session status");
       let testSession2 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.4.4", {
         addr: "0x0000000000000000000000000000000000001338",
       });
-      let fakeSocket2 = await injectTestWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
+      let fakeSocket2 = await injectFakeWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
       expect(testSession2.getSessionStatus()).to.equal("running", "unexpected session status");
       await testSession2.addReward(100n);
       fakeSocket1.emit("message", JSON.stringify({
@@ -648,13 +637,13 @@ describe("Faucet module: pow", () => {
       let testSession1 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
       });
-      let fakeSocket1 = await injectTestWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
+      let fakeSocket1 = await injectFakeWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
       testSession1.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession1.getSessionStatus()).to.equal("running", "unexpected session status");
       let testSession2 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.4.4", {
         addr: "0x0000000000000000000000000000000000001338",
       });
-      let fakeSocket2 = await injectTestWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
+      let fakeSocket2 = await injectFakeWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
       expect(testSession2.getSessionStatus()).to.equal("running", "unexpected session status");
       await testSession2.addReward(100n);
       fakeSocket1.emit("message", JSON.stringify({
@@ -718,13 +707,13 @@ describe("Faucet module: pow", () => {
       let testSession1 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
       });
-      let fakeSocket1 = await injectTestWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
+      let fakeSocket1 = await injectFakeWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
       testSession1.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession1.getSessionStatus()).to.equal("running", "unexpected session status");
       let testSession2 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.4.4", {
         addr: "0x0000000000000000000000000000000000001338",
       });
-      let fakeSocket2 = await injectTestWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
+      let fakeSocket2 = await injectFakeWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
       expect(testSession2.getSessionStatus()).to.equal("running", "unexpected session status");
       await testSession2.addReward(100n);
       fakeSocket1.emit("message", JSON.stringify({

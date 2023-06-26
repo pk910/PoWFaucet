@@ -23,9 +23,10 @@ describe("Faucet module: mainnet-wallet", () => {
     await ServiceManager.GetService(FaucetDatabase).initialize();
   });
   afterEach(async () => {
-    await ServiceManager.GetService(FaucetDatabase).closeDatabase();
-    await unbindTestStubs();
-    ServiceManager.ClearAllServices();
+    let dbService = ServiceManager.GetService(FaucetDatabase);
+    await ServiceManager.DisposeAllServices();
+    await dbService.closeDatabase();
+    await unbindTestStubs(globalStubs);
   });
 
   it("Start session with passing mainnet txcount & balance check", async () => {

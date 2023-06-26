@@ -27,9 +27,10 @@ describe("Faucet module: captcha", () => {
     await ServiceManager.GetService(FaucetDatabase).initialize();
   });
   afterEach(async () => {
-    await ServiceManager.GetService(FaucetDatabase).closeDatabase();
-    await unbindTestStubs();
-    ServiceManager.ClearAllServices();
+    let dbService = ServiceManager.GetService(FaucetDatabase);
+    await ServiceManager.DisposeAllServices();
+    await dbService.closeDatabase();
+    await unbindTestStubs(globalStubs);
   });
 
   it("Check client config exports", async () => {

@@ -14,6 +14,7 @@ import { FaucetHttpServer } from '../webserv/FaucetHttpServer';
 import { IncomingMessage } from 'http';
 import { EthClaimNotificationClient, IEthClaimNotificationData } from './EthClaimNotificationClient';
 import { FaucetOutflowModule } from '../modules/faucet-outflow/FaucetOutflowModule';
+import { clearInterval } from 'timers';
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -58,7 +59,7 @@ export interface EthClaimData {
 
 export class EthClaimManager {
   private initialized: boolean;
-
+  private queueInterval: NodeJS.Timer;
   private claimTxDict: {[session: string]: EthClaimInfo} = {};
   private claimTxQueue: EthClaimInfo[] = [];
   private pendingTxQueue: {[hash: string]: EthClaimInfo} = {};
@@ -112,7 +113,16 @@ export class EthClaimManager {
     ServiceManager.GetService(FaucetHttpServer).addWssEndpoint("claim", /^\/ws\/claim($|\?)/, (req, ws, ip) => this.processClaimNotificationWebSocket(req, ws, ip));
 
     // start queue processing interval
-    setInterval(() => this.processQueue(), 2000);
+    this.queueInterval = setInterval(() => this.processQueue(), 2000);
+  }
+
+  public dispose() {
+    if(!this.initialized)
+      return;
+    this.initialized = false;
+    
+    EthClaimNotificationClient.resetClaimNotification();
+    clearInterval(this.queueInterval);
   }
 
   private async processClaimNotificationWebSocket(req: IncomingMessage, ws: WebSocket, remoteIp: string) {
@@ -121,41 +131,25 @@ export class EthClaimManager {
       let urlParts = req.url.split("?");
       let url = new URLSearchParams(urlParts[1]);
       sessionId = url.get("session");
+    
+      let sessionInfo: FaucetSessionStoreData
+      if(!sessionId || !(sessionInfo = await ServiceManager.GetService(FaucetDatabase).getSession(sessionId)))
+        throw "session not found";
+
+      if(sessionInfo.status !== FaucetSessionStatus.CLAIMING)
+        throw "session not claiming";
+
+      new EthClaimNotificationClient(ws, sessionInfo.claim.claimIdx);
     } catch(ex) {
       ws.send(JSON.stringify({
         action: "error",
         data: {
-          reason: "session id missing"
+          reason: ex.toString()
         }
       }));
       ws.close();
       return;
     }
-
-    let sessionInfo: FaucetSessionStoreData
-    if(!sessionId || !(sessionInfo = await ServiceManager.GetService(FaucetDatabase).getSession(sessionId))) {
-      ws.send(JSON.stringify({
-        action: "error",
-        data: {
-          reason: "session not found"
-        }
-      }));
-      ws.close();
-      return;
-    }
-
-    if(sessionInfo.status !== FaucetSessionStatus.CLAIMING) {
-      ws.send(JSON.stringify({
-        action: "error",
-        data: {
-          reason: "session claiming"
-        }
-      }));
-      ws.close();
-      return;
-    }
-
-    new EthClaimNotificationClient(ws, sessionInfo.claim.claimIdx);
   }
 
   public getTransactionQueue(queueOnly?: boolean): EthClaimInfo[] {
@@ -193,8 +187,6 @@ export class EthClaimManager {
   public async createSessionClaim(sessionData: FaucetSessionStoreData, userInput: any): Promise<EthClaimInfo> {
     if(sessionData.status !== FaucetSessionStatus.CLAIMABLE)
       throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: not claimable (state: " + sessionData.status + ")");
-    if(this.claimTxDict[sessionData.sessionId])
-      throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: already claiming");
     if(BigInt(sessionData.dropAmount) < BigInt(faucetConfig.minDropAmount))
       throw new FaucetError("AMOUNT_TOO_LOW", "drop amount lower than minimum");
     if(BigInt(sessionData.dropAmount) > BigInt(faucetConfig.maxDropAmount))
@@ -218,7 +210,7 @@ export class EthClaimManager {
     
     // prevent multi claim via race condition
     if(this.claimTxDict[sessionData.sessionId])
-      throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: already claiming (race condition)");
+      throw new FaucetError("RACE_CLAIMING", "cannot claim session: already claiming (race condition)");
     
     claimInfo.claim = {
       claimIdx: this.lastClaimTxIdx++,
@@ -294,7 +286,6 @@ export class EthClaimManager {
       return;
     }
     if(
-      !walletState.ready || 
       walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(claimTx.amount) ||
       walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
     ) {
@@ -336,7 +327,7 @@ export class EthClaimManager {
       claimTx.claim.txBlock = txData.block;
       claimTx.claim.txFee = txData.fee.toString();
 
-      this.lastProcessedClaimTxIdx = claimTx.claim.claimIdx;
+      this.lastConfirmedClaimTxIdx = claimTx.claim.claimIdx;
 
       claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
       this.updateClaimStatus(claimTx);

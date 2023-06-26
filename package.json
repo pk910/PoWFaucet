@@ -25,6 +25,12 @@
     ],
     "outputPath": "dist"
   },
+  "nyc": {
+    "exclude": [
+      "libs/*.js",
+      "tests/**"
+    ]
+  },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.4",
     "@types/chai": "^4.3.5",

@@ -8,12 +8,25 @@ import { sleepPromise } from '../src/utils/SleepPromise';
 import { faucetConfig, loadFaucetConfig } from '../src/config/FaucetConfig';
 import { FakeProvider } from './stubs/FakeProvider';
 import { FaucetDbDriver } from '../src/db/FaucetDatabase';
+import { PromiseDfd } from '../src/utils/PromiseDfd';
 
 
 export function bindTestStubs(stubs?) {
   if(!stubs)
     stubs = {};
-  return {
+  let stubRefs = {
+    "global.setTimeout": global.setTimeout,
+    "global.clearTimeout": global.clearTimeout,
+    "global.setInterval": global.setInterval,
+    "global.clearInterval": global.clearInterval,
+  };
+  let stateDict = {
+    timeout: [] as NodeJS.Timeout[],
+    interval: [] as NodeJS.Timer[],
+  };
+
+  let allStubs = {
+    _state: stateDict,
     "FaucetWorkers.createWorker": sinon.stub(FaucetWorkers.prototype, "createWorker").callsFake((classKey) => {
       let channel = new MessageChannel();
       let worker: Worker = channel.port1 as any;
@@ -23,12 +36,51 @@ export function bindTestStubs(stubs?) {
       }, 1);
       return worker;
     }),
+    "global.setTimeout": sinon.stub(global, "setTimeout").callsFake((fn, ms) => {
+      let timer = stubRefs['global.setTimeout'](() => {
+        fn();
+        let timerIdx = stateDict.timeout.indexOf(timer);
+        if(timerIdx !== -1) stateDict.timeout.splice(timerIdx, 1);
+      }, ms);
+      stateDict.timeout.push(timer);
+      return timer;
+    }),
+    "global.clearTimeout": sinon.stub(global, "clearTimeout").callsFake((ti) => {
+      stubRefs['global.clearTimeout'](ti);
+      let timerIdx = stateDict.timeout.indexOf(ti);
+      if(timerIdx !== -1) stateDict.timeout.splice(timerIdx, 1);
+    }),
+    "global.setInterval": sinon.stub(global, "setInterval").callsFake((fn, ms) => {
+      let timer = stubRefs['global.setInterval'](() => {
+        fn();
+        let timerIdx = stateDict.interval.indexOf(timer);
+        if(timerIdx !== -1) stateDict.interval.splice(timerIdx, 1);
+      }, ms);
+      stateDict.interval.push(timer);
+      return timer;
+    }),
+    "global.clearInterval": sinon.stub(global, "clearInterval").callsFake((ti) => {
+      stubRefs['global.clearInterval'](ti);
+      let timerIdx = stateDict.interval.indexOf(ti);
+      if(timerIdx !== -1) stateDict.interval.splice(timerIdx, 1);
+    }),
     ...stubs,
-  }
+  };
+  return allStubs;
 }
 
-export async function unbindTestStubs() {
+export async function unbindTestStubs(stubs: any) {
+  let stubState: {
+    timeout: NodeJS.Timeout[];
+    interval: NodeJS.Timer[];
+  } = stubs._state;
   sinon.restore();
+  if(stubState.timeout.length > 0) {
+    stubState.timeout.forEach((timer) => clearTimeout(timer));
+  }
+  if(stubState.interval.length > 0) {
+    stubState.interval.forEach((timer) => clearInterval(timer));
+  }
 }
 
 export function loadDefaultTestConfig() {
@@ -52,6 +104,24 @@ export async function awaitSleepPromise(timeout: number, poll: () => boolean) {
       return;
     await sleepPromise(10);
   }
+}
+
+export function createFuse(): () => void {
+  let fuseFn: any;
+  fuseFn = () => {
+    fuseFn._dfd.resolve();
+  }
+  fuseFn._dfd = new PromiseDfd<void>();
+  return fuseFn;
+}
+
+export function fusedSleep(fuseFn: any, timeout?: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if(fuseFn?._dfd)
+      fuseFn._dfd.promise.then(resolve, reject);
+    if(timeout)
+      sleepPromise(timeout).then(resolve);
+  });
 }
 
 export function returnDelayedPromise(resolve: boolean, result: any, delay?: number): Promise<any> {

@@ -1,4 +1,7 @@
 import { WebSocket, RawData } from 'ws';
+import { IncomingMessage } from 'http';
+import { ServiceManager } from '../../src/common/ServiceManager';
+import { FaucetHttpServer } from '../../src/webserv/FaucetHttpServer';
 
 export let fakeWebSockets: FakeWebSocket[] = [];
 
@@ -6,6 +9,22 @@ export function disposeFakeWebSockets() {
   fakeWebSockets.forEach((fakeWs) => fakeWs.dispose());
 }
 
+export async function injectFakeWebSocket(url: string, ip: string): Promise<FakeWebSocket> {
+  let fakeWs = new FakeWebSocket();
+  let faucetHttpServer: any = ServiceManager.GetService(FaucetHttpServer);
+  let wsHandler: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => Promise<void> = null;
+  for(let endpoint in faucetHttpServer.wssEndpoints) {
+    if(faucetHttpServer.wssEndpoints[endpoint].pattern.test(url)) {
+      wsHandler = faucetHttpServer.wssEndpoints[endpoint].handler;
+    }
+  }
+  if(!wsHandler)
+    throw "no ws handler for url";
+  await wsHandler({
+    url: url,
+  } as any, fakeWs, ip)
+  return fakeWs;
+}
 
 export class FakeWebSocket extends WebSocket {
   private sentMessages: any[] = [];

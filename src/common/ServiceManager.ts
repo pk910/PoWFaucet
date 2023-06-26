@@ -76,11 +76,19 @@ export class ServiceManager {
     return serviceObj;
   }
 
-  public static ClearAllServices() {
+  public static DisposeAllServices(): Promise<void> {
+    let promises: Promise<void>[] = [];
     this._serviceInstances.forEach((instanceArr) => {
-      if(instanceArr.length > 0)
+      if(instanceArr.length > 0) {
+        instanceArr.forEach((instance) => {
+          if(typeof (instance[1] as any).dispose === "function") {
+            promises.push((instance[1] as any).dispose());
+          }
+        });
         instanceArr.splice(0, instanceArr.length);
+      }
     });
+    return Promise.all(promises).then();
   }
 
 }

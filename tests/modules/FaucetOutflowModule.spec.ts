@@ -33,9 +33,10 @@ describe("Faucet module: faucet-outflow", () => {
     await ServiceManager.GetService(EthWalletManager).initialize();
   });
   afterEach(async () => {
-    await ServiceManager.GetService(FaucetDatabase).closeDatabase();
-    await unbindTestStubs();
-    ServiceManager.ClearAllServices();
+    let dbService = ServiceManager.GetService(FaucetDatabase);
+    await ServiceManager.DisposeAllServices();
+    await dbService.closeDatabase();
+    await unbindTestStubs(globalStubs);
   });
 
   async function runTestSession(expectedStatus?: string): Promise<bigint> {
