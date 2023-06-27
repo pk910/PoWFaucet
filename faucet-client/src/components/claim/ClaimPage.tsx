@@ -129,32 +129,42 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       this.updateTimer = null;
     }
     let exactNow = (new Date()).getTime();
+
+    let timeLeft = (1000 - (exactNow % 1000)) + 2;
+    this.updateTimer = setTimeout(() => {
+      this.updateTimer = null;
+      this.setState({
+        refreshIndex: this.state.refreshIndex + 1,
+      });
+      this.setUpdateTimer();
+    }, timeLeft);
+  }
+
+	public render(): React.ReactElement<IClaimPageProps> {
+    let exactNow = (new Date()).getTime();
     let now = this.props.pageContext.faucetApi.getFaucetTime().getSyncedTime();
 
     let claimTimeout = (this.state.sessionStatus.start + this.props.faucetConfig.sessionTimeout) - now;
-    if(claimTimeout < 0 && this.state.sessionStatus.status === "claimable") {
-      if(!this.isTimedOut) {
-        this.isTimedOut = true;
-        this.setState({
-          isTimedOut: true
-        });
-        
-        this.props.pageContext.showDialog({
-          title: "Claim expired",
-          body: (
-            <div className='alert alert-danger'>
-              Sorry, your reward ({toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
-            </div>
-          ),
-          closeButton: {
-            caption: "Close"
-          },
-          closeFn: () => {
-            this.refreshSessionStatus();
-          }
-        });
-      }
-      return;
+    if(claimTimeout < 0 && this.state.sessionStatus.status === "claimable" && !this.isTimedOut) {
+      this.isTimedOut = true;
+      this.setState({
+        isTimedOut: true
+      });
+      
+      this.props.pageContext.showDialog({
+        title: "Claim expired",
+        body: (
+          <div className='alert alert-danger'>
+            Sorry, your reward ({toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
+          </div>
+        ),
+        closeButton: {
+          caption: "Close"
+        },
+        closeFn: () => {
+          this.refreshSessionStatus();
+        }
+      });
     }
 
     if(this.state.sessionStatus.status === "claiming") {
@@ -175,19 +185,6 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       }
     }
 
-    let timeLeft = (1000 - (exactNow % 1000)) + 2;
-    this.updateTimer = setTimeout(() => {
-      this.updateTimer = null;
-      if(this.state.sessionStatus.status === "claimable") {
-        this.setState({
-          refreshIndex: this.state.refreshIndex + 1,
-        });
-      }
-      this.setUpdateTimer();
-    }, timeLeft);
-  }
-
-	public render(): React.ReactElement<IClaimPageProps> {
     return (
       <div className='page-claim'>
         <div className='container'>

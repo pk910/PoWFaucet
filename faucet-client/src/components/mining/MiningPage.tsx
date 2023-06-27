@@ -333,10 +333,6 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
   private async processSessionError(error: any) {
     let showDialog: boolean = false;
     if(error.data?.code === "CLIENT_KILLED" || error.data?.code === "INVALID_SESSION") {
-      if(error.data.message.match(/reconnected from another client/))
-        showDialog = true;
-    }
-    else {
       showDialog = true;
     }
     if(showDialog) {

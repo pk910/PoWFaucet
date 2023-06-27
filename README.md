@@ -1,6 +1,7 @@
 # PoWFaucet
+<img src="https://faucets.pk910.de/images/logo-cat-small.png" height="90px" />
 
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/pk910/PoWFaucet?label=Github)](https://github.com/pk910/PoWFaucet/releases/latest)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/pk910/PoWFaucet?label=Latest%20Release)](https://github.com/pk910/PoWFaucet/releases/latest)
 [![codecov](https://codecov.io/gh/pk910/PoWFaucet/branch/master/graph/badge.svg)](https://codecov.io/gh/pk910/PoWFaucet)
 
 
