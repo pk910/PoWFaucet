@@ -144,44 +144,46 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     let exactNow = (new Date()).getTime();
     let now = this.props.pageContext.faucetApi.getFaucetTime().getSyncedTime();
 
-    let claimTimeout = (this.state.sessionStatus.start + this.props.faucetConfig.sessionTimeout) - now;
-    if(claimTimeout < 0 && this.state.sessionStatus.status === "claimable" && !this.isTimedOut) {
-      this.isTimedOut = true;
-      this.setState({
-        isTimedOut: true
-      });
-      
-      this.props.pageContext.showDialog({
-        title: "Claim expired",
-        body: (
-          <div className='alert alert-danger'>
-            Sorry, your reward ({toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
-          </div>
-        ),
-        closeButton: {
-          caption: "Close"
-        },
-        closeFn: () => {
+    if(this.state.sessionStatus) {
+      let claimTimeout = (this.state.sessionStatus.start + this.props.faucetConfig.sessionTimeout) - now;
+      if(claimTimeout < 0 && this.state.sessionStatus.status === "claimable" && !this.isTimedOut) {
+        this.isTimedOut = true;
+        this.setState({
+          isTimedOut: true
+        });
+        
+        this.props.pageContext.showDialog({
+          title: "Claim expired",
+          body: (
+            <div className='alert alert-danger'>
+              Sorry, your reward ({toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
+            </div>
+          ),
+          closeButton: {
+            caption: "Close"
+          },
+          closeFn: () => {
+            this.refreshSessionStatus();
+          }
+        });
+      }
+
+      if(this.state.sessionStatus.status === "claiming") {
+        if(!this.notificationClientActive) {
+          this.notificationClientActive = true;
+          this.notificationClient.start();
+        }
+
+        if(exactNow - this.lastStatusPoll > 30 * 1000 || this.state.sessionStatus.claimIdx <= (this.state.claimNotification?.confirmedIdx || 0)) {
+          this.lastStatusPoll = exactNow;
           this.refreshSessionStatus();
         }
-      });
-    }
-
-    if(this.state.sessionStatus.status === "claiming") {
-      if(!this.notificationClientActive) {
-        this.notificationClientActive = true;
-        this.notificationClient.start();
       }
-
-      if(exactNow - this.lastStatusPoll > 30 * 1000 || this.state.sessionStatus.claimIdx <= (this.state.claimNotification?.confirmedIdx || 0)) {
-        this.lastStatusPoll = exactNow;
-        this.refreshSessionStatus();
-      }
-    }
-    else {
-      if(this.notificationClientActive) {
-        this.notificationClientActive = false;
-        this.notificationClient.stop();
+      else {
+        if(this.notificationClientActive) {
+          this.notificationClientActive = false;
+          this.notificationClient.stop();
+        }
       }
     }
 
