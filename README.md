@@ -70,6 +70,8 @@ For a more detailed description, take a look into the [Project Wiki](https://git
 
 Read the [Faucet Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) to see the installation and configuration instructions.
 
+You can also find some demo instances with different module combinations here: [Demo Instances](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/README.md)
+
 # Bugs & Features
 
 Please feel free to report bugs and add new features via PRs if you like.
