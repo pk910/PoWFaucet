@@ -28,7 +28,7 @@ export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModule
   }
   
   public disableModule(): Promise<void> {
-    if(this.enabled)
+    if(!this.enabled)
       return Promise.reject("cannot disable module '" + this.moduleName + "': not enabled");
     this.enabled = false;
     return this.stopModule();

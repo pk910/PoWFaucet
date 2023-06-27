@@ -29,16 +29,21 @@ export class ModuleManager {
   private initialized: boolean;
   private loadedModules: {[module: string]: BaseModule} = {};
   private moduleHooks: {[action in ModuleHookAction]?: ModuleHookRegistration[]};
+  private loadingPromise: Promise<void>;
 
   public async initialize(): Promise<void> {
     if(this.initialized)
       throw "already initialized";
     this.initialized = true;
     this.moduleHooks = {};
-    await this.loadModules();
+    await (this.loadingPromise = this.loadModules());
     ServiceManager.GetService(FaucetProcess).addListener("reload", () => {
-      this.loadModules();
+      this.loadingPromise = this.loadModules();
     });
+  }
+
+  public getLoadingPromise(): Promise<void> {
+    return this.loadingPromise;
   }
 
   private async loadModules(): Promise<void> {
