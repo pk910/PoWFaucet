@@ -73,9 +73,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
 
     let githubInfo: IGithubInfo;
     try{
-      githubInfo = await this.githubResolver.getGithubInfo(userInput.githubToken, {
-        loadOwnRepo: true,
-      });
+      githubInfo = await this.githubResolver.getGithubInfo(userInput.githubToken, infoOpts);
     } catch(ex) {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Error while fetching github info: " + ex.toString());
     }
@@ -87,7 +85,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
       let passed: boolean = null;
       let errmsg: string = null;
 
-      if(!githubInfo) {
+      if(!githubInfo && check.required) {
         passed = false;
         errmsg = "missing or invalid github token";
       }
@@ -104,11 +102,11 @@ export class GithubModule extends BaseModule<IGithubConfig> {
           errmsg = "follower count check failed";
       }
       if((passed || passed === null) && check.minOwnRepoCount) {
-        if(!(passed = (githubInfo.info.followers >= check.minOwnRepoCount)))
+        if(!(passed = (githubInfo.info.ownRepoCount >= check.minOwnRepoCount)))
           errmsg = "own repository count check failed";
       }
       if((passed || passed === null) && check.minOwnRepoStars) {
-        if(!(passed = (githubInfo.info.followers >= check.minOwnRepoStars)))
+        if(!(passed = (githubInfo.info.ownRepoStars >= check.minOwnRepoStars)))
           errmsg = "own repository star count check failed";
       }
 
@@ -123,7 +121,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
           errMsg,
         );
       }
-      if(typeof check.rewardFactor === "number" && (rewardFactor === null || check.rewardFactor > rewardFactor)) {
+      if(passed !== false && typeof check.rewardFactor === "number" && (rewardFactor === null || check.rewardFactor > rewardFactor)) {
         rewardFactor = check.rewardFactor;
       }
     }

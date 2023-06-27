@@ -26,8 +26,6 @@ export interface IGithubRestrictionConfig {
   limitCount: number;
   limitAmount: number;
   duration: number;
-  byAddrOnly?: true;
-  byIPOnly?: true;
   message?: string;
 }
 

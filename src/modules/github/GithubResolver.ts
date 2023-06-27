@@ -148,9 +148,6 @@ export class GithubResolver {
     }
 
     let userInfo = await this.fetchProfileInfo(accessToken);
-    if(!userInfo.uid)
-      throw "github api error";
-
     let promises: Promise<void>[] = [];
     let githubInfo: IGithubInfo = {
       time: this.now(),
