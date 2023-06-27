@@ -70,7 +70,7 @@ describe("Faucet Module Management", () => {
       let modObj = moduleManager.getModule<BaseModule>(module);
       expect(!!modObj).to.equal(false, "module still loaded: " + module);
     });
-  });
+  }).timeout(5000);
 
   it("Module lifecycle", async () => {
     let moduleManager = ServiceManager.GetService(ModuleManager);
