@@ -80,14 +80,17 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   }
 
   public componentDidMount() {
-    if(!this.state.sessionStatus)
-      this.refreshSessionStatus();
+    this.refreshSessionStatus();
   }
 
   public componentWillUnmount() {
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);
       this.updateTimer = null;
+    }
+    if(this.notificationClientActive) {
+      this.notificationClientActive = false;
+      this.notificationClient.stop();
     }
   }
 

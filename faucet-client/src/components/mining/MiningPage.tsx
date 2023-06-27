@@ -136,7 +136,6 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
     this.setState({
       clientConnected: connected
     });
-    console.log("updateConnectionState", connected);
     if(connected && this.connectionAlertId !== null) {
       this.props.pageContext.hideStatusAlert(this.connectionAlertId);
       this.connectionAlertId = null;

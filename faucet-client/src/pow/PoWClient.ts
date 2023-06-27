@@ -86,7 +86,8 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
       return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.startClient();
+      if(this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
+        this.startClient();
     }, (5 * 1000) + (1000 * 5 * Math.random()));
   }
 

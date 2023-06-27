@@ -89,7 +89,8 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
       return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.startClient();
+      if(this.clientStatus === ClaimNotificationClientStatus.CLOSED_RECONNECT)
+        this.startClient();
     }, (5 * 1000) + (1000 * 5 * Math.random()));
   }
 
