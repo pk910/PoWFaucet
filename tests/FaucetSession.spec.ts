@@ -173,13 +173,14 @@ describe("Faucet Session Management", () => {
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(testSession.getBlockingTasks().length).to.equal(2, "unexpected blockingTasks");
     expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.RUNNING, "unexpected session status");
+    let error: FaucetError;
     try {
       testSession.setTargetAddr("0x0000000000000000000000000000000000001338");
-      expect(testSession.getTargetAddr()).to.equal("0x0000000000000000000000000000000000001337", "setTargetAddr must not change a already set address");
-    } catch(error) {
-      expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-      expect(error.getCode()).to.equal("INVALID_STATE", "unexpected error code");
+    } catch(ex) {
+      error = ex;
     }
+    expect(error && error instanceof FaucetError).to.equal(true, "unexpected error type");
+    expect(error.getCode()).to.equal("INVALID_STATE", "unexpected error code");
     await testSession.updateRemoteIP("::ffff:8.8.8.8");
     expect(changeAddrCalled).to.equal(0, "SessionIpChange for non-changed ip");
     await testSession.updateRemoteIP("8.8.4.4");

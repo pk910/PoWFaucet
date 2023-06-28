@@ -38,30 +38,9 @@ export class ServiceManager {
     ]);
   }
 
-  public static InitService<SvcT extends object, SvcP = any>(serviceClass: new(props: SvcP) => SvcT, serviceProps: SvcP = null, serviceIdent: object = undefined): SvcT {
+  public static GetService<SvcT extends object, SvcP = any>(serviceClass: new(props: SvcP) => SvcT, serviceIdent: object = null, serviceProps: SvcP = null): SvcT {
     if(!serviceClass)
       return null;
-    if(serviceIdent === undefined)
-      serviceIdent = null;
-
-    let serviceIdx = this.GetServiceIdx(serviceClass);
-    let serviceObj = this.GetServiceObj(serviceIdx, serviceIdent) as SvcT;
-    if(serviceObj)
-      throw "Service already initialized";
-    
-    serviceObj = new serviceClass(serviceProps);
-    if(!(serviceObj instanceof serviceClass))
-      throw "ServiceLoader found object that is not an instance of the requested service";
-
-    this.AddServiceObj(serviceIdx, serviceIdent, serviceObj);
-    return serviceObj;
-  }
-
-  public static GetService<SvcT extends object, SvcP = any>(serviceClass: new(props: SvcP) => SvcT, serviceProps: SvcP = null, serviceIdent: object = undefined): SvcT {
-    if(!serviceClass)
-      return null;
-    if(serviceIdent === undefined)
-      serviceIdent = serviceProps as any;
 
     let serviceIdx = this.GetServiceIdx(serviceClass);
     let serviceObj = this.GetServiceObj(serviceIdx, serviceIdent) as SvcT;
@@ -69,9 +48,6 @@ export class ServiceManager {
       serviceObj = new serviceClass(serviceProps);
       this.AddServiceObj(serviceIdx, serviceIdent, serviceObj);
     }
-
-    if(!(serviceObj instanceof serviceClass))
-      throw "ServiceLoader found object that is not an instance of the requested service";
 
     return serviceObj;
   }

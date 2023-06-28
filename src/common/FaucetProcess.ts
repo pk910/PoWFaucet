@@ -24,6 +24,42 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
   private initialized: boolean;
   public hideLogOutput: boolean;
 
+  private eventHandlers = {
+    "uncaughtException": (err, origin) => {
+      this.emitLog(FaucetLogLevel.ERROR, `### Caught unhandled exception: ${err}\r\n` + `  Exception origin: ${origin}\r\n` + `  Stack Trace: ${err.stack}\r\n`);
+      this.shutdown(1);
+    },
+    "unhandledRejection": (reason: any, promise) => {
+      let stack;
+      try {
+        throw new Error();
+      } catch(ex) {
+        stack = ex.stack;
+      }
+      this.emitLog(FaucetLogLevel.ERROR, `### Caught unhandled rejection: ${reason}\r\n` + `  Stack Trace: ${reason && reason.stack ? reason.stack : stack}\r\n`);
+    },
+    "SIGUSR1": () => {
+      this.emitLog(FaucetLogLevel.INFO, `# Received SIGURS1 signal - reloading faucet config`);
+      loadFaucetConfig();
+      this.emit("reload");
+    },
+    "SIGINT": () => {
+      // CTRL+C
+      this.emitLog(FaucetLogLevel.INFO, `# Received SIGINT signal - shutdown faucet`);
+      this.shutdown(0);
+    },
+    "SIGQUIT": () => {
+      // Keyboard quit
+      this.emitLog(FaucetLogLevel.INFO, `# Received SIGQUIT signal - shutdown faucet`);
+      this.shutdown(0);
+    },
+    "SIGTERM": () => {
+      // `kill` command
+      this.emitLog(FaucetLogLevel.INFO, `# Received SIGTERM signal - shutdown faucet`);
+      this.shutdown(0);
+    },
+  }
+
   public initialize() {
     if(this.initialized)
       return;
@@ -32,39 +68,17 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
     if(faucetConfig.faucetPidFile) {
       fs.writeFileSync(faucetConfig.faucetPidFile, process.pid.toString());
     }
+    Object.keys(this.eventHandlers).forEach((evtName) => {
+      process.on(evtName, this.eventHandlers[evtName]);
+    });
+  }
 
-    process.on('uncaughtException', (err, origin) => {
-      this.emitLog(FaucetLogLevel.ERROR, `### Caught unhandled exception: ${err}\r\n` + `  Exception origin: ${origin}\r\n` + `  Stack Trace: ${err.stack}\r\n`);
-      this.shutdown(1);
-    });
-    process.on('unhandledRejection', (reason: any, promise) => {
-      let stack;
-      try {
-        throw new Error();
-      } catch(ex) {
-        stack = ex.stack;
-      }
-      this.emitLog(FaucetLogLevel.ERROR, `### Caught unhandled rejection: ${reason}\r\n` + `  Stack Trace: ${reason && reason.stack ? reason.stack : stack}\r\n`);
-    });
-    process.on('SIGUSR1', () => {
-      this.emitLog(FaucetLogLevel.INFO, `# Received SIGURS1 signal - reloading faucet config`);
-      loadFaucetConfig();
-      this.emit("reload");
-    });
-    process.on('SIGINT', () => {
-      // CTRL+C
-      this.emitLog(FaucetLogLevel.INFO, `# Received SIGINT signal - shutdown faucet`);
-      this.shutdown(0);
-    });
-    process.on('SIGQUIT', () => {
-      // Keyboard quit
-      this.emitLog(FaucetLogLevel.INFO, `# Received SIGQUIT signal - shutdown faucet`);
-      this.shutdown(0);
-    });
-    process.on('SIGTERM', () => {
-      // `kill` command
-      this.emitLog(FaucetLogLevel.INFO, `# Received SIGTERM signal - shutdown faucet`);
-      this.shutdown(0);
+  public dispose() {
+    if(!this.initialized)
+      return;
+    this.initialized = false;
+    Object.keys(this.eventHandlers).forEach((evtName) => {
+      process.off(evtName, this.eventHandlers[evtName]);
     });
   }
 

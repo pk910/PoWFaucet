@@ -1,8 +1,10 @@
 import * as fs from 'fs'
 import * as crypto from "crypto";
-import { resolveRelativePath } from '../config/FaucetConfig';
+import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig';
 import { isVersionLower } from '../utils/VersionCompare';
 import { FaucetSession } from '../session/FaucetSession';
+import { ServiceManager } from '../common/ServiceManager';
+import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess';
 
 export enum FaucetStatusLevel {
   INFO    = "info",
@@ -28,20 +30,47 @@ export interface IFaucetStatusEntry extends IFaucetStatus {
   };
 }
 
+export interface IFaucetStatusConfig {
+  json?: string;
+  refresh?: number;
+}
+
 export class FaucetStatus {
+  private initialized: boolean;
+  private updateTimer: NodeJS.Timer;
   private localStatusJson: string;
   private localStatusEntries: IFaucetStatusEntry[] = [];
   private currentStatus: {[key: string]: IFaucetStatusEntry} = {};
 
-  public constructor() {
+  public initialize() {
+    if(this.initialized)
+      return;
+    this.initialized = true;
+
     this.updateLocalStatus();
-    setInterval(() => this.updateLocalStatus(), 10000);
+    this.resetUpdateTimer();
+
+    ServiceManager.GetService(FaucetProcess).addListener("reload", () => this.resetUpdateTimer());
+  }
+
+  public dispose() {
+    this.initialized = false;
+    if(this.updateTimer) {
+      clearInterval(this.updateTimer);
+      this.updateTimer = null;
+    }
+  }
+
+  private resetUpdateTimer() {
+    if(this.updateTimer)
+      clearInterval(this.updateTimer);
+    this.updateTimer = setInterval(() => this.updateLocalStatus(), (faucetConfig.faucetStatus?.refresh || 10) * 1000);
   }
 
   private updateLocalStatus() {
-    let faucetStatusFile = resolveRelativePath("faucet-status.json");
+    let faucetStatusFile = faucetConfig.faucetStatus?.json ? resolveRelativePath(faucetConfig.faucetStatus.json) : null;
     let faucetStatusStr = "";
-    if(!fs.existsSync(faucetStatusFile))
+    if(!faucetStatusFile || !fs.existsSync(faucetStatusFile))
       this.localStatusEntries = [];
     else {
       try {
@@ -57,7 +86,7 @@ export class FaucetStatus {
         else
           this.localStatusEntries = [];
       } catch(ex) {
-        console.error("cannot read local faucet status: ", ex);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "cannot read local faucet status: " + ex.toString());
         this.localStatusEntries = [];
       }
     }
@@ -66,18 +95,17 @@ export class FaucetStatus {
     }
   }
 
-  public setFaucetStatus(key: string, statusText: string, statusLevel: FaucetStatusLevel, prio?: number) {
+  public setFaucetStatus(key: string, statusText: string, statusLevel: FaucetStatusLevel, prio?: number): IFaucetStatusEntry {
     if(statusText) {
-      if(this.currentStatus[key] && this.currentStatus[key].text === statusText)
-        return;
-      this.currentStatus[key] = {key: key, text: statusText, level: statusLevel, prio: prio || 10};
+      if(!this.currentStatus[key] || this.currentStatus[key].text !== statusText) {
+        this.currentStatus[key] = {key: key, text: statusText, level: statusLevel, prio: prio || 10};
+      }
     }
-    else {
-      if(!this.currentStatus[key])
-        return;
+    else if(this.currentStatus[key]) {
       delete this.currentStatus[key];
     }
-    this.updateFaucetStatus();
+    setImmediate(() => this.updateFaucetStatus());
+    return this.currentStatus[key];
   }
 
   private updateFaucetStatus() {
@@ -85,7 +113,7 @@ export class FaucetStatus {
 
   }
 
-  public getFaucetStatus(clientVersion: string, session?: FaucetSession): {status: IFaucetStatus[], hash: string} {
+  public getFaucetStatus(clientVersion?: string, session?: FaucetSession): {status: IFaucetStatus[], hash: string} {
     let statusList: IFaucetStatus[] = [];
     let statusHash = crypto.createHash("sha256");
 

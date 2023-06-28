@@ -44,6 +44,15 @@ export class FaucetStatsLog {
     this.sheduleStatsLoop();
   }
 
+  public dispose() {
+    this.initialized = false;
+    this.enabled = false;
+    if(this.statsTimer) {
+      clearTimeout(this.statsTimer);
+      this.statsTimer = null;
+    }
+  }
+
   private sheduleStatsLoop() {
     let now = (new Date()).getTime();
     let loopInterval = faucetConfig.faucetLogStatsInterval * 1000;
@@ -70,7 +79,7 @@ export class FaucetStatsLog {
 
   public addSessionStats(session: FaucetSession) {
     let ipinfo = session.getSessionData("ipinfo.data");
-    let boostinfo = session.getSessionModuleRef("passport.score");
+    let boostinfo = session.getSessionData("passport.score");
     this.addStatsEntry("SESS", {
       st: session.getStartTime(),
       ip: session.getRemoteIP(),

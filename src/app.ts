@@ -11,6 +11,7 @@ import { FaucetLogLevel, FaucetProcess } from "./common/FaucetProcess";
 import { EthClaimManager } from "./eth/EthClaimManager";
 import { ModuleManager } from "./modules/ModuleManager";
 import { SessionManager } from "./session/SessionManager";
+import { FaucetStatus } from "./services/FaucetStatus";
 
 (async () => {
   if(!isMainThread) {
@@ -22,6 +23,7 @@ import { SessionManager } from "./session/SessionManager";
       loadFaucetConfig()
       ServiceManager.GetService(FaucetProcess).initialize();
       ServiceManager.GetService(FaucetWorkers).initialize(__filename);
+      ServiceManager.GetService(FaucetStatus).initialize();
       ServiceManager.GetService(FaucetStatsLog).initialize();
       await ServiceManager.GetService(FaucetDatabase).initialize();
       await ServiceManager.GetService(EthWalletManager).initialize();

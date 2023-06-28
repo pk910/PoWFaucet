@@ -4,6 +4,7 @@ import { FaucetCoinType } from '../eth/EthWalletManager';
 import { IFaucetStatsConfig } from '../services/FaucetStatsLog';
 import { IFaucetResultSharingConfig } from './ConfigShared';
 import { FaucetDatabaseOptions } from '../db/FaucetDatabase';
+import { IFaucetStatusConfig } from '../services/FaucetStatus';
 
 export interface IConfigSchema {
   version?: 2;
@@ -77,6 +78,7 @@ export interface IConfigSchema {
   };
 
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
+  faucetStatus: IFaucetStatusConfig | null; // faucet status config or null to disable status
   resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
 };
 
