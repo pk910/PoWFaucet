@@ -247,6 +247,7 @@ export class FaucetSession {
       return await this.setSessionFailed("AMOUNT_TOO_LOW", "drop amount lower than minimum");
     }
     
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Session " + this.sessionId + " is claimable");
     this.status = FaucetSessionStatus.CLAIMABLE;
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
@@ -357,7 +358,7 @@ export class FaucetSession {
 
   public async addReward(amount: bigint): Promise<bigint> {
     if(this.status === FaucetSessionStatus.CLAIMING || this.status === FaucetSessionStatus.FINISHED || this.status === FaucetSessionStatus.FAILED)
-      return;
+      return 0n;
     
     let rewardFactors: ISessionRewardFactor[] = [];
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewardFactor, [this, rewardFactors]);

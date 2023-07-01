@@ -198,15 +198,14 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     }
 
     powClient = new PoWClient(this, powSession, ws);
-    if(powSession.activeClient === powClient) {
-      this.powClients[session.getSessionId()] = powClient;
-      //ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "connected PoWClient: " + session.getSessionId());
-    }
+    this.powClients[session.getSessionId()] = powClient;
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "connected PoWClient: " + session.getSessionId());
+    
     this.resetSessionIdleTimer(powSession);
   }
 
   public disposePoWClient(client: PoWClient, reason: string) {
-    //ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "closed PoWClient: " + client.getFaucetSession().getSessionId() + " (" + reason + ")");
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "closed PoWClient: " + client.getFaucetSession().getSessionId() + " (" + reason + ")");
     this.resetSessionIdleTimer(client.getPoWSession());
 
     if(this.powClients[client.getFaucetSession().getSessionId()] === client) {
@@ -274,7 +273,10 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       let timeout = session.idleTime + this.moduleConfig.powIdleTimeout - now;
       if(timeout < 0)
         timeout = 0;
-      session.idleTimer = setTimeout(() => this.processPoWSessionClose(session.getFaucetSession()), timeout * 1000);
+      session.idleTimer = setTimeout(() => {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session idle timeout: " + session.getFaucetSession().getSessionId());
+        this.processPoWSessionClose(session.getFaucetSession());
+      }, timeout * 1000);
     }
   }
   
