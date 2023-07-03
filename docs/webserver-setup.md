@@ -4,7 +4,7 @@ For productive setups I'd suggest using a more complex webserver than the built 
 I preferred `apache2` for a long time, which works fine till there are more than ~4000 concurrent sessions (websocket connections) at the same time.
 Beyond that point I had to switch to `nginx`, which works just fine with a incredible high number of connections :)
 
-To setup the faucet with a proper webserver, you just need to point the document root to the /static folder of the faucet and forward websocket (Endpoint: `/pow`) and api (Endpoint: `/api`) calls to the faucet process.
+To setup the faucet with a proper webserver, you just need to point the document root to the /static folder of the faucet and forward websocket (Endpoint: `/ws/*`) and api (Endpoint: `/api/*`) calls to the faucet process.
 
 ## Apache2 webserver config
 
