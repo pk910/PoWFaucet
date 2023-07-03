@@ -194,24 +194,25 @@ export class PoWShareVerification {
       }
     });
 
-    let shareReward: bigint;
+    let shareReward: Promise<bigint>;
     if(this.isInvalid) {
       this.session.slashSession("invalid PoW result hash");
-      shareReward = 0n;
+      shareReward = Promise.resolve(0n);
     }
     else {
       // valid share - add rewards
-      shareReward = BigInt(powConfig.powShareReward);
-      this.session.getFaucetSession().addReward(shareReward).then((amount) => {
-        this.session.activeClient?.sendMessage("updateBalance", {
-          balance: this.session.getFaucetSession().getDropAmount().toString(),
-          reason: "valid share (reward: " + amount.toString() + ")"
-        });
-      });
+      shareReward = this.session.getFaucetSession().addReward(BigInt(powConfig.powShareReward));
     }
-    this.resultDfd.resolve({
-      isValid: !this.isInvalid,
-      reward: shareReward
+
+    shareReward.then((amount) => {
+      this.session.activeClient?.sendMessage("updateBalance", {
+        balance: this.session.getFaucetSession().getDropAmount().toString(),
+        reason: "valid share (reward: " + amount.toString() + ")"
+      });
+      this.resultDfd.resolve({
+        isValid: !this.isInvalid,
+        reward: amount
+      });
     });
   }
 

@@ -231,10 +231,10 @@ export class PoWClient {
     let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.getFaucetSession().getSessionId(), verifyRes.isValid);
     let verifyReward = BigInt(this.module.getModuleConfig().powShareReward) * BigInt(this.module.getModuleConfig().verifyMinerRewardPerc * 100) / 10000n;
     if(verifyValid && verifyReward > 0n) {
-      await this.getFaucetSession().addReward(verifyReward);
+      let addedReward = await this.getFaucetSession().addReward(verifyReward);
 
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
-      faucetStats.statVerifyReward += verifyReward;
+      faucetStats.statVerifyReward += addedReward;
 
       this.sendMessage("updateBalance", {
         balance: this.getFaucetSession().getDropAmount().toString(),
