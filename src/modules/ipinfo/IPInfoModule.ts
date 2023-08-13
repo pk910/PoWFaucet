@@ -87,6 +87,15 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
       sessionRestriction = this.getSessionRestriction(session);
       session.setSessionModuleRef("ipinfo.restriction.time", Math.floor((new Date()).getTime() / 1000));
       session.setSessionModuleRef("ipinfo.restriction.data", sessionRestriction);
+      if(sessionRestriction.blocked) {
+        let blockReason = "IP Blocked: " + sessionRestriction.messages.map((msg) => msg.text).join(", ");
+        if(sessionRestriction.blocked == "kill") {
+          await session.setSessionFailed("RESTRICTION", blockReason);
+        } else {
+          await session.completeSession();
+        }
+        return;
+      }
     }
     else
       sessionRestriction = session.getSessionModuleRef("ipinfo.restriction.data");
@@ -175,7 +184,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     return restriction;
   }
 
-  public getSessionRestriction(session: FaucetSession): IIPInfoRestriction {
+  private getSessionRestriction(session: FaucetSession): IIPInfoRestriction {
     let restriction: IIPInfoRestriction = {
       reward: 100,
       messages: [],

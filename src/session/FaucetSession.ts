@@ -347,8 +347,8 @@ export class FaucetSession {
   public setDropAmount(amount: bigint) {
     if(this.dropAmount !== -1n)
       return;
-    if(this.status === FaucetSessionStatus.CLAIMING || this.status === FaucetSessionStatus.FINISHED || this.status === FaucetSessionStatus.FAILED)
-      return;
+    if(this.getSessionStatus() === FaucetSessionStatus.CLAIMING || this.getSessionStatus() === FaucetSessionStatus.FINISHED || this.getSessionStatus() === FaucetSessionStatus.FAILED)
+      return 0n;
     this.dropAmount = 0n;
     if(amount > 0n)
       this.addReward(amount);
@@ -357,7 +357,7 @@ export class FaucetSession {
   }
 
   public async addReward(amount: bigint): Promise<bigint> {
-    if(this.status === FaucetSessionStatus.CLAIMING || this.status === FaucetSessionStatus.FINISHED || this.status === FaucetSessionStatus.FAILED)
+    if(this.getSessionStatus() === FaucetSessionStatus.CLAIMING || this.getSessionStatus() === FaucetSessionStatus.FINISHED || this.getSessionStatus() === FaucetSessionStatus.FAILED)
       return 0n;
     
     let rewardFactors: ISessionRewardFactor[] = [];
@@ -373,6 +373,9 @@ export class FaucetSession {
 
     let rewardAmount = amount * BigInt(Math.floor(rewardFactor * 100000)) / 100000n;
     ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewarded, [this, rewardAmount, rewardFactors]);
+
+    if(this.getSessionStatus() === FaucetSessionStatus.CLAIMING || this.getSessionStatus() === FaucetSessionStatus.FINISHED || this.getSessionStatus() === FaucetSessionStatus.FAILED)
+      return 0n;
 
     if(this.dropAmount === -1n)
       this.dropAmount = 0n;

@@ -11,3 +11,4 @@ faucet-store.*
 faucet-stats.log
 faucet-events.log
 faucet-pid.txt
+tmp*
