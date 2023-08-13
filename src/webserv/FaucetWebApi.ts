@@ -11,6 +11,7 @@ import { IFaucetResultSharingConfig } from "../config/ConfigShared";
 import { FaucetError } from "../common/FaucetError";
 import { EthClaimInfo, EthClaimManager } from "../eth/EthClaimManager";
 import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus";
+import { sha256 } from "../utils/CryptoUtils";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -90,7 +91,7 @@ export class FaucetWebApi {
       case "getQueueStatus".toLowerCase():
         return this.onGetQueueStatus();
       case "getFaucetStatus".toLowerCase():
-        return this.onGetFaucetStatus();
+        return this.onGetFaucetStatus(apiUrl.query['key'] as string);
       default:
         let handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>;
         if((handler = this.apiEndpoints[apiUrl.path[0].toLowerCase()]))
@@ -340,7 +341,17 @@ export class FaucetWebApi {
     return cachedRsp.data;
   }
 
-  public async onGetFaucetStatus(): Promise<any> {
+  public async onGetFaucetStatus(key: string): Promise<any> {
+    if(key) {
+      if(key !== sha256(faucetConfig.faucetSecret + "-unmasked"))
+        return new FaucetHttpResponse(403, "Access denied");
+      return Object.assign(
+        await buildFaucetStatus(),
+        buildQueueStatus(true),
+        await buildSessionStatus(true)
+      );
+    }
+
     let now = Math.floor(new Date().getTime() / 1000);
     let cachedRsp, cacheKey = "faucet";
     if(!(cachedRsp = this.cachedStatusData[cacheKey]) || cachedRsp.time < now - FAUCETSTATUS_CACHE_TIME) {

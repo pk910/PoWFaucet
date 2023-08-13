@@ -101,7 +101,7 @@ export async function buildFaucetStatus(): Promise<IClientFaucetStatus> {
   return statusRsp;
 }
 
-export async function buildSessionStatus(): Promise<IClientSessionsStatus> {
+export async function buildSessionStatus(unmasked?: boolean): Promise<IClientSessionsStatus> {
   let sessionsRsp: IClientSessionsStatus = {
     sessions: null,
   };
@@ -111,10 +111,10 @@ export async function buildSessionStatus(): Promise<IClientSessionsStatus> {
   sessionsRsp.sessions = sessions.map((session) => {
     let runningSession = sessionManager.getSession(session.sessionId);
     return {
-      id: getHashedSessionId(session.sessionId, faucetConfig.faucetSecret),
+      id: unmasked ? session.sessionId : getHashedSessionId(session.sessionId, faucetConfig.faucetSecret),
       start: session.startTime,
       target: session.targetAddr,
-      ip: getHashedIp(session.remoteIP, faucetConfig.faucetSecret),
+      ip: unmasked ? session.remoteIP : getHashedIp(session.remoteIP, faucetConfig.faucetSecret),
       ipInfo: session.data["ipinfo.data"],
       balance: session.dropAmount,
       nonce: session.data["pow.lastNonce"],
@@ -131,12 +131,12 @@ export async function buildSessionStatus(): Promise<IClientSessionsStatus> {
   return sessionsRsp;
 }
 
-export function buildQueueStatus(): IClientQueueStatus {
+export function buildQueueStatus(unmasked?: boolean): IClientQueueStatus {
   let claims = ServiceManager.GetService(EthClaimManager).getTransactionQueue();
   let rspClaims = claims.map((claimTx) => {
     return {
       time: claimTx.claim.claimTime,
-      session: getHashedSessionId(claimTx.session, faucetConfig.faucetSecret),
+      session: unmasked ? claimTx.session : getHashedSessionId(claimTx.session, faucetConfig.faucetSecret),
       target: claimTx.target,
       amount: claimTx.amount.toString(),
       status: claimTx.claim.claimStatus,
