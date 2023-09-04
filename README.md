@@ -65,7 +65,7 @@ For a more detailed description, take a look into the [Project Wiki](https://git
       </td>
     </tr>
     <tr>
-      <td><a href="https://github.com/eth-clients/goerli">Goerli Testnet</a> (deprecated)</td>
+      <td><a href="https://github.com/eth-clients/goerli">Goerli Testnet</a><br>(deprecated)</td>
       <td><a href="https://goerli-faucet.pk910.de">https://goerli-faucet.pk910.de</a></td>
       <td>
         <a href="#"><img alt="Faucet Version" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ffaucets.pk910.de%2Fbadges%2Fversion.php%3Ffaucet%3Dgoerli-faucet" /></a>
