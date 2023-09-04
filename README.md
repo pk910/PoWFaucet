@@ -7,13 +7,6 @@
 
 Modularized faucet for EVM chains with different protection methods (Captcha, Mining, IP, Mainnet Balance, Gitcoin Passport and more)
 
-<b>Warning: The master branch of this repository is now pointing to the new modularized v2 version of the faucet.</b>
-
-The v2 version is not compatible with the pow-only v1 configuration or database schema! When upgrading a v1 instance, you need to delete the old database file and recreate the configuration.
-Read through the [Faucet Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) to see the installation and configuration instructions.
-
-The latest version of the v1 faucet can be fetched via the v1 branch. I'll keep it updated in case any issues come up on v1, but don't expect any new features :)
-
 # Why
 
 Faucets for ETH Testnets are spammed by bots. This faucet tries to reduce the efficiency of these automated requests by various protection methods.
