@@ -81,6 +81,7 @@ describe("Faucet module: passport", () => {
     globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
@@ -138,6 +139,7 @@ describe("Faucet module: passport", () => {
     globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
       session.addBlockingTask("test", "test", 1);
@@ -168,6 +170,7 @@ describe("Faucet module: passport", () => {
     globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
       session.addBlockingTask("test", "test", 1);
@@ -269,6 +272,7 @@ describe("Faucet module: passport", () => {
     globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
@@ -306,6 +310,7 @@ describe("Faucet module: passport", () => {
     globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     let sessionManager = ServiceManager.GetService(SessionManager);
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
@@ -343,6 +348,7 @@ describe("Faucet module: passport", () => {
     globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     await ServiceManager.GetService(ModuleManager).initialize();
     let sessionManager = ServiceManager.GetService(SessionManager);
     let [testSession] = await Promise.all([
@@ -391,6 +397,7 @@ describe("Faucet module: passport", () => {
     globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
     }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
     let passportRefreshRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
       method: "GET",
       url: "/api/refreshPassport?session=" + testSession.getSessionId(),

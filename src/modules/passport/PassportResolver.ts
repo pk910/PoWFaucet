@@ -368,7 +368,7 @@ export class PassportResolver {
       return passportInfo._score;
     
     // calculate score
-    let now = Math.floor((new Date()).getTime() / 1000);
+    let now = this.getVerifyTime();
     let totalScore = 0;
     if(passportInfo.found && passportInfo.stamps) {
       passportInfo.stamps.forEach((stamp) => {
