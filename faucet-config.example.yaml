@@ -21,25 +21,24 @@ serverPort: 8080
 httpProxyCount: 0
 
 # title of the faucet
-faucetTitle: "Goerli PoW Faucet"
+faucetTitle: "Boba Faucet"
 
 # url to image displayed on the startpage
-faucetImage: "/images/fauceth_420.jpg"
+faucetImage: "/images/faucet-boba.png"
 
 # some additional html to show on the startpage
 faucetHomeHtml: |
   <div class='pow-info'>
-    <h5>What is a PoW Faucet?</h5>
-    This is an Ethereum Faucet running on the Goerli Testnet.<br>
+    <h5>What is this Faucet?</h5>
+    This is the official Boba Faucet running on the Boba testnets and mainnets.<br>
     To prevent malicious actors from exhausting all available funds or 
     accumulating enough Ether to mount long running spam attacks, 
-    this faucet requires some mining work to be done in exchange for 
-    free testnet funds.
+    this faucet requires some verifications in exchange for 
+    free testnet or mainnet funds.
   </div>
   <div class='pow-info'>
     <h5>How does this work?</h5>
-    Just enter your ETH Address and start mining. 
-    When you've collected enough ETH, stop mining and claim your rewards.
+    Just enter your ETH Address and request funds. 
   </div>
   <div class='pow-info'>
     <h5>How to help the faucet?</h5>
@@ -49,14 +48,14 @@ faucetHomeHtml: |
 
 # random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 # use a random string and do not share / reuse it anywhere. Everyone knowing this secret is theoretically able to claim rewards from the faucet without mining.
-faucetSecret: "RandomStringThatShouldBeVerySecret!"
+faucetSecret: "...your-secret"
 
 # ETH execution layer RPC host
 #ethRpcHost: "http://127.0.0.1:8545/"
-ethRpcHost: "https://ethereum-goerli.publicnode.com"
+ethRpcHost: "https://goerli.boba.network"
 
 # faucet wallet private key (hex, without 0x prefix)
-ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
+ethWalletKey: "....."
 
 # EVM chain id (null for auto-detect from RPC)
 ethChainId: null
@@ -74,11 +73,11 @@ faucetCoinType: "native"
 
 # transaction gas limit
 # use 21000 to prevent transactions to contracts
-ethTxGasLimit: 21000
+ethTxGasLimit: 300000
 
 # use legacy (non-eip1559) transaction type
 # true: Type 0 (Legacy Transactions), false: Type 2 (EIP1559 Transactions)
-ethLegacyTx: false
+ethLegacyTx: true
 
 # max transaction gas fee (in wei)
 # used as limit for legacy transactions (faucet won't build transactions with higher gas price)
@@ -94,12 +93,12 @@ ethMaxPending: 12
 ethQueueNoFunds: true
 
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
-ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
+ethTxExplorerLink: "https://testnet.bobascan.com/tx/{txid}"
 
 
 # min/max drop amount (max is the default if no module lowers it)
-maxDropAmount: 1000000000000000000 # 1 ETH
-minDropAmount: 10000000000000000 # 0.01 ETH
+maxDropAmount: 10000000000000000 # 0.01 ETH
+minDropAmount: 1000000000000000 # 0.001 ETH
 
 # maximum session time (from start till payout)
 # only relevant if one of the enabled protection mechanisms introduces a session delay (eg. mining)
@@ -128,26 +127,26 @@ modules:
     provider: "hcaptcha"
 
     # captcha site key
-    siteKey: "00000000-0000-0000-0000-000000000000"
+    siteKey: "00000-0000"
 
     # captcha secret key
-    secret: "0xCensoredHCaptchaSecretKey"
+    secret: "0x....."
 
     # require captcha to start a new session (default: false)
     checkSessionStart: false
 
     # require captcha to start claim payout (default: false)
-    checkBalanceClaim: false
-  
+    checkBalanceClaim: true
+
   ## ENS Name
   ensname:
-    enabled: true
+    enabled: false
 
     # RPC Host for ENS name resolver (mainnet)
     rpcHost: "https://rpc.flashbots.net/"
     # Custom ENS Resolver contract address
     #ensAddr: "0x"
-    
+
     # require ENS name
     required: false
 
@@ -188,7 +187,7 @@ modules:
     enabled: true
 
     # check balance and deny session if balance exceeds the limit (in wei)
-    maxBalance: 50000000000000000000 # 50 ETH
+    maxBalance: 1000000000000000 # 0.001 ETH
 
     # deny sessions for contract addresses
     denyContract: true
@@ -197,19 +196,19 @@ modules:
   ## Faucet Balance module
   faucet-balance:
     # enable / disable faucet balance protection
-    enabled: true
+    enabled: false
 
     # reward restriction based on faucet wallet balance. lowest value applies
     fixedRestriction:
-      1000000000000000000000: 90 # 90% if lower than 1000 ETH
-      100000000000000000000: 10  # 10% if lower than 100 ETH
+      10000000000000000000: 90 # 90% if lower than 10 ETH
+      1000000000000000000: 10  # 10% if lower than 1 ETH
 
     # dynamic reward restriction based on faucet balance
     # alternative to fixedRestriction, if both are set, the lower factor gets applied
     # limits the rewards linearly according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
     dynamicRestriction:
       targetBalance: 1100000000000000000000 # no restriction with faucet balance > 1100 ETH
-  
+
   ## Faucet Outflow module
   faucet-outflow:
     # enable / disable faucet outflow protection
@@ -225,7 +224,7 @@ modules:
     # Whenever the balance gets positive, there is less mining activity than allowed. The positive balance is a 'buffer' for activity spikes, anything above upperLimit gets burned.
 
     # limit outflow to 1000ETH per day
-    amount: 1000000000000000000000 # 1000 ETH
+    amount: 10000000000000000000 # 10 ETH
     duration: 86400 # 1 day
     # outflow balance limits
     lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
@@ -278,7 +277,7 @@ modules:
 
     # require minimum number of transactions from mainnet wallet (nonce count)
     minTxCount: 5
-  
+
   ## Recurring Limits module
   recurring-limits:
     # enable / disable recurring limits protection
@@ -286,18 +285,18 @@ modules:
 
     limits: # array of individual limits, which all need to be passed
       - limitCount: 10
-        limitAmount: 10000000000000000000 # 10 ETH
-        duration: 86400 # 1 day 
+        limitAmount: 1000000000000000000 # 1 ETH
+        duration: 86400 # 1 day
       - limitCount: 20
-        limitAmount: 20000000000000000000 # 20 ETH
+        limitAmount: 2000000000000000000 # 2 ETH
         duration: 172800 # 2 days
         byAddrOnly: true
-        
+
   ## Concurrency Limit module
   concurrency-limit:
     # enable / disable concurrency limit
     enabled: true
-    
+
     concurrencyLimit: 1 # only allow 1 concurrent session (sessions in 'running' state at the same time for the same ip / target addr)
     byAddrOnly: false # only check concurrency by target address
     byIPOnly: false # only check concurrency by IP address
@@ -307,7 +306,7 @@ modules:
   ## Proof of Work (mining) protection
   pow:
     # enable / disable PoW protection
-    enabled: true
+    enabled: false
 
     # reward amount per eligible hash (in wei)
     #powShareReward: 12500000000000000  # 0.0125
@@ -348,7 +347,7 @@ modules:
     trustedIssuers:
       - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
     passportCachePath: "passport-cache"
-    
+
     refreshCooldown: 300 # allow refreshing every 5mins
     cacheTime: 86400 # cache passports for 1 day (does not affect manual refreshing)
 
@@ -429,13 +428,13 @@ modules:
 ### Fund Management
 
 # minimum balance to keep in the faucet wallet (in wei)
-spareFundsAmount: 100000000000000000  # 0.1 ETH
+spareFundsAmount: 100000000000000  # 0.0001 ETH
 
 # minimum balance to show the empty faucet error message
-noFundsBalance:   1000000000000000000  # 1 ETH
+noFundsBalance:   1000000000000000  # 0.001 ETH
 
 # minimum balance to show the low funds warning
-lowFundsBalance: 10000000000000000000  # 10 ETH
+lowFundsBalance: 500000000000000000  # 0.5 ETH
 
 # low faucet balance warning message / false to disable the warning
 lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
@@ -446,11 +445,11 @@ noFundsError: "Sorry, the faucet is out of funds :("
 # RPC unreachable error message / true to show the generic message / false to disable the error
 rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 
-# prevent creation of new sessions (used for maintenance)
-#denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
+  # prevent creation of new sessions (used for maintenance)
+  #denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
 
 
-  
+
 
 
 ### Automatic wallet refill
@@ -460,16 +459,16 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 # the faucet tries to refill its wallet balance from the vault contract when it gets empty
 # see contract code in docs folder
 ethRefillContract:
-  #contract: "0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb"
-  #abi: '[{"inputs":[{"internalType":"address","name":"addr","type":"address"}],"name":"getAllowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
-  #allowanceFn: "getAllowance"
-  #withdrawFn: "withdraw"
-  #withdrawGasLimit: 300000
-  #checkContractBalance: true
-  #contractDustBalance: 1000000000000000000  # 1 ETH
-  #triggerBalance: 1100000000000000000000  # 1100 ETH
-  #cooldownTime: 5430 # 1.5h + 30sec
-  #requestAmount: 125000000000000000000 # 125 ETH
+#contract: "0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb"
+#abi: '[{"inputs":[{"internalType":"address","name":"addr","type":"address"}],"name":"getAllowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+#allowanceFn: "getAllowance"
+#withdrawFn: "withdraw"
+#withdrawGasLimit: 300000
+#checkContractBalance: true
+#contractDustBalance: 1000000000000000000  # 1 ETH
+#triggerBalance: 1100000000000000000000  # 1100 ETH
+#cooldownTime: 5430 # 1.5h + 30sec
+#requestAmount: 125000000000000000000 # 125 ETH
 
 
 ### Other Settings
@@ -488,7 +487,7 @@ buildSeoIndex: true
 
 # some additional meta tags to add to the SEO optimized page
 buildSeoMeta:
-  keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow"
+  keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,boba"
 
 resultSharing:
   preHtml: |
@@ -502,5 +501,5 @@ resultSharing:
   caption: "Or support this faucet by sharing your result with a "
 
   # result sharing buttons
-  twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s) #goerli #faucet"
-  mastodon: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s)"
+  twitter: "Boom! Just got {amount} ETH/BOBA from {url} #boba #faucet"
+  mastodon: "Boom! Just got {amount} ETH/BOBA from {url}"
