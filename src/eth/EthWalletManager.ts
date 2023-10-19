@@ -86,7 +86,10 @@ export class EthWalletManager {
     if(typeof faucetConfig.ethChainId === "number")
       this.initChainCommon(faucetConfig.ethChainId);
     
-    this.walletKey = Buffer.from(faucetConfig.ethWalletKey, "hex");
+    let privkey = faucetConfig.ethWalletKey;
+    if(privkey.match(/^0x/))
+      privkey = privkey.substring(2);
+    this.walletKey = Buffer.from(privkey, "hex");
     this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
 
     await this.loadWalletState();
