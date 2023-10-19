@@ -17,6 +17,9 @@ faucetPidFile: "faucet-pid.txt"
 # faucet http/ws server port
 serverPort: 8080
 
+# number of http proxies in front of this faucet
+httpProxyCount: 0
+
 # title of the faucet
 faucetTitle: "Goerli PoW Faucet"
 

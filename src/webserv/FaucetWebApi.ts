@@ -125,11 +125,14 @@ export class FaucetWebApi {
     return urlRes;
   }
 
-  private getRemoteAddr(req: IncomingMessage): string {
+  public getRemoteAddr(req: IncomingMessage): string {
     let remoteAddr: string = null;
-    if(req.headers['x-forwarded-for']) {
+    if(faucetConfig.httpProxyCount > 0 && req.headers['x-forwarded-for']) {
       let proxyChain = (req.headers['x-forwarded-for'] as string).split(", ");
-      remoteAddr = proxyChain.pop();
+      let clientIpIdx = proxyChain.length - faucetConfig.httpProxyCount;
+      if(clientIpIdx < 0)
+        clientIpIdx = 0;
+      remoteAddr = proxyChain[clientIpIdx];
     }
     if(!remoteAddr)
       remoteAddr = req.socket.remoteAddress;

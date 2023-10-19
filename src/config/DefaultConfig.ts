@@ -28,6 +28,7 @@ export function getDefaultConfig(): IConfigSchema {
     faucetLogFile: null,
     faucetLogStatsInterval: 600,
     serverPort: 8080,
+    httpProxyCount: 0,
     faucetSecret: null, // mandatory
 
     ethRpcHost: null, // mandatory

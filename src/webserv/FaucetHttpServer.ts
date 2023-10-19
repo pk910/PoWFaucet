@@ -157,13 +157,7 @@ export class FaucetHttpServer {
     }
     
     this.wssServer.handleUpgrade(req, socket, head, (ws) => {
-      let remoteAddr: string = null;
-      if(req.headers['x-forwarded-for']) {
-        let proxyChain = (req.headers['x-forwarded-for'] as string).split(", ");
-        remoteAddr = proxyChain.pop();
-      }
-      if(!remoteAddr)
-        remoteAddr = req.socket.remoteAddress;
+      let remoteAddr = ServiceManager.GetService(FaucetWebApi).getRemoteAddr(req);
       wssEndpoint.handler(req, ws, remoteAddr);
     });
   }

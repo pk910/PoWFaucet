@@ -27,6 +27,7 @@ export interface IConfigSchema {
   faucetLogFile: string; // logfile for faucet events / null for no log
   faucetLogStatsInterval: number; // print faucet stats to log interval (10min default)
   serverPort: number; // listener port
+  httpProxyCount: number; // number of http proxies in front of this faucet
   faucetSecret: string; // random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 
   ethRpcHost: string; // ETH execution layer RPC host
