@@ -4,7 +4,7 @@ WORKDIR /build
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN npm run build
+RUN npm run bundle
 RUN cd faucet-client && node ./build-client.js
 
 # final stage
@@ -15,6 +15,7 @@ RUN update-ca-certificates
 COPY --from=build-env /build/dist ./dist
 COPY --from=build-env /build/static ./static
 COPY --from=build-env /build/faucet-config.example.yaml .
+RUN cp ./static/index.html ./static/index.seo.html && chmod 777 ./static/index.seo.html
 
 EXPOSE 8080
-ENTRYPOINT [ "node", "--no-deprecation", "dist/app.js" ]
+ENTRYPOINT [ "node", "--no-deprecation", "dist/powfaucet.js" ]
