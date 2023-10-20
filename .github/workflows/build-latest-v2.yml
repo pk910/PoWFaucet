@@ -214,9 +214,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18.15.0
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
@@ -226,8 +223,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: npm install
-      - run: npm run bundle
       - name: Build v2-latest docker image
         run: docker build . --file Dockerfile --tag pk910/powfaucet:v2-latest
       - name: Push v2-latest docker image
