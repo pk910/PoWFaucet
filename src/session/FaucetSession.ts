@@ -300,8 +300,8 @@ export class FaucetSession {
     this.targetAddr = addr;
   }
 
-  public getSessionData(key: string): any {
-    return this.sessionDataDict[key];
+  public getSessionData<T = any>(key: string, defval?: T): T {
+    return key in this.sessionDataDict ? this.sessionDataDict[key] : defval;
   }
 
   public setSessionData(key: string, value: any) {

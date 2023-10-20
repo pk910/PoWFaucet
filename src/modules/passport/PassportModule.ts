@@ -69,6 +69,8 @@ export class PassportModule extends BaseModule<IPassportConfig> {
   }
 
   private async processSessionStart(session: FaucetSession): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     let targetAddr = session.getTargetAddr();
     let passportInfo = await this.passportResolver.getPassport(targetAddr);
     session.setSessionData("passport.refresh", Math.floor(new Date().getTime() / 1000));

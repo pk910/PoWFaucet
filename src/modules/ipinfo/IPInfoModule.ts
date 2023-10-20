@@ -58,6 +58,8 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   }
 
   private async processSessionStart(session: FaucetSession): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     let remoteIp = session.getRemoteIP();
     let ipInfo: IIPInfo;
     try {

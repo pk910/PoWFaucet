@@ -29,6 +29,8 @@ export class ConcurrencyLimitModule extends BaseModule<IConcurrencyLimitConfig> 
   }
 
   private async processSessionStart(session: FaucetSession): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     this.checkLimit(session);
   }
 

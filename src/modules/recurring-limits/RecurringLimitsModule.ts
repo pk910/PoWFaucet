@@ -21,6 +21,8 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
   }
 
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     await Promise.all(this.moduleConfig.limits.map((limit) => this.checkLimit(session, limit)));
   }
 

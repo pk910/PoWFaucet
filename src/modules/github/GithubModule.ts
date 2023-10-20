@@ -63,6 +63,8 @@ export class GithubModule extends BaseModule<IGithubConfig> {
   }
 
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     let infoOpts: IGithubInfoOpts = {
       loadOwnRepo: false,
     };

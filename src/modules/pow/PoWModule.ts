@@ -117,6 +117,9 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   }
 
   private async processSessionStart(session: FaucetSession): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
+
     session.addBlockingTask(this.moduleName, "mining", this.moduleConfig.powSessionTimeout); // this prevents the session from progressing to claimable before this module allows it
     session.setDropAmount(0n);
 

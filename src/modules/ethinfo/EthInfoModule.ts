@@ -20,6 +20,9 @@ export class EthInfoModule extends BaseModule<IEthInfoConfig> {
   }
 
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
+    
     let targetAddr = session.getTargetAddr();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
 
