@@ -6,7 +6,8 @@
   "bin": "dist/powfaucet.js",
   "scripts": {
     "build": "tsc",
-    "start": "tsc && node dist/app.js",
+    "start": "yarn run build:client && tsc && node dist/app.js",
+    "build:client": "cd faucet-client && node ./build-client.js && cd ..",
     "bundle": "webpack --mode production",
     "test": "mocha --exit -r ts-node/register --trace-warnings 'tests/**/*.ts'",
     "test-coverage": "nyc --reporter=text --reporter=lcov mocha --exit -r ts-node/register 'tests/**/*.ts'"

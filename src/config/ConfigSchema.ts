@@ -19,7 +19,8 @@ export interface IConfigSchema {
   database: FaucetDatabaseOptions;
 
   faucetTitle: string; // title of the faucet
-  faucetImage: string; // faucet image displayed on the startpage
+  faucetImage?: string; // faucet image displayed on the startpage
+  faucetLogo?: string;
   faucetHomeHtml: string; // some additional html to show on the startpage
   faucetCoinSymbol: string; // symbol (short name) of the coin that can be mined
   faucetCoinType: FaucetCoinType; // coin type (native / erc20)

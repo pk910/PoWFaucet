@@ -14,7 +14,7 @@ html, body {
 }
 
 .faucet-container {
-  padding: 8px;
+  padding: 24px;
   margin: 8px;
   background-color: white;
   box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
@@ -101,7 +101,7 @@ html, body {
 }
 
 .faucet-page .faucet-inputs {
-  margin: 18px 8px 0 8px;
+  margin: 24px 8px 16px 8px;
 }
 
 .faucet-page .faucet-actions {
@@ -121,7 +121,7 @@ html, body {
 }
 
 .faucet-page .faucet-actions button.start-action {
-  background-color: #4CAF50;
+  background-color: #aeda02;
 }
 
 .faucet-page .faucet-actions button.stop-action {
@@ -148,6 +148,7 @@ html, body {
 
 .faucet-page .faucet-title {
   position: relative;
+  font-weight: bold;
 }
 
 .faucet-page .faucet-title .faucet-status-link {
@@ -248,7 +249,7 @@ html, body {
 }
 
 .faucet-page .faucet-description .pow-info {
-  margin-top: 8px;
+  margin-top: 16px;
 }
 
 .modal-dialog.modal-700px {

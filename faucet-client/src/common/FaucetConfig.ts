@@ -2,7 +2,8 @@
 export interface IFaucetConfig {
   faucetTitle: string;
   faucetStatus: IFaucetStatus[];
-  faucetImage: string;
+  faucetImage?: string;
+  faucetLogo?: string;
   faucetHtml: string;
   faucetCoinSymbol: string;
   faucetCoinType: string;
