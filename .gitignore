@@ -6,6 +6,8 @@ node_modules/
 static/index.seo.html
 faucet-config.json
 faucet-config.yaml
+faucet-config-bnb.yaml
+faucet-config-eth.yaml
 faucet-status.json
 faucet-store.*
 faucet-stats.log
