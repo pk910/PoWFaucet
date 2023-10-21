@@ -61,7 +61,7 @@ ethWalletKey: "....."
 ethChainId: null
 
 # symbol (short name) of the coin that can be mined
-faucetCoinSymbol: "GöETH"
+faucetCoinSymbol: "BOBA"
 
 # type of coin that can be mined
 # native = native coin (ETH)
