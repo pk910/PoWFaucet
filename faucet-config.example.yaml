@@ -18,10 +18,11 @@ faucetPidFile: "faucet-pid.txt"
 serverPort: 8080
 
 # title of the faucet
-faucetTitle: "Boba Faucet"
+faucetTitle: "Boba BNB Faucet"
 
 # url to image displayed on the startpage
-faucetImage: "/images/faucet-boba.png"
+# faucetImage: "/images/faucet-boba.png"
+faucetLogo: "/images/boba-logo.png"
 
 # some additional html to show on the startpage
 faucetHomeHtml: |
@@ -40,7 +41,7 @@ faucetHomeHtml: |
   <div class='pow-info'>
     <h5>How to help the faucet?</h5>
     Replenish the faucet by sending funds you don't need anymore to:<br>
-    {faucetWallet}
+    <i>{faucetWallet}</i>
   </div>
 
 # random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed

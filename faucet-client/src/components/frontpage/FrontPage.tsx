@@ -89,12 +89,14 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
           faucetContext={this.props.faucetContext} 
           faucetConfig={this.props.faucetConfig} 
           submitInputs={(inputData) => this.onSubmitInputs(inputData)}/>
-        
+
+        {this.props.faucetConfig.faucetHtml ?
+            <>
+              <hr style={{marginBottom: 6}} />
         <div className='faucet-description'>
-          {this.props.faucetConfig.faucetHtml ?
             <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.props.faucetConfig.faucetHtml}} />
-          : null}
-        </div>
+        </div></>
+            : null}
       </div>
     );
 	}

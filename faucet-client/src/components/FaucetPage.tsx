@@ -118,7 +118,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       this.lastConfigRefresh = (new Date()).getTime();
       this.setState({
         initializing: false,
-        faucetConfig: faucetConfig,
+        faucetConfig,
         faucetStatus: faucetConfig.faucetStatus,
       });
     });
@@ -140,7 +140,11 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
         <FaucetConfigContext.Provider value={this.state.faucetConfig}>
           <FaucetPageContext.Provider value={this.pageContext}>
             <div className="faucet-title">
-              <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
+              <h1 className="center">
+                {this.state.faucetConfig.faucetLogo ?
+                    <img src={this.state.faucetConfig.faucetLogo} className="image" width="40em" height="auto" style={{display: "inline-block"}} />
+                    : null}
+                <span style={{paddingTop: 5, paddingLeft: 3}}>{this.state.faucetConfig.faucetTitle}</span></h1>
               <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
             </div>
             {this.renderStatusAlerts()}

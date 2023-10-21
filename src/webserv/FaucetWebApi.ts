@@ -23,6 +23,7 @@ export interface IClientFaucetConfig {
   faucetStatus: IFaucetStatus[];
   faucetStatusHash: string;
   faucetImage: string;
+  faucetLogo: string;
   faucetHtml: string;
   faucetCoinSymbol: string;
   faucetCoinType: string;
@@ -166,6 +167,7 @@ export class FaucetWebApi {
       faucetStatus: faucetStatus.status,
       faucetStatusHash: faucetStatus.hash,
       faucetImage: faucetConfig.faucetImage,
+      faucetLogo: faucetConfig.faucetLogo,
       faucetHtml: this.getFaucetHomeHtml(),
       faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
       faucetCoinType: faucetConfig.faucetCoinType,

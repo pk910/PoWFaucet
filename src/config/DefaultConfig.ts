@@ -20,7 +20,8 @@ export function getDefaultConfig(): IConfigSchema {
     },
 
     faucetTitle: "Test Faucet",
-    faucetImage: "/images/fauceth_420.jpg",
+    // faucetImage: "/images/fauceth_420.jpg",
+    faucetLogo: "/images/boba-logo.png",
     faucetHomeHtml: "",
     faucetCoinSymbol: "ETH",
     faucetCoinType: FaucetCoinType.NATIVE,
