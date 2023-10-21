@@ -51,7 +51,7 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
 
     if(limit.limitAmount > 0) {
       let totalAmount = 0n;
-      finishedSessions.forEach((session) => totalAmount += BigInt(session.dropAmount));
+      finishedSessions.forEach((session) => totalAmount += BigInt(session.dropAmount ?? '0'));
       if(totalAmount >= BigInt(limit.limitAmount)) {
         let errMsg = limit.message || [
           "You have already requested ",

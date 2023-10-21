@@ -86,13 +86,13 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
   private getDynamicBalanceRestriction(balance: bigint): number {
     if(!this.moduleConfig.dynamicRestriction || !this.moduleConfig.dynamicRestriction.targetBalance)
       return 100;
-    let targetBalance = BigInt(this.moduleConfig.dynamicRestriction.targetBalance);
+    let targetBalance = BigInt(this.moduleConfig.dynamicRestriction.targetBalance ?? '0');
     if(balance >= targetBalance)
       return 100;
     if(balance <= faucetConfig.spareFundsAmount)
       return 0;
 
-    let mineableBalance = balance - BigInt(faucetConfig.spareFundsAmount);
+    let mineableBalance = balance - BigInt(faucetConfig.spareFundsAmount ?? '0');
     let balanceRestriction = parseInt((mineableBalance * 100000n / targetBalance).toString()) / 1000;
     return balanceRestriction;
   }

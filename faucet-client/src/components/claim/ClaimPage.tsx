@@ -159,7 +159,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
           title: "Claim expired",
           body: (
             <div className='alert alert-danger'>
-              Sorry, your reward ({toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
+              Sorry, your reward ({toReadableAmount(BigInt(this.state.sessionStatus.balance ?? '0'), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}) has not been claimed in time.
             </div>
           ),
           closeButton: {
@@ -376,7 +376,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     return (
       <div className='claim-status'>
         <div className='alert alert-success'>
-          Claim Transaction has been confirmed in block #{this.state.sessionStatus.claimBlock}!<br />
+          Claim Transaction has been confirmed {this.state.sessionStatus.claimBlock ? `in block #${this.state.sessionStatus.claimBlock}` : ''}!<br />
           TX: 
           <span className='txhash'>
             {this.props.faucetConfig.ethTxExplorerLink ? 

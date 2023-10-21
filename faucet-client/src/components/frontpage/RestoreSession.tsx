@@ -49,7 +49,7 @@ export class RestoreSession extends React.PureComponent<IRestoreSessionProps, IR
             Balance:
           </div>
           <div className='col'>
-            {toReadableAmount(BigInt(this.props.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}
+            {toReadableAmount(BigInt(this.props.sessionStatus.balance ?? '0'), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}
           </div>
         </div>
         <div className='row'>

@@ -304,7 +304,7 @@ export class EthWalletManager {
     receipt: TransactionReceipt;
   }> {
     return this.awaitTransactionReceipt(claimInfo.claim.txHash).then((receipt) => {
-      let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+      let txfee = BigInt(receipt.effectiveGasPrice ?? '1') * BigInt(receipt.gasUsed ?? '1');
       this.walletState.nativeBalance -= txfee;
       if(!this.tokenState)
         this.walletState.balance -= txfee;
@@ -326,7 +326,7 @@ export class EthWalletManager {
       if(this.tokenState)
         return this.buildEthTx(this.tokenState.address, 0n, claimInfo.claim.txNonce, this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount)));
       else
-        return this.buildEthTx(claimInfo.target, BigInt(claimInfo.amount), claimInfo.claim.txNonce);
+        return this.buildEthTx(claimInfo.target, BigInt(claimInfo.amount ?? '0'), claimInfo.claim.txNonce);
     };
 
     do {
@@ -412,8 +412,8 @@ export class EthWalletManager {
     let tx: EthTx.Transaction | EthTx.FeeMarketEIP1559Transaction;
     if(faucetConfig.ethLegacyTx) {
       // legacy transaction
-      let gasPrice = parseInt(await this.web3.eth.getGasPrice());
-      gasPrice += faucetConfig.ethTxPrioFee;
+      let gasPrice = parseInt(await this.web3.eth.getGasPrice() ?? '10000000000');
+      gasPrice += faucetConfig.ethTxPrioFee ?? 0;
       if(faucetConfig.ethTxMaxFee > 0 && gasPrice > faucetConfig.ethTxMaxFee)
         gasPrice = faucetConfig.ethTxMaxFee;
 

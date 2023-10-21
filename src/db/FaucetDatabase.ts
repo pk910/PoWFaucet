@@ -406,7 +406,7 @@ export class FaucetDatabase {
     };
     if(!row || !row.TotalAmount)
       return 0n;
-    return BigInt(row.TotalAmount)
+    return BigInt(row.TotalAmount ?? '0')
   }
 
 }

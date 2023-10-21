@@ -136,7 +136,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public updateBalance(balanceUpdate: IPoWSessionBalanceUpdate) {
-    this.balance = BigInt(balanceUpdate.balance);
+    this.balance = BigInt(balanceUpdate.balance ?? '0');
     this.emit("balanceUpdate", balanceUpdate);
   }
 

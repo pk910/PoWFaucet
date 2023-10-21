@@ -126,7 +126,7 @@ export class FaucetSession {
     this.status = sessionData.status;
     this.startTime = sessionData.startTime;
     this.targetAddr = sessionData.targetAddr;
-    this.dropAmount = BigInt(sessionData.dropAmount);
+    this.dropAmount = BigInt(sessionData.dropAmount ?? '0');
     this.remoteIP = sessionData.remoteIP;
     this.blockingTasks = sessionData.tasks;
     this.sessionDataDict = sessionData.data;
