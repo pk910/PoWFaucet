@@ -127,10 +127,10 @@ modules:
     provider: "hcaptcha"
 
     # captcha site key
-    siteKey: "00000-0000"
+    siteKey: "00000000-0000-0000-0000-000000000000"
 
     # captcha secret key
-    secret: "0x....."
+    secret: "0xCensoredHCaptchaSecretKey"
 
     # require captcha to start a new session (default: false)
     checkSessionStart: false
@@ -445,8 +445,8 @@ noFundsError: "Sorry, the faucet is out of funds :("
 # RPC unreachable error message / true to show the generic message / false to disable the error
 rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 
-  # prevent creation of new sessions (used for maintenance)
-  #denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
+# prevent creation of new sessions (used for maintenance)
+#denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
 
 
 
@@ -459,16 +459,16 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 # the faucet tries to refill its wallet balance from the vault contract when it gets empty
 # see contract code in docs folder
 ethRefillContract:
-#contract: "0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb"
-#abi: '[{"inputs":[{"internalType":"address","name":"addr","type":"address"}],"name":"getAllowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
-#allowanceFn: "getAllowance"
-#withdrawFn: "withdraw"
-#withdrawGasLimit: 300000
-#checkContractBalance: true
-#contractDustBalance: 1000000000000000000  # 1 ETH
-#triggerBalance: 1100000000000000000000  # 1100 ETH
-#cooldownTime: 5430 # 1.5h + 30sec
-#requestAmount: 125000000000000000000 # 125 ETH
+  #contract: "0xA5058fbcD09425e922E3E9e78D569aB84EdB88Eb"
+  #abi: '[{"inputs":[{"internalType":"address","name":"addr","type":"address"}],"name":"getAllowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+  #allowanceFn: "getAllowance"
+  #withdrawFn: "withdraw"
+  #withdrawGasLimit: 300000
+  #checkContractBalance: true
+  #contractDustBalance: 1000000000000000000  # 1 ETH
+  #triggerBalance: 1100000000000000000000  # 1100 ETH
+  #cooldownTime: 5430 # 1.5h + 30sec
+  #requestAmount: 125000000000000000000 # 125 ETH
 
 
 ### Other Settings
