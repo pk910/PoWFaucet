@@ -92,7 +92,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
 
         {this.props.faucetConfig.faucetHtml ?
             <>
-              <hr style={{marginBottom: 6}} />
+              <hr style={{marginBottom: 24}} />
         <div className='faucet-description'>
             <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.props.faucetConfig.faucetHtml}} />
         </div></>

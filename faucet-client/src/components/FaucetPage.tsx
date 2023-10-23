@@ -140,11 +140,11 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
         <FaucetConfigContext.Provider value={this.state.faucetConfig}>
           <FaucetPageContext.Provider value={this.pageContext}>
             <div className="faucet-title">
-              <h1 className="center">
+              <h1 className="center" style={{width: '100%'}}>
                 {this.state.faucetConfig.faucetLogo ?
-                    <img src={this.state.faucetConfig.faucetLogo} className="image" width="40em" height="auto" style={{display: "inline-block"}} />
+                    <img src={this.state.faucetConfig.faucetLogo} className="image" width="40em" height="auto" style={{display: "inline-block", paddingRight: '4px'}} />
                     : null}
-                <span style={{paddingTop: 5, paddingLeft: 3}}>{this.state.faucetConfig.faucetTitle}</span></h1>
+                <span style={{verticalAlign: 'middle', paddingLeft: 3}}>{this.state.faucetConfig.faucetTitle}</span></h1>
               <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
             </div>
             {this.renderStatusAlerts()}
