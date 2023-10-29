@@ -2,6 +2,7 @@ const path = require('path');
 const webpack = require('webpack');
 const wpmerge = require('webpack-merge');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const Visualizer = require('webpack-visualizer-plugin2');
 var cliArgs = require('./utils/CliArgs');
@@ -34,6 +35,7 @@ var webpackModuleConfigs = [
         chunkFilename: 'powfaucet.[name].css',
 
       }),
+      new NodePolyfillPlugin(),
     ]
   },
   {

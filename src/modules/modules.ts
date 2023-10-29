@@ -11,6 +11,7 @@ import { PassportModule } from "./passport/PassportModule";
 import { PoWModule } from "./pow/PoWModule";
 import { RecurringLimitsModule } from "./recurring-limits/RecurringLimitsModule";
 import { WhitelistModule } from "./whitelist/WhitelistModule";
+import { ZupassModule } from "./zupass/ZupassModule";
 
 export const MODULE_CLASSES = {
   "captcha": CaptchaModule,
@@ -26,4 +27,5 @@ export const MODULE_CLASSES = {
   "pow": PoWModule,
   "recurring-limits": RecurringLimitsModule,
   "whitelist": WhitelistModule,
+  "zupass": ZupassModule,
 }
