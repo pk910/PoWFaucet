@@ -1,21 +1,14 @@
-import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
-import React, { useContext } from 'react';
+import React from 'react';
 import { IFaucetConfig } from '../../common/FaucetConfig';
-import { FaucetCaptcha } from '../shared/FaucetCaptcha';
 
 import './ZupassLogin.css';
-import { toQuery } from '../../utils/QueryUtils';
-import { TypedEmitter } from 'tiny-typed-emitter';
-import { FaucetTime } from '../../common/FaucetTime';
 import { IFaucetContext } from '../../common/FaucetContext';
 
 import { EdDSATicketPCDPackage } from "@pcd/eddsa-ticket-pcd";
 import { SemaphoreIdentityPCDPackage } from "@pcd/semaphore-identity-pcd";
 import { ArgumentTypeName } from "@pcd/pcd-types";
-import { ArgsOf, PCDPackage, SerializedPCD } from "@pcd/pcd-types";
+import { ArgsOf, PCDPackage } from "@pcd/pcd-types";
 import {
-  EdDSATicketFieldsToReveal,
-  ZKEdDSAEventTicketPCD,
   ZKEdDSAEventTicketPCDArgs,
   ZKEdDSAEventTicketPCDPackage
 } from "@pcd/zk-eddsa-event-ticket-pcd";
@@ -60,15 +53,6 @@ export interface ProveOptions {
   debug?: boolean;
   proveOnServer?: boolean;
   signIn?: boolean;
-}
-
-/**
- * When a website uses the Zupass for signing in, Zupass
- * signs this payload using a `SemaphoreSignaturePCD`.
- */
-export interface SignInMessagePayload {
-  uuid: string;
-  referrer: string;
 }
 
 export interface PCDGetRequest<T extends PCDPackage = PCDPackage>
@@ -124,7 +108,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
 	public render(): React.ReactElement {
 
     return (
-      <div className='faucet-auth faucet-zupass-auth'>
+      <div className='faucet-zupass-auth'>
         <div className='auth-icon'>
           <div className='logo logo-zupass' style={{backgroundImage: "url('/images/devconnect-ist.png')"}}></div>
         </div>
@@ -139,7 +123,22 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
   private renderLoginButton(): React.ReactElement {
     return (
       <div className='auth-field auth-noauth' onClick={(evt) => this.onLoginClick()}>
-        <div>DevConnect attendee? Login with your Ticket.</div>
+        <div>
+          DevConnect attendee? Login with your Ticket.
+          {this.props.faucetConfig.modules.zupass.infoHtml ?
+            <OverlayTrigger
+              placement="bottom"
+              overlay={this.renderInfoHtml()}
+            >
+              <span className="zupass-info-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-info-circle" viewBox="0 0 16 16">
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                </svg>
+              </span>
+            </OverlayTrigger>
+          : null}
+        </div>
         <div>
           <a href="#" onClick={(evt) => evt.preventDefault()}>
             {this.state.popupOpen ?
@@ -158,7 +157,27 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
     return (
       <div className='auth-field auth-profile'>
         <div className='auth-info'>
-          Authenticated with Zupass identity 
+          Authenticated with Devconnect Ticket. {this.props.faucetConfig.modules.zupass.infoHtml ?
+            <OverlayTrigger
+              placement="bottom"
+              overlay={this.renderInfoHtml()}
+            >
+              <span className="zupass-info-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-info-circle" viewBox="0 0 16 16">
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                </svg>
+              </span>
+            </OverlayTrigger>
+          : null}
+        </div>
+        <div className="auth-logout">
+          <a href="#" onClick={(evt) => {evt.preventDefault(); this.onLogoutClick()}}>
+            Logout
+          </a>
+        </div>
+        <div className='auth-info'>
+          Attendee ID: 
           <OverlayTrigger
             placement="bottom"
             delay={{ show: 250, hide: 400 }}
@@ -166,11 +185,6 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
           >
             <span className="auth-ident-truncated">{this.state.authInfo.attendeeId}</span>
           </OverlayTrigger>
-        </div>
-        <div>
-          <a href="#" onClick={(evt) => {evt.preventDefault(); this.onLogoutClick()}}>
-            Logout
-          </a>
         </div>
       </div>
     );
@@ -204,6 +218,17 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
             </tbody>
           </table>
         </div>
+      </Tooltip>
+    );
+  }
+
+  private renderInfoHtml(): React.ReactElement {
+    if(!this.props.faucetConfig.modules.zupass.infoHtml)
+      return null;
+    
+    return (
+      <Tooltip id="zupass-tooltip">
+        <div className='zupass-info' dangerouslySetInnerHTML={{__html: this.props.faucetConfig.modules.zupass.infoHtml}}></div>
       </Tooltip>
     );
   }

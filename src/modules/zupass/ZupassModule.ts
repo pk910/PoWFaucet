@@ -46,6 +46,7 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
           event: this.moduleConfig.event,
           watermark: this.pcdWatermark,
           nullifier: this.pcdNullifier,
+          infoHtml: this.moduleConfig.infoHtml,
         };
       }
     );

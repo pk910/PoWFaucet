@@ -58,6 +58,7 @@ export interface IZupassModuleConfig {
   };
   watermark: string;
   nullifier: string;
+  infoHtml: string;
 }
 
 export interface IPoWModuleConfig {

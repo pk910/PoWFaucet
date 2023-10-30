@@ -19,6 +19,11 @@
 
 .faucet-page .faucet-zupass-auth .auth-field {
   margin: 0 8px;
+  flex-grow: 1;
+}
+
+.faucet-page .faucet-zupass-auth .zupass-info-icon {
+  margin-left: 8px;
 }
 
 .faucet-page .faucet-zupass-auth .auth-field .auth-info {
@@ -27,17 +32,22 @@
 
 .faucet-page .faucet-zupass-auth .auth-ident-truncated {
   display: inline-block;
-  max-width: 110px;
+  max-width: 200px;
   text-overflow: ellipsis;
   overflow: hidden;
   vertical-align: bottom;
   margin-left: 4px;
 }
 
+.faucet-page .faucet-zupass-auth .auth-logout {
+  float: right;
+}
+
 #zupass-tooltip .tooltip-inner {
   max-width: 500px;
 }
 
+#zupass-tooltip .zupass-info,
 #zupass-tooltip .zupass-info td {
   text-align: left;
 }
