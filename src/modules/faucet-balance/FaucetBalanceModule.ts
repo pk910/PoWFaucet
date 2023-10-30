@@ -32,6 +32,8 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
   }
 
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     await this.refreshBalanceRestriction();
     if(this.balanceRestriction !== 100) {
       rewardFactors.push({

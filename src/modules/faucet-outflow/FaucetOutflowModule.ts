@@ -28,7 +28,7 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     );
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionRewarded, 5, "faucet outflow",
-      (session: FaucetSession, amount: bigint) => this.updateState(amount)
+      (session: FaucetSession, amount: bigint) => this.updateState(session, amount)
     );
     this.enforceBalanceBoundaries();
   }
@@ -44,6 +44,8 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
   }
 
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     let outflowRestriction = this.getOutflowRestriction();
     if(outflowRestriction < 100) {
       rewardFactors.push({
@@ -83,7 +85,9 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
     }
   }
 
-  public updateState(minedAmount: bigint) {
+  public updateState(session: FaucetSession, minedAmount: bigint) {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     if(minedAmount < 0)
       return;
     
