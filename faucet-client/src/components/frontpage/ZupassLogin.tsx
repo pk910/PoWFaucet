@@ -13,12 +13,10 @@ import {
   ZKEdDSAEventTicketPCDPackage
 } from "@pcd/zk-eddsa-event-ticket-pcd";
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { IZupassLogin } from './ZupassLoginInterface';
 
 export interface IZupassLoginProps {
   faucetContext: IFaucetContext;
   faucetConfig: IFaucetConfig;
-  forwardRef: React.RefObject<IZupassLogin>;
 }
 
 export interface IZupassLoginState {
@@ -36,9 +34,6 @@ export interface IZupassAuthInfo {
 
 export enum PCDRequestType {
   Get = "Get",
-  GetWithoutProving = "GetWithoutProving",
-  Add = "Add",
-  ProveAndAdd = "ProveAndAdd"
 }
 
 export interface PCDRequest {
@@ -69,7 +64,6 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
 
   constructor(props: IZupassLoginProps, state: IZupassLoginState) {
     super(props);
-    (this.props.forwardRef as any).current = this;
 
     this.messageEvtListener = (evt: MessageEvent) => this.processWindowMessage(evt);
 
@@ -369,6 +363,7 @@ export default (props) => {
   return (
     <ZupassLogin 
       {...props}
+      ref={props.forwardRef}
     />
   );
 };
