@@ -178,7 +178,7 @@ export class EthClaimManager {
     if(claimInfo.claim.claimStatus === ClaimTxStatus.CONFIRMED) {
       let moduleManager = ServiceManager.GetService(ModuleManager);
       moduleManager.processActionHooks([], ModuleHookAction.SessionClaimed, [claimInfo]);
-      moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(BigInt(claimInfo.claim.txFee));
+      moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(null, BigInt(claimInfo.claim.txFee));
       ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimInfo);
     }
     ServiceManager.GetService(FaucetDatabase).updateClaimData(claimInfo.session, claimInfo.claim);

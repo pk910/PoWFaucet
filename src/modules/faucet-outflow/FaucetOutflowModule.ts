@@ -86,7 +86,7 @@ export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
   }
 
   public updateState(session: FaucetSession, minedAmount: bigint) {
-    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+    if(session && session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
       return;
     if(minedAmount < 0)
       return;
