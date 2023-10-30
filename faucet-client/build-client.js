@@ -29,6 +29,24 @@ function copyIfFoundOrRemove(filename, dstpath, dstname) {
   }
 }
 
+function deleteMatching(pattern, dstpath) {
+  let fsptr = fs.readdirSync(dstpath);
+  for(let i = 0; i < fsptr.length; i++) {
+    if(fsptr[i].match(pattern)) {
+      fs.rmSync(path.join(dstpath, fsptr[i]));
+    }
+  }
+}
+
+function copyMatching(pattern, dstpath) {
+  let fsptr = fs.readdirSync(distDir);
+  for(let i = 0; i < fsptr.length; i++) {
+    if(fsptr[i].match(pattern)) {
+      copyIfFound(fsptr[i], dstpath);
+    }
+  }
+}
+
 (new Promise((resolve, reject) => {
   console.log("Building pow-faucet-client...");
   let compiler = webpack(webpackConfig);
@@ -64,6 +82,10 @@ function copyIfFoundOrRemove(filename, dstpath, dstname) {
 
   copyIfFound("powfaucet-worker-a2.js", path.join(staticPath, "js"));
   copyIfFoundOrRemove("powfaucet-worker-a2.js.map", path.join(staticPath, "js"));
+
+  deleteMatching("powfaucet-chunk-.*", path.join(staticPath, "js"));
+  copyMatching("powfaucet-chunk-.*", path.join(staticPath, "js"));
+  copyMatching("powfaucet\\..*\\.css", path.join(staticPath, "js"));
 
   console.log("finished");
 });

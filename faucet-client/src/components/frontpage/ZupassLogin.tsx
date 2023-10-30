@@ -1,4 +1,5 @@
-import React from 'react';
+import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
+import React, { useContext } from 'react';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { FaucetCaptcha } from '../shared/FaucetCaptcha';
 
@@ -19,10 +20,12 @@ import {
   ZKEdDSAEventTicketPCDPackage
 } from "@pcd/zk-eddsa-event-ticket-pcd";
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { IZupassLogin } from './ZupassLoginInterface';
 
 export interface IZupassLoginProps {
   faucetContext: IFaucetContext;
-  faucetConfig: IFaucetConfig
+  faucetConfig: IFaucetConfig;
+  forwardRef: React.RefObject<IZupassLogin>;
 }
 
 export interface IZupassLoginState {
@@ -82,6 +85,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
 
   constructor(props: IZupassLoginProps, state: IZupassLoginState) {
     super(props);
+    (this.props.forwardRef as any).current = this;
 
     this.messageEvtListener = (evt: MessageEvent) => this.processWindowMessage(evt);
 
@@ -335,3 +339,11 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
   }
 
 }
+
+export default (props) => {
+  return (
+    <ZupassLogin 
+      {...props}
+    />
+  );
+};

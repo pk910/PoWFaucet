@@ -19,7 +19,8 @@ var webpackModuleConfigs = [
     entry: './src/main',
     output: {
       path: path.join(__dirname, '/dist'),
-      filename: 'powfaucet.js'
+      filename: 'powfaucet.js',
+      chunkFilename: 'powfaucet-chunk-[name].js'
     },
     module: {
       rules: [
@@ -33,7 +34,7 @@ var webpackModuleConfigs = [
       new MiniCssExtractPlugin({
         filename: 'powfaucet.css',
         chunkFilename: 'powfaucet.[name].css',
-
+        
       }),
       new NodePolyfillPlugin(),
     ]

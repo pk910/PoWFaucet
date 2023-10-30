@@ -3,7 +3,9 @@ import { IFaucetConfig } from '../../common/FaucetConfig';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { FaucetCaptcha } from '../shared/FaucetCaptcha';
 import { GithubLogin } from './GithubLogin';
-import { ZupassLogin } from './ZupassLogin';
+import { IZupassLogin } from './ZupassLoginInterface';
+
+const ZupassLogin = React.lazy(() => import(/* webpackChunkName: "zupass" */ './ZupassLogin'));
 
 export interface IFaucetInputProps {
   faucetContext: IFaucetContext;
@@ -20,7 +22,7 @@ export interface IFaucetInputState {
 export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetInputState> {
   private faucetCaptcha = React.createRef<FaucetCaptcha>();
   private githubLogin = React.createRef<GithubLogin>();
-  private zupassLogin = React.createRef<ZupassLogin>();
+  private zupassLogin = React.createRef<IZupassLogin>();
 
   constructor(props: IFaucetInputProps, state: IFaucetInputState) {
     super(props);
@@ -69,11 +71,13 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
           />
         : null}
         {needZupassAuth ? 
-          <ZupassLogin 
-            faucetConfig={this.props.faucetConfig} 
-            faucetContext={this.props.faucetContext} 
-            ref={this.zupassLogin}
-          />
+          <React.Suspense fallback={<div>loading...</div>}>
+            <ZupassLogin 
+              faucetConfig={this.props.faucetConfig} 
+              faucetContext={this.props.faucetContext} 
+              forwardRef={this.zupassLogin}
+            />
+          </React.Suspense>
         : null}
         {requestCaptcha ? 
           <div className='faucet-captcha'>
