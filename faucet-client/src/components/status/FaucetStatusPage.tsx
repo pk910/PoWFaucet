@@ -120,7 +120,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
 
   private renderFaucetStatus(): React.ReactElement {
     if(!this.state.status)
-      return null;
+      return <span />;
 
     let sessionStatus = {
       mining: 0,
@@ -341,7 +341,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
 
   private renderSessionIpInfo(session: IClientSessionStatus, props: any): React.ReactElement {
     if(!session.ipInfo)
-      return null;
+      return <span />;
     
     return (
       <Tooltip id="ipinfo-tooltip" {...props}>
@@ -394,7 +394,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
 
   private renderRestrictionInfo(session: IClientSessionStatus, props: any): React.ReactElement {
     if(!session.restr)
-      return null;
+      return <span />;
     
     return (
       <Tooltip id="ipinfo-tooltip" {...props}>
@@ -427,7 +427,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
 
   private renderFactorInfo(session: IClientSessionStatus, props: any): React.ReactElement {
     if(!session.factors)
-      return null;
+      return <span />;
     
     return (
       <Tooltip id="ipinfo-tooltip" {...props}>
