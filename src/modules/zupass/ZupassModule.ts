@@ -21,6 +21,7 @@ import { SessionManager } from "../../session/SessionManager";
 export class ZupassGrantPerks {
   factor?: number;
   skipModules?: string[];
+  overrideMaxDrop?: number;
 }
 
 export class ZupassModule extends BaseModule<IZupassConfig> {
@@ -112,6 +113,8 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
       session.setSessionData("zupass.data", zupassInfo);
       if(typeof perks.factor === "number")
         session.setSessionData("zupass.factor", perks.factor);
+      if(typeof perks.overrideMaxDrop === "number")
+        session.setSessionData("overrideMaxDropAmount", perks.overrideMaxDrop.toString());
       if(perks.skipModules) {
         let skipModules = session.getSessionData<Array<string>>("skip.modules", []);
         perks.skipModules.forEach((mod) => {
@@ -289,6 +292,9 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
     }
     if(typeof grant.rewardFactor === "number") {
       perks.factor = grant.rewardFactor;
+    }
+    if(typeof grant.overrideMaxDrop !== "undefined") {
+      perks.overrideMaxDrop = grant.overrideMaxDrop;
     }
   }
 

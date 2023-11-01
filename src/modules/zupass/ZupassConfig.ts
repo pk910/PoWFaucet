@@ -30,6 +30,7 @@ export interface IZupassGrantConfig {
   duration: number;
   skipModules?: string[];
   rewardFactor?: number;
+  overrideMaxDrop?: number;
   required?: boolean;
   message?: string;
 }
