@@ -362,6 +362,7 @@ export class FaucetSession {
     
     let rewardFactors: ISessionRewardFactor[] = [];
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewardFactor, [this, rewardFactors]);
+    this.setSessionData("reward.factors", rewardFactors);
 
     let rewardFactor = 1;
     //console.log(rewardFactors);

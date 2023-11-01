@@ -26,6 +26,7 @@ export interface IClientSessionStatus {
   boost: any;
   connected: boolean;
   idle: number;
+  factor: ISessionRewardFactor[];
 }
 
 export interface IClientClaimStatusRsp {
@@ -92,4 +93,10 @@ export interface IClientSessionRestrictionStatus {
     notify: boolean|string;
   }[];
   blocked: false|"close"|"kill";
+}
+
+export interface ISessionRewardFactor {
+  factor: number;
+  module: string;
+  name?: string;
 }

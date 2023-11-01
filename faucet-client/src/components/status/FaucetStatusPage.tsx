@@ -296,6 +296,22 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       );
     }
 
+    if(session.factor && session.factor.length > 0) {
+      let totalFactor = 1;
+      session.factor.forEach((f) => {
+        totalFactor *= f.factor;
+      });
+      sessionStatus.push(
+        <OverlayTrigger
+          placement="auto"
+          delay={{ show: 250, hide: 400 }}
+          overlay={(props) => this.renderFactorInfo(session, props)}
+        >
+          <span key="factor" className={["badge", "bg-info"].join(" ")}>x{Math.round(totalFactor * 100) / 100}</span>
+        </OverlayTrigger>
+      );
+    }
+
     return (
       <tr key={session.id}>
         <th scope="row">{session.id}</th>
@@ -399,6 +415,30 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
                 return (
                   <tr>
                     <td key={idx} colSpan={2} className='ipinfo-value'>{message.text}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Tooltip>
+    );
+  }
+
+  private renderFactorInfo(session: IClientSessionStatus, props: any): React.ReactElement {
+    if(!session.factor)
+      return null;
+    
+    return (
+      <Tooltip id="ipinfo-tooltip" {...props}>
+        <div className='ipaddr-info'>
+          <table>
+            <tbody>
+              {session.factor.map((f) => {
+                return (
+                  <tr>
+                    <td className='ipinfo-title'>x{Math.round(f.factor * 100) / 100}</td>
+                    <td className='ipinfo-value'>{f.module} {f.name ? "/" + f.name : ""}</td>
                   </tr>
                 );
               })}
