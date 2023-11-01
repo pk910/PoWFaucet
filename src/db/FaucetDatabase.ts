@@ -321,7 +321,7 @@ export class FaucetDatabase {
       whereArgs.push(targetAddr);
     }
     if(remoteIP) {
-      whereSql.push("RemoteIP = ?");
+      whereSql.push("RemoteIP LIKE ?");
       whereArgs.push(remoteIP);
     }
     if(whereSql.length === 0)

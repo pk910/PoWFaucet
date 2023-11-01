@@ -189,8 +189,12 @@ export class EthClaimManager {
       throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: not claimable (state: " + sessionData.status + ")");
     if(BigInt(sessionData.dropAmount) < BigInt(faucetConfig.minDropAmount))
       throw new FaucetError("AMOUNT_TOO_LOW", "drop amount lower than minimum");
-    if(BigInt(sessionData.dropAmount) > BigInt(faucetConfig.maxDropAmount))
-      sessionData.dropAmount = faucetConfig.maxDropAmount.toString();
+
+    let maxDropAmount = BigInt(faucetConfig.maxDropAmount);
+    if(sessionData.data["overrideMaxDropAmount"])
+      maxDropAmount = BigInt(sessionData.data["overrideMaxDropAmount"]);
+    if(BigInt(sessionData.dropAmount) > maxDropAmount)
+      sessionData.dropAmount = maxDropAmount.toString();
     
     let claimInfo: EthClaimInfo = {
       session: sessionData.sessionId,
