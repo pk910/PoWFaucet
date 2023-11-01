@@ -26,7 +26,7 @@ export interface IClientSessionStatus {
   boost: any;
   connected: boolean;
   idle: number;
-  factor: ISessionRewardFactor[];
+  factors: ISessionRewardFactor[];
 }
 
 export interface IClientClaimStatusRsp {

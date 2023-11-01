@@ -296,9 +296,9 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       );
     }
 
-    if(session.factor && session.factor.length > 0) {
+    if(session.factors && session.factors.length > 0) {
       let totalFactor = 1;
-      session.factor.forEach((f) => {
+      session.factors.forEach((f) => {
         totalFactor *= f.factor;
       });
       sessionStatus.push(
@@ -426,7 +426,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
   }
 
   private renderFactorInfo(session: IClientSessionStatus, props: any): React.ReactElement {
-    if(!session.factor)
+    if(!session.factors)
       return null;
     
     return (
@@ -434,7 +434,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         <div className='ipaddr-info'>
           <table>
             <tbody>
-              {session.factor.map((f) => {
+              {session.factors.map((f) => {
                 return (
                   <tr>
                     <td className='ipinfo-title'>x{Math.round(f.factor * 100) / 100}</td>
