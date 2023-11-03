@@ -4,6 +4,14 @@ name: Build docker image for latest release
 
 on:
   workflow_dispatch:
+    inputs:
+      name:
+        type: choice
+        required: true
+        description: Which faucet config to use?
+        options:
+          - BOBAGOERLI_FAUCET_CONFIG
+          - BOBABNBTESTNET_FAUCET_CONFIG
   release:
     types: [published]
 
@@ -33,7 +41,7 @@ jobs:
         run: |
           python -c "import os; file = open('faucet-config.example.yaml', 'w'); file.write(os.environ['FAUCET_CONFIG']); file.close()"
         env:
-          FAUCET_CONFIG: ${{secrets.BOBAGOERLI_FAUCET_CONFIG}} # todo: use correct network
+          FAUCET_CONFIG: ${{ secrets[format('{0}', )], github.event.inputs.choice }}
 
       - name: Build version specific docker image
         run: docker build . --file Dockerfile --tag bobanetwork/faucet:v${{ steps.version.outputs.server_version }}

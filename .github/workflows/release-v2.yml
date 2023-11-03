@@ -3,7 +3,14 @@ name: Release latest v2 version
 
 on:
   workflow_dispatch:
-
+    inputs:
+      name:
+        type: choice
+        required: true
+        description: Which faucet config to use?
+        options:
+          - BOBAGOERLI_FAUCET_CONFIG
+          - BOBABNBTESTNET_FAUCET_CONFIG
 
 jobs:
   run_tests:
@@ -49,7 +56,7 @@ jobs:
       run: |
         python -c "import os; file = open('faucet-config.example.yaml', 'w'); file.write(os.environ['FAUCET_CONFIG']); file.close()"
       env:
-        FAUCET_CONFIG : ${{secrets.BOBAGOERLI_FAUCET_CONFIG}} # todo: use correct network
+        FAUCET_CONFIG: ${{ secrets[format('{0}', )], github.event.inputs.choice }}
 
     # package bundled release
     - name: Package bundled release
