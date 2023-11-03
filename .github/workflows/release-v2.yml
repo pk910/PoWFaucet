@@ -47,7 +47,7 @@ jobs:
     - name: Use correct faucet config
       shell: bash
       run: |
-        python -c "import os; file = open('.env', 'w'); file.write(os.environ['FAUCET_CONFIG']); file.close()"
+        python -c "import os; file = open('faucet-config.example.yaml', 'w'); file.write(os.environ['FAUCET_CONFIG']); file.close()"
       env:
         FAUCET_CONFIG : ${{secrets.BOBAGOERLI_FAUCET_CONFIG}} # todo: use correct network
 
