@@ -178,7 +178,7 @@ export class EthClaimManager {
     if(claimInfo.claim.claimStatus === ClaimTxStatus.CONFIRMED) {
       let moduleManager = ServiceManager.GetService(ModuleManager);
       moduleManager.processActionHooks([], ModuleHookAction.SessionClaimed, [claimInfo]);
-      moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(BigInt(claimInfo.claim.txFee ?? '0'));
+      moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(null, BigInt(claimInfo.claim.txFee ?? '0'));
       ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimInfo);
     }
     ServiceManager.GetService(FaucetDatabase).updateClaimData(claimInfo.session, claimInfo.claim);
@@ -192,8 +192,12 @@ export class EthClaimManager {
     }
     if(BigInt(sessionData.dropAmount) < BigInt(faucetConfig.minDropAmount))
       throw new FaucetError("AMOUNT_TOO_LOW", "drop amount lower than minimum");
-    if(BigInt(sessionData.dropAmount) > BigInt(faucetConfig.maxDropAmount))
-      sessionData.dropAmount = faucetConfig.maxDropAmount.toString();
+
+    let maxDropAmount = BigInt(faucetConfig.maxDropAmount);
+    if(sessionData.data["overrideMaxDropAmount"])
+      maxDropAmount = BigInt(sessionData.data["overrideMaxDropAmount"]);
+    if(BigInt(sessionData.dropAmount) > maxDropAmount)
+      sessionData.dropAmount = maxDropAmount.toString();
     
     let claimInfo: EthClaimInfo = {
       session: sessionData.sessionId,

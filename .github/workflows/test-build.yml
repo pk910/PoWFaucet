@@ -31,6 +31,7 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version: 18.15.0
+    - run: npm install -g pkg
 
     - run: npm install
     - run: npm run bundle

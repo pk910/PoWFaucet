@@ -8,6 +8,7 @@ import { FaucetBalanceModule } from "../../modules/faucet-balance/FaucetBalanceM
 import { FaucetOutflowModule } from "../../modules/faucet-outflow/FaucetOutflowModule";
 import { ModuleManager } from "../../modules/ModuleManager";
 import { SessionManager } from "../../session/SessionManager";
+import { ISessionRewardFactor } from "../../session/SessionRewardFactor";
 import { getHashedIp, getHashedSessionId } from "../../utils/HashedInfo";
 
 export interface IClientClaimStatus {
@@ -37,6 +38,7 @@ export interface IClientSessionStatus {
   boost: any;
   connected: boolean;
   idle: number;
+  factors: ISessionRewardFactor[];
 }
 
 export interface IClientFaucetStatus {
@@ -125,6 +127,7 @@ export async function buildSessionStatus(unmasked?: boolean): Promise<IClientSes
       boost: session.data["passport.score"],
       connected: runningSession ? !!runningSession.getSessionModuleRef("pow.client") : null,
       idle: session.data["pow.idleTime"],
+      factors: session.data["reward.factors"],
     }
   });
 
