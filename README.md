@@ -1,11 +1,19 @@
-# PoWFaucet
-<img src="https://faucets.pk910.de/images/logo-cat-small.png" height="90px" />
+# Faucet
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/bobanetwork/faucet?label=Latest%20Release)](https://github.com/bobanetwork/faucet/releases/latest)
 [![codecov](https://codecov.io/gh/bobanetwork/faucet/branch/master/graph/badge.svg)](https://codecov.io/gh/bobanetwork/faucet)
 
-
 Modularized faucet for EVM chains with different protection methods (Captcha, Mining, IP, Mainnet Balance, Gitcoin Passport and more)
+
+## Deployment
+1. Open Actions tab
+2. Select `Build docker image for latest release`
+   ![image](https://github.com/bobanetwork/Faucet/assets/28724551/b2ee60f4-a8ce-4545-aca4-4e12381d7ffe)
+3. Trigger workflow to deploy new docker image for the network you want to deploy an update for:
+   ![image](https://github.com/bobanetwork/Faucet/assets/28724551/7560e76b-f727-418b-885a-9f5e8ea5446b)
+
+Docker images and project itself unfortunately doesn't work with environment variables. 
+
 
 # Why
 
