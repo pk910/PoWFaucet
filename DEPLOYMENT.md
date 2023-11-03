@@ -17,3 +17,6 @@ Images are tagged in 2 ways:
 
 1. `v2-stable-{network}` (e.g. v2-stable-bobagoerli = Boba Goerli testnet faucet)
 2. `v{Major.Minor.Patch}-{network}` (e.g. v2.0.8-bobabnbtestnet = Boba BNB testnet faucet v2.0.8)
+
+Upstream also pushes new images on every push to the master branch. 
+I disabled this for the time being to reduce the consumption of GH action minutes as I don't see an immediate reason to have these images. 
