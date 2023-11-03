@@ -7,7 +7,7 @@ Modularized faucet for EVM chains with different protection methods (Captcha, Mi
 
 ## Deployment
 1. Open Actions tab
-2. Select `Build docker image for latest release`
+2. Select `Build docker image for latest release`:
 
    ![image](https://github.com/bobanetwork/Faucet/assets/28724551/b2ee60f4-a8ce-4545-aca4-4e12381d7ffe)
 
