@@ -9,3 +9,11 @@
    ![image](https://github.com/bobanetwork/Faucet/assets/28724551/7560e76b-f727-418b-885a-9f5e8ea5446b)
 
 Docker images and project itself unfortunately doesn't work with environment variables. 
+
+
+
+## Docker tags
+Images are tagged in 2 ways: 
+
+1. `v2-stable-{network}` (e.g. v2-stable-bobagoerli = Boba Goerli testnet faucet)
+2. `v{Major.Minor.Patch}-{network}` (e.g. v2.0.8-bobabnbtestnet = Boba BNB testnet faucet v2.0.8)
