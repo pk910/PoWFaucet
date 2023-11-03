@@ -12,6 +12,8 @@ on:
         options:
           - BOBAGOERLI_FAUCET_CONFIG
           - BOBABNBTESTNET_FAUCET_CONFIG
+          - BOBABNB_FAUCET_CONFIG
+          - BOBAETH_FAUCET_CONFIG
       network:
         type: choice
         required: true
@@ -19,6 +21,8 @@ on:
         options:
           - bobagoerli
           - bobabnbtestnet
+          - bobaeth
+          - bobabnb
   release:
     types: [published]
 
