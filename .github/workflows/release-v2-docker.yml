@@ -27,6 +27,14 @@ jobs:
           echo "server_version=$(cat package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
           echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
         id: version
+      # override faucet config
+      - name: Use correct faucet config
+        shell: bash
+        run: |
+          python -c "import os; file = open('faucet-config.example.yaml', 'w'); file.write(os.environ['FAUCET_CONFIG']); file.close()"
+        env:
+          FAUCET_CONFIG: ${{secrets.BOBAGOERLI_FAUCET_CONFIG}} # todo: use correct network
+
       - name: Build version specific docker image
         run: docker build . --file Dockerfile --tag bobanetwork/faucet:v${{ steps.version.outputs.server_version }}
       - name: Push version specific docker image
