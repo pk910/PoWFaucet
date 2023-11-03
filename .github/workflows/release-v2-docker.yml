@@ -5,13 +5,20 @@ name: Build docker image for latest release
 on:
   workflow_dispatch:
     inputs:
-      name:
+      faucetConfig:
         type: choice
         required: true
         description: Which faucet config to use?
         options:
           - BOBAGOERLI_FAUCET_CONFIG
           - BOBABNBTESTNET_FAUCET_CONFIG
+      network:
+        type: choice
+        required: true
+        description: Which network to tag the build for? (99% of the time this equals the faucetConfig)
+        options:
+          - bobagoerli
+          - bobabnbtestnet
   release:
     types: [published]
 
@@ -41,13 +48,13 @@ jobs:
         run: |
           python -c "import os; file = open('faucet-config.example.yaml', 'w'); file.write(os.environ['FAUCET_CONFIG']); file.close()"
         env:
-          FAUCET_CONFIG: ${{ secrets[format('{0}', )], github.event.inputs.choice }}
+          FAUCET_CONFIG: ${{ secrets[format('{0}', )], inputs.faucetConfig }}
 
       - name: Build version specific docker image
-        run: docker build . --file Dockerfile --tag bobanetwork/faucet:v${{ steps.version.outputs.server_version }}
+        run: docker build . --file Dockerfile --tag bobanetwork/faucet:v${{ steps.version.outputs.server_version }}-${{ inputs.network }}
       - name: Push version specific docker image
-        run: docker push bobanetwork/faucet:v${{ steps.version.outputs.server_version }}
+        run: docker push bobanetwork/faucet:v${{ steps.version.outputs.server_version }}-${{ inputs.network }}
       - name: Build v2-stable docker image
-        run: docker build . --file Dockerfile --tag bobanetwork/faucet:v2-stable
+        run: docker build . --file Dockerfile --tag bobanetwork/faucet:v2-stable-${{ inputs.network }}
       - name: Push v2-stable docker image
-        run: docker push bobanetwork/faucet:v2-stable
+        run: docker push bobanetwork/faucet:v2-stable-${{ inputs.network }}
