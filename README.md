@@ -1,8 +1,8 @@
 # PoWFaucet
 <img src="https://faucets.pk910.de/images/logo-cat-small.png" height="90px" />
 
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/pk910/PoWFaucet?label=Latest%20Release)](https://github.com/pk910/PoWFaucet/releases/latest)
-[![codecov](https://codecov.io/gh/pk910/PoWFaucet/branch/master/graph/badge.svg)](https://codecov.io/gh/pk910/PoWFaucet)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/bobanetwork/faucet?label=Latest%20Release)](https://github.com/bobanetwork/faucet/releases/latest)
+[![codecov](https://codecov.io/gh/bobanetwork/faucet/branch/master/graph/badge.svg)](https://codecov.io/gh/bobanetwork/faucet)
 
 
 Modularized faucet for EVM chains with different protection methods (Captcha, Mining, IP, Mainnet Balance, Gitcoin Passport and more)
@@ -17,7 +17,7 @@ For clarification: This faucet does NOT generate new coins with the "mining" pro
 It's just one of the protection methods the faucet uses to prevent anyone from requesting big amount of funds and draining the faucet wallet.
 If you want to run your own instance you need to transfer the funds you want to distribute to the faucet wallet yourself!
 
-For a more detailed description, take a look into the [Project Wiki](https://github.com/pk910/PoWFaucet/wiki)
+For a more detailed description, take a look into the [Project Wiki](https://github.com/bobanetwork/faucet/wiki)
 
 # Instances
 
@@ -71,9 +71,9 @@ For a more detailed description, take a look into the [Project Wiki](https://git
 
 # Run Yourself
 
-Read the [Faucet Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) to see the installation and configuration instructions.
+Read the [Faucet Operator Wiki](https://github.com/bobanetwork/faucet/wiki/Operator-Wiki) to see the installation and configuration instructions.
 
-You can also find some demo instances with different module combinations here: [Demo Instances](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/README.md)
+You can also find some demo instances with different module combinations here: [Demo Instances](https://github.com/bobanetwork/faucet/blob/master/docs/demo/README.md)
 
 # Bugs & Features
 

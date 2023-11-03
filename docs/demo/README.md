@@ -3,7 +3,7 @@
 All demo instances will drop a useless ERC20 token (["PoWC"](https://goerli.etherscan.io/token/0x1ef15b05e6cf521632a8e3a4d86e9b78b19da894)) instead of native funds.
 
 The demo instances are there to show different configuration scenarios with different modules enabled.\
-If your're looking for native testnet funds, use one of my [productive instances](https://github.com/pk910/PoWFaucet#instances).
+If your're looking for native testnet funds, use one of my [productive instances](https://github.com/bobanetwork/faucet#instances).
 
 ### Demo 1
 
@@ -12,7 +12,7 @@ Some additional restrictions for hosting/proxy IP-Ranges & target wallet balance
 
 URL: [https://demo1.faucets.pk910.de/](https://demo1.faucets.pk910.de/)\
 Status Page: [https://demo1.faucets.pk910.de/#/status](https://demo1.faucets.pk910.de/#/status)\
-Configuration: [demo1-config.yaml](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/demo1-config.yaml)
+Configuration: [demo1-config.yaml](https://github.com/bobanetwork/faucet/blob/master/docs/demo/demo1-config.yaml)
 
 Modules:
 * captcha:
@@ -35,7 +35,7 @@ Additional recurring limit, that prevents requesting more than a specific amount
 
 URL: [https://demo2.faucets.pk910.de/](https://demo2.faucets.pk910.de/)\
 Status Page: [https://demo2.faucets.pk910.de/#/status](https://demo2.faucets.pk910.de/#/status)\
-Configuration: [demo2-config.yaml](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/demo2-config.yaml)
+Configuration: [demo2-config.yaml](https://github.com/bobanetwork/faucet/blob/master/docs/demo/demo2-config.yaml)
 
 Modules:
 * captcha:
@@ -54,7 +54,7 @@ Additional recurring limit, that prevents requesting more than a specific amount
 
 URL: [https://demo3.faucets.pk910.de/](https://demo3.faucets.pk910.de/)\
 Status Page: [https://demo3.faucets.pk910.de/#/status](https://demo3.faucets.pk910.de/#/status)\
-Configuration: [demo3-config.yaml](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/demo3-config.yaml)
+Configuration: [demo3-config.yaml](https://github.com/bobanetwork/faucet/blob/master/docs/demo/demo3-config.yaml)
 
 Modules:
 * ensname:
@@ -79,7 +79,7 @@ High protection configuration, mainly based on mining (pow) protection.\
 
 URL: [https://demo4.faucets.pk910.de/](https://demo4.faucets.pk910.de/)\
 Status Page: [https://demo4.faucets.pk910.de/#/status](https://demo4.faucets.pk910.de/#/status)\
-Configuration: [demo4-config.yaml](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/demo4-config.yaml)
+Configuration: [demo4-config.yaml](https://github.com/bobanetwork/faucet/blob/master/docs/demo/demo4-config.yaml)
 
 Modules:
 * faucet-outflow:
@@ -106,7 +106,7 @@ Medium protection configuration, mainly based on github login protection.\
 
 URL: [https://demo5.faucets.pk910.de/](https://demo5.faucets.pk910.de/)\
 Status Page: [https://demo5.faucets.pk910.de/#/status](https://demo5.faucets.pk910.de/#/status)\
-Configuration: [demo5-config.yaml](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/demo5-config.yaml)
+Configuration: [demo5-config.yaml](https://github.com/bobanetwork/faucet/blob/master/docs/demo/demo5-config.yaml)
 
 Modules:
 * captcha:

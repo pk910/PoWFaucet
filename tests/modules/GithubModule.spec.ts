@@ -123,7 +123,7 @@ describe("Faucet module: github", () => {
                     name: "PoWFaucet",
                     forkCount: 629,
                     stargazerCount: 1521,
-                    url: "https://github.com/pk910/PoWFaucet",
+                    url: "https://github.com/bobanetwork/faucet",
                   }},
                 ]
               }

@@ -138,7 +138,7 @@ jobs:
           ## Latest automatically built v2 executables. (Unstable development snapshot)
           Built from master branch (commit: ${{ github.sha }})
 
-          Please read the [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) for setup / configuration instructions.
+          Please read the [Operator Wiki](https://github.com/bobanetwork/faucet/wiki/Operator-Wiki) for setup / configuration instructions.
 
           Server Version: ${{ steps.version.outputs.server_version }}
           Client Version: ${{ steps.version.outputs.client_version }}
@@ -146,10 +146,10 @@ jobs:
           ### Release Artifacts
           | Release File  | Description |
           | ------------- | ------------- |
-          | powfaucet-server-all [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-server-all.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs (recommended) |
-          | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (NodeJS 18, 64bit) |
-          | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (NodeJS 18, 64bit) |
-          | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/snapshot/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
+          | powfaucet-server-all [.tar.gz](https://github.com/bobanetwork/faucet/releases/download/snapshot/powfaucet-server-all.tar.gz) / [.zip](https://github.com/bobanetwork/faucet/releases/download/snapshot/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs (recommended) |
+          | [powfaucet-server-win.exe](https://github.com/bobanetwork/faucet/releases/download/snapshot/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (NodeJS 18, 64bit) |
+          | [powfaucet-server-linux](https://github.com/bobanetwork/faucet/releases/download/snapshot/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (NodeJS 18, 64bit) |
+          | powfaucet-static [.tar.gz](https://github.com/bobanetwork/faucet/releases/download/snapshot/powfaucet-static.tar.gz) / [.zip](https://github.com/bobanetwork/faucet/releases/download/snapshot/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/bobanetwork/faucet/wiki/Operator-Wiki)) |
       env:
         GITHUB_TOKEN: ${{ github.token }}
 
@@ -221,9 +221,9 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_HUB_READ_ONLY_USER }}
+          password: ${{ secrets.DOCKER_HUB_READ_ONLY_TOKEN }}
       - name: Build v2-latest docker image
-        run: docker build . --file Dockerfile --tag pk910/powfaucet:v2-latest
+        run: docker build . --file Dockerfile --tag bobanetwork/faucet:v2-latest
       - name: Push v2-latest docker image
-        run: docker push pk910/powfaucet:v2-latest
+        run: docker push bobanetwork/faucet:v2-latest

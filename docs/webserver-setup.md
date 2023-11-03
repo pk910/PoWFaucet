@@ -11,7 +11,7 @@ To setup the faucet with a proper webserver, you just need to point the document
 Apache has a limit of 150 concurrent connections in its default mpm_prefork configuration.
 I'd suggest mpm_event with high limits instead. There is not much traffic going through the client websockets, but it can be a high number of concurrent and long running connections.
 
-See [sitecfg-apache2.conf](https://github.com/pk910/PoWFaucet/blob/master/docs/sitecfg-apache2.conf) for example apache2 site config (used for kiln-faucet.pk910.de)
+See [sitecfg-apache2.conf](https://github.com/bobanetwork/faucet/blob/master/docs/sitecfg-apache2.conf) for example apache2 site config (used for kiln-faucet.pk910.de)
 
 required apache2 modules:
 - proxy
@@ -24,7 +24,7 @@ Nginx seems to work much more reliable with its websocket handling.
 
 ## Nginx webserver config
 
-See [sitecfg-nginx.conf](https://github.com/pk910/PoWFaucet/blob/master/docs/sitecfg-nginx.conf) for example nginx site config (used for goerli-faucet.pk910.de)
+See [sitecfg-nginx.conf](https://github.com/bobanetwork/faucet/blob/master/docs/sitecfg-nginx.conf) for example nginx site config (used for goerli-faucet.pk910.de)
 
 ## Common issue: Connection limits too low
 
