@@ -20,8 +20,8 @@ on:
         options:
           - bobagoerli
           - bobabnbtestnet
-          - bobaeth
           - bobabnb
+          - bobaeth
 
 jobs:
   run_tests:

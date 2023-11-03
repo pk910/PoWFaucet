@@ -21,8 +21,8 @@ on:
         options:
           - bobagoerli
           - bobabnbtestnet
-          - bobaeth
           - bobabnb
+          - bobaeth
   release:
     types: [published]
 
