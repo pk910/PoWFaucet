@@ -43,6 +43,12 @@ jobs:
         npm install
         node ./build-client.js 
 
+    # override faucet config
+    - name: Use correct faucet config
+      shell: bash
+      run: |
+        echo ${{ secrets.BOBAGOERLI_FAUCET_CONFIG }} > faucet-config.example.yaml
+
     # package bundled release
     - name: Package bundled release
       run: |
