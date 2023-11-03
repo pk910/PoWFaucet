@@ -1,21 +1,21 @@
-
 import Web3 from 'web3';
-import { Contract } from 'web3-eth-contract';
-import { AbiItem } from 'web3-utils';
+import {Contract} from 'web3-eth-contract';
+import {AbiItem} from 'web3-utils';
 import net from 'net';
-import { TransactionReceipt } from 'web3-core';
+import {TransactionReceipt} from 'web3-core';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
 import * as EthUtil from 'ethereumjs-util';
-import { faucetConfig } from '../config/FaucetConfig';
-import { ServiceManager } from '../common/ServiceManager';
-import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
-import { FaucetStatus, FaucetStatusLevel } from '../services/FaucetStatus';
-import { strFormatPlaceholder } from '../utils/StringUtils';
-import { PromiseDfd } from '../utils/PromiseDfd';
+import {faucetConfig} from '../config/FaucetConfig';
+import {ServiceManager} from '../common/ServiceManager';
+import {FaucetLogLevel, FaucetProcess} from '../common/FaucetProcess';
+import {FaucetStatus, FaucetStatusLevel} from '../services/FaucetStatus';
+import {strFormatPlaceholder} from '../utils/StringUtils';
+import {PromiseDfd} from '../utils/PromiseDfd';
 import ERC20_ABI from '../abi/ERC20.json';
-import { sleepPromise } from '../utils/SleepPromise';
-import { EthClaimInfo } from './EthClaimManager';
+import {sleepPromise} from '../utils/SleepPromise';
+import {EthClaimInfo} from './EthClaimManager';
+import {KMSSigner} from "./AwsKmsManager";
 
 export interface WalletState {
   ready: boolean;
@@ -63,7 +63,8 @@ export class EthWalletManager {
   private initialized: boolean;
   private web3: Web3;
   private chainCommon: EthCom.default;
-  private walletKey: Buffer;
+  private walletKey?: Buffer;
+  private awsKms?: KMSSigner;
   private walletAddr: string;
   private walletState: WalletState;
   private tokenState: FaucetTokenState;
@@ -85,12 +86,25 @@ export class EthWalletManager {
     this.startWeb3();
     if(typeof faucetConfig.ethChainId === "number")
       this.initChainCommon(faucetConfig.ethChainId);
-    
-    let privkey = faucetConfig.ethWalletKey;
-    if(privkey.match(/^0x/))
-      privkey = privkey.substring(2);
-    this.walletKey = Buffer.from(privkey, "hex");
-    this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
+
+    if (faucetConfig.ethWalletKey) {
+      let privkey = faucetConfig.ethWalletKey;
+      if (privkey.match(/^0x/))
+        privkey = privkey.substring(2);
+      this.walletKey = Buffer.from(privkey, "hex");
+      this.walletAddr = EthUtil.toChecksumAddress("0x" + EthUtil.privateToAddress(this.walletKey).toString("hex"));
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Using regular private key since private key provided.");
+    } else {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Using AWS KMS since no private key provided.");
+      this.awsKms = new KMSSigner({
+        awsKmsAccessKey: faucetConfig.awsKmsAccessKey,
+        awsKmsSecretKey: faucetConfig.awsKmsSecretKey,
+        awsKmsKeyId: faucetConfig.awsKmsKeyId,
+        awsKmsEndpoint: faucetConfig.awsKmsEndpoint,
+        awsKmsRegion: faucetConfig.awsKmsRegion,
+      })
+      this.walletAddr = await this.awsKms.getSignerAddr();
+    }
 
     await this.loadWalletState();
 
@@ -443,7 +457,11 @@ export class EthWalletManager {
       });
     }
 
-    tx = tx.sign(this.walletKey);
+    if (this.walletKey) {
+      tx = tx.sign(this.walletKey);
+    } else {
+      tx = await this.awsKms.getSignedKmsTx(tx, !faucetConfig.ethLegacyTx)
+    }
     return tx.serialize().toString('hex');
   }
 

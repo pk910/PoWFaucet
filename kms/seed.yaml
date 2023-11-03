@@ -1,0 +1,13 @@
+Keys:
+  Asymmetric:
+    Ecc:
+      - Metadata:
+          KeyId: 0xSigner
+          KeyUsage: SIGN_VERIFY
+          Description: Faucet private key
+          # funded on local network
+        PrivateKeyHex: c526ee95bf44d8fc405a158bb884d9d1238d99f0612e9f33d006bb0789009aaa
+
+Aliases:
+  - AliasName: alias/0xSigner
+    TargetKeyId: 0xSigner
