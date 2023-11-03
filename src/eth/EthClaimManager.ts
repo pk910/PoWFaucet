@@ -120,7 +120,7 @@ export class EthClaimManager {
     if(!this.initialized)
       return;
     this.initialized = false;
-    
+
     EthClaimNotificationClient.resetClaimNotification();
     clearInterval(this.queueInterval);
   }
@@ -131,7 +131,7 @@ export class EthClaimManager {
       let urlParts = req.url.split("?");
       let url = new URLSearchParams(urlParts[1]);
       sessionId = url.get("session");
-    
+
       let sessionInfo: FaucetSessionStoreData
       if(!sessionId || !(sessionInfo = await ServiceManager.GetService(FaucetDatabase).getSession(sessionId)))
         throw "session not found";
@@ -165,7 +165,7 @@ export class EthClaimManager {
   public getQueuedAmount(): bigint | null {
     let totalPending = 0n;
     this.claimTxQueue.forEach((claimTx) => {
-      totalPending += BigInt(claimTx.amount ?? '0');
+      totalPending += BigInt(claimTx.amount);
     });
     return totalPending;
   }
@@ -178,7 +178,7 @@ export class EthClaimManager {
     if(claimInfo.claim.claimStatus === ClaimTxStatus.CONFIRMED) {
       let moduleManager = ServiceManager.GetService(ModuleManager);
       moduleManager.processActionHooks([], ModuleHookAction.SessionClaimed, [claimInfo]);
-      moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(null, BigInt(claimInfo.claim.txFee ?? '0'));
+      moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(null, BigInt(claimInfo.claim.txFee));
       ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimInfo);
     }
     ServiceManager.GetService(FaucetDatabase).updateClaimData(claimInfo.session, claimInfo.claim);
@@ -187,9 +187,6 @@ export class EthClaimManager {
   public async createSessionClaim(sessionData: FaucetSessionStoreData, userInput: any): Promise<EthClaimInfo> {
     if(sessionData.status !== FaucetSessionStatus.CLAIMABLE)
       throw new FaucetError("NOT_CLAIMABLE", "cannot claim session: not claimable (state: " + sessionData.status + ")");
-    if (!sessionData.dropAmount || !faucetConfig.minDropAmount || !faucetConfig.maxDropAmount) {
-      throw new FaucetError("SESSION_INVALID", "Session data is invalid, dropAmounts missing.")
-    }
     if(BigInt(sessionData.dropAmount) < BigInt(faucetConfig.minDropAmount))
       throw new FaucetError("AMOUNT_TOO_LOW", "drop amount lower than minimum");
 
@@ -198,14 +195,14 @@ export class EthClaimManager {
       maxDropAmount = BigInt(sessionData.data["overrideMaxDropAmount"]);
     if(BigInt(sessionData.dropAmount) > maxDropAmount)
       sessionData.dropAmount = maxDropAmount.toString();
-    
+
     let claimInfo: EthClaimInfo = {
       session: sessionData.sessionId,
       target: sessionData.targetAddr,
       amount: sessionData.dropAmount,
       claim: sessionData.claim,
     };
-    
+
     try {
       await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionClaim, [claimInfo, userInput]);
     } catch(ex) {
@@ -214,11 +211,11 @@ export class EthClaimManager {
       else
         throw new FaucetError("INTERNAL_ERROR", "claimSession failed: " + ex.toString());
     }
-    
+
     // prevent multi claim via race condition
     if(this.claimTxDict[sessionData.sessionId])
       throw new FaucetError("RACE_CLAIMING", "cannot claim session: already claiming (race condition)");
-    
+
     claimInfo.claim = {
       claimIdx: this.lastClaimTxIdx++,
       claimStatus: ClaimTxStatus.QUEUE,
@@ -242,13 +239,10 @@ export class EthClaimManager {
     try {
       let walletState = ServiceManager.GetService(EthWalletManager).getWalletState();
       while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
-        if (!faucetConfig.spareFundsAmount || !this.claimTxQueue[0].amount || !faucetConfig.ethTxGasLimit || !faucetConfig.ethTxMaxFee) {
-          throw new Error('Values undefined.')
-        }
         if(faucetConfig.ethQueueNoFunds && (
-          !walletState.ready || 
-          walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(this.claimTxQueue[0].amount) ||
-          walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
+            !walletState.ready ||
+            walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(this.claimTxQueue[0].amount) ||
+            walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
         )) {
           break; // skip processing (out of funds)
         }
@@ -295,15 +289,9 @@ export class EthClaimManager {
       this.updateClaimStatus(claimTx);
       return;
     }
-    if (!faucetConfig.spareFundsAmount || !claimTx.amount || !faucetConfig.ethTxGasLimit || !faucetConfig.ethTxMaxFee) {
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Faucet config invalid.";
-      this.updateClaimStatus(claimTx);
-      return;
-    }
     if(
-      walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(claimTx.amount) ||
-      walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
+        walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(claimTx.amount) ||
+        walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
     ) {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Faucet wallet is out of funds.";
@@ -317,8 +305,8 @@ export class EthClaimManager {
       // send transaction
       let { txPromise } = await ethWalletManager.sendClaimTx(claimTx);
       this.pendingTxQueue[claimTx.claim.txHash] = claimTx;
-      
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount ?? '0')) + "] to: " + claimTx.target + ": " + claimTx.claim.txHash);
+
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount)) + "] to: " + claimTx.target + ": " + claimTx.claim.txHash);
       claimTx.claim.claimStatus = ClaimTxStatus.PENDING;
       this.updateClaimStatus(claimTx);
 
@@ -338,7 +326,6 @@ export class EthClaimManager {
   }>) {
     // await transaction receipt
     txPromise.then((txData) => {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "tx successful" + txData?.toString() + "// " +claimTx?.toString());
       delete this.pendingTxQueue[claimTx.claim.txHash];
       delete this.claimTxDict[claimTx.session];
       claimTx.claim.txBlock = txData.block;
@@ -349,16 +336,11 @@ export class EthClaimManager {
       claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
       this.updateClaimStatus(claimTx);
     }, (error) => {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
       delete this.pendingTxQueue[claimTx.claim.txHash];
       delete this.claimTxDict[claimTx.session];
-      if (error.toString().includes('Cannot convert undefined to a BigInt')) {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " succeeded but unknown typeError: " + error.toString());
-        claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
-      } else {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
-        claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-        claimTx.claim.txError = "Transaction Error: " + error.toString();
-      }
+      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
+      claimTx.claim.txError = "Transaction Error: " + error.toString();
       this.updateClaimStatus(claimTx);
     }).then(() => {
       this.historyTxDict[claimTx.claim.txNonce] = claimTx;
