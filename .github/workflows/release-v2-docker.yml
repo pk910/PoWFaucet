@@ -48,7 +48,7 @@ jobs:
         run: |
           python -c "import os; file = open('faucet-config.example.yaml', 'w'); file.write(os.environ['FAUCET_CONFIG']); file.close()"
         env:
-          FAUCET_CONFIG: ${{ secrets[format('{0}', )], inputs.faucetConfig }}
+          FAUCET_CONFIG: ${{ secrets[format('{0}', inputs.faucetConfig] }}
 
       - name: Build version specific docker image
         run: docker build . --file Dockerfile --tag bobanetwork/faucet:v${{ steps.version.outputs.server_version }}-${{ inputs.network }}
