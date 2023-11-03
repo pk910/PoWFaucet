@@ -1,6 +1,7 @@
 
 export interface IFaucetConfig {
   faucetTitle: string;
+  networkType?: string;
   faucetStatus: IFaucetStatus[];
   faucetImage?: string;
   faucetLogo?: string;

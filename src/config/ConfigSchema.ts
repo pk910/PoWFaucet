@@ -19,6 +19,7 @@ export interface IConfigSchema {
   database: FaucetDatabaseOptions;
 
   faucetTitle: string; // title of the faucet
+  networkType?: string;
   faucetImage?: string; // faucet image displayed on the startpage
   faucetLogo?: string;
   faucetHomeHtml: string; // some additional html to show on the startpage

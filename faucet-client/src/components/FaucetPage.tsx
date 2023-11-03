@@ -15,6 +15,7 @@ import FaucetStatusPage from './status/FaucetStatusPage';
 import QueueStatusPage from './status/QueueStatusPage';
 
 import './FaucetPage.css'
+import {Badge} from "react-bootstrap";
 
 export interface IFaucetPageProps {
   apiUrl: string;
@@ -140,11 +141,14 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
         <FaucetConfigContext.Provider value={this.state.faucetConfig}>
           <FaucetPageContext.Provider value={this.pageContext}>
             <div className="faucet-title">
+              { this.state.faucetConfig.networkType ?
+                  <div style={{width: '100%', textAlign: 'right'}}><Badge bg="secondary">{this.state.faucetConfig.networkType}</Badge></div> : undefined}
               <h1 className="center" style={{width: '100%'}}>
                 {this.state.faucetConfig.faucetLogo ?
                     <img src={this.state.faucetConfig.faucetLogo} className="image" width="40em" height="auto" style={{display: "inline-block", paddingRight: '4px'}} />
                     : null}
-                <span style={{verticalAlign: 'middle', paddingLeft: 3}}>{this.state.faucetConfig.faucetTitle}</span></h1>
+                <span style={{verticalAlign: 'middle', paddingLeft: 3}}>{this.state.faucetConfig.faucetTitle}</span>
+              </h1>
               <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
             </div>
             {this.renderStatusAlerts()}

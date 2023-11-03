@@ -20,6 +20,7 @@ export interface IFaucetApiUrl {
 
 export interface IClientFaucetConfig {
   faucetTitle: string;
+  networkType?: string;
   faucetStatus: IFaucetStatus[];
   faucetStatusHash: string;
   faucetImage: string;
@@ -167,6 +168,7 @@ export class FaucetWebApi {
 
     return {
       faucetTitle: faucetConfig.faucetTitle,
+      networkType: faucetConfig.networkType,
       faucetStatus: faucetStatus.status,
       faucetStatusHash: faucetStatus.hash,
       faucetImage: faucetConfig.faucetImage,
