@@ -47,7 +47,9 @@ jobs:
     - name: Use correct faucet config
       shell: bash
       run: |
-        echo ${{ secrets.BOBAGOERLI_FAUCET_CONFIG }} > faucet-config.example.yaml
+        python -c "import os; file = open('.env', 'w'); file.write(os.environ['FAUCET_CONFIG']); file.close()"
+      env:
+        FAUCET_CONFIG : ${{secrets.BOBAGOERLI_FAUCET_CONFIG}} # todo: use correct network
 
     # package bundled release
     - name: Package bundled release
