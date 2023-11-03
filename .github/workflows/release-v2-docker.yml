@@ -50,10 +50,6 @@ jobs:
         env:
           FAUCET_CONFIG: ${{ secrets[inputs.faucetConfig] }}
 
-      - name: Build version specific docker image
-        run: docker build . --file Dockerfile --tag bobanetwork/faucet:v${{ steps.version.outputs.server_version }}-${{ inputs.network }}
-      - name: Push version specific docker image
-        run: docker push bobanetwork/faucet:v${{ steps.version.outputs.server_version }}-${{ inputs.network }}
       - name: Build v2-stable docker image
         run: docker build . --file Dockerfile --tag bobanetwork/faucet:v2-stable-${{ inputs.network }}
       - name: Push v2-stable docker image
