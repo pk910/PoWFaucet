@@ -18,6 +18,8 @@
     "scripts": "dist/powfaucet.js",
     "assets": [
       "faucet-config.example.yaml",
+      "faucet-config.yaml",
+      "faucet-config-*.yaml",
       "static/**/*"
     ],
     "targets": [
