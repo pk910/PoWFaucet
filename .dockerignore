@@ -2,7 +2,7 @@
 node_modules
 static/index.seo.html
 faucet-config.json
-faucet-config.yaml
+# do not add faucet-config.yaml or faucet-config.example.yaml here
 faucet-config-bnb.yaml
 faucet-config-eth.yaml
 faucet-status.json
