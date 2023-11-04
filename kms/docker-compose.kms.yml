@@ -1,0 +1,16 @@
+version: "3"
+
+services:
+
+  #in no way should this be running in production
+  kms:
+    image: bobanetwork/local-kms:latest
+    environment:
+      PORT: "8888"
+      KMS_REGION: "us-east-2"
+    volumes:
+      - type: bind
+        source: ./seed.yaml
+        target: /init/seed.yaml
+    ports:
+      - 8888:8888

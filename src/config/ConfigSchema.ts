@@ -5,6 +5,7 @@ import { IFaucetStatsConfig } from '../services/FaucetStatsLog';
 import { IFaucetResultSharingConfig } from './ConfigShared';
 import { FaucetDatabaseOptions } from '../db/FaucetDatabase';
 import { IFaucetStatusConfig } from '../services/FaucetStatus';
+import {IKMSSignerConfig} from "../eth/AwsKmsManager";
 
 export interface IConfigSchema {
   version?: 2;
@@ -32,8 +33,15 @@ export interface IConfigSchema {
   httpProxyCount: number; // number of http proxies in front of this faucet
   faucetSecret: string; // random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 
+  // aws kms config alternatively to ethWalletKey
+  awsKmsAccessKey?: string;
+  awsKmsSecretKey?: string;
+  awsKmsKeyId?: string;
+  awsKmsEndpoint?: string;
+  awsKmsRegion?: string;
+
   ethRpcHost: string; // ETH execution layer RPC host
-  ethWalletKey: string; // faucet wallet private key
+  ethWalletKey?: string; // faucet wallet private key
   ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)
   ethLegacyTx: boolean; // use legacy (non-eip1559) transaction type
