@@ -50,3 +50,5 @@ awsKmsKeyId: ""
 awsKmsEndpoint: ""
 awsKmsRegion: ""
 ```
+
+You can use a local instance of AWS KMS by doing `docker-compose ./kms/docker-compose.kms.yml up`.
