@@ -1,20 +1,20 @@
-import { TransactionReceipt } from 'web3-core';
-import { WebSocket } from 'ws';
-import { faucetConfig } from "../config/FaucetConfig";
-import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
-import { ServiceManager } from "../common/ServiceManager";
-import { EthWalletManager } from "./EthWalletManager";
-import { FaucetStatsLog } from "../services/FaucetStatsLog";
-import { FaucetDatabase } from "../db/FaucetDatabase";
-import { EthWalletRefill } from "./EthWalletRefill";
-import { FaucetSessionStatus, FaucetSessionStoreData } from "../session/FaucetSession";
-import { FaucetError } from '../common/FaucetError';
-import { ModuleHookAction, ModuleManager } from '../modules/ModuleManager';
-import { FaucetHttpServer } from '../webserv/FaucetHttpServer';
-import { IncomingMessage } from 'http';
-import { EthClaimNotificationClient, IEthClaimNotificationData } from './EthClaimNotificationClient';
-import { FaucetOutflowModule } from '../modules/faucet-outflow/FaucetOutflowModule';
-import { clearInterval } from 'timers';
+import {TransactionReceipt} from 'web3-core';
+import {WebSocket} from 'ws';
+import {faucetConfig} from "../config/FaucetConfig";
+import {FaucetLogLevel, FaucetProcess} from "../common/FaucetProcess";
+import {ServiceManager} from "../common/ServiceManager";
+import {EthWalletManager} from "./EthWalletManager";
+import {FaucetStatsLog} from "../services/FaucetStatsLog";
+import {FaucetDatabase} from "../db/FaucetDatabase";
+import {EthWalletRefill} from "./EthWalletRefill";
+import {FaucetSessionStatus, FaucetSessionStoreData} from "../session/FaucetSession";
+import {FaucetError} from '../common/FaucetError';
+import {ModuleHookAction, ModuleManager} from '../modules/ModuleManager';
+import {FaucetHttpServer} from '../webserv/FaucetHttpServer';
+import {IncomingMessage} from 'http';
+import {EthClaimNotificationClient, IEthClaimNotificationData} from './EthClaimNotificationClient';
+import {FaucetOutflowModule} from '../modules/faucet-outflow/FaucetOutflowModule';
+import {clearInterval} from 'timers';
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -326,6 +326,7 @@ export class EthClaimManager {
   }>) {
     // await transaction receipt
     txPromise.then((txData) => {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Transaction receipt arrived, changing state..")
       delete this.pendingTxQueue[claimTx.claim.txHash];
       delete this.claimTxDict[claimTx.session];
       claimTx.claim.txBlock = txData.block;

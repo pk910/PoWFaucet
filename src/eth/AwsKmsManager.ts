@@ -2,8 +2,10 @@ import {GetPublicKeyCommand, KMSClient, SignCommand, SignCommandInput, SignComma
 import * as ethutil from 'ethereumjs-util'
 import * as asn1 from 'asn1.js'
 import BN from 'bn.js'
+import Common from '@ethereumjs/common'
 import {FeeMarketEIP1559Transaction, Transaction} from '@ethereumjs/tx'
 import {keccak256} from '@ethersproject/keccak256'
+import * as EthTx from "@ethereumjs/tx";
 
 export interface IKMSSignerConfig {
     awsKmsEndpoint: string
@@ -148,10 +150,44 @@ export class KMSSigner {
     }
 
     public getSignedKmsTx = async (
+        rawTx: Transaction | FeeMarketEIP1559Transaction,
+        supportsEIP1559: boolean,
+    ): Promise<Transaction | FeeMarketEIP1559Transaction> => {
+        const ethAddr = await this.getSignerAddr()
+        const ethAddrHash = ethutil.keccak(Buffer.from(ethAddr))
+        const sig = await this.findEthereumSig(ethAddrHash)
+        const recoveredPubAddr = this.findRightKey(
+            ethAddrHash,
+            sig.r,
+            sig.s,
+            ethAddr,
+            supportsEIP1559
+        )
+        const rawTxObj = {
+            ...rawTx,
+            r: sig.r.toBuffer(),
+            s: sig.s.toBuffer(),
+            v: recoveredPubAddr.v,
+        }
+        let tx: Transaction | FeeMarketEIP1559Transaction;
+        if (supportsEIP1559) {
+            tx = new FeeMarketEIP1559Transaction({
+                ...rawTxObj as any
+            }, {common: rawTxObj.common})
+        } else {
+            tx = new Transaction({
+                ...rawTxObj
+            }, {})
+        }
+
+       return this.signTx(ethAddr, tx, supportsEIP1559);
+    }
+
+    private signTx = async (
+        ethAddr: string,
         tx: Transaction | FeeMarketEIP1559Transaction,
         supportsEIP1559: boolean,
     ) => {
-        const ethAddr = await this.getSignerAddr()
         const msgHash = tx.getMessageToSign(true) // tx.hash();
         const sig = await this.findEthereumSig(msgHash);
 
@@ -174,6 +210,6 @@ export class KMSSigner {
         }
 
         // return signed tx
-        return signedTx
+        return signedTx;
     }
 }

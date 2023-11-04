@@ -318,6 +318,7 @@ export class EthWalletManager {
     receipt: TransactionReceipt;
   }> {
     return this.awaitTransactionReceipt(claimInfo.claim.txHash).then((receipt) => {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Transaction receipt in watcher arrived, changing state..")
       let txfee = BigInt(receipt.effectiveGasPrice ?? '1') * BigInt(receipt.gasUsed ?? '1');
       this.walletState.nativeBalance -= txfee;
       if(!this.tokenState)
@@ -349,6 +350,7 @@ export class EthWalletManager {
         let txResult = await this.sendTransaction(claimInfo.claim.txHex);
         claimInfo.claim.txHash = txResult[0];
         txPromise = txResult[1];
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Transaction submitted, waiting for receipt to arrive.");
       } catch(ex) {
         if(!txError)
           txError = ex;
@@ -376,7 +378,7 @@ export class EthWalletManager {
           throw ex;
         }
       }).then((receipt) => {
-        let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+        let txfee = BigInt(receipt.cumulativeGasUsed ?? '1') * BigInt(receipt.gasUsed ?? '1');
         this.walletState.nativeBalance -= txfee;
         if(!this.tokenState)
           this.walletState.balance -= txfee;
