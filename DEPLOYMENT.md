@@ -21,7 +21,32 @@ Images are tagged in 2 ways:
 Upstream also pushes new images on every push to the master branch. 
 I disabled this for the time being to reduce the consumption of GH action minutes as I don't see an immediate reason to have these images. 
 
-
 ## AWS KMS
-This faucet supports AWS KMS. To enable it you need to remove or comment the private key config in the `faucet-config.yaml`.
+This faucet supports AWS KMS. 
 
+### Create AWS KMS key
+1. Open the right AWS account & go to the KMS management console
+2. Create new key and choose following configuration: 
+- Type: Asymmetric
+- Usage: Signing & verification
+- Specification: ECC_SECG_P256K1
+- Origin: KMS
+- Regional: Multi-region key
+
+### Adapt the faucet-config
+To enable it you need to remove or comment the private key config in the `faucet-config.yaml`.
+
+```yaml
+#ethWalletKey: "0x.."
+```
+
+And then add the following configuration: 
+
+```yaml
+# Alternatively to providing the ethWalletKey we can use awsKMS
+awsKmsAccessKey: ""
+awsKmsSecretKey: ""
+awsKmsKeyId: ""
+awsKmsEndpoint: ""
+awsKmsRegion: ""
+```
