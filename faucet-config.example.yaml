@@ -290,11 +290,11 @@ modules:
     enabled: true
 
     limits: # array of individual limits, which all need to be passed
-      - limitCount: 10
-        limitAmount: 1000000000000000000 # 1 ETH
+      - limitCount: 1
+        limitAmount: 10000000000000000 # 0.001 ETH
         duration: 86400 # 1 day
-      - limitCount: 20
-        limitAmount: 2000000000000000000 # 2 ETH
+      - limitCount: 2
+        limitAmount: 20000000000000000 # 0.002 ETH
         duration: 172800 # 2 days
         byAddrOnly: true
 
