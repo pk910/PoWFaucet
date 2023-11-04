@@ -20,3 +20,13 @@ Images are tagged in 2 ways:
 
 Upstream also pushes new images on every push to the master branch. 
 I disabled this for the time being to reduce the consumption of GH action minutes as I don't see an immediate reason to have these images. 
+
+
+## Create AWS KMS key
+1. Open the right AWS account & go to the KMS management console
+2. Create new key and choose following configuration: 
+- Type: Asymmetric
+- Usage: Signing & verification
+- Specification: ECC_SECG_P256K1
+- Origin: KMS
+- Regional: Multi-region key
