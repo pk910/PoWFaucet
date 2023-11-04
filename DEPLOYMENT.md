@@ -20,3 +20,8 @@ Images are tagged in 2 ways:
 
 Upstream also pushes new images on every push to the master branch. 
 I disabled this for the time being to reduce the consumption of GH action minutes as I don't see an immediate reason to have these images. 
+
+
+## AWS KMS
+This faucet supports AWS KMS. To enable it you need to remove or comment the private key config in the `faucet-config.yaml`.
+
