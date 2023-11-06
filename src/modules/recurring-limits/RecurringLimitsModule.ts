@@ -97,6 +97,8 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
   }
 
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]) {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     let rewardPerc = session.getSessionData("recurring-limits.factor", 100);
     if(rewardPerc !== 100) {
       rewardFactors.push({

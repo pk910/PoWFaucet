@@ -79,6 +79,8 @@ export class PassportModule extends BaseModule<IPassportConfig> {
   }
 
   private async processSessionInfo(session: FaucetSession, moduleState: any): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     if(session.getSessionStatus() !== FaucetSessionStatus.RUNNING)
       return;
     let passportInfo: IPassportInfo = session.getSessionData("passport.data");
@@ -87,6 +89,8 @@ export class PassportModule extends BaseModule<IPassportConfig> {
   }
 
   private processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]): void {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     let passportInfo: IPassportInfo = session.getSessionData("passport.data");
     if(!passportInfo)
       return;

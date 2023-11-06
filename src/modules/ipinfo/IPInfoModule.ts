@@ -82,6 +82,8 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   }
 
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]) {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     let refreshTime = session.getSessionModuleRef("ipinfo.restriction.time") || 0;
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionRestriction: IIPInfoRestriction;
