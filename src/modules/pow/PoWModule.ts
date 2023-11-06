@@ -106,6 +106,8 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   }
 
   private async processSessionInfo(session: FaucetSession, moduleState: any): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     if(session.getSessionStatus() !== FaucetSessionStatus.RUNNING)
       return;
     let powSession = this.getPoWSession(session);
@@ -130,11 +132,15 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   }
 
   private async processSessionRestore(session: FaucetSession): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     let powSession = this.getPoWSession(session);
     this.resetSessionIdleTimer(powSession);
   }
 
   private async processSessionComplete(session: FaucetSession): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
     setTimeout(() => {
       let powSession = this.getPoWSession(session);
       if(session.getSessionStatus() === FaucetSessionStatus.FAILED)
