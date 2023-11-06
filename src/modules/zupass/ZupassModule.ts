@@ -262,7 +262,7 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
         renderTimespan(grant.duration)
       ].join("");
       throw new FaucetError(
-        "GITHUB_LIMIT", 
+        "ZUPASS_LIMIT", 
         errMsg,
       );
     }
@@ -280,7 +280,7 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
           renderTimespan(grant.duration)
         ].join("");
         throw new FaucetError(
-          "GITHUB_LIMIT", 
+          "ZUPASS_LIMIT", 
           errMsg,
         );
       }

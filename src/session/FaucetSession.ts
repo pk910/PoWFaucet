@@ -244,6 +244,7 @@ export class FaucetSession {
     }
 
     if(this.dropAmount < BigInt(faucetConfig.minDropAmount)) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session amount too low: [" + this.dropAmount + "] " + JSON.stringify(this.sessionDataDict));
       return await this.setSessionFailed("AMOUNT_TOO_LOW", "drop amount lower than minimum");
     }
     
