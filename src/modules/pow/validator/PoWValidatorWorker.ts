@@ -1,8 +1,8 @@
 import assert from 'node:assert';
 import { MessagePort } from "worker_threads";
-import { base64ToHex } from "../../../utils/ConvertHelpers";
-import { IPoWValidatorValidateRequest } from "./IPoWValidator";
-import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from '../PoWConfig';
+import { base64ToHex } from "../../../utils/ConvertHelpers.js";
+import { IPoWValidatorValidateRequest } from "./IPoWValidator.js";
+import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from '../PoWConfig.js';
 
 export type PoWHashFn = (nonceHex: string, preimgHex: string, params: PoWCryptoParams) => string;
 
@@ -30,7 +30,7 @@ export class PoWValidatorWorker {
     switch(algo) {
       case PoWHashAlgo.SCRYPT:
         hashFn = await (async () => {
-          let module = await import("../../../../libs/scrypt_wasm");
+          let module = await import("../../../../libs/scrypt_wasm.js");
           await module.getScryptReadyPromise();
           let scrypt = module.getScrypt();
           return (nonce, preimg, params: IPoWSCryptParams) => {
@@ -40,7 +40,7 @@ export class PoWValidatorWorker {
         break;
       case PoWHashAlgo.CRYPTONIGHT:
         hashFn = await (async () => {
-          let module = await import("../../../../libs/cryptonight_wasm");
+          let module = await import("../../../../libs/cryptonight_wasm.js");
           await module.getCryptoNightReadyPromise();
           let cryptonight = module.getCryptoNight();
           return (nonce, preimg, params: IPoWCryptoNightParams) => {
@@ -50,7 +50,7 @@ export class PoWValidatorWorker {
         break;
       case PoWHashAlgo.ARGON2:
         hashFn = await (async () => {
-          let module = await import("../../../../libs/argon2_wasm");
+          let module = await import("../../../../libs/argon2_wasm.js");
           await module.getArgon2ReadyPromise();
           let argon2 = module.getArgon2();
           return (nonce, preimg, params: IPoWArgon2Params) => {

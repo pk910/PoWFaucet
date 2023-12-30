@@ -1,13 +1,13 @@
-import { ServiceManager } from "../../common/ServiceManager";
-import { EthWalletManager } from "../../eth/EthWalletManager";
-import { FaucetSession, FaucetSessionStoreData } from "../../session/FaucetSession";
-import { BaseModule } from "../BaseModule";
-import { ModuleHookAction } from "../ModuleManager";
-import { defaultConfig, IRecurringLimitConfig, IRecurringLimitsConfig } from './RecurringLimitsConfig';
-import { FaucetError } from '../../common/FaucetError';
-import { FaucetDatabase } from "../../db/FaucetDatabase";
-import { renderTimespan } from "../../utils/DateUtils";
-import { ISessionRewardFactor } from "../../session/SessionRewardFactor";
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { EthWalletManager } from "../../eth/EthWalletManager.js";
+import { FaucetSession, FaucetSessionStoreData } from "../../session/FaucetSession.js";
+import { BaseModule } from "../BaseModule.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { defaultConfig, IRecurringLimitConfig, IRecurringLimitsConfig } from './RecurringLimitsConfig.js';
+import { FaucetError } from '../../common/FaucetError.js';
+import { FaucetDatabase } from "../../db/FaucetDatabase.js";
+import { renderTimespan } from "../../utils/DateUtils.js";
+import { ISessionRewardFactor } from "../../session/SessionRewardFactor.js";
 
 export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;

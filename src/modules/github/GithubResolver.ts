@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
-import { faucetConfig } from "../../config/FaucetConfig";
-import { decryptStr, encryptStr } from "../../utils/CryptoUtils";
-import { GithubModule } from "./GithubModule";
+import { faucetConfig } from "../../config/FaucetConfig.js";
+import { decryptStr, encryptStr } from "../../utils/CryptoUtils.js";
+import { GithubModule } from "./GithubModule.js";
 
 export interface IGithubAuthInfo {
   time: number;
@@ -117,7 +117,7 @@ export class GithubResolver {
     let userData = await fetch("https://api.github.com/user", {
       method: 'GET',
       headers: {'Authorization': 'token ' + accessToken}
-    }).then((rsp) => rsp.json());
+    }).then((rsp) => rsp.json()) as any;
     return {
       uid: userData.id,
       user: userData.name,
@@ -200,7 +200,7 @@ export class GithubResolver {
         'Authorization': 'token ' + accessToken,
         'Content-Type': 'application/x-www-form-urlencoded',
       }
-    }).then((rsp) => rsp.json());
+    }).then((rsp) => rsp.json()) as any;
 
     githubInfo.info.ownRepoCount = 0;
     githubInfo.info.ownRepoStars = 0;

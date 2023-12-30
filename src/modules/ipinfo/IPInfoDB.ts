@@ -1,7 +1,7 @@
-import { FaucetDbDriver } from '../../db/FaucetDatabase';
-import { FaucetModuleDB } from '../../db/FaucetModuleDB';
-import { SQL } from '../../db/SQL';
-import { IIPInfo } from './IPInfoResolver';
+import { FaucetDbDriver } from '../../db/FaucetDatabase.js';
+import { FaucetModuleDB } from '../../db/FaucetModuleDB.js';
+import { SQL } from '../../db/SQL.js';
+import { IIPInfo } from './IPInfoResolver.js';
 
 export class IPInfoDB extends FaucetModuleDB {
   protected override latestSchemaVersion = 1;

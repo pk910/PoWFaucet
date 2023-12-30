@@ -1,8 +1,8 @@
-import { FaucetDbDriver } from '../../db/FaucetDatabase';
-import { FaucetModuleDB } from '../../db/FaucetModuleDB';
-import { SQL } from '../../db/SQL';
-import { FaucetSessionStoreData } from '../../session/FaucetSession';
-import { IGithubInfo } from './GithubResolver';
+import { FaucetDbDriver } from '../../db/FaucetDatabase.js';
+import { FaucetModuleDB } from '../../db/FaucetModuleDB.js';
+import { SQL } from '../../db/SQL.js';
+import { FaucetSessionStoreData } from '../../session/FaucetSession.js';
+import { IGithubInfo } from './GithubResolver.js';
 
 export class GithubDB extends FaucetModuleDB {
   protected override latestSchemaVersion = 1;

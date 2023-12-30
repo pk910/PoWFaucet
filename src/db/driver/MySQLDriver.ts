@@ -1,6 +1,6 @@
 import mysql from "mysql";
-import { FaucetDbDriver } from "../FaucetDatabase";
-import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver";
+import { FaucetDbDriver } from "../FaucetDatabase.js";
+import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver.js";
 
 export interface IMySQLOptions {
   driver: FaucetDbDriver.MYSQL;

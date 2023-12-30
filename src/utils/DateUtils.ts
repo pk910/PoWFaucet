@@ -1,4 +1,4 @@
-import { strPadLeft } from "./StringUtils";
+import { strPadLeft } from "./StringUtils.js";
 
 
 export const renderDate = (date: Date, withTime?: boolean, withSec?: boolean): string => {

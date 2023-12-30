@@ -1,7 +1,7 @@
-import { MySQLDriver } from "../db/driver/MySQLDriver";
-import { SQLiteDriver } from "../db/driver/SQLiteDriver";
-import { FaucetDbDriver } from "../db/FaucetDatabase";
-import { SQL } from "../db/SQL";
+import { MySQLDriver } from "../db/driver/MySQLDriver.js";
+import { SQLiteDriver } from "../db/driver/SQLiteDriver.js";
+import { FaucetDbDriver } from "../db/FaucetDatabase.js";
+import { SQL } from "../db/SQL.js";
 
 (async function() {
   // migration config

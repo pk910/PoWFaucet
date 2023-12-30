@@ -1,8 +1,8 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { renderTimespan } from '../src/utils/DateUtils';
-import { getHashedIp } from '../src/utils/HashedInfo';
+import { renderTimespan } from '../src/utils/DateUtils.js';
+import { getHashedIp } from '../src/utils/HashedInfo.js';
 
 
 describe("Utility Functions", () => {

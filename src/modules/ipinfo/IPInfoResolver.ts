@@ -1,7 +1,5 @@
 import fetch from 'node-fetch';
-import { ServiceManager } from '../../common/ServiceManager';
-import { FaucetDatabase } from '../../db/FaucetDatabase';
-import { IPInfoDB } from './IPInfoDB';
+import { IPInfoDB } from './IPInfoDB.js';
 
 
 export interface IIPInfo {

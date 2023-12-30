@@ -1,16 +1,16 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { unbindTestStubs, awaitSleepPromise, bindTestStubs, loadDefaultTestConfig } from './common';
-import { faucetConfig } from '../src/config/FaucetConfig';
-import { EthWalletManager, FaucetCoinType } from '../src/eth/EthWalletManager';
-import { ServiceManager } from '../src/common/ServiceManager';
-import { ClaimTxStatus, EthClaimManager } from '../src/eth/EthClaimManager';
-import { sleepPromise } from '../src/utils/SleepPromise';
-import { FakeProvider } from './stubs/FakeProvider';
-import { FaucetDatabase } from '../src/db/FaucetDatabase';
-import { FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession';
-import { ModuleManager } from '../src/modules/ModuleManager';
+import { unbindTestStubs, awaitSleepPromise, bindTestStubs, loadDefaultTestConfig } from './common.js';
+import { faucetConfig } from '../src/config/FaucetConfig.js';
+import { EthWalletManager, FaucetCoinType } from '../src/eth/EthWalletManager.js';
+import { ServiceManager } from '../src/common/ServiceManager.js';
+import { ClaimTxStatus, EthClaimManager } from '../src/eth/EthClaimManager.js';
+import { sleepPromise } from '../src/utils/SleepPromise.js';
+import { FakeProvider } from './stubs/FakeProvider.js';
+import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
+import { FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession.js';
+import { ModuleManager } from '../src/modules/ModuleManager.js';
 
 describe("ETH Wallet Manager", () => {
   let globalStubs;
@@ -35,6 +35,7 @@ describe("ETH Wallet Manager", () => {
   });
 
   it("check wallet state initialization", async () => {
+    console.log("start");
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_chainId", 1337);
     fakeProvider.injectResponse("eth_getBalance", "1000");
@@ -141,7 +142,7 @@ describe("ETH Wallet Manager", () => {
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
-    let rawTxReq = [];
+    let rawTxReq: any[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
@@ -202,7 +203,7 @@ describe("ETH Wallet Manager", () => {
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
     fakeProvider.injectResponse("eth_subscribe", () => { throw "not supported" });
-    let rawTxReq = [];
+    let rawTxReq: any[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
@@ -277,7 +278,7 @@ describe("ETH Wallet Manager", () => {
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
     fakeProvider.injectResponse("eth_gasPrice", "150000000000"); // 150 gwei
-    let rawTxReq = [];
+    let rawTxReq: any[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
@@ -439,7 +440,7 @@ describe("ETH Wallet Manager", () => {
           console.log("unknown call: ", payload);
       }
     });
-    let rawTxReq = [];
+    let rawTxReq: any[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281331337";

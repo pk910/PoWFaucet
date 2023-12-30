@@ -1,11 +1,11 @@
 import Web3 from 'web3';
 import ENS from 'ethereum-ens';
-import { FaucetSession } from "../../session/FaucetSession";
-import { BaseModule } from "../BaseModule";
-import { ModuleHookAction } from "../ModuleManager";
-import { defaultConfig, IEnsNameConfig } from './EnsNameConfig';
-import { FaucetError } from '../../common/FaucetError';
-import { EthWalletManager } from '../../eth/EthWalletManager';
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { BaseModule } from "../BaseModule.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { defaultConfig, IEnsNameConfig } from './EnsNameConfig.js';
+import { FaucetError } from '../../common/FaucetError.js';
+import { EthWalletManager } from '../../eth/EthWalletManager.js';
 
 export class EnsNameModule extends BaseModule<IEnsNameConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;

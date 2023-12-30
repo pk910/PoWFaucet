@@ -1,7 +1,7 @@
 
 import { Worker, parentPort, workerData } from "node:worker_threads";
-import { DatabaseWorker } from "../db/DatabaseWorker";
-import { PoWValidatorWorker } from "../modules/pow/validator/PoWValidatorWorker";
+import { DatabaseWorker } from "../db/DatabaseWorker.js";
+import { PoWValidatorWorker } from "../modules/pow/validator/PoWValidatorWorker.js";
 
 const WORKER_CLASSES = {
   "database": DatabaseWorker,

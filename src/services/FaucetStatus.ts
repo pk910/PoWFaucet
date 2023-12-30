@@ -1,10 +1,10 @@
 import * as fs from 'fs'
 import * as crypto from "crypto";
-import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig';
-import { isVersionLower } from '../utils/VersionCompare';
-import { FaucetSession } from '../session/FaucetSession';
-import { ServiceManager } from '../common/ServiceManager';
-import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess';
+import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig.js';
+import { isVersionLower } from '../utils/VersionCompare.js';
+import { FaucetSession } from '../session/FaucetSession.js';
+import { ServiceManager } from '../common/ServiceManager.js';
+import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
 
 export enum FaucetStatusLevel {
   INFO    = "info",
@@ -37,7 +37,7 @@ export interface IFaucetStatusConfig {
 
 export class FaucetStatus {
   private initialized: boolean;
-  private updateTimer: NodeJS.Timer;
+  private updateTimer: NodeJS.Timeout;
   private localStatusJson: string;
   private localStatusEntries: IFaucetStatusEntry[] = [];
   private currentStatus: {[key: string]: IFaucetStatusEntry} = {};

@@ -1,12 +1,12 @@
 
 import * as fs from 'fs';
-import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig';
-import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
-import { ServiceManager } from '../common/ServiceManager';
-import { EthWalletManager } from '../eth/EthWalletManager';
-import { FaucetSession } from '../session/FaucetSession';
-import { SessionManager } from '../session/SessionManager';
-import { EthClaimInfo } from '../eth/EthClaimManager';
+import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig.js';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
+import { ServiceManager } from '../common/ServiceManager.js';
+import { EthWalletManager } from '../eth/EthWalletManager.js';
+import { FaucetSession } from '../session/FaucetSession.js';
+import { SessionManager } from '../session/SessionManager.js';
+import { EthClaimInfo } from '../eth/EthClaimManager.js';
 
 export interface IFaucetStatsConfig {
   logfile: string;
@@ -26,7 +26,7 @@ export class FaucetStatsLog {
   private initialized: boolean;
   private enabled: boolean;
   private statsFile: string;
-  private statsTimer: NodeJS.Timer;
+  private statsTimer: NodeJS.Timeout;
 
   public initialize() {
     if(this.initialized)

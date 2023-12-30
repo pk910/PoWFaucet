@@ -39,8 +39,8 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 
-node build_wasm.js > "../../libs/argon2_wasm.js"
+node build_wasm.js > "../../libs/argon2_wasm.cjs"
 
-printf "\n\nbuilt ../libs/argon2_wasm.js successfully!\n\n"
+printf "\n\nbuilt ../libs/argon2_wasm.cjs successfully!\n\n"
 
 

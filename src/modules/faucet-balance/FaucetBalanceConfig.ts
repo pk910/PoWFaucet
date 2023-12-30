@@ -1,4 +1,4 @@
-import { IBaseModuleConfig } from "../BaseModule";
+import { IBaseModuleConfig } from "../BaseModule.js";
 
 export interface IFaucetBalanceConfig extends IBaseModuleConfig {
   fixedRestriction: {

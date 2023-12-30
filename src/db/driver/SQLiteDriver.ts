@@ -1,5 +1,5 @@
-import { FaucetDbDriver } from "../FaucetDatabase";
-import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver";
+import { FaucetDbDriver } from "../FaucetDatabase.js";
+import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver.js";
 
 export interface ISQLiteOptions {
   driver: FaucetDbDriver.SQLITE;
@@ -12,7 +12,7 @@ export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
 
   private static loadSQLite(): Promise<any> {
     if(!this.sqlite) {
-      this.sqlite = import("../../../libs/sqlite3_wasm");
+      this.sqlite = import("../../../libs/sqlite3_wasm.cjs");
     }
     return this.sqlite;
   }
@@ -21,7 +21,7 @@ export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
 
   public override async open(options: ISQLiteOptions): Promise<void> {
     let sqlite = await SQLiteDriver.loadSQLite();
-    this.db = new sqlite.Database(options.file);
+    this.db = new sqlite.default.Database(options.file);
   }
   public override async close(): Promise<void> {
     this.db.close();

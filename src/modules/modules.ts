@@ -1,16 +1,16 @@
-import { CaptchaModule } from "./captcha/CaptchaModule";
-import { ConcurrencyLimitModule } from "./concurrency-limit/ConcurrencyLimitModule";
-import { EnsNameModule } from "./ensname/EnsNameModule";
-import { EthInfoModule } from "./ethinfo/EthInfoModule";
-import { FaucetBalanceModule } from "./faucet-balance/FaucetBalanceModule";
-import { FaucetOutflowModule } from "./faucet-outflow/FaucetOutflowModule";
-import { GithubModule } from "./github/GithubModule";
-import { IPInfoModule } from "./ipinfo/IPInfoModule";
-import { MainnetWalletModule } from "./mainnet-wallet/MainnetWalletModule";
-import { PassportModule } from "./passport/PassportModule";
-import { PoWModule } from "./pow/PoWModule";
-import { RecurringLimitsModule } from "./recurring-limits/RecurringLimitsModule";
-import { WhitelistModule } from "./whitelist/WhitelistModule";
+import { CaptchaModule } from "./captcha/CaptchaModule.js";
+import { ConcurrencyLimitModule } from "./concurrency-limit/ConcurrencyLimitModule.js";
+import { EnsNameModule } from "./ensname/EnsNameModule.js";
+import { EthInfoModule } from "./ethinfo/EthInfoModule.js";
+import { FaucetBalanceModule } from "./faucet-balance/FaucetBalanceModule.js";
+import { FaucetOutflowModule } from "./faucet-outflow/FaucetOutflowModule.js";
+import { GithubModule } from "./github/GithubModule.js";
+import { IPInfoModule } from "./ipinfo/IPInfoModule.js";
+import { MainnetWalletModule } from "./mainnet-wallet/MainnetWalletModule.js";
+import { PassportModule } from "./passport/PassportModule.js";
+import { PoWModule } from "./pow/PoWModule.js";
+import { RecurringLimitsModule } from "./recurring-limits/RecurringLimitsModule.js";
+import { WhitelistModule } from "./whitelist/WhitelistModule.js";
 
 export const MODULE_CLASSES = {
   "captcha": CaptchaModule,

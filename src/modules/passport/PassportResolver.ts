@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import fetch from 'node-fetch';
-import { resolveRelativePath } from '../../config/FaucetConfig';
-import { FaucetProcess, FaucetLogLevel } from "../../common/FaucetProcess";
-import { ServiceManager } from '../../common/ServiceManager';
-import { PassportModule } from './PassportModule';
+import { resolveRelativePath } from '../../config/FaucetConfig.js';
+import { FaucetProcess, FaucetLogLevel } from "../../common/FaucetProcess.js";
+import { ServiceManager } from '../../common/ServiceManager.js';
+import { PassportModule } from './PassportModule.js';
 
 type DIDKitLib = {
   verifyCredential: (vc: string, proofOptions: string) => Promise<string>;
@@ -74,7 +74,7 @@ export class PassportResolver {
 
   public constructor(module: PassportModule) {
     this.module = module;
-    this.didkitPromise = import("../../../libs/didkit_wasm");
+    this.didkitPromise = import("../../../libs/didkit_wasm.js");
   }
 
   private getVerifyTime(): number {
@@ -160,7 +160,7 @@ export class PassportResolver {
         let passportRsp = await fetch("https://api.scorer.gitcoin.co/registry/stamps/" + addr, {
           method: 'GET',
           headers: {'X-API-KEY': this.module.getModuleConfig().scorerApiKey}
-        }).then((rsp) => rsp.json(), (ex) => {
+        }).then((rsp) => rsp.json() as any, (ex) => {
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "API Error while fetching passport: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
         });
         let gotPassport = passportRsp && passportRsp.items && passportRsp.items.length > 0;

@@ -1,17 +1,18 @@
-import path from "path";
+import path, { dirname, basename } from "path";
+import { fileURLToPath } from "url";
 import { isMainThread, workerData } from "node:worker_threads";
-import { loadFaucetConfig, setAppBasePath } from "./config/FaucetConfig";
-import { FaucetWorkers } from "./common/FaucetWorker";
-import { EthWalletManager } from "./eth/EthWalletManager";
-import { FaucetHttpServer } from "./webserv/FaucetHttpServer";
-import { FaucetDatabase } from "./db/FaucetDatabase";
-import { ServiceManager } from "./common/ServiceManager";
-import { FaucetStatsLog } from "./services/FaucetStatsLog";
-import { FaucetLogLevel, FaucetProcess } from "./common/FaucetProcess";
-import { EthClaimManager } from "./eth/EthClaimManager";
-import { ModuleManager } from "./modules/ModuleManager";
-import { SessionManager } from "./session/SessionManager";
-import { FaucetStatus } from "./services/FaucetStatus";
+import { loadFaucetConfig, setAppBasePath } from "./config/FaucetConfig.js";
+import { FaucetWorkers } from "./common/FaucetWorker.js";
+import { EthWalletManager } from "./eth/EthWalletManager.js";
+import { FaucetHttpServer } from "./webserv/FaucetHttpServer.js";
+import { FaucetDatabase } from "./db/FaucetDatabase.js";
+import { ServiceManager } from "./common/ServiceManager.js";
+import { FaucetStatsLog } from "./services/FaucetStatsLog.js";
+import { FaucetLogLevel, FaucetProcess } from "./common/FaucetProcess.js";
+import { EthClaimManager } from "./eth/EthClaimManager.js";
+import { ModuleManager } from "./modules/ModuleManager.js";
+import { SessionManager } from "./session/SessionManager.js";
+import { FaucetStatus } from "./services/FaucetStatus.js";
 
 (async () => {
   if(!isMainThread) {
@@ -19,10 +20,13 @@ import { FaucetStatus } from "./services/FaucetStatus";
   }
   else {
     try {
+      let importUrl = fileURLToPath(import.meta.url);
+      const __dirname = dirname(importUrl);
+
       setAppBasePath(path.join(__dirname, ".."))
       loadFaucetConfig()
       ServiceManager.GetService(FaucetProcess).initialize();
-      ServiceManager.GetService(FaucetWorkers).initialize(__filename);
+      ServiceManager.GetService(FaucetWorkers).initialize(importUrl);
       ServiceManager.GetService(FaucetStatus).initialize();
       ServiceManager.GetService(FaucetStatsLog).initialize();
       await ServiceManager.GetService(FaucetDatabase).initialize();
@@ -34,7 +38,7 @@ import { FaucetStatus } from "./services/FaucetStatus";
 
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
     } catch(ex) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Faucet initialization failed: " + ex.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Faucet initialization failed: " + ex.toString() + " " + ex.stack);
       process.exit(0);
     }
   }

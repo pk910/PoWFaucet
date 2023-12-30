@@ -2,17 +2,17 @@ import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
 import * as nodeFetch from 'node-fetch';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase';
-import { ModuleManager } from '../../src/modules/ModuleManager';
-import { SessionManager } from '../../src/session/SessionManager';
-import { faucetConfig } from '../../src/config/FaucetConfig';
-import { FaucetError } from '../../src/common/FaucetError';
-import { ICaptchaConfig } from '../../src/modules/captcha/CaptchaConfig';
-import { EthClaimManager } from '../../src/eth/EthClaimManager';
-import { HCaptchaApi } from '../../src/modules/captcha/CaptchaModule';
-import { FaucetWebApi } from '../../src/webserv/FaucetWebApi';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common.ts';
+import { ServiceManager } from '../../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
+import { ModuleManager } from '../../src/modules/ModuleManager.js';
+import { SessionManager } from '../../src/session/SessionManager.js';
+import { faucetConfig } from '../../src/config/FaucetConfig.js';
+import { FaucetError } from '../../src/common/FaucetError.js';
+import { ICaptchaConfig } from '../../src/modules/captcha/CaptchaConfig.js';
+import { EthClaimManager } from '../../src/eth/EthClaimManager.js';
+import { HCaptchaApi } from '../../src/modules/captcha/CaptchaModule.js';
+import { FaucetWebApi } from '../../src/webserv/FaucetWebApi.js';
 
 
 describe("Faucet module: captcha", () => {

@@ -1,18 +1,18 @@
 
 import { Worker } from "node:worker_threads";
-import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig';
-import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
-import { ServiceManager } from '../common/ServiceManager';
-import { FaucetSessionStatus, FaucetSessionStoreData } from '../session/FaucetSession';
-import { BaseModule } from '../modules/BaseModule';
-import { ClaimTxStatus, EthClaimData } from '../eth/EthClaimManager';
-import { FaucetModuleDB } from './FaucetModuleDB';
-import { BaseDriver } from './driver/BaseDriver';
-import { ISQLiteOptions } from './driver/SQLiteDriver';
-import { WorkerDriver } from './driver/WorkerDriver';
-import { FaucetWorkers } from '../common/FaucetWorker';
-import { IMySQLOptions, MySQLDriver } from "./driver/MySQLDriver";
-import { SQL } from "./SQL";
+import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig.js';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
+import { ServiceManager } from '../common/ServiceManager.js';
+import { FaucetSessionStatus, FaucetSessionStoreData } from '../session/FaucetSession.js';
+import { BaseModule } from '../modules/BaseModule.js';
+import { ClaimTxStatus, EthClaimData } from '../eth/EthClaimManager.js';
+import { FaucetModuleDB } from './FaucetModuleDB.js';
+import { BaseDriver } from './driver/BaseDriver.js';
+import { ISQLiteOptions } from './driver/SQLiteDriver.js';
+import { WorkerDriver } from './driver/WorkerDriver.js';
+import { FaucetWorkers } from '../common/FaucetWorker.js';
+import { IMySQLOptions, MySQLDriver } from "./driver/MySQLDriver.js";
+import { SQL } from "./SQL.js";
 
 export type FaucetDatabaseOptions = ISQLiteOptions | IMySQLOptions;
 
@@ -24,7 +24,7 @@ export enum FaucetDbDriver {
 export class FaucetDatabase {
 
   private initialized: boolean;
-  private cleanupTimer: NodeJS.Timer;
+  private cleanupTimer: NodeJS.Timeout;
   private db: BaseDriver;
   private dbWorker: Worker;
   private moduleDBs: {[module: string]: FaucetModuleDB} = {};

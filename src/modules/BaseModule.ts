@@ -1,4 +1,4 @@
-import { ModuleManager } from "./ModuleManager";
+import { ModuleManager } from "./ModuleManager.js";
 
 export interface IBaseModuleConfig {
   enabled: boolean;

@@ -1,14 +1,14 @@
-import { FaucetError } from "../common/FaucetError";
-import { ServiceManager } from "../common/ServiceManager";
-import { faucetConfig } from "../config/FaucetConfig";
-import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager";
-import { EthClaimData, EthClaimManager } from "../eth/EthClaimManager";
-import { FaucetDatabase } from "../db/FaucetDatabase";
-import { getNewGuid } from "../utils/GuidUtils";
-import { SessionManager } from "./SessionManager";
-import { ISessionRewardFactor } from "./SessionRewardFactor";
-import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
-import { FaucetStatsLog } from "../services/FaucetStatsLog";
+import { FaucetError } from "../common/FaucetError.js";
+import { ServiceManager } from "../common/ServiceManager.js";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
+import { EthClaimData, EthClaimManager } from "../eth/EthClaimManager.js";
+import { FaucetDatabase } from "../db/FaucetDatabase.js";
+import { getNewGuid } from "../utils/GuidUtils.js";
+import { SessionManager } from "./SessionManager.js";
+import { ISessionRewardFactor } from "./SessionRewardFactor.js";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 
 export enum FaucetSessionStatus {
   UNKNOWN = "unknown",
@@ -35,7 +35,7 @@ export interface FaucetSessionStoreData {
   remoteIP: string;
   tasks: any;
   data: any;
-  claim: EthClaimData;
+  claim: EthClaimData | null;
 }
 
 export interface IClientSessionInfo {

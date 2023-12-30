@@ -1,9 +1,9 @@
 import { MessagePort } from "worker_threads";
 import assert from 'node:assert';
-import { BaseDriver } from "./driver/BaseDriver";
-import { FaucetDatabaseOptions } from "./FaucetDatabase";
-import { SQLiteDriver } from "./driver/SQLiteDriver";
-import { MySQLDriver } from "./driver/MySQLDriver";
+import { BaseDriver } from "./driver/BaseDriver.js";
+import { FaucetDatabaseOptions } from "./FaucetDatabase.js";
+import { SQLiteDriver } from "./driver/SQLiteDriver.js";
+import { MySQLDriver } from "./driver/MySQLDriver.js";
 
 export class DatabaseWorker {
   private port: MessagePort;

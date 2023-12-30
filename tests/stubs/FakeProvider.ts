@@ -21,17 +21,21 @@ export class FakeProvider extends TypedEmitter {
     return methodCalls[methodCalls.length - 1];
   }
 
-  public send(payload) {
+  public send(payload, callback) {
+    console.log("stub.send", payload, callback)
     let response;
     if(Array.isArray(payload))
       response = this.getResponses(payload);
     else
       response = this.getResponse(payload);
     
-    return response;
+    setTimeout(function(){
+      callback(null, response);
+    }, 1);
   }
 
   public sendAsync(payload, callback) {
+    console.log("stub.sendAsync", payload)
     let response;
     if(Array.isArray(payload))
       response = this.getResponses(payload);

@@ -1,14 +1,11 @@
 import * as fs from 'fs';
 import YAML from 'yaml'
-import { ServiceManager } from "../../common/ServiceManager";
-import { FaucetSession } from "../../session/FaucetSession";
-import { BaseModule } from "../BaseModule";
-import { ModuleHookAction } from "../ModuleManager";
-import { FaucetError } from '../../common/FaucetError';
-import { defaultConfig, IWhitelistConfig, IWhitelistEntryConfig } from "./WhitelistConfig";
-import { resolveRelativePath } from "../../config/FaucetConfig";
-import { ISessionRewardFactor } from '../../session/SessionRewardFactor';
-import { FaucetLogLevel, FaucetProcess } from '../../common/FaucetProcess';
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { BaseModule } from "../BaseModule.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { defaultConfig, IWhitelistConfig, IWhitelistEntryConfig } from "./WhitelistConfig.js";
+import { resolveRelativePath } from "../../config/FaucetConfig.js";
+import { ISessionRewardFactor } from '../../session/SessionRewardFactor.js';
 
 export class WhitelistModule extends BaseModule<IWhitelistConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;

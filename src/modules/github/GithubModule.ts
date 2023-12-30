@@ -1,20 +1,20 @@
-import { ServiceManager } from "../../common/ServiceManager";
-import { EthWalletManager } from "../../eth/EthWalletManager";
-import { FaucetSession } from "../../session/FaucetSession";
-import { BaseModule } from "../BaseModule";
-import { ModuleHookAction } from "../ModuleManager";
-import { defaultConfig, IGithubRestrictionConfig, IGithubConfig } from './GithubConfig';
-import { FaucetError } from '../../common/FaucetError';
-import { FaucetDatabase } from "../../db/FaucetDatabase";
-import { renderTimespan } from "../../utils/DateUtils";
-import { FaucetWebApi, IFaucetApiUrl } from "../../webserv/FaucetWebApi";
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { EthWalletManager } from "../../eth/EthWalletManager.js";
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { BaseModule } from "../BaseModule.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { defaultConfig, IGithubRestrictionConfig, IGithubConfig } from './GithubConfig.js';
+import { FaucetError } from '../../common/FaucetError.js';
+import { FaucetDatabase } from "../../db/FaucetDatabase.js";
+import { renderTimespan } from "../../utils/DateUtils.js";
+import { FaucetWebApi, IFaucetApiUrl } from "../../webserv/FaucetWebApi.js";
 import { IncomingMessage } from "http";
-import { faucetConfig } from "../../config/FaucetConfig";
-import { FaucetHttpResponse } from "../../webserv/FaucetHttpServer";
-import { GithubResolver, IGithubInfo, IGithubInfoOpts } from './GithubResolver';
-import { GithubDB } from './GithubDB';
-import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess";
-import { ISessionRewardFactor } from "../../session/SessionRewardFactor";
+import { faucetConfig } from "../../config/FaucetConfig.js";
+import { FaucetHttpResponse } from "../../webserv/FaucetHttpServer.js";
+import { GithubResolver, IGithubInfo, IGithubInfoOpts } from './GithubResolver.js';
+import { GithubDB } from './GithubDB.js';
+import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
+import { ISessionRewardFactor } from "../../session/SessionRewardFactor.js";
 
 export class GithubModule extends BaseModule<IGithubConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;

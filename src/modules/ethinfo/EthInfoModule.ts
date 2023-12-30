@@ -1,10 +1,10 @@
-import { ServiceManager } from "../../common/ServiceManager";
-import { EthWalletManager } from "../../eth/EthWalletManager";
-import { FaucetSession } from "../../session/FaucetSession";
-import { BaseModule } from "../BaseModule";
-import { ModuleHookAction } from "../ModuleManager";
-import { defaultConfig, IEthInfoConfig } from './EthInfoConfig';
-import { FaucetError } from '../../common/FaucetError';
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { EthWalletManager } from "../../eth/EthWalletManager.js";
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { BaseModule } from "../BaseModule.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { defaultConfig, IEthInfoConfig } from './EthInfoConfig.js';
+import { FaucetError } from '../../common/FaucetError.js';
 
 export class EthInfoModule extends BaseModule<IEthInfoConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;

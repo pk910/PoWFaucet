@@ -3,10 +3,10 @@ import * as path from 'path';
 import YAML from 'yaml'
 import randomBytes from 'randombytes'
 
-import { ServiceManager } from '../common/ServiceManager';
-import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess';
-import { IConfigSchema } from './ConfigSchema';
-import { getDefaultConfig } from './DefaultConfig';
+import { ServiceManager } from '../common/ServiceManager.js';
+import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
+import { IConfigSchema } from './ConfigSchema.js';
+import { getDefaultConfig } from './DefaultConfig.js';
 
 let cliArgs = (function() {
   let args = {};
@@ -24,8 +24,9 @@ let cliArgs = (function() {
   return args;
 })();
 
-let packageJson = require('../../package.json');
-let internalBasePath = path.join(__dirname, "..", "..");
+
+let packageJson = JSON.parse(fs.readFileSync(path.join(".", "package.json"), 'utf8'));
+let internalBasePath = path.join(".");
 let basePath: string;
 if(cliArgs['datadir']) {
   basePath = cliArgs['datadir'];

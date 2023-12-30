@@ -1,8 +1,8 @@
-import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
-import { ServiceManager } from "../common/ServiceManager";
-import { faucetConfig } from "../config/FaucetConfig";
-import { FaucetDatabase } from "../db/FaucetDatabase";
-import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from "./FaucetSession";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { ServiceManager } from "../common/ServiceManager.js";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { FaucetDatabase } from "../db/FaucetDatabase.js";
+import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from "./FaucetSession.js";
 
 export class SessionManager {
   private initialized: boolean;

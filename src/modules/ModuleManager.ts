@@ -1,8 +1,8 @@
-import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
-import { ServiceManager } from "../common/ServiceManager";
-import { faucetConfig } from "../config/FaucetConfig";
-import { BaseModule } from "./BaseModule";
-import { MODULE_CLASSES } from "./modules";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { ServiceManager } from "../common/ServiceManager.js";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { BaseModule } from "./BaseModule.js";
+import { MODULE_CLASSES } from "./modules.js";
 
 export enum ModuleHookAction {
   ClientConfig,
@@ -85,7 +85,7 @@ export class ModuleManager {
     return this.loadedModules[moduleName] as TModule;
   }
 
-  public addActionHook(module: BaseModule, action: ModuleHookAction, priority: number, name: string, hook: Function) {
+  public addActionHook(module: BaseModule | null, action: ModuleHookAction, priority: number, name: string, hook: Function) {
     let hookList = this.moduleHooks[action];
     if(!hookList)
       hookList = this.moduleHooks[action] = [];

@@ -1,7 +1,7 @@
-import { FaucetDbDriver } from '../../db/FaucetDatabase';
-import { FaucetModuleDB } from '../../db/FaucetModuleDB';
-import { SQL } from '../../db/SQL';
-import { IPassportInfo } from './PassportResolver';
+import { FaucetDbDriver } from '../../db/FaucetDatabase.js';
+import { FaucetModuleDB } from '../../db/FaucetModuleDB.js';
+import { SQL } from '../../db/SQL.js';
+import { IPassportInfo } from './PassportResolver.js';
 
 export class PassportDB extends FaucetModuleDB {
   protected override latestSchemaVersion = 1;
