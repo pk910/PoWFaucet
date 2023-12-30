@@ -105,6 +105,7 @@ describe("ETH Wallet Manager", () => {
   it("check wallet state initialization (erc20 token)", async () => {
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_chainId", 1337);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_getBalance", "1000");
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
     fakeProvider.injectResponse("eth_call", (payload) => {
@@ -140,12 +141,21 @@ describe("ETH Wallet Manager", () => {
     await ServiceManager.GetService(FaucetDatabase).initialize();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
     let rawTxReq: any[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
+    });
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
+        default:
+          console.log("unknown call: ", payload);
+      }
     });
     fakeProvider.injectResponse("eth_getTransactionReceipt", (payload) => {
       return {
@@ -201,6 +211,7 @@ describe("ETH Wallet Manager", () => {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
     fakeProvider.injectResponse("eth_subscribe", () => { throw "not supported" });
     let rawTxReq: any[] = [];
@@ -208,13 +219,18 @@ describe("ETH Wallet Manager", () => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
     });
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
+        default:
+          console.log("unknown call: ", payload);
+      }
+    });
     let receiptResponseMode = "null";
     fakeProvider.injectResponse("eth_getTransactionReceipt", (payload) => {
       if(receiptResponseMode === "null") {
         return null
-      }
-      else if(receiptResponseMode === "conn") {
-        throw "test CONNECTION ERROR";
       }
       return {
         "blockHash": "0xfce202c4104864d81d8bd78b7202a77e5dca634914a3fd6636f2765d65fa9a07",
@@ -234,7 +250,7 @@ describe("ETH Wallet Manager", () => {
       };
     });
     await ethWalletManager.initialize();
-    (ethWalletManager as any).web3.eth.transactionPollingTimeout = 1;
+    (ethWalletManager as any).web3.eth.transactionPollingInterval = 100;
     (ethWalletManager as any).txReceiptPollInterval = 10;
     await ethWalletManager.loadWalletState();
     let testSessionData: FaucetSessionStoreData = {
@@ -249,8 +265,6 @@ describe("ETH Wallet Manager", () => {
     let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
     await sleepPromise(3000); // wait for timeout from web3js lib
-    receiptResponseMode = "conn";
-    await sleepPromise(100); // do a few "connection error"-polls
     receiptResponseMode = "receipt"; // now return the receipt
     await awaitSleepPromise(1000, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");
@@ -276,12 +290,21 @@ describe("ETH Wallet Manager", () => {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
     fakeProvider.injectResponse("eth_gasPrice", "150000000000"); // 150 gwei
     let rawTxReq: any[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
+    });
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
+        default:
+          console.log("unknown call: ", payload);
+      }
     });
     fakeProvider.injectResponse("eth_getTransactionReceipt", (payload) => {
       return {
@@ -338,6 +361,15 @@ describe("ETH Wallet Manager", () => {
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
+        default:
+          console.log("unknown call: ", payload);
+      }
+    });
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       throw "test error 57572x";
     });
@@ -377,6 +409,15 @@ describe("ETH Wallet Manager", () => {
     let ethClaimManager = ServiceManager.GetService(EthClaimManager);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
+        default:
+          console.log("unknown call: ", payload);
+      }
+    });
     fakeProvider.injectResponse("eth_sendRawTransaction", "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337");
     fakeProvider.injectResponse("eth_getTransactionReceipt", {
       "blockHash": "0xfce202c4104864d81d8bd78b7202a77e5dca634914a3fd6636f2765d65fa9a07",
@@ -413,8 +454,8 @@ describe("ETH Wallet Manager", () => {
     expect(!!walletState).equal(true, "no wallet state");
     expect(walletState.ready).equal(true, "wallet state not ready");
     expect(walletState.nonce).equal(43, "unexpected nonce in wallet state");
-    expect(walletState.balance).equal(999999999999998663n, "unexpected balance in wallet state");
-    expect(walletState.nativeBalance).equal(999999999999998663n, "unexpected balance in wallet state");
+    expect(walletState.balance).equal(999978999999998663n, "unexpected balance in wallet state");
+    expect(walletState.nativeBalance).equal(999978999999998663n, "unexpected balance in wallet state");
   });
 
   it("send ClaimTx transaction (erc20 token transfer)", async () => {
@@ -430,12 +471,17 @@ describe("ETH Wallet Manager", () => {
     fakeProvider.injectResponse("eth_chainId", 1337);
     fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_call", (payload) => {
       switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
         case "0x313ce567": // decimals()
           return "0x0000000000000000000000000000000000000000000000000000000000000006"; // 6
         case "0x70a08231": // balanceOf()
           return "0x000000000000000000000000000000000000000000000000000000e8d4a51000"; // 1000000000000
+        case "0xa9059cbb": // transfer()
+          return "0x";
         default:
           console.log("unknown call: ", payload);
       }

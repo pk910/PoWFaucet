@@ -1,23 +1,13 @@
 import 'mocha';
-import sinon from 'sinon';
 import { expect } from 'chai';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from './common';
-import { ServiceManager } from '../src/common/ServiceManager';
-import { FaucetDatabase } from '../src/db/FaucetDatabase';
-import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager';
-import { SessionManager } from '../src/session/SessionManager';
-import { faucetConfig } from '../src/config/FaucetConfig';
-import { FaucetError } from '../src/common/FaucetError';
-import { FaucetSession, FaucetSessionStatus } from '../src/session/FaucetSession';
-import { MODULE_CLASSES } from '../src/modules/modules';
-import { FaucetProcess } from '../src/common/FaucetProcess';
-import { BaseModule } from '../src/modules/BaseModule';
-import { FakeProvider } from './stubs/FakeProvider';
-import { IEnsNameConfig } from '../src/modules/ensname/EnsNameConfig';
-import { IMainnetWalletConfig } from '../src/modules/mainnet-wallet/MainnetWalletConfig';
-import { EthWalletManager } from '../src/eth/EthWalletManager';
-import { EthClaimManager } from '../src/eth/EthClaimManager';
-import { sleepPromise } from '../src/utils/SleepPromise';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from './common.js';
+import { ServiceManager } from '../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
+import { ModuleManager } from '../src/modules/ModuleManager.js';
+import { faucetConfig } from '../src/config/FaucetConfig.js';
+import { FakeProvider } from './stubs/FakeProvider.js';
+import { EthWalletManager } from '../src/eth/EthWalletManager.js';
+import { EthClaimManager } from '../src/eth/EthClaimManager.js';
 
 
 describe("ETH Wallet Refill", () => {
@@ -63,17 +53,22 @@ describe("ETH Wallet Refill", () => {
       "0xca9456991e0aa5d5321e88bba44d405aab401193": "900000000000000000000",
       "0xa5058fbcd09425e922e3e9e78d569ab84edb88eb": "2000000000000000000000",
     };
-    fakeProvider.injectResponse("eth_getBalance", (payload) => balances[payload.params[0]]); // 900 ETH
+    fakeProvider.injectResponse("eth_getBalance", (payload) => balances[payload.params[0].toLowerCase()]); // 900 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_call", (payload) => {
       switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
         case "0xeb5a662e": // getAllowance()
           return "0x00000000000000000000000000000000000000000000003635c9adc5dea00000"; // 1000 ETH
+        case "0x2e1a7d4d": // withdraw()
+          return "0x";
         default:
           console.log("unknown call: ", payload);
       }
     });
-    let rawTxReq = [];
+    let rawTxReq: any[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
@@ -114,9 +109,18 @@ describe("ETH Wallet Refill", () => {
       "0xca9456991e0aa5d5321e88bba44d405aab401193": "3000000000000000000000",
       "0xa5058fbcd09425e922e3e9e78d569ab84edb88eb": "2000000000000000000000",
     };
-    fakeProvider.injectResponse("eth_getBalance", (payload) => balances[payload.params[0]]); // 900 ETH
+    fakeProvider.injectResponse("eth_getBalance", (payload) => balances[payload.params[0].toLowerCase()]); // 900 ETH
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
-    let rawTxReq = [];
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
+        default:
+          console.log("unknown call: ", payload);
+      }
+    });
+    let rawTxReq: any[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       rawTxReq.push(payload);
       return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";

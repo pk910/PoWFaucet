@@ -326,16 +326,20 @@ export class EthClaimManager {
   }>) {
     // await transaction receipt
     txPromise.then((txData) => {
+      claimTx.claim.txFee = txData.fee.toString();
+      if(!txData.status) {
+        throw "transaction reverted";
+      }
+
       delete this.pendingTxQueue[claimTx.claim.txHash];
       delete this.claimTxDict[claimTx.session];
       claimTx.claim.txBlock = txData.block;
-      claimTx.claim.txFee = txData.fee.toString();
 
       this.lastConfirmedClaimTxIdx = claimTx.claim.claimIdx;
 
       claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
       this.updateClaimStatus(claimTx);
-    }, (error) => {
+    }).catch((error) => {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
       delete this.pendingTxQueue[claimTx.claim.txHash];
       delete this.claimTxDict[claimTx.session];

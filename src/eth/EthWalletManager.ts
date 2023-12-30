@@ -148,7 +148,7 @@ export class EthWalletManager {
           getTransferData: (addr: string, amount: bigint) => tokenContract.methods['transfer'](addr, amount).encodeABI(),
         };
         tokenContract.methods.decimals().call().then((res) => {
-          this.tokenState.decimals = res as number;
+          this.tokenState.decimals = Number(res);
         });
         break;
       default:
@@ -307,7 +307,7 @@ export class EthWalletManager {
       if(!this.tokenState)
         this.walletState.balance -= txfee;
       return {
-        status: (!!receipt.status) as boolean,
+        status: Number(receipt.status) > 0,
         block: Number(receipt.blockNumber),
         fee: txfee,
         receipt: receipt,
@@ -365,7 +365,7 @@ export class EthWalletManager {
         if(!this.tokenState)
           this.walletState.balance -= txfee;
         return {
-          status: (!!receipt.status) as boolean,
+          status: Number(receipt.status) > 0,
           block: Number(receipt.blockNumber),
           fee: txfee,
           receipt: receipt,
@@ -394,7 +394,7 @@ export class EthWalletManager {
         if(!this.tokenState)
           this.walletState.balance -= txfee;
         return {
-          status: (!!receipt.status) as boolean,
+          status: Number(receipt.status) > 0,
           block: Number(receipt.blockNumber),
           fee: txfee,
           receipt: receipt,
