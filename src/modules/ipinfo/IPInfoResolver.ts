@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import { FetchUtil } from '../../utils/FetchUtil.js';
 import { IPInfoDB } from './IPInfoDB.js';
 
 
@@ -45,7 +45,7 @@ export class IPInfoResolver {
       return this.ipInfoCache[ipAddr][1];
 
     let ipApiUrl = this.ipInfoApi.replace(/{ip}/, ipAddr);
-    let promise = fetch(ipApiUrl)
+    let promise = FetchUtil.fetch(ipApiUrl)
     .then((rsp) => rsp.json())
     .then((rsp: any) => {
       if(!rsp || !rsp.status)

@@ -156,7 +156,7 @@ export class FaucetWebApi {
     return faucetHtml;
   }
 
-  public onGetFaucetConfig(clientVersion: string, sessionId: string): IClientFaucetConfig {
+  public onGetFaucetConfig(clientVersion?: string, sessionId?: string): IClientFaucetConfig {
     let faucetSession = sessionId ? ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING, FaucetSessionStatus.CLAIMABLE]) : null;
     let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(clientVersion, faucetSession);
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);

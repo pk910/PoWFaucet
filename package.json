@@ -3,19 +3,19 @@
   "version": "2.0.9",
   "description": "PoW Faucet Server",
   "main": "dist/app.js",
-  "bin": "dist/powfaucet.js",
+  "bin": "bundle/powfaucet.cjs",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "tsc && node dist/app.js",
-    "bundle": "webpack --mode production",
-    "test": "mocha --exit -r ts-node/register --trace-warnings 'tests/**/*.ts'",
-    "test-coverage": "nyc --reporter=text --reporter=lcov mocha --exit -r ts-node/register 'tests/**/*.ts'"
+    "bundle": "tsc && webpack --mode production",
+    "test": "mocha --exit --trace-warnings 'tests/**/*.ts'",
+    "test-coverage": "c8 --reporter=text --reporter=lcov mocha --exit -r ts-node/register 'tests/**/*.ts'"
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",
   "pkg": {
-    "scripts": "dist/powfaucet.js",
+    "scripts": "bundle/*.cjs",
     "assets": [
       "faucet-config.example.yaml",
       "static/**/*"
@@ -24,17 +24,19 @@
       "node18-linux-x64",
       "node18-win-x64"
     ],
-    "outputPath": "dist"
+    "outputPath": "bin"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
     "@types/chai": "^4.3.11",
     "@types/mocha": "^10.0.6",
     "@types/mysql": "^2.15.25",
+    "@types/node-fetch": "^2.6.10",
     "@types/node-static": "^0.7.11",
     "@types/randombytes": "^2.0.3",
     "@types/sinon": "^17.0.2",
     "@types/ws": "^8.5.10",
+    "c8": "^8.0.1",
     "chai": "^5.0.0",
     "mocha": "^10.2.0",
     "nyc": "^15.1.0",
@@ -52,15 +54,15 @@
     "@ethereumjs/tx": "^5.1.0",
     "@types/node": "^20.10.5",
     "bignumber.js": "^9.1.2",
-    "ethereum-ens": "^0.8.0",
     "ethereumjs-util": "^7.1.5",
     "hcaptcha": "^0.1.1",
     "html-entities": "^2.4.0",
     "mysql": "^2.18.1",
-    "node-fetch": "^2.6.11",
+    "node-fetch": "^2.7.0",
     "randombytes": "^2.1.0",
     "tiny-typed-emitter": "^2.1.0",
     "web3": "^4.3.0",
+    "web3-eth-ens": "^4.0.8",
     "web3-providers-ipc": "^4.0.7",
     "ws": "^8.16.0",
     "yaml": "^2.3.4"

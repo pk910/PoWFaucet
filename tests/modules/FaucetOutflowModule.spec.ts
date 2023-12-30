@@ -1,17 +1,17 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase';
-import { ModuleManager } from '../../src/modules/ModuleManager';
-import { SessionManager } from '../../src/session/SessionManager';
-import { faucetConfig } from '../../src/config/FaucetConfig';
-import { IFaucetOutflowConfig } from '../../src/modules/faucet-outflow/FaucetOutflowConfig';
-import { FakeProvider } from '../stubs/FakeProvider';
-import { EthWalletManager } from '../../src/eth/EthWalletManager';
-import { sleepPromise } from '../../src/utils/SleepPromise';
-import { FaucetOutflowModule } from '../../src/modules/faucet-outflow/FaucetOutflowModule';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig } from '../common.js';
+import { ServiceManager } from '../../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
+import { ModuleManager } from '../../src/modules/ModuleManager.js';
+import { SessionManager } from '../../src/session/SessionManager.js';
+import { faucetConfig } from '../../src/config/FaucetConfig.js';
+import { IFaucetOutflowConfig } from '../../src/modules/faucet-outflow/FaucetOutflowConfig.js';
+import { FakeProvider } from '../stubs/FakeProvider.js';
+import { EthWalletManager } from '../../src/eth/EthWalletManager.js';
+import { sleepPromise } from '../../src/utils/SleepPromise.js';
+import { FaucetOutflowModule } from '../../src/modules/faucet-outflow/FaucetOutflowModule.js';
 
 
 describe("Faucet module: faucet-outflow", () => {

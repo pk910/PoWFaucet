@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import { FetchUtil } from '../../utils/FetchUtil.js';
 import { faucetConfig } from "../../config/FaucetConfig.js";
 import { decryptStr, encryptStr } from "../../utils/CryptoUtils.js";
 import { GithubModule } from "./GithubModule.js";
@@ -63,7 +63,7 @@ export class GithubResolver {
       tokenReqData.append("client_id", this.module.getModuleConfig().appClientId);
       tokenReqData.append("client_secret", this.module.getModuleConfig().appSecret);
       tokenReqData.append("code", authCode);
-      let tokenRsp = await fetch("https://github.com/login/oauth/access_token", {
+      let tokenRsp = await FetchUtil.fetch("https://github.com/login/oauth/access_token", {
         method: 'POST',
         body: tokenReqData,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'}
@@ -114,7 +114,7 @@ export class GithubResolver {
   }
 
   private async fetchProfileInfo(accessToken: string): Promise<IGithubUserInfo> {
-    let userData = await fetch("https://api.github.com/user", {
+    let userData = await FetchUtil.fetch("https://api.github.com/user", {
       method: 'GET',
       headers: {'Authorization': 'token ' + accessToken}
     }).then((rsp) => rsp.json()) as any;
@@ -191,7 +191,7 @@ export class GithubResolver {
         }
       }
     }`;
-    let graphData = await fetch("https://api.github.com/graphql", {
+    let graphData = await FetchUtil.fetch("https://api.github.com/graphql", {
       method: 'POST',
       body: JSON.stringify({
         query: graphQuery,

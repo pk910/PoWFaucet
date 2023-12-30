@@ -1,22 +1,19 @@
-const path = require('path');
+import path, { dirname } from 'path'
+import { fileURLToPath } from "url";
 
-module.exports = {
-  entry: './src/app.ts',
+let importUrl = fileURLToPath(import.meta.url);
+const __dirname = dirname(importUrl);
+
+export default {
+  entry: './dist/app.js',
   target: 'node',
-  module: {
-    rules: [
-      {
-        test: /\.ts?$/,
-        use: 'ts-loader',
-        exclude: /node_modules/,
-      },
-    ],
-  },
   resolve: {
     extensions: ['.ts', '.js'],
   },
   output: {
-    filename: 'powfaucet.js',
-    path: path.resolve(__dirname, 'dist'),
+    filename: 'powfaucet.cjs',
+    chunkFilename: 'powfaucet-[name].cjs',
+    path: path.resolve(__dirname, 'bundle'),
+    libraryTarget: 'umd',
   }
 };

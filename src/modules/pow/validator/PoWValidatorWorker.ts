@@ -30,9 +30,9 @@ export class PoWValidatorWorker {
     switch(algo) {
       case PoWHashAlgo.SCRYPT:
         hashFn = await (async () => {
-          let module = await import("../../../../libs/scrypt_wasm.js");
-          await module.getScryptReadyPromise();
-          let scrypt = module.getScrypt();
+          let module = await import("../../../../libs/scrypt_wasm.cjs");
+          await module.default.getScryptReadyPromise();
+          let scrypt = module.default.getScrypt();
           return (nonce, preimg, params: IPoWSCryptParams) => {
             return scrypt(nonce, preimg, params.cpuAndMemory, params.blockSize, params.parallelization, params.keyLength);
           };
@@ -40,9 +40,9 @@ export class PoWValidatorWorker {
         break;
       case PoWHashAlgo.CRYPTONIGHT:
         hashFn = await (async () => {
-          let module = await import("../../../../libs/cryptonight_wasm.js");
-          await module.getCryptoNightReadyPromise();
-          let cryptonight = module.getCryptoNight();
+          let module = await import("../../../../libs/cryptonight_wasm.cjs");
+          await module.default.getCryptoNightReadyPromise();
+          let cryptonight = module.default.getCryptoNight();
           return (nonce, preimg, params: IPoWCryptoNightParams) => {
             return cryptonight(preimg + nonce, params.algo, params.variant, params.height);
           };
@@ -50,9 +50,9 @@ export class PoWValidatorWorker {
         break;
       case PoWHashAlgo.ARGON2:
         hashFn = await (async () => {
-          let module = await import("../../../../libs/argon2_wasm.js");
-          await module.getArgon2ReadyPromise();
-          let argon2 = module.getArgon2();
+          let module = await import("../../../../libs/argon2_wasm.cjs");
+          await module.default.getArgon2ReadyPromise();
+          let argon2 = module.default.getArgon2();
           return (nonce, preimg, params: IPoWArgon2Params) => {
             return argon2(nonce, preimg, params.keyLength, params.timeCost, params.memoryCost, params.parallelization, params.type, params.version);
           };

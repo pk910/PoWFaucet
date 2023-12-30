@@ -1,5 +1,7 @@
 .nyc_output/
+bin/
 build/
+bundle/
 coverage/
 dist/
 node_modules/

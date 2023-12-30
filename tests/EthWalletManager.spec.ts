@@ -35,7 +35,6 @@ describe("ETH Wallet Manager", () => {
   });
 
   it("check wallet state initialization", async () => {
-    console.log("start");
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_chainId", 1337);
     fakeProvider.injectResponse("eth_getBalance", "1000");
