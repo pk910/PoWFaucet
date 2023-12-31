@@ -20,7 +20,7 @@ jobs:
 
     - uses: actions/setup-node@v3
       with:
-        node-version: 18.15.0
+        node-version: 21
 
     - run: npm install
     - run: npm run test-coverage
@@ -40,7 +40,7 @@ jobs:
     # setup global dependencies
     - uses: actions/setup-node@v3
       with:
-        node-version: 18.15.0
+        node-version: 20
     - run: npm install -g pkg
 
     # build server project
