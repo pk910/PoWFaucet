@@ -41,15 +41,15 @@ jobs:
     - name: Upload powfaucet.js artifact
       uses: actions/upload-artifact@v3
       with:
-        path: ./dist/powfaucet.js
+        path: ./bundle/powfaucet.cjs
         name: powfaucet.js
     - name: Upload linux binary artifact
       uses: actions/upload-artifact@v3
       with:
-        path: ./dist/pow-faucet-server-linux
+        path: ./bin/pow-faucet-server-linux
         name: powfaucet-server-linux
     - name: Upload windows binary artifact
       uses: actions/upload-artifact@v3
       with:
-        path: ./dist/pow-faucet-server-win.exe
+        path: ./bin/pow-faucet-server-win.exe
         name: powfaucet-server-win.exe

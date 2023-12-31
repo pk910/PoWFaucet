@@ -1,5 +1,6 @@
 import path, { dirname } from 'path'
 import { fileURLToPath } from "url";
+import webpack from "webpack";
 
 let importUrl = fileURLToPath(import.meta.url);
 const __dirname = dirname(importUrl);
@@ -12,8 +13,11 @@ export default {
   },
   output: {
     filename: 'powfaucet.cjs',
-    chunkFilename: 'powfaucet-[name].cjs',
     path: path.resolve(__dirname, 'bundle'),
-    libraryTarget: 'umd',
-  }
+  },
+  plugins: [
+    new webpack.optimize.LimitChunkCountPlugin({
+      maxChunks: 1,
+    }),
+  ],
 };

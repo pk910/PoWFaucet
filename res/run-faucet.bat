@@ -1,2 +1,2 @@
 
-node --no-deprecation .\dist\powfaucet.js
+node --no-deprecation .\bundle\powfaucet.cjs
