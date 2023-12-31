@@ -1,16 +1,15 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase';
-import { ModuleHookAction, ModuleManager } from '../../src/modules/ModuleManager';
-import { SessionManager } from '../../src/session/SessionManager';
-import { faucetConfig } from '../../src/config/FaucetConfig';
-import { IRecurringLimitsConfig } from '../../src/modules/recurring-limits/RecurringLimitsConfig';
-import { FaucetError } from '../../src/common/FaucetError';
-import { IConcurrencyLimitConfig } from '../../src/modules/concurrency-limit/ConcurrencyLimitConfig';
-import { FaucetSession } from '../../src/session/FaucetSession';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common.js';
+import { ServiceManager } from '../../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
+import { ModuleHookAction, ModuleManager } from '../../src/modules/ModuleManager.js';
+import { SessionManager } from '../../src/session/SessionManager.js';
+import { faucetConfig } from '../../src/config/FaucetConfig.js';
+import { FaucetError } from '../../src/common/FaucetError.js';
+import { IConcurrencyLimitConfig } from '../../src/modules/concurrency-limit/ConcurrencyLimitConfig.js';
+import { FaucetSession } from '../../src/session/FaucetSession.js';
 
 
 describe("Faucet module: concurrency-limit", () => {
@@ -53,7 +52,7 @@ describe("Faucet module: concurrency-limit", () => {
       session.addBlockingTask("test", "test1", 1);
     });
     await runTestSession("8.8.8.8", "0x0000000000000000000000000000000000001337", "running");
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await runTestSession("8.8.8.8", "0x0000000000000000000000000000000000001338");
     } catch(ex) {
@@ -61,8 +60,8 @@ describe("Faucet module: concurrency-limit", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
-    expect(error.message).to.matches(/test-error-message/, "unexpected error message");
+    expect(error?.getCode()).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
+    expect(error?.message).to.matches(/test-error-message/, "unexpected error message");
   });
 
   it("Exceed limit by addr", async () => {
@@ -80,7 +79,7 @@ describe("Faucet module: concurrency-limit", () => {
       session.addBlockingTask("test", "test1", 1);
     });
     await runTestSession("8.8.8.8", "0x0000000000000000000000000000000000001337", "running");
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await runTestSession("8.8.8.8", "0x0000000000000000000000000000000000001337");
     } catch(ex) {
@@ -88,8 +87,8 @@ describe("Faucet module: concurrency-limit", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
-    expect(error.message).to.matches(/test-error-message/, "unexpected error message");
+    expect(error?.getCode()).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
+    expect(error?.message).to.matches(/test-error-message/, "unexpected error message");
   });
 
   it("Exceed limit by addr or ip", async () => {
@@ -109,7 +108,7 @@ describe("Faucet module: concurrency-limit", () => {
     });
     await runTestSession("8.8.8.8", "0x0000000000000000000000000000000000001337", "running");
     await runTestSession("8.8.4.4", "0x0000000000000000000000000000000000001338", "running");
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await runTestSession("8.8.8.8", "0x0000000000000000000000000000000000001338");
     } catch(ex) {
@@ -117,8 +116,8 @@ describe("Faucet module: concurrency-limit", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
-    expect(error.message).to.matches(/test-error-message/, "unexpected error message");
+    expect(error?.getCode()).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
+    expect(error?.message).to.matches(/test-error-message/, "unexpected error message");
   });
 
 });

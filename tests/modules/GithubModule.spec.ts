@@ -1,19 +1,19 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import * as nodeFetch from 'node-fetch';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase';
-import { ModuleHookAction, ModuleManager } from '../../src/modules/ModuleManager';
-import { SessionManager } from '../../src/session/SessionManager';
-import { faucetConfig } from '../../src/config/FaucetConfig';
-import { FaucetError } from '../../src/common/FaucetError';
-import { IGithubConfig } from '../../src/modules/github/GithubConfig';
-import { FaucetWebApi } from '../../src/webserv/FaucetWebApi';
-import { FaucetSession } from '../../src/session/FaucetSession';
-import { encryptStr } from '../../src/utils/CryptoUtils';
-import { FaucetHttpResponse } from '../../src/webserv/FaucetHttpServer';
+import { FetchUtil } from '../../src/utils/FetchUtil.js';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig } from '../common.js';
+import { ServiceManager } from '../../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
+import { ModuleHookAction, ModuleManager } from '../../src/modules/ModuleManager.js';
+import { SessionManager } from '../../src/session/SessionManager.js';
+import { faucetConfig } from '../../src/config/FaucetConfig.js';
+import { FaucetError } from '../../src/common/FaucetError.js';
+import { IGithubConfig } from '../../src/modules/github/GithubConfig.js';
+import { FaucetWebApi } from '../../src/webserv/FaucetWebApi.js';
+import { FaucetSession } from '../../src/session/FaucetSession.js';
+import { encryptStr } from '../../src/utils/CryptoUtils.js';
+import { FaucetHttpResponse } from '../../src/webserv/FaucetHttpServer.js';
 
 interface IFakeFetchResponse {
   url: RegExp;
@@ -21,7 +21,7 @@ interface IFakeFetchResponse {
   json?: any;
   fail?: boolean;
   promise?: Promise<void>;
-  calls?: {
+  calls: {
     url: string;
     opts: any;
   }[];
@@ -35,7 +35,7 @@ describe("Faucet module: github", () => {
   beforeEach(async () => {
     fakeFetchResponses = [];
     globalStubs = bindTestStubs({
-      "fetch": sinon.stub(nodeFetch, "default").callsFake(fakeFetch),
+      "fetch": sinon.stub(FetchUtil, "fetch").callsFake(fakeFetch),
     });
     loadDefaultTestConfig();
     await ServiceManager.GetService(FaucetDatabase).initialize();
@@ -58,7 +58,7 @@ describe("Faucet module: github", () => {
     await unbindTestStubs(globalStubs);
   });
 
-  function fakeFetch(url: string, opts: any): Promise<any> {
+  function fakeFetch(url: any, opts: any): Promise<any> {
     for(let i = 0; i < fakeFetchResponses.length; i++) {
       if(fakeFetchResponses[i].url.test(url)) {
         let promise = fakeFetchResponses[i].promise || Promise.resolve();
@@ -97,6 +97,7 @@ describe("Faucet module: github", () => {
       authToken: addFakeFetchResponse({
         url: /github\.com\/login\/oauth\/access_token/,
         rsp: { text: () => Promise.resolve("access_token=test_access_token&scope=&token_type=bearer") },
+        calls: [],
       }),
       userInfo: addFakeFetchResponse({
         url: /api\.github\.com\/user$/,
@@ -110,6 +111,7 @@ describe("Faucet module: github", () => {
           public_repos: 10,
           followers: 5,
         },
+        calls: [],
       }),
       ownRepos: addFakeFetchResponse({
         url: /api\.github\.com\/graphql$/,
@@ -129,7 +131,8 @@ describe("Faucet module: github", () => {
               }
             }
           }
-        }
+        },
+        calls: [],
       }),
     };
   }
@@ -143,7 +146,7 @@ describe("Faucet module: github", () => {
 
   it("Check client config exports", async () => {
     await ServiceManager.GetService(ModuleManager).initialize();
-    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig(null, null);
+    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['github']).to.equal(true, "no github config exported");
     expect(clientConfig.modules['github'].clientId).to.equal("test-client-id", "client config missmatch: clientId");
     expect(clientConfig.modules['github'].authTimeout).to.equal(86400, "client config missmatch: authTimeout");
@@ -174,7 +177,7 @@ describe("Faucet module: github", () => {
     let apiRsp = addGithubApiResponses();
     apiRsp.userInfo.fail = true;
     apiRsp.userInfo.rsp = "test-error";
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -185,8 +188,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/missing or invalid github token/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/missing or invalid github token/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(1, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(0, "unexpected number of own repos api calls");
@@ -197,7 +200,7 @@ describe("Faucet module: github", () => {
     (faucetConfig.modules["github"] as IGithubConfig).checks.push({
       required: true,
     });
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -207,8 +210,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/missing or invalid github token/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/missing or invalid github token/, "unexpected error message");
   });
 
   it("Check github requirements: invalid token 1", async () => {
@@ -218,7 +221,7 @@ describe("Faucet module: github", () => {
     });
     let apiRsp = addGithubApiResponses();
     apiRsp.userInfo.json.created_at = new Date().toISOString();
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       let resolver = ServiceManager.GetService(ModuleManager).getModule<any>("github").githubResolver;
       let invalidToken = encryptStr([
@@ -234,8 +237,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/missing or invalid github token/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/missing or invalid github token/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(0, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(0, "unexpected number of own repos api calls");
@@ -248,7 +251,7 @@ describe("Faucet module: github", () => {
     });
     let apiRsp = addGithubApiResponses();
     apiRsp.userInfo.json.created_at = new Date().toISOString();
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       let resolver = ServiceManager.GetService(ModuleManager).getModule<any>("github").githubResolver;
       let invalidToken = encryptStr([
@@ -266,8 +269,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/missing or invalid github token/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/missing or invalid github token/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(0, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(0, "unexpected number of own repos api calls");
@@ -280,7 +283,7 @@ describe("Faucet module: github", () => {
     });
     let apiRsp = addGithubApiResponses();
     apiRsp.userInfo.json.created_at = new Date().toISOString();
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -291,8 +294,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/missing or invalid github token/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/missing or invalid github token/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(0, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(0, "unexpected number of own repos api calls");
@@ -306,7 +309,7 @@ describe("Faucet module: github", () => {
     });
     let apiRsp = addGithubApiResponses();
     apiRsp.userInfo.json.created_at = new Date().toISOString();
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -317,8 +320,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/account age check failed/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/account age check failed/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(1, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(0, "unexpected number of own repos api calls");
@@ -331,7 +334,7 @@ describe("Faucet module: github", () => {
       minRepoCount: 20,
     });
     let apiRsp = addGithubApiResponses();
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -342,8 +345,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/repository count check failed/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/repository count check failed/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(1, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(0, "unexpected number of own repos api calls");
@@ -357,7 +360,7 @@ describe("Faucet module: github", () => {
       message: "test error: {0}",
     });
     let apiRsp = addGithubApiResponses();
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -368,9 +371,9 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/follower count check failed/, "unexpected error message");
-    expect(error.message).to.matches(/test error/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/follower count check failed/, "unexpected error message");
+    expect(error?.message).to.matches(/test error/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(1, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(0, "unexpected number of own repos api calls");
@@ -383,7 +386,7 @@ describe("Faucet module: github", () => {
       minOwnRepoCount: 20,
     });
     let apiRsp = addGithubApiResponses();
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -394,8 +397,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/own repository count check failed/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/own repository count check failed/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(1, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(1, "unexpected number of own repos api calls");
@@ -408,7 +411,7 @@ describe("Faucet module: github", () => {
       minOwnRepoStars: 2000,
     });
     let apiRsp = addGithubApiResponses();
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -419,8 +422,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
-    expect(error.message).to.matches(/own repository star count check failed/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_CHECK", "unexpected error code");
+    expect(error?.message).to.matches(/own repository star count check failed/, "unexpected error message");
 
     expect(apiRsp.userInfo.calls?.length || 0).to.equal(1, "unexpected number of user info api calls");
     expect(apiRsp.ownRepos.calls?.length || 0).to.equal(1, "unexpected number of own repos api calls");
@@ -551,7 +554,7 @@ describe("Faucet module: github", () => {
     expect(testSession1.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession1.getSessionData("github.uid")).to.equal(1337, "unexpected github info in session data: github.uid");
 
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -562,8 +565,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_LIMIT", "unexpected error code");
-    expect(error.message).to.matches(/test-message/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_LIMIT", "unexpected error code");
+    expect(error?.message).to.matches(/test-message/, "unexpected error message");
   });
 
   it("Check github based recurring restrictions: exceed total amount", async () => {
@@ -582,7 +585,7 @@ describe("Faucet module: github", () => {
     expect(testSession1.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession1.getSessionData("github.uid")).to.equal(1337, "unexpected github info in session data: github.uid");
 
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -593,8 +596,8 @@ describe("Faucet module: github", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("GITHUB_LIMIT", "unexpected error code");
-    expect(error.message).to.matches(/test-message/, "unexpected error message");
+    expect(error?.getCode()).to.equal("GITHUB_LIMIT", "unexpected error code");
+    expect(error?.message).to.matches(/test-message/, "unexpected error message");
   });
 
 });

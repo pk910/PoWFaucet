@@ -1,11 +1,11 @@
 import Web3 from 'web3';
-import { ServiceManager } from "../../common/ServiceManager";
-import { EthWalletManager } from "../../eth/EthWalletManager";
-import { FaucetSession } from "../../session/FaucetSession";
-import { BaseModule } from "../BaseModule";
-import { ModuleHookAction } from "../ModuleManager";
-import { defaultConfig, IMainnetWalletConfig } from './MainnetWalletConfig';
-import { FaucetError } from '../../common/FaucetError';
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { EthWalletManager } from "../../eth/EthWalletManager.js";
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { BaseModule } from "../BaseModule.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { defaultConfig, IMainnetWalletConfig } from './MainnetWalletConfig.js';
+import { FaucetError } from '../../common/FaucetError.js';
 
 export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -44,7 +44,7 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
     }
 
     if(this.moduleConfig.minTxCount > 0) {
-      let walletTxCount: number;
+      let walletTxCount: bigint;
       try {
         walletTxCount = await this.web3.eth.getTransactionCount(targetAddr);
       } catch(ex) {

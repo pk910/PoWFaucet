@@ -1,9 +1,9 @@
-import { faucetConfig } from "../config/FaucetConfig";
-import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
-import { ServiceManager } from "../common/ServiceManager";
-import { EthClaimManager } from "./EthClaimManager";
-import { EthWalletManager, TransactionResult } from "./EthWalletManager";
-import { SessionManager } from "../session/SessionManager";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { ServiceManager } from "../common/ServiceManager.js";
+import { EthClaimManager } from "./EthClaimManager.js";
+import { EthWalletManager, TransactionResult } from "./EthWalletManager.js";
+import { SessionManager } from "../session/SessionManager.js";
 
 export class EthWalletRefill {
   private lastWalletRefill: number;

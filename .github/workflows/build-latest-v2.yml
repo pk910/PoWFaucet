@@ -59,8 +59,8 @@ jobs:
       run: |
         mv res/run-faucet.* ./
         chmod +x ./run-faucet.sh
-        tar cfz powfaucet-server-all.tar.gz dist static faucet-config.example.yaml run-faucet.sh
-        zip -r powfaucet-server-all.zip dist static faucet-config.example.yaml run-faucet.bat
+        tar cfz powfaucet-server-all.tar.gz bundle static faucet-config.example.yaml run-faucet.sh
+        zip -r powfaucet-server-all.zip bundle static faucet-config.example.yaml run-faucet.bat
     
     # package static folder
     - name: Package static folder
@@ -158,7 +158,7 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/pow-faucet-server-linux
+        asset_path: ./bin/pow-faucet-server-linux
         asset_name: powfaucet-server-linux
         asset_content_type: application/octet-stream
       env:
@@ -167,7 +167,7 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/pow-faucet-server-win.exe
+        asset_path: ./bin/pow-faucet-server-win.exe
         asset_name: powfaucet-server-win.exe
         asset_content_type: application/octet-stream
       env:

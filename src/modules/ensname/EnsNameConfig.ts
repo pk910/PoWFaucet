@@ -1,4 +1,4 @@
-import { IBaseModuleConfig } from "../BaseModule";
+import { IBaseModuleConfig } from "../BaseModule.js";
 
 export interface IEnsNameConfig extends IBaseModuleConfig {
   rpcHost: string; // ETH execution layer RPC host for ENS resolver

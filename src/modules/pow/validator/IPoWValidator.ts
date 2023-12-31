@@ -1,4 +1,4 @@
-import { PoWCryptoParams, PoWHashAlgo } from "../PoWConfig";
+import { PoWCryptoParams, PoWHashAlgo } from "../PoWConfig.js";
 
 export interface IPoWValidatorValidateRequest {
   shareId: string;

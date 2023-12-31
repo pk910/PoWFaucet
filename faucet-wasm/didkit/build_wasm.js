@@ -43,4 +43,4 @@ librarySrc.push(`
 `);
 librarySrc.push(wasmWrappperLines.join("\n"));
 
-fs.writeFileSync("../../libs/didkit_wasm.js", librarySrc.join("\n"));
+fs.writeFileSync("../../libs/didkit_wasm.cjs", librarySrc.join("\n"));

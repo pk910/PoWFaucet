@@ -1,21 +1,20 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise, createFuse, fusedSleep } from './common';
-import { ServiceManager } from '../src/common/ServiceManager';
-import { FaucetDatabase } from '../src/db/FaucetDatabase';
-import { TransactionReceipt } from 'web3-core';
-import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager';
-import { SessionManager } from '../src/session/SessionManager';
-import { faucetConfig } from '../src/config/FaucetConfig';
-import { FaucetError } from '../src/common/FaucetError';
-import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession';
-import { ClaimTxStatus, EthClaimInfo, EthClaimManager } from '../src/eth/EthClaimManager';
-import { getNewGuid } from '../src/utils/GuidUtils';
-import { EthWalletManager, TransactionResult } from '../src/eth/EthWalletManager';
-import { sleepPromise } from '../src/utils/SleepPromise';
-import { FakeWebSocket, injectFakeWebSocket } from './stubs/FakeWebSocket';
-import { EthClaimNotificationClient } from '../src/eth/EthClaimNotificationClient';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise, createFuse, fusedSleep } from './common.js';
+import { ServiceManager } from '../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
+import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager.js';
+import { SessionManager } from '../src/session/SessionManager.js';
+import { faucetConfig } from '../src/config/FaucetConfig.js';
+import { FaucetError } from '../src/common/FaucetError.js';
+import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession.js';
+import { ClaimTxStatus, EthClaimInfo, EthClaimManager } from '../src/eth/EthClaimManager.js';
+import { getNewGuid } from '../src/utils/GuidUtils.js';
+import { EthWalletManager, TransactionResult } from '../src/eth/EthWalletManager.js';
+import { sleepPromise } from '../src/utils/SleepPromise.js';
+import { FakeWebSocket, injectFakeWebSocket } from './stubs/FakeWebSocket.js';
+import { EthClaimNotificationClient } from '../src/eth/EthClaimNotificationClient.js';
 
 
 describe("ETH Claim Manager", () => {
@@ -54,7 +53,7 @@ describe("ETH Claim Manager", () => {
     return sessionData;
   }
 
-  function getTestReceipt(): TransactionReceipt {
+  function getTestReceipt(): any {
     return {
       status: true,
       transactionHash: null,
@@ -132,7 +131,7 @@ describe("ETH Claim Manager", () => {
       status: boolean;
       block: number;
       fee: bigint;
-      receipt: TransactionReceipt;
+      receipt: any;
     }>} = {
       [ses1.sessionId]: awaitSleepPromise(200, () => txResFuse.ses1).then(() => ({
         status: true,
@@ -179,7 +178,7 @@ describe("ETH Claim Manager", () => {
     await claimManager.initialize();
     let testSession = await addTestSession(FaucetSessionStatus.FAILED, null);
 
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await claimManager.createSessionClaim(testSession, {});
     } catch(ex) {
@@ -187,7 +186,7 @@ describe("ETH Claim Manager", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("NOT_CLAIMABLE", "unexpected error code");
+    expect(error?.getCode()).to.equal("NOT_CLAIMABLE", "unexpected error code");
     expect(claimManager.getTransactionQueue().length).to.equal(0, "unexpected queue count");
   });
 
@@ -200,7 +199,7 @@ describe("ETH Claim Manager", () => {
     let testSession = await addTestSession(FaucetSessionStatus.CLAIMABLE, null);
     claimManager.createSessionClaim(testSession, {});
 
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await claimManager.createSessionClaim(testSession, {});
     } catch(ex) {
@@ -208,7 +207,7 @@ describe("ETH Claim Manager", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("RACE_CLAIMING", "unexpected error code");
+    expect(error?.getCode()).to.equal("RACE_CLAIMING", "unexpected error code");
     expect(claimManager.getTransactionQueue().length).to.equal(1, "unexpected queue count");
   });
 
@@ -218,7 +217,7 @@ describe("ETH Claim Manager", () => {
     await claimManager.initialize();
     let testSession = await addTestSession(FaucetSessionStatus.CLAIMABLE, null);
 
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await claimManager.createSessionClaim(testSession, {});
     } catch(ex) {
@@ -226,7 +225,7 @@ describe("ETH Claim Manager", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("AMOUNT_TOO_LOW", "unexpected error code");
+    expect(error?.getCode()).to.equal("AMOUNT_TOO_LOW", "unexpected error code");
     expect(claimManager.getTransactionQueue().length).to.equal(0, "unexpected queue count");
   });
 
@@ -462,7 +461,7 @@ describe("ETH Claim Manager", () => {
       balance: 1000000000000000000n,
       nativeBalance: 1000000000000000000n,
     });
-    let claimFuses = [];
+    let claimFuses: (() => void)[] = [];
     globalStubs["EthWalletManager.sendClaimTx"].callsFake(() => {
       let claimFuse = createFuse();
       claimFuses.push(claimFuse);

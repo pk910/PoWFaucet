@@ -34,4 +34,4 @@ librarySrc.push(`
 `);
 librarySrc.push(wasmWrappperLines.join("\n"));
 
-fs.writeFileSync("../../libs/sqlite3_wasm.js", librarySrc.join("\n"));
+fs.writeFileSync("../../libs/sqlite3_wasm.cjs", librarySrc.join("\n"));

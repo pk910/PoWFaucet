@@ -1,21 +1,20 @@
 
-import Web3 from 'web3';
-import { Contract } from 'web3-eth-contract';
-import { AbiItem } from 'web3-utils';
+import Web3, { ContractAbi, AbiFragment, TransactionReceipt } from 'web3';
 import net from 'net';
-import { TransactionReceipt } from 'web3-core';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
 import * as EthUtil from 'ethereumjs-util';
-import { faucetConfig } from '../config/FaucetConfig';
-import { ServiceManager } from '../common/ServiceManager';
-import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
-import { FaucetStatus, FaucetStatusLevel } from '../services/FaucetStatus';
-import { strFormatPlaceholder } from '../utils/StringUtils';
-import { PromiseDfd } from '../utils/PromiseDfd';
-import ERC20_ABI from '../abi/ERC20.json';
-import { sleepPromise } from '../utils/SleepPromise';
-import { EthClaimInfo } from './EthClaimManager';
+import { Contract } from 'web3-eth-contract';
+import { faucetConfig } from '../config/FaucetConfig.js';
+import { ServiceManager } from '../common/ServiceManager.js';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
+import { FaucetStatus, FaucetStatusLevel } from '../services/FaucetStatus.js';
+import { strFormatPlaceholder } from '../utils/StringUtils.js';
+import { PromiseDfd } from '../utils/PromiseDfd.js';
+import { sleepPromise } from '../utils/SleepPromise.js';
+import { EthClaimInfo } from './EthClaimManager.js';
+import { Erc20Abi } from '../abi/ERC20.js';
+import IpcProvider from 'web3-providers-ipc';
 
 export interface WalletState {
   ready: boolean;
@@ -27,7 +26,7 @@ export interface WalletState {
 interface FaucetTokenState {
   address: string;
   decimals: number;
-  contract: Contract;
+  contract: Contract<ContractAbi>;
   getBalance(addr: string): Promise<bigint>;
   getTransferData(addr: string, amount: bigint): string;
 }
@@ -55,14 +54,14 @@ export class EthWalletManager {
     else if(rpcHost.match(/^wss?:\/\//))
       return new Web3.providers.WebsocketProvider(rpcHost);
     else if(rpcHost.match(/^\//))
-      return new Web3.providers.IpcProvider(rpcHost, net);
+      return new IpcProvider(rpcHost);
     else
       return new Web3.providers.HttpProvider(rpcHost);
   }
 
   private initialized: boolean;
   private web3: Web3;
-  private chainCommon: EthCom.default;
+  private chainCommon: EthCom.Common;
   private walletKey: Buffer;
   private walletAddr: string;
   private walletState: WalletState;
@@ -84,7 +83,7 @@ export class EthWalletManager {
 
     this.startWeb3();
     if(typeof faucetConfig.ethChainId === "number")
-      this.initChainCommon(faucetConfig.ethChainId);
+      this.initChainCommon(BigInt(faucetConfig.ethChainId));
     
     let privkey = faucetConfig.ethWalletKey;
     if(privkey.match(/^0x/))
@@ -101,14 +100,14 @@ export class EthWalletManager {
     });
   }
 
-  private initChainCommon(chainId: number) {
-    if(this.chainCommon && this.chainCommon.chainIdBN().toNumber() === chainId)
+  private initChainCommon(chainId: bigint) {
+    if(this.chainCommon && this.chainCommon.chainId() === chainId)
       return;
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Web3 ChainCommon initialized with chainId " + chainId);
-    this.chainCommon = EthCom.default.forCustomChain('mainnet', {
+    this.chainCommon = EthCom.Common.custom({
       networkId: chainId,
       chainId: chainId,
-    }, 'london');
+    });
   }
 
   private startWeb3() {
@@ -120,7 +119,7 @@ export class EthWalletManager {
     else
       this.tokenState = null;
 
-    if(provider.on) {
+    try {
       provider.on('error', e => {
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 provider error: " + e.toString());
       });
@@ -132,25 +131,24 @@ export class EthWalletManager {
           this.startWeb3();
         }, 2000);
       });
-    }
+    } catch(ex) {}
   }
 
   private initWeb3Token() {
-    let tokenContract: Contract = null;
     switch(faucetConfig.faucetCoinType) {
       case FaucetCoinType.ERC20:
-        tokenContract = new this.web3.eth.Contract(ERC20_ABI as AbiItem[], faucetConfig.faucetCoinContract, {
+        let tokenContract = new this.web3.eth.Contract(Erc20Abi, faucetConfig.faucetCoinContract, {
           from: this.walletAddr,
         });
         this.tokenState = {
           address: faucetConfig.faucetCoinContract,
           contract: tokenContract,
           decimals: 0,
-          getBalance: (addr: string) => tokenContract.methods['balanceOf'](addr).call(),
+          getBalance: (addr: string) => tokenContract.methods.balanceOf(addr).call(),
           getTransferData: (addr: string, amount: bigint) => tokenContract.methods['transfer'](addr, amount).encodeABI(),
         };
-        tokenContract.methods['decimals']().call().then((res) => {
-          this.tokenState.decimals = parseInt(res);
+        tokenContract.methods.decimals().call().then((res) => {
+          this.tokenState.decimals = Number(res);
         });
         break;
       default:
@@ -188,12 +186,12 @@ export class EthWalletManager {
       else
         throw ex;
     }).then((res) => {
-      this.initChainCommon(res[2]);
+      this.initChainCommon(BigInt(res[2]));
       Object.assign(this.walletState, {
         ready: true,
         balance: this.tokenState ? BigInt(res[3]) : BigInt(res[0]),
         nativeBalance: BigInt(res[0]),
-        nonce: res[1],
+        nonce: Number(res[1]),
       });
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + this.readableAmount(this.walletState.balance) + "  [Nonce: " + this.walletState.nonce + "]");
     }, (err) => {
@@ -291,7 +289,7 @@ export class EthWalletManager {
       return this.walletState?.balance;
   }
 
-  public getContractInterface(addr: string, abi: AbiItem[]): Contract {
+  public getContractInterface(addr: string, abi: AbiFragment[]): Contract<ContractAbi> {
     return new this.web3.eth.Contract(abi, addr, {
       from: this.walletAddr,
     });
@@ -309,8 +307,8 @@ export class EthWalletManager {
       if(!this.tokenState)
         this.walletState.balance -= txfee;
       return {
-        status: !!receipt.status,
-        block: receipt.blockNumber,
+        status: Number(receipt.status) > 0,
+        block: Number(receipt.blockNumber),
         fee: txfee,
         receipt: receipt,
       };
@@ -367,8 +365,8 @@ export class EthWalletManager {
         if(!this.tokenState)
           this.walletState.balance -= txfee;
         return {
-          status: !!receipt.status,
-          block: receipt.blockNumber,
+          status: Number(receipt.status) > 0,
+          block: Number(receipt.blockNumber),
           fee: txfee,
           receipt: receipt,
         };
@@ -396,8 +394,8 @@ export class EthWalletManager {
         if(!this.tokenState)
           this.walletState.balance -= txfee;
         return {
-          status: !!receipt.status,
-          block: receipt.blockNumber,
+          status: Number(receipt.status) > 0,
+          block: Number(receipt.blockNumber),
           fee: txfee,
           receipt: receipt,
         };
@@ -409,15 +407,15 @@ export class EthWalletManager {
     if(target.match(/^0X/))
       target = "0x" + target.substring(2);
 
-    let tx: EthTx.Transaction | EthTx.FeeMarketEIP1559Transaction;
+    let tx: EthTx.LegacyTransaction | EthTx.FeeMarketEIP1559Transaction;
     if(faucetConfig.ethLegacyTx) {
       // legacy transaction
-      let gasPrice = parseInt(await this.web3.eth.getGasPrice());
-      gasPrice += faucetConfig.ethTxPrioFee;
+      let gasPrice = await this.web3.eth.getGasPrice();
+      gasPrice += BigInt(faucetConfig.ethTxPrioFee);
       if(faucetConfig.ethTxMaxFee > 0 && gasPrice > faucetConfig.ethTxMaxFee)
-        gasPrice = faucetConfig.ethTxMaxFee;
+        gasPrice = BigInt(faucetConfig.ethTxMaxFee);
 
-      tx = EthTx.Transaction.fromTxData({
+      tx = EthTx.LegacyTransaction.fromTxData({
         nonce: nonce,
         gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
         gasPrice: gasPrice,
@@ -444,7 +442,7 @@ export class EthWalletManager {
     }
 
     tx = tx.sign(this.walletKey);
-    return tx.serialize().toString('hex');
+    return Buffer.from(tx.serialize()).toString('hex');
   }
 
   private async sendTransaction(txhex: string): Promise<[string, Promise<TransactionReceipt>]> {

@@ -1,20 +1,20 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import * as nodeFetch from 'node-fetch';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import crypto from 'crypto';
 import YAML from 'yaml'
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise, returnDelayedPromise } from '../common';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase';
-import { ModuleManager } from '../../src/modules/ModuleManager';
-import { SessionManager } from '../../src/session/SessionManager';
-import { faucetConfig } from '../../src/config/FaucetConfig';
-import { FaucetError } from '../../src/common/FaucetError';
-import { IIPInfoConfig } from '../../src/modules/ipinfo/IPInfoConfig';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, returnDelayedPromise } from '../common.js';
+import { FetchUtil } from '../../src/utils/FetchUtil.js';
+import { ServiceManager } from '../../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
+import { ModuleManager } from '../../src/modules/ModuleManager.js';
+import { SessionManager } from '../../src/session/SessionManager.js';
+import { faucetConfig } from '../../src/config/FaucetConfig.js';
+import { FaucetError } from '../../src/common/FaucetError.js';
+import { IIPInfoConfig } from '../../src/modules/ipinfo/IPInfoConfig.js';
 
 
 describe("Faucet module: ipinfo", () => {
@@ -22,7 +22,7 @@ describe("Faucet module: ipinfo", () => {
 
   beforeEach(async () => {
     globalStubs = bindTestStubs({
-      "fetch": sinon.stub(nodeFetch, "default"),
+      "fetch": sinon.stub(FetchUtil, "fetch"),
     });
     loadDefaultTestConfig();
     faucetConfig.maxDropAmount = 100;
@@ -99,7 +99,7 @@ describe("Faucet module: ipinfo", () => {
     }));
     await ServiceManager.GetService(ModuleManager).initialize();
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -109,7 +109,7 @@ describe("Faucet module: ipinfo", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_IPINFO", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_IPINFO", "unexpected error code");
   });
 
   it("Start session with failed IP info request (api error)", async () => {
@@ -125,7 +125,7 @@ describe("Faucet module: ipinfo", () => {
     globalStubs["fetch"].returns(returnDelayedPromise(false, "something bad happened"));
     await ServiceManager.GetService(ModuleManager).initialize();
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -135,7 +135,7 @@ describe("Faucet module: ipinfo", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_IPINFO", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_IPINFO", "unexpected error code");
   });
 
   it("check ipinfo based restriction (no restriction)", async () => {

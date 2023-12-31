@@ -1,6 +1,6 @@
-import { BaseModule } from "../modules/BaseModule";
-import { BaseDriver } from "./driver/BaseDriver";
-import { FaucetDatabase } from "./FaucetDatabase";
+import { BaseModule } from "../modules/BaseModule.js";
+import { BaseDriver } from "./driver/BaseDriver.js";
+import { FaucetDatabase } from "./FaucetDatabase.js";
 
 export abstract class FaucetModuleDB {
   protected abstract readonly latestSchemaVersion: number;

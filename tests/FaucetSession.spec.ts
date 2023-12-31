@@ -1,14 +1,14 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from './common';
-import { ServiceManager } from '../src/common/ServiceManager';
-import { FaucetDatabase } from '../src/db/FaucetDatabase';
-import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager';
-import { SessionManager } from '../src/session/SessionManager';
-import { faucetConfig } from '../src/config/FaucetConfig';
-import { FaucetError } from '../src/common/FaucetError';
-import { FaucetSession, FaucetSessionStatus } from '../src/session/FaucetSession';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from './common.js';
+import { ServiceManager } from '../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
+import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager.js';
+import { SessionManager } from '../src/session/SessionManager.js';
+import { faucetConfig } from '../src/config/FaucetConfig.js';
+import { FaucetError } from '../src/common/FaucetError.js';
+import { FaucetSession, FaucetSessionStatus } from '../src/session/FaucetSession.js';
 
 
 describe("Faucet Session Management", () => {
@@ -42,24 +42,24 @@ describe("Faucet Session Management", () => {
 
   it("Create invalid session (missing addr)", async () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await sessionManager.createSession("8.8.8.8", { });
     } catch(ex) { error = ex; }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_ADDR", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_ADDR", "unexpected error code");
   });
 
   it("Create invalid session (invalid addr)", async () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await sessionManager.createSession("8.8.8.8", { addr: "not_a_eth_address" });
     } catch(ex) { error = ex; }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_ADDR", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_ADDR", "unexpected error code");
   });
 
   it("Create session with blocking task", async () => {
@@ -173,14 +173,14 @@ describe("Faucet Session Management", () => {
     expect(testSession).to.not.equal(null, "createSession failed");
     expect(testSession.getBlockingTasks().length).to.equal(2, "unexpected blockingTasks");
     expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.RUNNING, "unexpected session status");
-    let error: FaucetError;
+    let error: FaucetError | null = null;
     try {
       testSession.setTargetAddr("0x0000000000000000000000000000000000001338");
     } catch(ex) {
       error = ex;
     }
     expect(error && error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_STATE", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_STATE", "unexpected error code");
     await testSession.updateRemoteIP("::ffff:8.8.8.8");
     expect(changeAddrCalled).to.equal(0, "SessionIpChange for non-changed ip");
     await testSession.updateRemoteIP("8.8.4.4");

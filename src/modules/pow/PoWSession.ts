@@ -1,5 +1,5 @@
-import { FaucetSession } from "../../session/FaucetSession";
-import { PoWClient } from "./PoWClient";
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { PoWClient } from "./PoWClient.js";
 
 export class PoWSession {
   private session: FaucetSession;

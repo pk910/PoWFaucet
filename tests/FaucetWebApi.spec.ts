@@ -1,20 +1,20 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { bindTestStubs, loadDefaultTestConfig, unbindTestStubs } from './common';
-import { ServiceManager } from '../src/common/ServiceManager';
-import { FaucetWebApi } from '../src/webserv/FaucetWebApi';
+import { bindTestStubs, loadDefaultTestConfig, unbindTestStubs } from './common.js';
+import { ServiceManager } from '../src/common/ServiceManager.js';
+import { FaucetWebApi } from '../src/webserv/FaucetWebApi.js';
 import { IncomingHttpHeaders, IncomingMessage } from 'http';
 import { Socket } from 'net';
-import { FaucetDatabase } from '../src/db/FaucetDatabase';
-import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager';
-import { faucetConfig } from '../src/config/FaucetConfig';
-import { FaucetHttpResponse } from '../src/webserv/FaucetHttpServer';
-import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession';
-import { getNewGuid } from '../src/utils/GuidUtils';
-import { SessionManager } from '../src/session/SessionManager';
-import { EthClaimManager } from '../src/eth/EthClaimManager';
-import { FaucetError } from '../src/common/FaucetError';
+import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
+import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager.js';
+import { faucetConfig } from '../src/config/FaucetConfig.js';
+import { FaucetHttpResponse } from '../src/webserv/FaucetHttpServer.js';
+import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession.js';
+import { getNewGuid } from '../src/utils/GuidUtils.js';
+import { SessionManager } from '../src/session/SessionManager.js';
+import { EthClaimManager } from '../src/eth/EthClaimManager.js';
+import { FaucetError } from '../src/common/FaucetError.js';
 
 describe("Faucet Web API", () => {
   let globalStubs;

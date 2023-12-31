@@ -1,12 +1,13 @@
-import fetch from 'node-fetch';
+
 import * as hcaptcha from "hcaptcha";
-import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess";
-import { ServiceManager } from "../../common/ServiceManager";
-import { FaucetSession, FaucetSessionStoreData } from "../../session/FaucetSession";
-import { BaseModule } from "../BaseModule";
-import { ModuleHookAction } from "../ModuleManager";
-import { defaultConfig, ICaptchaConfig } from "./CaptchaConfig";
-import { FaucetError } from '../../common/FaucetError';
+import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { FaucetSession, FaucetSessionStoreData } from "../../session/FaucetSession.js";
+import { BaseModule } from "../BaseModule.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { defaultConfig, ICaptchaConfig } from "./CaptchaConfig.js";
+import { FaucetError } from '../../common/FaucetError.js';
+import { FetchUtil } from '../../utils/FetchUtil.js';
 
 export class HCaptchaApi {
   public static verify(secret: string, token: string, remoteip?: string, sitekey?: string) {
@@ -94,11 +95,11 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
     verifyData.append("response", token);
     verifyData.append("remoteip", remoteIp);
 
-    let verifyRsp = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+    let verifyRsp = await FetchUtil.fetch("https://www.google.com/recaptcha/api/siteverify", {
       method: 'POST',
       body: verifyData,
       headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-    }).then((rsp) => rsp.json());
+    }).then((rsp) => rsp.json()) as any;
 
     if(!verifyRsp || !verifyRsp.success)
       return false;
@@ -111,11 +112,11 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
     verifyData.append("remoteip", remoteIp);
     verifyData.append("variant", variant);
 
-    let verifyRsp = await fetch(this.moduleConfig.secret, {
+    let verifyRsp = await FetchUtil.fetch(this.moduleConfig.secret, {
       method: 'POST',
       body: verifyData,
       headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-    }).then((rsp) => rsp.json());
+    }).then((rsp) => rsp.json()) as any;
 
     if(!verifyRsp || !verifyRsp.success) {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Captcha verification failed: " + (verifyRsp?.info || ""));

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "ES2022",
     "esModuleInterop": true,
     "target": "esnext",
     "moduleResolution": "node",
@@ -11,6 +11,7 @@
   },
   "lib": ["es2015"],
   "include": [
+    "src/@types",
     "src/app.ts",
     "src/tools/migrateDB.ts"
   ],

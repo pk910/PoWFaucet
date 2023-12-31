@@ -1,11 +1,11 @@
 import * as fs from 'fs';
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { FaucetDatabase } from '../db/FaucetDatabase';
-import { renderDate } from '../utils/DateUtils';
-import { strPadRight } from '../utils/StringUtils';
-import { faucetConfig, loadFaucetConfig, resolveRelativePath } from '../config/FaucetConfig';
-import { ServiceManager } from './ServiceManager';
-import { SessionManager } from '../session/SessionManager';
+import { FaucetDatabase } from '../db/FaucetDatabase.js';
+import { renderDate } from '../utils/DateUtils.js';
+import { strPadRight } from '../utils/StringUtils.js';
+import { faucetConfig, loadFaucetConfig, resolveRelativePath } from '../config/FaucetConfig.js';
+import { ServiceManager } from './ServiceManager.js';
+import { SessionManager } from '../session/SessionManager.js';
 
 
 interface FaucetProcessEvents {

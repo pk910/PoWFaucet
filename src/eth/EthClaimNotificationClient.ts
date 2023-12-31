@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
-import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess";
-import { ServiceManager } from "../common/ServiceManager";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { ServiceManager } from "../common/ServiceManager.js";
 
 export interface IEthClaimNotificationData {
   processedIdx: number;
@@ -26,7 +26,7 @@ export class EthClaimNotificationClient {
   }
 
   private socket: WebSocket;
-  private pingTimer: NodeJS.Timer = null;
+  private pingTimer: NodeJS.Timeout = null;
   private lastPingPong: Date;
   private claimIdx: number;
 

@@ -1,12 +1,12 @@
-import { ServiceManager } from "../../common/ServiceManager";
-import { getNewGuid } from "../../utils/GuidUtils";
-import { PromiseDfd } from "../../utils/PromiseDfd";
-import { PoWSession } from "./PoWSession";
-import { PoWModule } from "./PoWModule";
-import { SessionManager } from "../../session/SessionManager";
-import { FaucetSessionStatus } from "../../session/FaucetSession";
-import { PoWClient } from "./PoWClient";
-import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess";
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { getNewGuid } from "../../utils/GuidUtils.js";
+import { PromiseDfd } from "../../utils/PromiseDfd.js";
+import { PoWSession } from "./PoWSession.js";
+import { PoWModule } from "./PoWModule.js";
+import { SessionManager } from "../../session/SessionManager.js";
+import { FaucetSessionStatus } from "../../session/FaucetSession.js";
+import { PoWClient } from "./PoWClient.js";
+import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -110,7 +110,6 @@ export class PoWShareVerification {
     return activeClients.map((client) => client.getPoWSession()).filter((session, index) => {
       if(!session.activeClient) {
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "PoWModule.getActiveClients returned a inactive client: " + session.getFaucetSession().getSessionId());
-        console.log(activeClients[index]);
         return false;
       }
       return (

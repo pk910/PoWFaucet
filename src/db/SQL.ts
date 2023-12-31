@@ -1,5 +1,5 @@
-import { faucetConfig } from "../config/FaucetConfig";
-import { FaucetDbDriver } from "./FaucetDatabase";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { FaucetDbDriver } from "./FaucetDatabase.js";
 
 export class SQL {
 

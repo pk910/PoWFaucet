@@ -1,10 +1,10 @@
-import { IBaseModuleConfig } from "../BaseModule";
+import { IBaseModuleConfig } from "../BaseModule.js";
 
 export interface IFaucetBalanceConfig extends IBaseModuleConfig {
-  fixedRestriction: {
+  fixedRestriction?: {
     [limit: number]: number; // limit: min balance in wei, value: percent of normal reward (eg. 50 = half rewards)
   };
-  dynamicRestriction: {
+  dynamicRestriction?: {
     targetBalance: number;
   }
 }

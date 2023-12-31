@@ -3,10 +3,10 @@ import * as path from 'path';
 import YAML from 'yaml'
 import randomBytes from 'randombytes'
 
-import { ServiceManager } from '../common/ServiceManager';
-import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess';
-import { IConfigSchema } from './ConfigSchema';
-import { getDefaultConfig } from './DefaultConfig';
+import { ServiceManager } from '../common/ServiceManager.js';
+import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
+import { IConfigSchema } from './ConfigSchema.js';
+import { getDefaultConfig } from './DefaultConfig.js';
 
 let cliArgs = (function() {
   let args = {};
@@ -24,8 +24,8 @@ let cliArgs = (function() {
   return args;
 })();
 
-let packageJson = require('../../package.json');
-let internalBasePath = path.join(__dirname, "..", "..");
+
+let internalBasePath = path.join(".");
 let basePath: string;
 if(cliArgs['datadir']) {
   basePath = cliArgs['datadir'];
@@ -55,7 +55,14 @@ export function setAppBasePath(basePath: string) {
 export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   let config: IConfigSchema;
   let configFile = faucetConfigFile;
-  debugger;
+
+  let faucetVersion: string;
+  if(typeof POWFAUCET_VERSION !== "undefined") {
+    faucetVersion = POWFAUCET_VERSION;
+  } else {
+    let packageJson = JSON.parse(fs.readFileSync(path.join(internalBasePath, "package.json"), 'utf8'));
+    faucetVersion = packageJson.version;
+  }
 
   if(!fs.existsSync(configFile) && !loadDefaultsOnly) {
     // create copy of faucet-config.example.yml
@@ -102,7 +109,7 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     faucetConfig = {} as any;
   Object.assign(faucetConfig, getDefaultConfig(), config, {
     appBasePath: basePath,
-    faucetVersion: packageJson.version,
+    faucetVersion: faucetVersion,
   } as any);
 }
 

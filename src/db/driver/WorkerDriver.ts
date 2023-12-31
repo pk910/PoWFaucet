@@ -1,6 +1,6 @@
-import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver";
+import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver.js";
 import { Worker } from "worker_threads";
-import { PromiseDfd } from "../../utils/PromiseDfd";
+import { PromiseDfd } from "../../utils/PromiseDfd.js";
 
 export interface IWorkerOptions {
   port: Worker;

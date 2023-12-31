@@ -1,18 +1,18 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import * as nodeFetch from 'node-fetch';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase';
-import { ModuleManager } from '../../src/modules/ModuleManager';
-import { SessionManager } from '../../src/session/SessionManager';
-import { faucetConfig } from '../../src/config/FaucetConfig';
-import { FaucetError } from '../../src/common/FaucetError';
-import { ICaptchaConfig } from '../../src/modules/captcha/CaptchaConfig';
-import { EthClaimManager } from '../../src/eth/EthClaimManager';
-import { HCaptchaApi } from '../../src/modules/captcha/CaptchaModule';
-import { FaucetWebApi } from '../../src/webserv/FaucetWebApi';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common.js';
+import { ServiceManager } from '../../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
+import { ModuleManager } from '../../src/modules/ModuleManager.js';
+import { SessionManager } from '../../src/session/SessionManager.js';
+import { faucetConfig } from '../../src/config/FaucetConfig.js';
+import { FaucetError } from '../../src/common/FaucetError.js';
+import { ICaptchaConfig } from '../../src/modules/captcha/CaptchaConfig.js';
+import { EthClaimManager } from '../../src/eth/EthClaimManager.js';
+import { HCaptchaApi } from '../../src/modules/captcha/CaptchaModule.js';
+import { FaucetWebApi } from '../../src/webserv/FaucetWebApi.js';
+import { FetchUtil } from '../../src/utils/FetchUtil.js';
 
 
 describe("Faucet module: captcha", () => {
@@ -20,7 +20,7 @@ describe("Faucet module: captcha", () => {
 
   beforeEach(async () => {
     globalStubs = bindTestStubs({
-      "fetch": sinon.stub(nodeFetch, "default"),
+      "fetch": sinon.stub(FetchUtil, "fetch"),
       "hcaptcha.verify": sinon.stub(HCaptchaApi, "verify"),
     });
     loadDefaultTestConfig();
@@ -43,7 +43,7 @@ describe("Faucet module: captcha", () => {
       checkBalanceClaim: true,
     } as ICaptchaConfig;
     await ServiceManager.GetService(ModuleManager).initialize();
-    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig(null, null);
+    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['captcha']).to.equal(true, "no captcha config exported");
     expect(clientConfig.modules['captcha'].provider).to.equal("hcaptcha", "client config missmatch: provider");
     expect(clientConfig.modules['captcha'].siteKey).to.equal("test-site-key", "client config missmatch: siteKey");
@@ -121,7 +121,7 @@ describe("Faucet module: captcha", () => {
     globalStubs["hcaptcha.verify"].returns(Promise.resolve({
       success: true,
     }));
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -131,7 +131,7 @@ describe("Faucet module: captcha", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
   });
 
   it("Require hcaptcha for session start (invalid token)", async () => {
@@ -148,7 +148,7 @@ describe("Faucet module: captcha", () => {
     globalStubs["hcaptcha.verify"].returns(Promise.resolve({
       success: false,
     }));
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
@@ -159,7 +159,7 @@ describe("Faucet module: captcha", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
   });
 
   it("Require recaptcha for session claim (missing token)", async () => {
@@ -182,7 +182,7 @@ describe("Faucet module: captcha", () => {
       addr: "0x0000000000000000000000000000000000001337",
     });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after start");
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(EthClaimManager).createSessionClaim(testSession.getStoreData(), {});
     } catch(ex) {
@@ -192,7 +192,7 @@ describe("Faucet module: captcha", () => {
     expect(sessionData?.status).to.equal("claimable", "unexpected session status after invalid claim attempt");
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
   });
 
   it("Require recaptcha for session claim (invalid token)", async () => {
@@ -215,7 +215,7 @@ describe("Faucet module: captcha", () => {
       addr: "0x0000000000000000000000000000000000001337",
     });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after start");
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(EthClaimManager).createSessionClaim(testSession.getStoreData(), {
         captchaToken: "test-token",
@@ -227,7 +227,7 @@ describe("Faucet module: captcha", () => {
     expect(sessionData?.status).to.equal("claimable", "unexpected session status after invalid claim attempt");
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
   });
 
   it("Require custom captcha for session start", async () => {
@@ -278,7 +278,7 @@ describe("Faucet module: captcha", () => {
       addr: "0x0000000000000000000000000000000000001337",
     });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after start");
-    let error: FaucetError = null;
+    let error: FaucetError | null = null;
     try {
       await ServiceManager.GetService(EthClaimManager).createSessionClaim(testSession.getStoreData(), {
         captchaToken: "test-token",
@@ -290,7 +290,7 @@ describe("Faucet module: captcha", () => {
     expect(sessionData?.status).to.equal("claimable", "unexpected session status after invalid claim attempt");
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
+    expect(error?.getCode()).to.equal("INVALID_CAPTCHA", "unexpected error code");
   });
 
 });

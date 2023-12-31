@@ -1,16 +1,16 @@
 
-import { ServiceManager } from '../../common/ServiceManager';
-import { BaseModule } from '../BaseModule';
-import { defaultConfig, IPassportConfig } from './PassportConfig';
-import { ModuleHookAction } from '../ModuleManager';
-import { FaucetSession, FaucetSessionStatus } from '../../session/FaucetSession';
-import { ISessionRewardFactor } from '../../session/SessionRewardFactor';
-import { FaucetWebApi, IFaucetApiUrl } from '../../webserv/FaucetWebApi';
-import { IPassportInfo, PassportResolver } from './PassportResolver';
+import { ServiceManager } from '../../common/ServiceManager.js';
+import { BaseModule } from '../BaseModule.js';
+import { defaultConfig, IPassportConfig } from './PassportConfig.js';
+import { ModuleHookAction } from '../ModuleManager.js';
+import { FaucetSession, FaucetSessionStatus } from '../../session/FaucetSession.js';
+import { ISessionRewardFactor } from '../../session/SessionRewardFactor.js';
+import { FaucetWebApi, IFaucetApiUrl } from '../../webserv/FaucetWebApi.js';
+import { IPassportInfo, PassportResolver } from './PassportResolver.js';
 import { IncomingMessage } from 'http';
-import { SessionManager } from '../../session/SessionManager';
-import { PassportDB } from './PassportDB';
-import { FaucetDatabase } from '../../db/FaucetDatabase';
+import { SessionManager } from '../../session/SessionManager.js';
+import { PassportDB } from './PassportDB.js';
+import { FaucetDatabase } from '../../db/FaucetDatabase.js';
 
 export class PassportModule extends BaseModule<IPassportConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;

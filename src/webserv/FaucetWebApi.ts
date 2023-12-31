@@ -1,17 +1,17 @@
 import { IncomingMessage } from "http";
-import { faucetConfig } from "../config/FaucetConfig";
-import { ServiceManager } from "../common/ServiceManager";
-import { EthWalletManager } from "../eth/EthWalletManager";
-import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus";
-import { FaucetHttpResponse } from "./FaucetHttpServer";
-import { SessionManager } from "../session/SessionManager";
-import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData, FaucetSessionTask, IClientSessionInfo } from "../session/FaucetSession";
-import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager";
-import { IFaucetResultSharingConfig } from "../config/ConfigShared";
-import { FaucetError } from "../common/FaucetError";
-import { EthClaimInfo, EthClaimManager } from "../eth/EthClaimManager";
-import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus";
-import { sha256 } from "../utils/CryptoUtils";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { ServiceManager } from "../common/ServiceManager.js";
+import { EthWalletManager } from "../eth/EthWalletManager.js";
+import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus.js";
+import { FaucetHttpResponse } from "./FaucetHttpServer.js";
+import { SessionManager } from "../session/SessionManager.js";
+import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData, FaucetSessionTask, IClientSessionInfo } from "../session/FaucetSession.js";
+import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
+import { IFaucetResultSharingConfig } from "../config/ConfigShared.js";
+import { FaucetError } from "../common/FaucetError.js";
+import { EthClaimInfo, EthClaimManager } from "../eth/EthClaimManager.js";
+import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus.js";
+import { sha256 } from "../utils/CryptoUtils.js";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -156,7 +156,7 @@ export class FaucetWebApi {
     return faucetHtml;
   }
 
-  public onGetFaucetConfig(clientVersion: string, sessionId: string): IClientFaucetConfig {
+  public onGetFaucetConfig(clientVersion?: string, sessionId?: string): IClientFaucetConfig {
     let faucetSession = sessionId ? ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING, FaucetSessionStatus.CLAIMABLE]) : null;
     let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(clientVersion, faucetSession);
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);

@@ -4,12 +4,12 @@ import * as stream from 'node:stream';
 import { createServer, IncomingMessage, Server as HttpServer, ServerResponse } from 'http';
 import { Server as StaticServer } from '@brettz9/node-static';
 import { WebSocket, WebSocketServer } from 'ws';
-import { faucetConfig } from '../config/FaucetConfig';
+import { faucetConfig } from '../config/FaucetConfig.js';
 import { encode } from 'html-entities';
 import { OutgoingHttpHeaders } from 'http2';
-import { FaucetWebApi } from './FaucetWebApi';
-import { ServiceManager } from '../common/ServiceManager';
-import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess';
+import { FaucetWebApi } from './FaucetWebApi.js';
+import { ServiceManager } from '../common/ServiceManager.js';
+import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
 
 export class FaucetHttpResponse {
   public readonly code: number;

@@ -1,7 +1,7 @@
-import { FaucetDbDriver } from "../db/FaucetDatabase";
-import { FaucetCoinType } from "../eth/EthWalletManager";
-import { IConfigSchema } from "./ConfigSchema";
-import { resolveRelativePath } from "./FaucetConfig";
+import { FaucetDbDriver } from "../db/FaucetDatabase.js";
+import { FaucetCoinType } from "../eth/EthWalletManager.js";
+import { IConfigSchema } from "./ConfigSchema.js";
+import { resolveRelativePath } from "./FaucetConfig.js";
 
 export function getDefaultConfig(): IConfigSchema {
   return {

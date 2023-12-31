@@ -1,6 +1,6 @@
 
 import { PoWWorker } from "./PoWWorker";
-import { getScrypt, getScryptReadyPromise, Scrypt } from "../../../libs/scrypt_wasm";
+import { getScrypt, getScryptReadyPromise } from "../../../libs/scrypt_wasm.cjs";
 import { PoWHashAlgo } from "../common/FaucetConfig";
 
 (() => {

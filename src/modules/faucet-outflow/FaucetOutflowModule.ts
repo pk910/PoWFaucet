@@ -1,12 +1,12 @@
 
 import { clearInterval } from "timers";
-import { ServiceManager } from "../../common/ServiceManager";
-import { FaucetDatabase } from "../../db/FaucetDatabase";
-import { BaseModule } from "../BaseModule";
-import { defaultConfig, IFaucetOutflowConfig } from "./FaucetOutflowConfig";
-import { ModuleHookAction } from "../ModuleManager";
-import { FaucetSession } from "../../session/FaucetSession";
-import { ISessionRewardFactor } from "../../session/SessionRewardFactor";
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { FaucetDatabase } from "../../db/FaucetDatabase.js";
+import { BaseModule } from "../BaseModule.js";
+import { defaultConfig, IFaucetOutflowConfig } from "./FaucetOutflowConfig.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { ISessionRewardFactor } from "../../session/SessionRewardFactor.js";
 
 interface OutflowState {
   trackTime: number;
@@ -16,7 +16,7 @@ interface OutflowState {
 export class FaucetOutflowModule extends BaseModule<IFaucetOutflowConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
   private outflowState: OutflowState;
-  private saveTimer: NodeJS.Timer;
+  private saveTimer: NodeJS.Timeout;
   
 
   protected override async startModule(): Promise<void> {

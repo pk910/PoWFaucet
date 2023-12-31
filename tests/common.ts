@@ -1,14 +1,15 @@
 
 import sinon from 'sinon';
+import '../src/@types/global.js';
 import { Worker } from "node:worker_threads";
-import { FaucetProcess } from '../src/common/FaucetProcess';
-import { ServiceManager } from '../src/common/ServiceManager';
-import { FaucetWorkers } from '../src/common/FaucetWorker';
-import { sleepPromise } from '../src/utils/SleepPromise';
-import { faucetConfig, loadFaucetConfig } from '../src/config/FaucetConfig';
-import { FakeProvider } from './stubs/FakeProvider';
-import { FaucetDbDriver } from '../src/db/FaucetDatabase';
-import { PromiseDfd } from '../src/utils/PromiseDfd';
+import { FaucetProcess } from '../src/common/FaucetProcess.js';
+import { ServiceManager } from '../src/common/ServiceManager.js';
+import { FaucetWorkers } from '../src/common/FaucetWorker.js';
+import { sleepPromise } from '../src/utils/SleepPromise.js';
+import { faucetConfig, loadFaucetConfig } from '../src/config/FaucetConfig.js';
+import { FakeProvider } from './stubs/FakeProvider.js';
+import { FaucetDbDriver } from '../src/db/FaucetDatabase.js';
+import { PromiseDfd } from '../src/utils/PromiseDfd.js';
 
 
 export function bindTestStubs(stubs?) {
@@ -22,7 +23,7 @@ export function bindTestStubs(stubs?) {
   };
   let stateDict = {
     timeout: [] as NodeJS.Timeout[],
-    interval: [] as NodeJS.Timer[],
+    interval: [] as NodeJS.Timeout[],
   };
 
   let allStubs = {
@@ -47,7 +48,7 @@ export function bindTestStubs(stubs?) {
     }),
     "global.clearTimeout": sinon.stub(global, "clearTimeout").callsFake((ti) => {
       stubRefs['global.clearTimeout'](ti);
-      let timerIdx = stateDict.timeout.indexOf(ti);
+      let timerIdx = stateDict.timeout.indexOf(ti as NodeJS.Timeout);
       if(timerIdx !== -1) stateDict.timeout.splice(timerIdx, 1);
     }),
     "global.setInterval": sinon.stub(global, "setInterval").callsFake((fn, ms) => {
@@ -61,7 +62,7 @@ export function bindTestStubs(stubs?) {
     }),
     "global.clearInterval": sinon.stub(global, "clearInterval").callsFake((ti) => {
       stubRefs['global.clearInterval'](ti);
-      let timerIdx = stateDict.interval.indexOf(ti);
+      let timerIdx = stateDict.interval.indexOf(ti as NodeJS.Timeout);
       if(timerIdx !== -1) stateDict.interval.splice(timerIdx, 1);
     }),
     ...stubs,
@@ -72,7 +73,7 @@ export function bindTestStubs(stubs?) {
 export async function unbindTestStubs(stubs: any) {
   let stubState: {
     timeout: NodeJS.Timeout[];
-    interval: NodeJS.Timer[];
+    interval: NodeJS.Timeout[];
   } = stubs._state;
   sinon.restore();
   if(stubState.timeout.length > 0) {

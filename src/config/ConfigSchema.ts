@@ -1,10 +1,10 @@
 
-import { IBaseModuleConfig } from '../modules/BaseModule';
-import { FaucetCoinType } from '../eth/EthWalletManager';
-import { IFaucetStatsConfig } from '../services/FaucetStatsLog';
-import { IFaucetResultSharingConfig } from './ConfigShared';
-import { FaucetDatabaseOptions } from '../db/FaucetDatabase';
-import { IFaucetStatusConfig } from '../services/FaucetStatus';
+import { IBaseModuleConfig } from '../modules/BaseModule.js';
+import { FaucetCoinType } from '../eth/EthWalletManager.js';
+import { IFaucetStatsConfig } from '../services/FaucetStatsLog.js';
+import { IFaucetResultSharingConfig } from './ConfigShared.js';
+import { FaucetDatabaseOptions } from '../db/FaucetDatabase.js';
+import { IFaucetStatusConfig } from '../services/FaucetStatus.js';
 
 export interface IConfigSchema {
   version?: 2;

@@ -1,17 +1,17 @@
 import * as fs from 'fs';
 import YAML from 'yaml'
-import { ServiceManager } from "../../common/ServiceManager";
-import { FaucetSession } from "../../session/FaucetSession";
-import { BaseModule } from "../BaseModule";
-import { ModuleHookAction } from "../ModuleManager";
-import { FaucetError } from '../../common/FaucetError';
-import { defaultConfig, IIPInfoConfig, IIPInfoRestrictionConfig } from "./IPInfoConfig";
-import { IIPInfo, IPInfoResolver } from "./IPInfoResolver";
-import { resolveRelativePath } from "../../config/FaucetConfig";
-import { ISessionRewardFactor } from '../../session/SessionRewardFactor';
-import { IPInfoDB } from './IPInfoDB';
-import { FaucetDatabase } from '../../db/FaucetDatabase';
-import { FaucetLogLevel, FaucetProcess } from '../../common/FaucetProcess';
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { BaseModule } from "../BaseModule.js";
+import { ModuleHookAction } from "../ModuleManager.js";
+import { FaucetError } from '../../common/FaucetError.js';
+import { defaultConfig, IIPInfoConfig, IIPInfoRestrictionConfig } from "./IPInfoConfig.js";
+import { IIPInfo, IPInfoResolver } from "./IPInfoResolver.js";
+import { resolveRelativePath } from "../../config/FaucetConfig.js";
+import { ISessionRewardFactor } from '../../session/SessionRewardFactor.js';
+import { IPInfoDB } from './IPInfoDB.js';
+import { FaucetDatabase } from '../../db/FaucetDatabase.js';
+import { FaucetLogLevel, FaucetProcess } from '../../common/FaucetProcess.js';
 
 export interface IIPInfoRestriction {
   reward: number;

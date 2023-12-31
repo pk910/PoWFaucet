@@ -1,19 +1,16 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase';
-import { ModuleManager } from '../../src/modules/ModuleManager';
-import { SessionManager } from '../../src/session/SessionManager';
-import { faucetConfig } from '../../src/config/FaucetConfig';
-import { FaucetError } from '../../src/common/FaucetError';
-import { IPoWConfig, PoWHashAlgo } from '../../src/modules/pow/PoWConfig';
-import { FaucetWebApi } from '../../src/webserv/FaucetWebApi';
-import { disposeFakeWebSockets, FakeWebSocket, injectFakeWebSocket } from '../stubs/FakeWebSocket';
-import { FaucetHttpServer } from '../../src/webserv/FaucetHttpServer';
-import { PoWModule } from '../../src/modules/pow/PoWModule';
-import { PoWClient } from '../../src/modules/pow/PoWClient';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common.js';
+import { ServiceManager } from '../../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
+import { ModuleManager } from '../../src/modules/ModuleManager.js';
+import { SessionManager } from '../../src/session/SessionManager.js';
+import { faucetConfig } from '../../src/config/FaucetConfig.js';
+import { IPoWConfig, PoWHashAlgo } from '../../src/modules/pow/PoWConfig.js';
+import { FaucetWebApi } from '../../src/webserv/FaucetWebApi.js';
+import { disposeFakeWebSockets, FakeWebSocket, injectFakeWebSocket } from '../stubs/FakeWebSocket.js';
+import { PoWModule } from '../../src/modules/pow/PoWModule.js';
 
 
 describe("Faucet module: pow", () => {
@@ -50,7 +47,7 @@ describe("Faucet module: pow", () => {
     } as IPoWConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
     await moduleManager.initialize();
-    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig(null, null);
+    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['pow']).to.equal(true, "no pow config exported");
     expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config missmatch: powTimeout");
     expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.SCRYPT, "client config missmatch: powParams.a");
@@ -82,7 +79,7 @@ describe("Faucet module: pow", () => {
     } as IPoWConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
     await moduleManager.initialize();
-    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig(null, null);
+    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['pow']).to.equal(true, "no pow config exported");
     expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config missmatch: powTimeout");
     expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.CRYPTONIGHT, "client config missmatch: powParams.a");
@@ -116,7 +113,7 @@ describe("Faucet module: pow", () => {
     } as IPoWConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
     await moduleManager.initialize();
-    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig(null, null);
+    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['pow']).to.equal(true, "no pow config exported");
     expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config missmatch: powTimeout");
     expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.ARGON2, "client config missmatch: powParams.a");
@@ -145,10 +142,10 @@ describe("Faucet module: pow", () => {
     });
     expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
     let clientInfo = await testSession.getSessionInfo();
-    expect(!!clientInfo.modules["pow"]).to.equal(true, "missing pow info in client session info");
-    expect(clientInfo.modules["pow"].lastNonce).to.equal(0, "invalid pow info in client session info: lastNonce");
-    expect(clientInfo.modules["pow"].preImage).to.equal(testSession.getSessionData("pow.preimage"), "invalid pow info in client session info: preImage");
-    expect(clientInfo.modules["pow"].shareCount).to.equal(0, "invalid pow info in client session info: shareCount");
+    expect(!!(clientInfo.modules as any)["pow"]).to.equal(true, "missing pow info in client session info");
+    expect((clientInfo.modules as any)["pow"].lastNonce).to.equal(0, "invalid pow info in client session info: lastNonce");
+    expect((clientInfo.modules as any)["pow"].preImage).to.equal(testSession.getSessionData("pow.preimage"), "invalid pow info in client session info: preImage");
+    expect((clientInfo.modules as any)["pow"].shareCount).to.equal(0, "invalid pow info in client session info: shareCount");
   });
 
   it("Start mining session and connect mining client", async () => {
@@ -454,7 +451,7 @@ describe("Faucet module: pow", () => {
       expect(errorMsg[0].data.message).to.matches(/Nonce too high/i, "unexpected error message");
     });
 
-    it("check action 'foundShare': valid share, local verification", async () => {
+    it("check action 'foundShare': valid share, local verification, scrypt", async () => {
       faucetConfig.modules["pow"] = {
         enabled: true,
         powShareReward: 10,
@@ -499,7 +496,7 @@ describe("Faucet module: pow", () => {
       expect(balanceMsg[0].data.reason).to.matches(/valid share/, "invalid updateBalance message: unexpected reason");
     });
 
-    it("check action 'foundShare': invalid share, local verification", async () => {
+    it("check action 'foundShare': invalid share, local verification, scrypt", async () => {
       faucetConfig.modules["pow"] = {
         enabled: true,
         powHashAlgo: PoWHashAlgo.SCRYPT,
@@ -528,6 +525,186 @@ describe("Faucet module: pow", () => {
         data: {
           nonces: [ 1526 ],
           params: "scrypt|4096|8|1|16|11",
+          hashrate: 12,
+        }
+      }))
+      expect(fakeSocket.isReady).to.equal(true, "client is not ready");
+      await awaitSleepPromise(1000, () => !fakeSocket.isReady);
+      let errorMsg = fakeSocket.getSentMessage("error");
+      expect(errorMsg.length).to.equal(2, "unexpected number of error messages sent");
+      expect(errorMsg[0].rsp).to.equal(42, "invalid response id");
+      expect(errorMsg[0].data.code).to.equal("WRONG_SHARE", "unexpected error1 code");
+      expect(errorMsg[0].data.message).to.matches(/verification failed/i, "unexpected error1 message");
+      expect(errorMsg[1].data.code).to.equal("CLIENT_KILLED", "unexpected error2 code");
+      expect(errorMsg[1].data.message).to.matches(/session failed/i, "unexpected error2 message");
+      expect(testSession.getDropAmount()).to.equal(0n, "unexpected drop amount");
+    });
+
+    it("check action 'foundShare': valid share, local verification, cryptonight", async () => {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powShareReward: 10,
+        powHashAlgo: PoWHashAlgo.CRYPTONIGHT,
+        powCryptoNightParams: {
+          algo: 0,
+          variant: 0,
+          height: 0,
+        },
+        powDifficulty: 11,
+        powNonceCount: 1,
+        powHashrateHardLimit: 100,
+        verifyLocalLowPeerPercent: 100,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+      testSession.setSessionData("pow.preimage", "2TobvsN38W8=");
+      expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket.emit("message", JSON.stringify({
+        id: 42,
+        action: "foundShare",
+        data: {
+          nonces: [ 1944 ],
+          params: "cryptonight|0|0|0|11",
+          hashrate: 12,
+        }
+      }))
+      expect(fakeSocket.isReady).to.equal(true, "client is not ready");
+      await awaitSleepPromise(1000, () => fakeSocket.getSentMessage("ok").length > 0);
+      let okMsg = fakeSocket.getSentMessage("ok");
+      expect(okMsg.length).to.equal(1, "no ok message sent");
+      expect(okMsg[0].rsp).to.equal(42, "invalid response id");
+      await awaitSleepPromise(100, () => fakeSocket.getSentMessage("updateBalance").length > 0);
+      let balanceMsg = fakeSocket.getSentMessage("updateBalance");
+      expect(balanceMsg.length).to.equal(1, "no updateBalance message sent");
+      expect(balanceMsg[0].data.balance).to.equal("10", "invalid updateBalance message: unexpected balance");
+      expect(balanceMsg[0].data.reason).to.matches(/valid share/, "invalid updateBalance message: unexpected reason");
+    });
+
+    it("check action 'foundShare': invalid share, local verification, cryptonight", async () => {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powHashAlgo: PoWHashAlgo.CRYPTONIGHT,
+        powCryptoNightParams: {
+          algo: 0,
+          variant: 0,
+          height: 0,
+        },
+        powDifficulty: 11,
+        powNonceCount: 1,
+        powHashrateHardLimit: 100,
+        verifyLocalLowPeerPercent: 100,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+      testSession.setSessionData("pow.preimage", "oXwNMIuRUOc=");
+      expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket.emit("message", JSON.stringify({
+        id: 42,
+        action: "foundShare",
+        data: {
+          nonces: [ 1526 ],
+          params: "cryptonight|0|0|0|11",
+          hashrate: 12,
+        }
+      }))
+      expect(fakeSocket.isReady).to.equal(true, "client is not ready");
+      await awaitSleepPromise(1000, () => !fakeSocket.isReady);
+      let errorMsg = fakeSocket.getSentMessage("error");
+      expect(errorMsg.length).to.equal(2, "unexpected number of error messages sent");
+      expect(errorMsg[0].rsp).to.equal(42, "invalid response id");
+      expect(errorMsg[0].data.code).to.equal("WRONG_SHARE", "unexpected error1 code");
+      expect(errorMsg[0].data.message).to.matches(/verification failed/i, "unexpected error1 message");
+      expect(errorMsg[1].data.code).to.equal("CLIENT_KILLED", "unexpected error2 code");
+      expect(errorMsg[1].data.message).to.matches(/session failed/i, "unexpected error2 message");
+      expect(testSession.getDropAmount()).to.equal(0n, "unexpected drop amount");
+    });
+
+    it("check action 'foundShare': valid share, local verification, argon2", async () => {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powShareReward: 10,
+        powHashAlgo: PoWHashAlgo.ARGON2,
+        powArgon2Params: {
+          type: 0,
+          version: 13,
+          timeCost: 4,
+          memoryCost: 4096,
+          parallelization: 1,
+          keyLength: 16,
+        },
+        powDifficulty: 11,
+        powNonceCount: 1,
+        powHashrateHardLimit: 100,
+        verifyLocalLowPeerPercent: 100,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+      testSession.setSessionData("pow.preimage", "2TobvsN38W8=");
+      expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket.emit("message", JSON.stringify({
+        id: 42,
+        action: "foundShare",
+        data: {
+          nonces: [ 2034 ],
+          params: "argon2|0|13|4|4096|1|16|11",
+          hashrate: 12,
+        }
+      }))
+      expect(fakeSocket.isReady).to.equal(true, "client is not ready");
+      await awaitSleepPromise(1000, () => fakeSocket.getSentMessage("ok").length > 0);
+      let okMsg = fakeSocket.getSentMessage("ok");
+      expect(okMsg.length).to.equal(1, "no ok message sent");
+      expect(okMsg[0].rsp).to.equal(42, "invalid response id");
+      await awaitSleepPromise(100, () => fakeSocket.getSentMessage("updateBalance").length > 0);
+      let balanceMsg = fakeSocket.getSentMessage("updateBalance");
+      expect(balanceMsg.length).to.equal(1, "no updateBalance message sent");
+      expect(balanceMsg[0].data.balance).to.equal("10", "invalid updateBalance message: unexpected balance");
+      expect(balanceMsg[0].data.reason).to.matches(/valid share/, "invalid updateBalance message: unexpected reason");
+    });
+
+    it("check action 'foundShare': invalid share, local verification, argon2", async () => {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powHashAlgo: PoWHashAlgo.ARGON2,
+        powArgon2Params: {
+          type: 0,
+          version: 13,
+          timeCost: 4,
+          memoryCost: 4096,
+          parallelization: 1,
+          keyLength: 16,
+        },
+        powDifficulty: 11,
+        powNonceCount: 1,
+        powHashrateHardLimit: 100,
+        verifyLocalLowPeerPercent: 100,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+      testSession.setSessionData("pow.preimage", "oXwNMIuRUOc=");
+      expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket.emit("message", JSON.stringify({
+        id: 42,
+        action: "foundShare",
+        data: {
+          nonces: [ 1526 ],
+          params: "argon2|0|13|4|4096|1|16|11",
           hashrate: 12,
         }
       }))

@@ -1,17 +1,17 @@
 import { WebSocket, RawData } from 'ws';
-import { PoWSession } from './PoWSession';
-import { ServiceManager } from '../../common/ServiceManager';
-import { PoWShareVerification } from './PoWShareVerification';
-import { FaucetProcess, FaucetLogLevel } from '../../common/FaucetProcess';
-import { FaucetStatsLog } from '../../services/FaucetStatsLog';
-import { FaucetSession } from '../../session/FaucetSession';
-import { PoWModule } from './PoWModule';
+import { PoWSession } from './PoWSession.js';
+import { ServiceManager } from '../../common/ServiceManager.js';
+import { PoWShareVerification } from './PoWShareVerification.js';
+import { FaucetProcess, FaucetLogLevel } from '../../common/FaucetProcess.js';
+import { FaucetStatsLog } from '../../services/FaucetStatsLog.js';
+import { FaucetSession } from '../../session/FaucetSession.js';
+import { PoWModule } from './PoWModule.js';
 
 export class PoWClient {
   private module: PoWModule;
   private socket: WebSocket;
   private session: PoWSession;
-  private pingTimer: NodeJS.Timer = null;
+  private pingTimer: NodeJS.Timeout = null;
   private lastPingPong: Date;
 
   public constructor(module: PoWModule, session: PoWSession, socket: WebSocket) {

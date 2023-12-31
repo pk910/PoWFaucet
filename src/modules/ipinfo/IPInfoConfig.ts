@@ -1,4 +1,4 @@
-import { IBaseModuleConfig } from "../BaseModule";
+import { IBaseModuleConfig } from "../BaseModule.js";
 
 export interface IIPInfoConfig extends IBaseModuleConfig {
   apiUrl: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)

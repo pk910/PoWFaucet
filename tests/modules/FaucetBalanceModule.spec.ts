@@ -1,16 +1,16 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common';
-import { ServiceManager } from '../../src/common/ServiceManager';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase';
-import { ModuleManager } from '../../src/modules/ModuleManager';
-import { SessionManager } from '../../src/session/SessionManager';
-import { faucetConfig } from '../../src/config/FaucetConfig';
-import { FakeProvider } from '../stubs/FakeProvider';
-import { EthWalletManager } from '../../src/eth/EthWalletManager';
-import { IFaucetBalanceConfig } from '../../src/modules/faucet-balance/FaucetBalanceConfig';
-import { FaucetBalanceModule } from '../../src/modules/faucet-balance/FaucetBalanceModule';
+import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from '../common.js';
+import { ServiceManager } from '../../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
+import { ModuleManager } from '../../src/modules/ModuleManager.js';
+import { SessionManager } from '../../src/session/SessionManager.js';
+import { faucetConfig } from '../../src/config/FaucetConfig.js';
+import { FakeProvider } from '../stubs/FakeProvider.js';
+import { EthWalletManager } from '../../src/eth/EthWalletManager.js';
+import { IFaucetBalanceConfig } from '../../src/modules/faucet-balance/FaucetBalanceConfig.js';
+import { FaucetBalanceModule } from '../../src/modules/faucet-balance/FaucetBalanceModule.js';
 
 
 describe("Faucet module: faucet-balance", () => {
@@ -47,7 +47,6 @@ describe("Faucet module: faucet-balance", () => {
         99999: 90,
         90000: 50,
       },
-      dynamicRestriction: null,
     } as IFaucetBalanceConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
     await moduleManager.initialize();
@@ -70,7 +69,6 @@ describe("Faucet module: faucet-balance", () => {
         110000: 50,
          90000: 30,
       },
-      dynamicRestriction: null,
     } as IFaucetBalanceConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
     await moduleManager.initialize();
@@ -88,7 +86,6 @@ describe("Faucet module: faucet-balance", () => {
     faucetConfig.minDropAmount = 10;
     faucetConfig.modules["faucet-balance"] = {
       enabled: true,
-      fixedRestriction: null,
       dynamicRestriction: {
         targetBalance: 100000
       },
@@ -109,7 +106,6 @@ describe("Faucet module: faucet-balance", () => {
     faucetConfig.minDropAmount = 10;
     faucetConfig.modules["faucet-balance"] = {
       enabled: true,
-      fixedRestriction: null,
       dynamicRestriction: {
         targetBalance: 200000
       },
@@ -131,7 +127,6 @@ describe("Faucet module: faucet-balance", () => {
     faucetConfig.spareFundsAmount = 100000;
     faucetConfig.modules["faucet-balance"] = {
       enabled: true,
-      fixedRestriction: null,
       dynamicRestriction: {
         targetBalance: 200000
       },
