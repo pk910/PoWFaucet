@@ -1,5 +1,6 @@
 
 import sinon from 'sinon';
+import '../src/@types/global.js';
 import { Worker } from "node:worker_threads";
 import { FaucetProcess } from '../src/common/FaucetProcess.js';
 import { ServiceManager } from '../src/common/ServiceManager.js';
