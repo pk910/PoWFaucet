@@ -25,7 +25,6 @@ let cliArgs = (function() {
 })();
 
 
-let packageJson = JSON.parse(fs.readFileSync(path.join(".", "package.json"), 'utf8'));
 let internalBasePath = path.join(".");
 let basePath: string;
 if(cliArgs['datadir']) {
@@ -56,7 +55,14 @@ export function setAppBasePath(basePath: string) {
 export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   let config: IConfigSchema;
   let configFile = faucetConfigFile;
-  debugger;
+
+  let faucetVersion: string;
+  if(typeof POWFAUCET_VERSION !== "undefined") {
+    faucetVersion = POWFAUCET_VERSION;
+  } else {
+    let packageJson = JSON.parse(fs.readFileSync(path.join(internalBasePath, "package.json"), 'utf8'));
+    faucetVersion = packageJson.version;
+  }
 
   if(!fs.existsSync(configFile) && !loadDefaultsOnly) {
     // create copy of faucet-config.example.yml
@@ -103,7 +109,7 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     faucetConfig = {} as any;
   Object.assign(faucetConfig, getDefaultConfig(), config, {
     appBasePath: basePath,
-    faucetVersion: packageJson.version,
+    faucetVersion: faucetVersion,
   } as any);
 }
 

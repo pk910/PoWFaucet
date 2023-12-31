@@ -1,7 +1,7 @@
 import path, { dirname, basename } from "path";
 import { fileURLToPath } from "url";
 import { isMainThread, workerData } from "node:worker_threads";
-import { loadFaucetConfig, setAppBasePath } from "./config/FaucetConfig.js";
+import { faucetConfig, loadFaucetConfig, setAppBasePath } from "./config/FaucetConfig.js";
 import { FaucetWorkers } from "./common/FaucetWorker.js";
 import { EthWalletManager } from "./eth/EthWalletManager.js";
 import { FaucetHttpServer } from "./webserv/FaucetHttpServer.js";
@@ -20,13 +20,19 @@ import { FaucetStatus } from "./services/FaucetStatus.js";
   }
   else {
     try {
-      let importUrl = fileURLToPath(import.meta.url);
-      const __dirname = dirname(importUrl);
+      let srcfile: string;
+      if(typeof require !== "undefined") {
+        srcfile = require.main.filename;
+      } else {
+        srcfile = fileURLToPath(import.meta.url);
+      }
+      let basepath = path.join(dirname(srcfile), "..");
 
-      setAppBasePath(path.join(__dirname, ".."))
-      loadFaucetConfig()
+      setAppBasePath(basepath);
+      loadFaucetConfig();
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Initializing PoWFaucet v" + faucetConfig.faucetVersion + " (AppBasePath: " + faucetConfig.appBasePath + ", InternalBasePath: " + basepath + ")");
       ServiceManager.GetService(FaucetProcess).initialize();
-      ServiceManager.GetService(FaucetWorkers).initialize(importUrl);
+      ServiceManager.GetService(FaucetWorkers).initialize(srcfile);
       ServiceManager.GetService(FaucetStatus).initialize();
       ServiceManager.GetService(FaucetStatsLog).initialize();
       await ServiceManager.GetService(FaucetDatabase).initialize();
