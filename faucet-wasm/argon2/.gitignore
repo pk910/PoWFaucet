@@ -1,4 +1,5 @@
 argon2-wasm/
+emsdk/
 node_modules/
 hash_a2.wasm
 hash_a2.js
