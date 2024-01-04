@@ -26,4 +26,7 @@ export default {
       POWFAUCET_VERSION: JSON.stringify(packageJson.version),
     }),
   ],
+  optimization: {
+    minimize: false
+  }
 };
