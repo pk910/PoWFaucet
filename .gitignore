@@ -6,6 +6,8 @@ coverage/
 dist/
 node_modules/
 static/index.seo.html
+static/css/powfaucet*
+static/js/powfaucet*
 faucet-config.json
 faucet-config.yaml
 faucet-status.json

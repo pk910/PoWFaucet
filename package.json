@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "build-client": "cd faucet-client && node build-client.js",
     "start": "tsc && node dist/app.js",
     "bundle": "tsc && webpack --mode production",
     "test": "mocha --exit --trace-warnings 'tests/**/*.ts'",
