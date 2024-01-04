@@ -1,28 +1,53 @@
 import 'mocha';
 import sinon from 'sinon';
-import path from 'path';
-import os from 'os';
 import { expect } from 'chai';
+import testDatabase from '@databases/mysql-test';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from './common.js';
 import { ServiceManager } from '../src/common/ServiceManager.js';
 import { FaucetDatabase, FaucetDbDriver } from '../src/db/FaucetDatabase.js';
 import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager.js';
-import { SessionManager } from '../src/session/SessionManager.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
+import { FakeProvider } from './stubs/FakeProvider.js';
+import { SessionManager } from '../src/session/SessionManager.js';
 import { FaucetError } from '../src/common/FaucetError.js';
 import { FaucetSession, FaucetSessionStatus } from '../src/session/FaucetSession.js';
 
 
-describe("Faucet Session Management", () => {
+describe("Session Management with MySQL DB Driver", () => {
   let globalStubs;
+  let fakeProvider;
+  let mysqlKill;
 
-  beforeEach(async () => {
+  before(async function() {
+    this.timeout(120000);
+    let {kill} = await (testDatabase as any).default({
+      connectTimeoutSeconds: 120,
+      mysqlUser: "powfaucet",
+      mysqlPassword: "test123",
+      mysqlDb: "powfaucet",
+    });
+    mysqlKill = kill;
+  });
+  after(async function() {
+    this.timeout(10000);
+    await mysqlKill();
+  });
+
+  beforeEach(async function() {
+    this.timeout(10000);
+
     globalStubs = bindTestStubs();
+    fakeProvider = new FakeProvider();
+    fakeProvider.injectResponse("net_version", "5");
     loadDefaultTestConfig();
     faucetConfig.database = {
-      driver: FaucetDbDriver.SQLITE,
-      file: path.join(os.tmpdir(), "powfaucet-test.sqlite"),
+      driver: FaucetDbDriver.MYSQL,
+      host: "localhost",
+      username: "powfaucet",
+      password: "test123",
+      database: "powfaucet",
     };
+
     await ServiceManager.GetService(FaucetDatabase).initialize();
     await ServiceManager.GetService(ModuleManager).initialize();
   });
@@ -313,4 +338,6 @@ describe("Faucet Session Management", () => {
     await sessionManager.processSessionTimeouts();
     expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");
   });
+
+  
 });

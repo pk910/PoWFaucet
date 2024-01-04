@@ -1,4 +1,4 @@
-import mysql from "mysql";
+import mysql, { ResultSetHeader } from "mysql2";
 import { FaucetDbDriver } from "../FaucetDatabase.js";
 import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver.js";
 
@@ -58,8 +58,8 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
             reject("mysql run() error [" + sql + "]: " + error.toString());
           else {
             resolve({
-              changes: results.affectedRows,
-              lastInsertRowid: results.insertId,
+              changes: (results as ResultSetHeader).affectedRows,
+              lastInsertRowid: (results as ResultSetHeader).insertId,
             });
           }
           connection.release();
@@ -78,7 +78,7 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
           if(error)
             reject("mysql all() error [" + sql + "]: " + error.toString());
           else {
-            resolve(results);
+            resolve(results as QueryResult[]);
           }
           connection.release();
         })
@@ -96,7 +96,7 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
           if(error)
             reject("mysql get() error [" + sql + "]: " + error.toString());
           else {
-            resolve(results.length > 0 ? results[0] : null);
+            resolve((results as QueryResult[]).length > 0 ? results[0] : null);
           }
           connection.release();
         })

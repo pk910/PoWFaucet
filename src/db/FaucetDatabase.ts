@@ -225,6 +225,24 @@ export class FaucetDatabase {
     });
   }
 
+  public async dropAllTables() {
+    // for tests only! this drops the whole DB.
+    let tables = await this.db.all(
+      SQL.driverSql({
+        [FaucetDbDriver.SQLITE]: "SELECT name FROM sqlite_schema WHERE type ='table' AND name NOT LIKE 'sqlite_%'",
+        [FaucetDbDriver.MYSQL]: "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE()",
+      })
+    ) as {
+      name: string;
+    }[];
+
+    let dropPromises = tables.map((table) => {
+      return this.db.run("DROP TABLE " + table.name);
+    });
+
+    await Promise.all(dropPromises);
+  }
+
   public async getKeyValueEntry(key: string): Promise<string> {
     let row = await this.db.get("SELECT " + SQL.field("Value") + " FROM KeyValueStore WHERE " + SQL.field("Key") + " = ?", [key]) as {Value: string};
     return row?.Value;

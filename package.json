@@ -28,6 +28,7 @@
     "outputPath": "bin"
   },
   "devDependencies": {
+    "@databases/mysql-test": "^4.0.2",
     "@types/better-sqlite3": "^7.6.8",
     "@types/chai": "^4.3.11",
     "@types/mocha": "^10.0.6",
@@ -58,7 +59,7 @@
     "ethereumjs-util": "^7.1.5",
     "hcaptcha": "^0.1.1",
     "html-entities": "^2.4.0",
-    "mysql": "^2.18.1",
+    "mysql2": "^3.6.5",
     "node-fetch": "^2.7.0",
     "randombytes": "^2.1.0",
     "tiny-typed-emitter": "^2.1.0",
