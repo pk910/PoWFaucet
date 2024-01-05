@@ -1,8 +1,8 @@
 
-const base32768 = require('base32768');
-const fs = require('fs');
+import { encode } from "base32768";
+import fs from "fs";
  
-const base32768WASM = base32768.encode(fs.readFileSync("scrypt-wasm/pkg/scrypt_wasm_bg.wasm"));
+const base32768WASM = encode(fs.readFileSync("scrypt-wasm/pkg/scrypt_wasm_bg.wasm"));
 
 const wasmWrappperJS = fs.readFileSync("scrypt-wasm/pkg/scrypt_wasm_bg.js", { encoding: "utf8" });
 let lines = wasmWrappperJS.split("\n");
@@ -45,13 +45,12 @@ module.exports = {
 
 // Now its time to load the wasm module. 
 // first, load the base32768 module into a global variable called "base32768"
-console.log(fs.readFileSync("node_modules/base32768/dist/iife/base32768.js", { encoding: "utf8" }))
+console.log(fs.readFileSync("node_modules/base32768/src/index.js", { encoding: "utf8" }).replace(/^export .*$/m, ""))
 
 // now, decode the base32768 string into an ArrayBuffer and tell WebAssembly to load it
 console.log(`
 const base32768WASM = "${base32768WASM}";
-
-const wasmBinary = base32768.decode(base32768WASM);
+const wasmBinary = decode(base32768WASM);
 
 scryptPromise = WebAssembly.instantiate(wasmBinary, {}).then(instantiatedModule => {
 `);
