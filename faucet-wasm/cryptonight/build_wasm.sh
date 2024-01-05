@@ -12,7 +12,9 @@ fi
 emcc_is_installed="$(which emcc | wc -l)"
 
 if [ "$emcc_is_installed" == "0" ]; then
-  git clone https://github.com/emscripten-core/emsdk.git
+  if [ ! -d ./emsdk ]; then
+    git clone https://github.com/emscripten-core/emsdk.git
+  fi
   cd emsdk
   ./emsdk install latest
   ./emsdk activate latest
@@ -21,7 +23,7 @@ if [ "$emcc_is_installed" == "0" ]; then
 fi
 
 cd cryptonight-wasm/hash_cn/webassembly
-if [ ! -f ./cn.wasm ]; then
+
   printf "running ./Makefile for webminerpool/hash_cn/webassembly... \n"
   
   # included Makefile is not working...
@@ -29,7 +31,7 @@ if [ ! -f ./cn.wasm ]; then
   cp ../../../Makefile ./Makefile
   make
   mv Makefile.org Makefile
-fi
+
 cd ../../..
 
 nodejs_is_installed="$(which node | wc -l)"

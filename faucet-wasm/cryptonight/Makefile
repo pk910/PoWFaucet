@@ -1,7 +1,7 @@
 TARGET = prog
 LIBS = -lm
 
-CC = emcc -O3 -s NO_FILESYSTEM=1 -s TOTAL_MEMORY=67108864 -s EXPORTED_FUNCTIONS="['_hash_cn']" -s WASM=1 -s ENVIRONMENT=worker -s MODULARIZE=1 -s EXPORT_ES6=1 -s STANDALONE_WASM --no-entry --pre-js ../../../wasm-pre.js
+CC = emcc -O3 -s NO_FILESYSTEM=1 -s 'EXPORTED_RUNTIME_METHODS=["ccall", "cwrap"]' -s TOTAL_MEMORY=67108864 -s EXPORTED_FUNCTIONS="['_hash_cn']" -s WASM=1 -s ENVIRONMENT=worker -s MODULARIZE=1 -sWASM_BIGINT -s EXPORT_ES6=1 --no-entry --pre-js ../../../wasm-pre.js
 CFLAGS = 
 
 # -s ASSERTIONS=1
