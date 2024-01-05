@@ -12,7 +12,9 @@ fi
 emcc_is_installed="$(which emcc | wc -l)"
 
 if [ "$emcc_is_installed" == "0" ]; then
-  git clone https://github.com/emscripten-core/emsdk.git
+  if [ ! -d ./emsdk ]; then
+    git clone https://github.com/emscripten-core/emsdk.git
+  fi
   cd emsdk
   ./emsdk install latest
   ./emsdk activate latest
@@ -20,11 +22,8 @@ if [ "$emcc_is_installed" == "0" ]; then
   cd ..
 fi
 
-if [ ! -f ./cn.wasm ]; then
-  printf "compiling argon2 wasm... \n"
-  
-  emcc -O3 -s NO_FILESYSTEM=1 -s TOTAL_MEMORY=67108864 -s EXPORTED_FUNCTIONS="['_hash_a2','_argon2_hash']" -s WASM=1 -s ENVIRONMENT=worker -s MODULARIZE=1 -s EXPORT_ES6=1 -s STANDALONE_WASM --no-entry --pre-js ./wasm-pre.js -I./argon2-wasm/include ./hash_a2.c -o hash_a2.js
-fi
+printf "compiling argon2 wasm... \n"
+emcc -O3 -s NO_FILESYSTEM=1 -s TOTAL_MEMORY=67108864 -s 'EXPORTED_RUNTIME_METHODS=["ccall", "cwrap"]' -s EXPORTED_FUNCTIONS="['_hash_a2','_argon2_hash']" -s WASM=1 -s ENVIRONMENT=worker -s MODULARIZE=1 -s EXPORT_ES6=1 -s STANDALONE_WASM --no-entry --pre-js ./wasm-pre.js -I./argon2-wasm/include ./hash_a2.c -o hash_a2.js
 
 nodejs_is_installed="$(which node | wc -l)"
 npm_is_installed="$(which npm | wc -l)"

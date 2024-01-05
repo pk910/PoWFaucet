@@ -1,9 +1,9 @@
 
-const base32768 = require('base32768');
-const fs = require('fs');
+import { encode } from "base32768";
+import fs from "fs";
 
-const base32768Module = fs.readFileSync("node_modules/base32768/dist/iife/base32768.js", { encoding: "utf8" });
-const base32768WASM = base32768.encode(fs.readFileSync("hash_a2.wasm"));
+const base32768Module = fs.readFileSync("node_modules/base32768/src/index.js", { encoding: "utf8" }).replace(/^export .*$/m, "");
+const base32768WASM = encode(fs.readFileSync("hash_a2.wasm"));
 
 const wasmWrappperJS = fs.readFileSync("hash_a2.js", { encoding: "utf8" });
 let lines = wasmWrappperJS.replace(/import\.meta/g, "wasmMeta").split("\n");
@@ -31,7 +31,7 @@ module.exports = {
 function getWasmBinary() {
   ${base32768Module}
   const base32768WASM = "${base32768WASM}";
-  return base32768.decode(base32768WASM);
+  return decode(base32768WASM);
 }
 
 (function() {
