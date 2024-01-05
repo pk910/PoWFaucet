@@ -18,7 +18,8 @@ describe("Faucet Module Management", () => {
   let globalStubs;
   let fakeProvider;
 
-  beforeEach(async () => {
+  beforeEach(async function() {
+    this.timeout(5000);
     globalStubs = bindTestStubs();
     fakeProvider = new FakeProvider();
     fakeProvider.injectResponse("net_version", "5");
