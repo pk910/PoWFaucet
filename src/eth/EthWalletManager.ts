@@ -11,7 +11,7 @@ import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
 import { FaucetStatus, FaucetStatusLevel } from '../services/FaucetStatus.js';
 import { strFormatPlaceholder } from '../utils/StringUtils.js';
 import { PromiseDfd } from '../utils/PromiseDfd.js';
-import { sleepPromise } from '../utils/SleepPromise.js';
+import { sleepPromise, timeoutPromise } from '../utils/PromiseUtils.js';
 import { EthClaimInfo } from './EthClaimManager.js';
 import { Erc20Abi } from '../abi/ERC20.js';
 import IpcProvider from 'web3-providers-ipc';
@@ -352,7 +352,7 @@ export class EthWalletManager {
     return {
       txHash: claimInfo.claim.txHash,
       txPromise : txPromise.catch((ex) => {
-        if(ex.toString().match(/Transaction was not mined within/)) {
+        if(ex.toString().match(/Transaction was not mined within/) || ex.toString().match(/timeout/)) {
           // poll receipt
           return this.awaitTransactionReceipt(claimInfo.claim.txHash);
         }
@@ -381,7 +381,7 @@ export class EthWalletManager {
     return {
       txHash: txResult[0],
       txPromise : txResult[1].catch((ex) => {
-        if(ex.toString().match(/Transaction was not mined within/)) {
+        if(ex.toString().match(/Transaction was not mined within/) || ex.toString().match(/timeout/)) {
           // poll receipt
           return this.awaitTransactionReceipt(txResult[0]);
         }
@@ -449,24 +449,40 @@ export class EthWalletManager {
     let txhashDfd = new PromiseDfd<string>();
     let receiptDfd = new PromiseDfd<TransactionReceipt>();
     let txStatus = 0;
+    let receiptTimeout: NodeJS.Timeout;
 
     let txPromise = this.web3.eth.sendSignedTransaction("0x" + txhex);
     txPromise.once('transactionHash', (hash) => {
       txStatus = 1;
       txhashDfd.resolve(hash);
+      receiptTimeout = setTimeout(() => {
+        receiptTimeout = null;
+        if(txStatus === 1) {
+          receiptDfd.reject("web3js await transaction timeout");
+        }
+      }, (this.web3.eth.transactionPollingTimeout + 1) * 1000);
     });
     txPromise.once('receipt', (receipt) => {
       txStatus = 2;
       receiptDfd.resolve(receipt);
+      if(receiptTimeout) {
+        clearTimeout(receiptTimeout);
+        receiptTimeout = null;
+      }
     });
     txPromise.on('error', (error) => {
       if(txStatus === 0)
         txhashDfd.reject(error);
       else
         receiptDfd.reject(error);
+
+      if(receiptTimeout) {
+        clearTimeout(receiptTimeout);
+        receiptTimeout = null;
+      }
     });
 
-    let txHash = await txhashDfd.promise;
+    let txHash = await timeoutPromise(txhashDfd.promise, 5000, "web3js sendSignedTransaction timeout");
     return [txHash, receiptDfd.promise];
   }
 
@@ -475,12 +491,12 @@ export class EthWalletManager {
       let receipt: TransactionReceipt;
       do {
         await sleepPromise(this.txReceiptPollInterval); // 30 secs
-        receipt = await this.web3.eth.getTransactionReceipt(txhash);
+        receipt = await timeoutPromise(this.web3.eth.getTransactionReceipt(txhash), 5000, "web3js getTransactionReceipt timeout");
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Polled transaction receipt for " + txhash + ": " + (receipt ? "found!" : "pending"));
       } while(!receipt);
       return receipt;
     } catch(ex) {
-      if(ex.toString().match(/CONNECTION ERROR/)) {
+      if(ex.toString().match(/CONNECTION ERROR/) || ex.toString().match(/timeout/) || ex.toString().match(/invalid json response/)) {
         // just retry when RPC connection issue
         return this.awaitTransactionReceipt(txhash);
       }

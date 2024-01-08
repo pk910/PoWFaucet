@@ -48,6 +48,9 @@ API extends Web3APISpec = EthExecutionAPI,
         id: payload.id || this.idCounter++,
         result: rsp
       };
+      if(rsp && (rsp._return || rsp._throw)) {
+        rspStub = rsp;
+      }
     } catch(ex) {
       rspStub = {
         jsonrpc: '2.0',
@@ -57,6 +60,9 @@ API extends Web3APISpec = EthExecutionAPI,
           message: 'Stub error: ' + ex?.toString()
         }
       };
+    }
+    if(rspStub && rspStub._throw) {
+      throw rspStub._throw;
     }
     return rspStub;
   }

@@ -5,7 +5,7 @@ import { Worker } from "node:worker_threads";
 import { FaucetProcess } from '../src/common/FaucetProcess.js';
 import { ServiceManager } from '../src/common/ServiceManager.js';
 import { FaucetWorkers } from '../src/common/FaucetWorker.js';
-import { sleepPromise } from '../src/utils/SleepPromise.js';
+import { sleepPromise } from '../src/utils/PromiseUtils.js';
 import { faucetConfig, loadFaucetConfig } from '../src/config/FaucetConfig.js';
 import { FakeProvider } from './stubs/FakeProvider.js';
 import { FaucetDbDriver } from '../src/db/FaucetDatabase.js';
