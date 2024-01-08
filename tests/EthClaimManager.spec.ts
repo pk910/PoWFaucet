@@ -12,7 +12,7 @@ import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from '../s
 import { ClaimTxStatus, EthClaimInfo, EthClaimManager } from '../src/eth/EthClaimManager.js';
 import { getNewGuid } from '../src/utils/GuidUtils.js';
 import { EthWalletManager, TransactionResult } from '../src/eth/EthWalletManager.js';
-import { sleepPromise } from '../src/utils/SleepPromise.js';
+import { sleepPromise } from '../src/utils/PromiseUtils.js';
 import { FakeWebSocket, injectFakeWebSocket } from './stubs/FakeWebSocket.js';
 import { EthClaimNotificationClient } from '../src/eth/EthClaimNotificationClient.js';
 

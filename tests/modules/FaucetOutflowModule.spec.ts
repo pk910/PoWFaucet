@@ -10,7 +10,7 @@ import { faucetConfig } from '../../src/config/FaucetConfig.js';
 import { IFaucetOutflowConfig } from '../../src/modules/faucet-outflow/FaucetOutflowConfig.js';
 import { FakeProvider } from '../stubs/FakeProvider.js';
 import { EthWalletManager } from '../../src/eth/EthWalletManager.js';
-import { sleepPromise } from '../../src/utils/SleepPromise.js';
+import { sleepPromise } from '../../src/utils/PromiseUtils.js';
 import { FaucetOutflowModule } from '../../src/modules/faucet-outflow/FaucetOutflowModule.js';
 
 
