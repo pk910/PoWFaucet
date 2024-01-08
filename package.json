@@ -54,7 +54,7 @@
     "@brettz9/node-static": "^0.1.1",
     "@ethereumjs/common": "^4.1.0",
     "@ethereumjs/tx": "^5.1.0",
-    "@types/node": "^20.10.6",
+    "@types/node": "^20.10.7",
     "bignumber.js": "^9.1.2",
     "ethereumjs-util": "^7.1.5",
     "hcaptcha": "^0.1.1",
