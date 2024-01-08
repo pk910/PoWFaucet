@@ -130,6 +130,64 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.balance).equal(1000000000000n, "unexpected balance in wallet state");
     expect(walletState.nativeBalance).equal(1000n, "unexpected balance in wallet state");
     expect(ethWalletManager.getTokenAddress()).equal("0x0000000000000000000000000000000000001337", "unexpected token address");
+    expect(await ethWalletManager.getWalletBalance("0x0000000000000000000000000000000000000042")).equal(1000000000000n, "unexpected wallet token balance");
+  });
+
+  it("check wallet state initialization (unknown token)", async () => {
+    let ethWalletManager = new EthWalletManager();
+    fakeProvider.injectResponse("eth_chainId", 1337);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    fakeProvider.injectResponse("eth_getBalance", "1000");
+    fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    faucetConfig.faucetCoinType = "test" as any;
+    faucetConfig.faucetCoinContract = "0x0000000000000000000000000000000000001337";
+    await ethWalletManager.initialize();
+    await ethWalletManager.loadWalletState();
+    let walletState = ethWalletManager.getWalletState();
+    expect(!!walletState).equal(true, "no wallet state");
+    expect(walletState.ready).equal(true, "wallet state not ready");
+    expect(walletState.nonce).equal(42, "unexpected nonce in wallet state");
+    expect(walletState.balance).equal(1000n, "unexpected balance in wallet state");
+    expect(walletState.nativeBalance).equal(1000n, "unexpected balance in wallet state");
+    expect(ethWalletManager.getTokenAddress()).equal(null, "unexpected token address");
+  });
+
+  it("check wallet config refresh", async () => {
+    let ethWalletManager = new EthWalletManager();
+    fakeProvider.injectResponse("eth_chainId", 1337);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    fakeProvider.injectResponse("eth_getBalance", "1000");
+    fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    await ethWalletManager.initialize();
+    await ethWalletManager.loadWalletState();
+    ServiceManager.GetService(FaucetProcess).emit("reload");
+    fakeProvider.injectResponse("eth_getBalance", "2000");
+    await ethWalletManager.loadWalletState();
+    let walletState = ethWalletManager.getWalletState();
+    expect(!!walletState).equal(true, "no wallet state");
+    expect(walletState.ready).equal(true, "wallet state not ready");
+    expect(walletState.nonce).equal(42, "unexpected nonce in wallet state");
+    expect(walletState.balance).equal(2000n, "unexpected balance in wallet state");
+    expect(walletState.nativeBalance).equal(2000n, "unexpected balance in wallet state");
+  });
+
+  it("check wallet state unavailibility", async () => {
+    let ethWalletManager = new EthWalletManager();
+    fakeProvider.injectResponse("eth_chainId", 1337);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    fakeProvider.injectResponse("eth_getBalance", () => {
+      throw "request failed";
+    });
+    fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    await ethWalletManager.initialize();
+    await ethWalletManager.loadWalletState();
+    await ethWalletManager.loadWalletState();
+    let walletState = ethWalletManager.getWalletState();
+    expect(!!walletState).equal(true, "no wallet state");
+    expect(walletState.ready).equal(false, "wallet state is ready");
+    expect(walletState.nonce).equal(0, "unexpected nonce in wallet state");
+    expect(walletState.balance).equal(0n, "unexpected balance in wallet state");
+    expect(walletState.nativeBalance).equal(0n, "unexpected balance in wallet state");
   });
 
   it("send ClaimTx transaction", async () => {
@@ -182,7 +240,7 @@ describe("ETH Wallet Manager", () => {
       sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
       status: FaucetSessionStatus.CLAIMABLE,
       startTime: Math.floor(new Date().getTime() / 1000),
-      targetAddr: "0x0000000000000000000000000000000000001337",
+      targetAddr: "0X0000000000000000000000000000000000001337",
       dropAmount: "1337",
       remoteIP: "8.8.8.8",
       tasks: [], data: {}, claim: null,
