@@ -64,7 +64,7 @@ describe("Faucet Web Server", () => {
     let listenPort = webServer.getListenPort();
     let configData = await fetch("http://localhost:" + listenPort + "/api/getFaucetConfig", {method: "GET"}).then((rsp) => rsp.json());
     expect(!!configData).equals(true, "no api response");
-    expect(configData.faucetTitle).equals(faucetConfig.faucetTitle, "api response mismatch");
+    expect((configData as any).faucetTitle).equals(faucetConfig.faucetTitle, "api response mismatch");
   });
 
   it("check api call (POST)", async () => {
