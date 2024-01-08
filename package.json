@@ -59,7 +59,7 @@
     "ethereumjs-util": "^7.1.5",
     "hcaptcha": "^0.1.1",
     "html-entities": "^2.4.0",
-    "mysql2": "^3.6.5",
+    "mysql2": "^3.7.0",
     "node-fetch": "^3.3.2",
     "randombytes": "^2.1.0",
     "tiny-typed-emitter": "^2.1.0",
