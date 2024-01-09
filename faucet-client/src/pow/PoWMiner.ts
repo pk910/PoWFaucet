@@ -338,7 +338,9 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     
     let nonceLimit =  sessionAge * this.options.hashrateLimit;
     let nonceCount = nonceLimit - this.options.session.getLastNonce();
-    if(requestedRefill > nonceCount)
+    if(nonceCount <= 0)
+      requestedRefill = requestedRefill > 0 ? 1 : 0;
+    else if(requestedRefill > nonceCount)
       requestedRefill = nonceCount;
     
     return requestedRefill;
