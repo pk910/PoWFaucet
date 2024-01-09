@@ -1,6 +1,6 @@
 ## Demo Instances
 
-All demo instances will drop a useless ERC20 token (["PoWC"](https://goerli.etherscan.io/token/0x1ef15b05e6cf521632a8e3a4d86e9b78b19da894)) instead of native funds.
+All demo instances will drop a useless ERC20 token (["PoWC"](https://holesky.etherscan.io/token/0xaC7BE2aeF3b59079F76fE333e131A76FB44497C3)) instead of native funds.
 
 The demo instances are there to show different configuration scenarios with different modules enabled.\
 If your're looking for native testnet funds, use one of my [productive instances](https://github.com/pk910/PoWFaucet#instances).

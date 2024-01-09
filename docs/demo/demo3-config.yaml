@@ -27,7 +27,7 @@ faucetImage: "/images/fauceth_420.jpg"
 faucetHomeHtml: |
   <div class='pow-info'>
     <h5>What is a PoW Faucet?</h5>
-    This is a Demo Ethereum Faucet running on the Goerli Testnet.<br>
+    This is a Demo Ethereum Faucet running on the Hole&scaron;ovice Testnet.<br>
     The faucet is for demonstration purposes only and drops a wothless ERC20 token.
   </div>
   <div class='pow-info'>
@@ -50,8 +50,8 @@ faucetHomeHtml: |
 faucetSecret: "***censored***"
 
 # ETH execution layer RPC host
-ethRpcHost: "https://goerli.infura.io/v3/***censored***"
-#ethRpcHost: "https://ethereum-goerli.publicnode.com"
+ethRpcHost: "https://holesky.infura.io/v3/***censored***"
+#ethRpcHost: "https://rpc.holesky.ethpandaops.io"
 
 # faucet wallet private key (hex, without 0x prefix)
 ethWalletKey: "***censored***"
@@ -68,7 +68,7 @@ faucetCoinSymbol: "PoWC"
 faucetCoinType: "erc20"
 
 # coin contract address (only for faucetCoinType = erc20)
-faucetCoinContract: "0x1eF15b05E6cF521632a8E3a4d86e9B78B19dA894"
+faucetCoinContract: "0xaC7BE2aeF3b59079F76fE333e131A76FB44497C3"
 
 # transaction gas limit
 # use 21000 to prevent transactions to contracts
@@ -92,7 +92,7 @@ ethMaxPending: 12
 ethQueueNoFunds: true
 
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
-ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
+ethTxExplorerLink: "https://holesky.etherscan.io/tx/{txid}"
 
 
 # min/max drop amount (max is the default if no module lowers it)
@@ -192,7 +192,7 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 # the faucet tries to refill its wallet balance from the vault contract when it gets empty
 # see contract code in docs folder
 ethRefillContract:
-  contract: "0x1eF15b05E6cF521632a8E3a4d86e9B78B19dA894"
+  contract: "0xaC7BE2aeF3b59079F76fE333e131A76FB44497C3"
   abi: '[{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
   allowanceFn: null
   withdrawFn: "mint"
