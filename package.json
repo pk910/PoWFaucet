@@ -36,7 +36,7 @@
     "@types/node-fetch": "^2.6.10",
     "@types/node-static": "^0.7.11",
     "@types/randombytes": "^2.0.3",
-    "@types/sinon": "^17.0.2",
+    "@types/sinon": "^17.0.3",
     "@types/ws": "^8.5.10",
     "c8": "^9.0.0",
     "chai": "^5.0.0",
