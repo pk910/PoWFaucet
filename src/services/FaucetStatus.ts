@@ -1,10 +1,12 @@
 import * as fs from 'fs'
 import * as crypto from "crypto";
+import YAML from 'yaml';
 import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig.js';
 import { isVersionLower } from '../utils/VersionCompare.js';
 import { FaucetSession } from '../session/FaucetSession.js';
 import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
+import { SessionManager } from '../session/SessionManager.js';
 
 export enum FaucetStatusLevel {
   INFO    = "info",
@@ -27,11 +29,19 @@ export interface IFaucetStatusEntry extends IFaucetStatus {
     hosting?: boolean;
     proxy?: boolean;
     lt_version?: string; // lower than version
+    gt_hashrate?: number; // higher than total hashrate
+
   };
+}
+
+interface IFaucetStatusCachedValue {
+  time: number;
+  value: any;
 }
 
 export interface IFaucetStatusConfig {
   json?: string;
+  yaml?: string;
   refresh?: number;
 }
 
@@ -41,6 +51,7 @@ export class FaucetStatus {
   private localStatusJson: string;
   private localStatusEntries: IFaucetStatusEntry[] = [];
   private currentStatus: {[key: string]: IFaucetStatusEntry} = {};
+  private statusValueCache: {[key: string]: IFaucetStatusCachedValue} = {};
 
   public initialize() {
     if(this.initialized)
@@ -68,28 +79,46 @@ export class FaucetStatus {
   }
 
   private updateLocalStatus() {
-    let faucetStatusFile = faucetConfig.faucetStatus?.json ? resolveRelativePath(faucetConfig.faucetStatus.json) : null;
+    this.localStatusEntries = [];
+
+    let faucetStatusJsonFile = faucetConfig.faucetStatus?.json ? resolveRelativePath(faucetConfig.faucetStatus.json) : null;
+    let faucetStatusYamlFile = faucetConfig.faucetStatus?.yaml ? resolveRelativePath(faucetConfig.faucetStatus.yaml) : null;
     let faucetStatusStr = "";
-    if(!faucetStatusFile || !fs.existsSync(faucetStatusFile))
-      this.localStatusEntries = [];
-    else {
+
+    if(faucetStatusJsonFile && fs.existsSync(faucetStatusJsonFile)) {
       try {
-        faucetStatusStr = fs.readFileSync(faucetStatusFile, "utf8");
-        let faucetStatusJson = JSON.parse(faucetStatusStr);
+        let faucetStatusJsonStr = fs.readFileSync(faucetStatusJsonFile, "utf8");
+        let faucetStatusJson = JSON.parse(faucetStatusJsonStr);
+        faucetStatusStr += faucetStatusJsonStr;
 
         if(typeof faucetStatusJson === "string")
-          this.localStatusEntries = [{ level: FaucetStatusLevel.INFO, text: faucetStatusJson, prio: 10 }];
+          this.localStatusEntries.push({ level: FaucetStatusLevel.INFO, text: faucetStatusJson, prio: 10 });
         else if(typeof faucetStatusJson === "object" && faucetStatusJson && faucetStatusJson.text)
-          this.localStatusEntries = [ faucetStatusJson ];
+          this.localStatusEntries.push(faucetStatusJson);
         else if(typeof faucetStatusJson === "object" && Array.isArray(faucetStatusJson))
-          this.localStatusEntries = faucetStatusJson;
-        else
-          this.localStatusEntries = [];
+          Array.prototype.push.apply(this.localStatusEntries, faucetStatusJson);
       } catch(ex) {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "cannot read local faucet status: " + ex.toString());
-        this.localStatusEntries = [];
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "cannot read local faucet statu from json: " + ex.toString());
       }
     }
+
+    if(faucetStatusYamlFile && fs.existsSync(faucetStatusYamlFile)) {
+      try {
+        let faucetStatusYamlStr = fs.readFileSync(faucetStatusYamlFile, "utf8");
+        let faucetStatusYaml = YAML.parse(faucetStatusYamlStr);
+        faucetStatusStr += faucetStatusYamlStr;
+
+        if(typeof faucetStatusYaml === "string")
+          this.localStatusEntries.push({ level: FaucetStatusLevel.INFO, text: faucetStatusYaml, prio: 10 });
+        else if(typeof faucetStatusYaml === "object" && faucetStatusYaml && faucetStatusYaml.text)
+          this.localStatusEntries.push(faucetStatusYaml);
+        else if(typeof faucetStatusYaml === "object" && Array.isArray(faucetStatusYaml))
+          Array.prototype.push.apply(this.localStatusEntries, faucetStatusYaml);
+      } catch(ex) {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "cannot read local faucet statu from yaml: " + ex.toString());
+      }
+    }
+
     if(faucetStatusStr !== this.localStatusJson) {
       this.updateFaucetStatus();
     }
@@ -113,16 +142,59 @@ export class FaucetStatus {
 
   }
 
+  private getCachedValue(key: string, timeout: number, getter: () => any): any {
+    let cachedValue: IFaucetStatusCachedValue;
+    let now = Math.floor((new Date()).getTime() / 1000);
+    if((cachedValue = this.statusValueCache[key]) && cachedValue.time > now - timeout) {
+      return cachedValue.value;
+    }
+
+    let value = getter();
+    this.statusValueCache[key] = {
+      time: now,
+      value: value,
+    };
+    return value;
+  }
+
+  private getWellKnownValue(key: string): any {
+    switch(key) {
+      case "hashrate":
+        return this.getCachedValue(key, 60, () => {
+          let sessionManager = ServiceManager.GetService(SessionManager);
+          let totalHashrate = 0;
+          sessionManager.getActiveSessions().forEach((session) => {
+            totalHashrate += session.getSessionData("pow.hashrate", 0);
+          });
+          return totalHashrate;
+        });
+      
+    }
+  }
+
   public getFaucetStatus(clientVersion?: string, session?: FaucetSession): {status: IFaucetStatus[], hash: string} {
     let statusList: IFaucetStatus[] = [];
     let statusHash = crypto.createHash("sha256");
 
     let addStatus = (status: IFaucetStatusEntry) => {
-      statusHash.update((status.key || "*") + ":" + status.text + "\n");
+      let text = status.text.replaceAll(/\{([a-z]+)\}/g, (match, key) => {
+        switch(key) {
+          case "hashrate":
+            let hashrate = this.getWellKnownValue("hashrate");
+            if(hashrate > 2000) {
+              return Math.floor(hashrate / 1000) + " kH/s";
+            } else {
+              return Math.floor(hashrate) + " H/s";
+            }
+        }
+        return match;
+      })
+
+      statusHash.update((status.key || "*") + ":" + text + "\n");
       statusList.push({
         level: status.level,
         prio: status.prio,
-        text: status.text,
+        text: text,
         ishtml: status.ishtml
       });
     };
@@ -151,6 +223,13 @@ export class FaucetStatus {
         if(!isVersionLower(clientVersion, status.filter.lt_version))
           return false;
       }
+
+      if(status.filter.gt_hashrate !== undefined) {
+        let hashrate = this.getWellKnownValue("hashrate");
+        if(hashrate < status.filter.gt_hashrate)
+          return false;
+      }
+
       return true;
     };
 

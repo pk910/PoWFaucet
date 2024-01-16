@@ -11,6 +11,7 @@ static/js/powfaucet*
 faucet-config.json
 faucet-config.yaml
 faucet-status.json
+faucet-status.yaml
 faucet-store.*
 faucet-stats.log
 faucet-events.log

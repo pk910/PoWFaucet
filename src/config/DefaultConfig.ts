@@ -61,6 +61,7 @@ export function getDefaultConfig(): IConfigSchema {
     faucetStats: null,
     faucetStatus: {
       json: "faucet-status.json",
+      yaml: "faucet-status.yaml",
     },
     resultSharing: {
       preHtml: '<div class="sh-opt">Do you like the faucet? Give that project a <iframe src="https://ghbtns.com/github-btn.html?user=pk910&repo=PoWFaucet&type=star&count=true" frameborder="0" scrolling="0" width="150" height="20" title="GitHub"></iframe></div>',
