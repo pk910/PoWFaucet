@@ -33,7 +33,7 @@
     "@types/chai": "^4.3.11",
     "@types/mocha": "^10.0.6",
     "@types/mysql": "^2.15.25",
-    "@types/node-fetch": "^2.6.10",
+    "@types/node-fetch": "^2.6.11",
     "@types/node-static": "^0.7.11",
     "@types/randombytes": "^2.0.3",
     "@types/sinon": "^17.0.3",
