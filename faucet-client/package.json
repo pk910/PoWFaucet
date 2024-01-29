@@ -32,7 +32,7 @@
     "webpack-visualizer-plugin2": "^1.1.0"
   },
   "dependencies": {
-    "@hcaptcha/react-hcaptcha": "^1.9.2",
+    "@hcaptcha/react-hcaptcha": "^1.9.3",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "country-flag-icons": "^1.5.9",
