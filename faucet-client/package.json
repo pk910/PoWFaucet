@@ -19,7 +19,7 @@
     "@babel/preset-flow": "^7.23.3",
     "@babel/preset-react": "^7.23.3",
     "@babel/preset-typescript": "^7.23.3",
-    "@types/react-google-recaptcha": "^2.1.8",
+    "@types/react-google-recaptcha": "^2.1.9",
     "babel-loader": "^9.1.3",
     "clean-webpack-plugin": "^4.0.0",
     "css-loader": "^6.10.0",
