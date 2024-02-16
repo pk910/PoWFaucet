@@ -21,7 +21,7 @@ serverPort: 8080
 httpProxyCount: 0
 
 # title of the faucet
-faucetTitle: "Goerli PoW Faucet"
+faucetTitle: "Holesky PoW Faucet"
 
 # url to image displayed on the startpage
 faucetImage: "/images/fauceth_420.jpg"
@@ -30,7 +30,7 @@ faucetImage: "/images/fauceth_420.jpg"
 faucetHomeHtml: |
   <div class='pow-info'>
     <h5>What is a PoW Faucet?</h5>
-    This is an Ethereum Faucet running on the Goerli Testnet.<br>
+    This is an Ethereum Faucet running on the Holesky Testnet.<br>
     To prevent malicious actors from exhausting all available funds or 
     accumulating enough Ether to mount long running spam attacks, 
     this faucet requires some mining work to be done in exchange for 
@@ -53,7 +53,7 @@ faucetSecret: "RandomStringThatShouldBeVerySecret!"
 
 # ETH execution layer RPC host
 #ethRpcHost: "http://127.0.0.1:8545/"
-ethRpcHost: "https://ethereum-goerli.publicnode.com"
+ethRpcHost: "https://rpc.holesky.ethpandaops.io"
 
 # faucet wallet private key (hex, without 0x prefix)
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
@@ -62,7 +62,7 @@ ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
 ethChainId: null
 
 # symbol (short name) of the coin that can be mined
-faucetCoinSymbol: "GöETH"
+faucetCoinSymbol: "HolETH"
 
 # type of coin that can be mined
 # native = native coin (ETH)
@@ -94,7 +94,7 @@ ethMaxPending: 12
 ethQueueNoFunds: true
 
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
-ethTxExplorerLink: "https://goerli.etherscan.io/tx/{txid}"
+ethTxExplorerLink: "https://holesky.etherscan.io/tx/{txid}"
 
 
 # min/max drop amount (max is the default if no module lowers it)
@@ -502,5 +502,5 @@ resultSharing:
   caption: "Or support this faucet by sharing your result with a "
 
   # result sharing buttons
-  twitter: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s) #goerli #faucet"
-  mastodon: "Boom! Just got {amount} Goerli ETH from {url} (Mining for {duration} with {hashrate} H/s)"
+  twitter: "Boom! Just got {amount} Holesky ETH from {url} (Mining for {duration} with {hashrate} H/s) #holesky #faucet"
+  mastodon: "Boom! Just got {amount} Holesky ETH from {url} (Mining for {duration} with {hashrate} H/s)"
