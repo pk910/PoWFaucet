@@ -40,7 +40,7 @@
     "react-bootstrap": "^2.10.1",
     "react-dom": "^18.2.0",
     "react-google-recaptcha": "^3.1.0",
-    "react-router-dom": "^6.22.0",
+    "react-router-dom": "^6.22.1",
     "tiny-typed-emitter": "^2.1.0"
   }
 }
