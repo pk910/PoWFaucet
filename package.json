@@ -30,7 +30,7 @@
   "devDependencies": {
     "@databases/mysql-test": "^4.0.2",
     "@types/better-sqlite3": "^7.6.9",
-    "@types/chai": "^4.3.11",
+    "@types/chai": "^4.3.12",
     "@types/mocha": "^10.0.6",
     "@types/mysql": "^2.15.25",
     "@types/node-fetch": "^2.6.11",
