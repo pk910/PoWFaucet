@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@hcaptcha/react-hcaptcha": "^1.10.1",
-    "@types/react": "^18.2.56",
+    "@types/react": "^18.2.58",
     "@types/react-dom": "^18.2.19",
     "country-flag-icons": "^1.5.9",
     "react": "^18.2.0",
