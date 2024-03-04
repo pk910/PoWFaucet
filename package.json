@@ -58,7 +58,7 @@
     "bignumber.js": "^9.1.2",
     "ethereumjs-util": "^7.1.5",
     "hcaptcha": "^0.1.1",
-    "html-entities": "^2.4.0",
+    "html-entities": "^2.5.2",
     "mysql2": "^3.9.2",
     "node-fetch": "^3.3.2",
     "randombytes": "^2.1.0",
