@@ -32,6 +32,7 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version: 20
+        registry-url: "https://registry.npmjs.org"
     - run: npm install -g pkg
 
     # build server project
@@ -47,11 +48,12 @@ jobs:
 
     # publish npm packages
     - run: |
-        npm publish --access public
+        npm set "//registry.npmjs.org/:_authToken=$NPM_TOKEN"
+        npm publish --access public || true
         cd faucet-client
-        npm publish --access public
+        npm publish --access public || true
       env:
-        NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     # package bundled release
     - name: Package bundled release
@@ -105,7 +107,7 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bin/pow-faucet-server-linux
+        asset_path: ./bin/server-linux
         asset_name: powfaucet-server-linux
         asset_content_type: application/octet-stream
       env:
@@ -114,7 +116,7 @@ jobs:
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bin/pow-faucet-server-win.exe
+        asset_path: ./bin/server-win.exe
         asset_name: powfaucet-server-win.exe
         asset_content_type: application/octet-stream
       env:

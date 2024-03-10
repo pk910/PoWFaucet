@@ -11,7 +11,13 @@
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",
-  "repository": "https://github.com/pk910/PoWFaucet",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pk910/PoWFaucet"
+  },
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@babel/plugin-proposal-class-properties": "^7.18.6",
