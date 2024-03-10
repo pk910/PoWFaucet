@@ -33,7 +33,7 @@ export interface IPoWConfig extends IBaseModuleConfig {
   verifyMinerMaxMissed: number; // max number of missed verifications before not sending any more verification requests
   verifyMinerTimeout: number; // timeout for verification requests (client gets penalized if not responding within this timespan)
   verifyMinerRewardPerc: number; // percent of powShareReward as reward for responding to a verification request in time
-  verifyMinerMissPenaltyPerc: number; // percent of powShareReward as penalty for not responding to a verification request (shouldn't be too high as this can happen regularily in case of connection loss or so)
+  verifyMinerMissPenaltyPerc: number; // percent of powShareReward as penalty for not responding to a verification request (shouldn't be too high as this can happen regularly in case of connection loss or so)
 }
 
 export enum PoWHashAlgo {

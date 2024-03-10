@@ -34,7 +34,7 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
     return new Promise((resolve, reject) => {
       this.pool.getConnection((err, connection) => {
         if(err)
-          return reject("mysql exec() error: could not aquire connection: " + err.toString());
+          return reject("mysql exec() error: could not acquire connection: " + err.toString());
         
         connection.query(sql, (error, results) => {
           if(error)
@@ -51,7 +51,7 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
     return new Promise((resolve, reject) => {
       this.pool.getConnection((err, connection) => {
         if(err)
-          return reject("mysql run() error: could not aquire connection: " + err.toString());
+          return reject("mysql run() error: could not acquire connection: " + err.toString());
         
         connection.query(sql, values, (error, results) => {
           if(error)
@@ -72,7 +72,7 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
     return new Promise((resolve, reject) => {
       this.pool.getConnection((err, connection) => {
         if(err)
-          return reject("mysql all() error: could not aquire connection: " + err.toString());
+          return reject("mysql all() error: could not acquire connection: " + err.toString());
         
         connection.query(sql, values, (error, results) => {
           if(error)
@@ -90,7 +90,7 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
     return new Promise((resolve, reject) => {
       this.pool.getConnection((err, connection) => {
         if(err)
-          return reject("mysql get() error: could not aquire connection: " + err.toString());
+          return reject("mysql get() error: could not acquire connection: " + err.toString());
         
         connection.query(sql, values, (error, results) => {
           if(error)

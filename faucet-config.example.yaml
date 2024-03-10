@@ -314,7 +314,7 @@ modules:
     powShareReward:   2000000000000000  # 0.002 ETH
 
     # penalty for not responding to a verification request (percent of powShareReward)
-    # shouldn't be too high as this can happen regularily in case of connection loss or so
+    # shouldn't be too high as this can happen regularly in case of connection loss or so
     verifyMinerMissPenaltyPerc: 10  # 10% of powShareReward
 
     # reward for responding to a verification request in time (percent of powShareReward)

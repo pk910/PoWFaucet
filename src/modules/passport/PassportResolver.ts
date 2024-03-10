@@ -124,7 +124,7 @@ export class PassportResolver {
     if(!verifyResult.valid || !verifyResult.passport)
       return verifyResult;
 
-    // refresh passport if neccesary
+    // refresh passport if necessary
     passport = await this.refreshPassport(addr, verifyResult.passport);
     if(passport !== verifyResult.passport)
       return {valid: false, errors: ["Cannot update to an older passport"]};
