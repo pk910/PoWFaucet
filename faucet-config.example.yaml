@@ -70,7 +70,7 @@ faucetCoinSymbol: "HolETH"
 faucetCoinType: "native"
 
 # coin contract address (only for faucetCoinType = erc20)
-#faucetCoinContract: "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6" # WETH9 on goerli
+#faucetCoinContract: "0x94373a4919B3240D86eA41593D5eBa789FEF3848" # WETH9 on holesky
 
 # transaction gas limit
 # use 21000 to prevent transactions to contracts

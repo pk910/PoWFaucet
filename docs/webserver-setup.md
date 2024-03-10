@@ -24,7 +24,7 @@ Nginx seems to work much more reliable with its websocket handling.
 
 ## Nginx webserver config
 
-See [sitecfg-nginx.conf](https://github.com/pk910/PoWFaucet/blob/master/docs/sitecfg-nginx.conf) for example nginx site config (used for goerli-faucet.pk910.de)
+See [sitecfg-nginx.conf](https://github.com/pk910/PoWFaucet/blob/master/docs/sitecfg-nginx.conf) for example nginx site config (used for holesky-faucet.pk910.de)
 
 ## Common issue: Connection limits too low
 
