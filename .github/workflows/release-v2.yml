@@ -45,6 +45,14 @@ jobs:
         npm install
         node ./build-client.js 
 
+    # publish npm packages
+    - run: |
+        npm publish --access public
+        cd faucet-client
+        npm publish --access public
+      env:
+        NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
     # package bundled release
     - name: Package bundled release
       run: |

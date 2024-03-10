@@ -1,5 +1,5 @@
 {
-  "name": "pow-faucet-server",
+  "name": "@powfaucet/server",
   "version": "2.1.5",
   "description": "PoW Faucet Server",
   "main": "dist/app.js",
@@ -15,6 +15,7 @@
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",
+  "repository": "https://github.com/pk910/PoWFaucet",
   "pkg": {
     "scripts": "bundle/*.cjs",
     "assets": [
