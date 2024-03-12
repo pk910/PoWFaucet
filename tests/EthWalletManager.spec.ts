@@ -309,8 +309,7 @@ describe("ETH Wallet Manager", () => {
       };
     });
     await ethWalletManager.initialize();
-    (ethWalletManager as any).web3.eth.transactionPollingInterval = 100;
-    (ethWalletManager as any).txReceiptPollInterval = 10;
+    (ethWalletManager as any).txReceiptPollInterval = 100;
     await ethWalletManager.loadWalletState();
     let testSessionData: FaucetSessionStoreData = {
       sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
@@ -569,9 +568,7 @@ describe("ETH Wallet Manager", () => {
       };
     });
     await ethWalletManager.initialize();
-    (ethWalletManager as any).web3.eth.transactionPollingInterval = 1000;
     (ethWalletManager as any).txReceiptPollInterval = 1000;
-    (ethWalletManager as any).web3.eth.transactionPollingTimeout = 4;
     await ethWalletManager.loadWalletState();
     let testSessionData: FaucetSessionStoreData = {
       sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",

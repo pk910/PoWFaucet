@@ -1,10 +1,11 @@
 
-import Web3, { ContractAbi, AbiFragment, TransactionReceipt } from 'web3';
+import Web3, { ContractAbi, AbiFragment, TransactionReceipt, TransactionNotFound } from 'web3';
 import net from 'net';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
 import * as EthUtil from 'ethereumjs-util';
 import { Contract } from 'web3-eth-contract';
+import { ethRpcMethods } from 'web3-rpc-methods';
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
@@ -67,7 +68,7 @@ export class EthWalletManager {
   private walletState: WalletState;
   private tokenState: FaucetTokenState;
   private lastWalletRefresh: number;
-  private txReceiptPollInterval = 30000;
+  private txReceiptPollInterval = 12000;
 
   public async initialize(): Promise<void> {
     if(this.initialized)
@@ -301,7 +302,7 @@ export class EthWalletManager {
     fee: bigint;
     receipt: TransactionReceipt;
   }> {
-    return this.awaitTransactionReceipt(claimInfo.claim.txHash).then((receipt) => {
+    return this.awaitTransactionReceipt(claimInfo.claim.txHash, claimInfo.claim.txNonce).then((receipt) => {
       let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
       this.walletState.nativeBalance -= txfee;
       if(!this.tokenState)
@@ -330,7 +331,7 @@ export class EthWalletManager {
     do {
       try {
         claimInfo.claim.txHex = await buildTx();
-        let txResult = await this.sendTransaction(claimInfo.claim.txHex);
+        let txResult = await this.sendTransaction(claimInfo.claim.txHex, claimInfo.claim.txNonce);
         claimInfo.claim.txHash = txResult[0];
         txPromise = txResult[1];
       } catch(ex) {
@@ -351,15 +352,7 @@ export class EthWalletManager {
     this.updateFaucetStatus();
     return {
       txHash: claimInfo.claim.txHash,
-      txPromise : txPromise.catch((ex) => {
-        if(ex.toString().match(/Transaction was not mined within/) || ex.toString().match(/invalid json response/)) {
-          // poll receipt
-          return this.awaitTransactionReceipt(claimInfo.claim.txHash);
-        }
-        else {
-          throw ex;
-        }
-      }).then((receipt) => {
+      txPromise : txPromise.then((receipt) => {
         let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
         this.walletState.nativeBalance -= txfee;
         if(!this.tokenState)
@@ -376,19 +369,11 @@ export class EthWalletManager {
 
   public async sendCustomTx(target: string, amount: bigint, data?: string, gasLimit?: number): Promise<TransactionResult> {
     let txHex = await this.buildEthTx(target, amount, this.walletState.nonce, data, gasLimit);
-    let txResult = await this.sendTransaction(txHex);
+    let txResult = await this.sendTransaction(txHex, this.walletState.nonce);
     this.walletState.nonce++;
     return {
       txHash: txResult[0],
-      txPromise : txResult[1].catch((ex) => {
-        if(ex.toString().match(/Transaction was not mined within/) || ex.toString().match(/invalid json response/)) {
-          // poll receipt
-          return this.awaitTransactionReceipt(txResult[0]);
-        }
-        else {
-          throw ex;
-        }
-      }).then((receipt) => {
+      txPromise : txResult[1].then((receipt) => {
         let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
         this.walletState.nativeBalance -= txfee;
         if(!this.tokenState)
@@ -445,7 +430,14 @@ export class EthWalletManager {
     return Buffer.from(tx.serialize()).toString('hex');
   }
 
-  private async sendTransaction(txhex: string): Promise<[string, Promise<TransactionReceipt>]> {
+  private async sendTransaction(txhex: string, txnonce: number): Promise<[string, Promise<TransactionReceipt>]> {
+    let txHash = await ethRpcMethods.sendRawTransaction(this.web3.eth.requestManager, "0x" + txhex);
+
+    return [txHash, this.awaitTransactionReceipt(txHash, txnonce)];
+  }
+
+  /*
+  private async sendTransaction(txhex: string, nonce: number): Promise<[string, Promise<TransactionReceipt>]> {
     let txhashDfd = new PromiseDfd<string>();
     let receiptDfd = new PromiseDfd<TransactionReceipt>();
     let txStatus = 0;
@@ -472,24 +464,25 @@ export class EthWalletManager {
     let txHash = await txhashDfd.promise;
     return [txHash, receiptDfd.promise];
   }
+  */
 
-  private async awaitTransactionReceipt(txhash: string): Promise<TransactionReceipt> {
-    try {
+  private async awaitTransactionReceipt(txhash: string, txnonce: number): Promise<TransactionReceipt> {
+
+    while(true) {
       let receipt: TransactionReceipt;
-      do {
-        await sleepPromise(this.txReceiptPollInterval); // 30 secs
-        receipt = await this.web3.eth.getTransactionReceipt(txhash);
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Polled transaction receipt for " + txhash + ": " + (receipt ? "found!" : "pending"));
-      } while(!receipt);
-      return receipt;
-    } catch(ex) {
-      if(ex.toString().match(/CONNECTION ERROR/) || ex.toString().match(/invalid json response/)) {
-        // just retry when RPC connection issue
-        return this.awaitTransactionReceipt(txhash);
+      try {
+        return await this.web3.eth.getTransactionReceipt(txhash);
+      } catch(ex) {
+        if(ex instanceof TransactionNotFound || ex.toString().match(/CONNECTION ERROR/) || ex.toString().match(/invalid json response/)) {
+          // just retry when RPC connection issue
+        } else {
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
+          console.log("err ", ex);
+          throw ex;
+        }
       }
 
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
-      throw ex;
+      await sleepPromise(this.txReceiptPollInterval); // 12 secs
     }
   }
 
