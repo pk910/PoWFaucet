@@ -2,10 +2,12 @@
 import { Worker, parentPort, workerData } from "node:worker_threads";
 import { DatabaseWorker } from "../db/DatabaseWorker.js";
 import { PoWValidatorWorker } from "../modules/pow/validator/PoWValidatorWorker.js";
+import { ZupassWorker } from "../modules/zupass/ZupassWorker.js";
 
 const WORKER_CLASSES = {
   "database": DatabaseWorker,
   "pow-validator": PoWValidatorWorker,
+  "zupass-worker": ZupassWorker,
 };
 
 interface IFaucetWorkerData {
