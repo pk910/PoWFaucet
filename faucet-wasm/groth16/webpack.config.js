@@ -1,9 +1,5 @@
-const path = require('path');
-const url = require('url');
 const webpack = require('webpack');
-
-const basedir = __dirname;
-console.log(basedir);
+const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = [
   {
@@ -15,7 +11,7 @@ module.exports = [
     },
     output: {
       filename: 'groth16.cjs',
-      path: path.resolve(basedir, '..', '..', 'libs'),
+      path: __dirname + '/dist',
       library: 'libpack',
       libraryTarget:'umd'
     },
@@ -25,7 +21,17 @@ module.exports = [
       }),
     ],
     optimization: {
-      minimize: false
+      minimize: true,
+      minimizer: [
+        new TerserPlugin({
+          extractComments: false,
+          terserOptions: {
+            format: {
+              comments: false,
+            },
+          },
+        }),
+      ],
     },
   }
 ];

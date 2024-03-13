@@ -19,6 +19,8 @@ fi
 
 npx webpack --stats-error-details
 
+cp ./dist/ ../../libs/groth16.cjs
+
 printf "\n\nbuilt ../../libs/groth16.cjs successfully!\n\n"
 
 
