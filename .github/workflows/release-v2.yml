@@ -16,7 +16,7 @@ jobs:
       uses: docker/setup-buildx-action@v2
     - uses: actions/setup-node@v3
       with:
-        node-version: 20
+        node-version: 21
 
     - run: npm install
     - run: npm run test
