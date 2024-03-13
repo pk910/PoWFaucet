@@ -1,18 +1,10 @@
 import React from 'react';
+import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { IFaucetConfig } from '../../../common/FaucetConfig';
+import { IFaucetContext } from '../../../common/FaucetContext';
+import { ArgumentTypeName, PCDGetRequest, PCDRequestType, PCDTypeName } from "./ZupassTypes";
 
 import './ZupassLogin.css';
-import { IFaucetContext } from '../../../common/FaucetContext';
-
-import { EdDSATicketPCDPackage } from "@pcd/eddsa-ticket-pcd";
-import { SemaphoreIdentityPCDPackage } from "@pcd/semaphore-identity-pcd";
-import { ArgumentTypeName } from "@pcd/pcd-types";
-import { ArgsOf, PCDPackage } from "@pcd/pcd-types";
-import {
-  ZKEdDSAEventTicketPCDArgs,
-  ZKEdDSAEventTicketPCDPackage
-} from "@pcd/zk-eddsa-event-ticket-pcd";
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 
 export interface IZupassLoginProps {
   faucetContext: IFaucetContext;
@@ -30,32 +22,6 @@ export interface IZupassAuthInfo {
   eventId: string;
   attendeeId: string;
   token: string;
-}
-
-export enum PCDRequestType {
-  Get = "Get",
-}
-
-export interface PCDRequest {
-  returnUrl: string;
-  type: PCDRequestType;
-}
-
-export interface ProveOptions {
-  genericProveScreen?: boolean;
-  title?: string;
-  description?: string;
-  debug?: boolean;
-  proveOnServer?: boolean;
-  signIn?: boolean;
-}
-
-export interface PCDGetRequest<T extends PCDPackage = PCDPackage>
-  extends PCDRequest {
-  type: PCDRequestType.Get;
-  pcdType: T["name"];
-  args: ArgsOf<T>;
-  options?: ProveOptions;
 }
 
 export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassLoginState> {
@@ -233,10 +199,10 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
 
   private onLoginClick() {
 
-    const args: ZKEdDSAEventTicketPCDArgs = {
+    const args = {
       ticket: {
         argumentType: ArgumentTypeName.PCD,
-        pcdType: EdDSATicketPCDPackage.name,
+        pcdType: PCDTypeName.EdDSATicket,
         value: undefined,
         userProvided: true,
         validatorParams: {
@@ -247,7 +213,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
       },
       identity: {
         argumentType: ArgumentTypeName.PCD,
-        pcdType: SemaphoreIdentityPCDPackage.name,
+        pcdType: PCDTypeName.SemaphoreIdentity,
         value: undefined,
         userProvided: true
       },
@@ -278,7 +244,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
       }
     };
 
-    const req: PCDGetRequest<typeof ZKEdDSAEventTicketPCDPackage> = {
+    const req: PCDGetRequest = {
       type: PCDRequestType.Get,
       returnUrl: this.props.faucetConfig.modules.zupass.redirectUrl || this.props.faucetContext.faucetApi.getApiUrl("/zupassCallback", true),
       args: args,
