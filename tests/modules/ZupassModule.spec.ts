@@ -1,7 +1,6 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import { FetchUtil } from '../../src/utils/FetchUtil.js';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig } from '../common.js';
 import { ServiceManager } from '../../src/common/ServiceManager.js';
 import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
@@ -9,16 +8,13 @@ import { ModuleHookAction, ModuleManager } from '../../src/modules/ModuleManager
 import { SessionManager } from '../../src/session/SessionManager.js';
 import { faucetConfig } from '../../src/config/FaucetConfig.js';
 import { FaucetError } from '../../src/common/FaucetError.js';
-import { IGithubConfig } from '../../src/modules/github/GithubConfig.js';
 import { FaucetWebApi } from '../../src/webserv/FaucetWebApi.js';
 import { FaucetSession, FaucetSessionStatus } from '../../src/session/FaucetSession.js';
-import { encryptStr } from '../../src/utils/CryptoUtils.js';
 import { FaucetHttpResponse } from '../../src/webserv/FaucetHttpServer.js';
 import { IZupassConfig } from '../../src/modules/zupass/ZupassConfig.js';
 import { ZupassPCD } from '../../src/modules/zupass/ZupassPCD.js';
 import { sleepPromise } from '../../src/utils/PromiseUtils.js';
 import { ZupassDB } from '../../src/modules/zupass/ZupassDB.js';
-import { DatabaseWorker } from '../../src/db/DatabaseWorker.js';
 
 
 describe("Faucet module: zupass", () => {
@@ -46,6 +42,9 @@ describe("Faucet module: zupass", () => {
       requireLogin: true,
       concurrencyLimit: 1,
       grants: [],
+      loginLogo: null,
+      loginLabel: "zupass login",
+      userLabel: null,
       infoHtml: "zupass info"
     } as IZupassConfig;
   });
@@ -558,119 +557,5 @@ describe("Faucet module: zupass", () => {
     expect(callbackRsp.body).to.matches(/token/, "token not in response page");
     expect(callbackRsp.body).to.matches(/attendeeId/, "attendeeId not in response page");
   });
-
-  /*
-  it("Check authentication callback: unknown parameters", async () => {
-    await ServiceManager.GetService(ModuleManager).initialize();
-    let callbackRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
-      method: "GET",
-      url: "/api/githubCallback?test=test_error",
-    } as any);
-    expect(callbackRsp instanceof FaucetHttpResponse).to.equal(true, "unexpected api response");
-    expect(callbackRsp.body).to.matches(/github\.AuthResult/, "unexpected response page");
-    expect(callbackRsp.body).to.matches(/UNKNOWN/, "UNKNOWN error code not in response page");
-  });
-
-  it("Check authentication callback: successful authentication", async () => {
-    await ServiceManager.GetService(ModuleManager).initialize();
-    let apiRsp = addGithubApiResponses();
-    let callbackRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
-      method: "GET",
-      url: "/api/githubCallback?code=test_auth_code",
-    } as any);
-    expect(callbackRsp instanceof FaucetHttpResponse).to.equal(true, "unexpected api response");
-    expect(callbackRsp.body).to.matches(/github\.AuthResult/, "unexpected response page");
-    expect(callbackRsp.body).to.matches(/"user": *"testus"/, "auth result not in response page");
-  });
-
-  it("Check authentication callback: api error", async () => {
-    await ServiceManager.GetService(ModuleManager).initialize();
-    let apiRsp = addGithubApiResponses();
-    apiRsp.authToken.fail = true;
-    apiRsp.authToken.rsp = "test error";
-    let callbackRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
-      method: "GET",
-      url: "/api/githubCallback?code=test_auth_code",
-    } as any);
-    expect(callbackRsp instanceof FaucetHttpResponse).to.equal(true, "unexpected api response");
-    expect(callbackRsp.body).to.matches(/github\.AuthResult/, "unexpected response page");
-    expect(callbackRsp.body).to.matches(/AUTH_ERROR/, "AUTH_ERROR error code not in response page");
-  });
-
-  it("Check authentication callback: unexpected error", async () => {
-    await ServiceManager.GetService(ModuleManager).initialize();
-    let apiRsp = addGithubApiResponses();
-    apiRsp.authToken.rsp = {text: () => Promise.resolve("no proper response")};
-    let callbackRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
-      method: "GET",
-      url: "/api/githubCallback?code=test_auth_code",
-    } as any);
-    expect(callbackRsp instanceof FaucetHttpResponse).to.equal(true, "unexpected api response");
-    expect(callbackRsp.body).to.matches(/github\.AuthResult/, "unexpected response page");
-    expect(callbackRsp.body).to.matches(/AUTH_ERROR/, "AUTH_ERROR error code not in response page");
-  });
-
-  it("Check github based recurring restrictions: exceed session count", async () => {
-    await ServiceManager.GetService(ModuleManager).initialize();
-    (faucetConfig.modules["github"] as IGithubConfig).restrictions.push({
-      limitCount: 1,
-      limitAmount: 0,
-      duration: 10,
-      message: "test-message"
-    });
-    let apiRsp = addGithubApiResponses();
-    let testSession1 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
-      addr: "0x0000000000000000000000000000000000001337",
-      githubToken: generateTestToken("test-github-token", 1337),
-    });
-    expect(testSession1.getSessionStatus()).to.equal("claimable", "unexpected session status");
-    expect(testSession1.getSessionData("github.uid")).to.equal(1337, "unexpected github info in session data: github.uid");
-
-    let error: FaucetError | null = null;
-    try {
-      await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
-        addr: "0x0000000000000000000000000000000000001337",
-        githubToken: generateTestToken("test-github-token", 1337),
-      });
-    } catch(ex) {
-      error = ex;
-    }
-    expect(error).to.not.equal(null, "no exception thrown");
-    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error?.getCode()).to.equal("GITHUB_LIMIT", "unexpected error code");
-    expect(error?.message).to.matches(/test-message/, "unexpected error message");
-  });
-
-  it("Check github based recurring restrictions: exceed total amount", async () => {
-    await ServiceManager.GetService(ModuleManager).initialize();
-    (faucetConfig.modules["github"] as IGithubConfig).restrictions.push({
-      limitCount: 0,
-      limitAmount: 10,
-      duration: 10,
-      message: "test-message"
-    });
-    let apiRsp = addGithubApiResponses();
-    let testSession1 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
-      addr: "0x0000000000000000000000000000000000001337",
-      githubToken: generateTestToken("test-github-token", 1337),
-    });
-    expect(testSession1.getSessionStatus()).to.equal("claimable", "unexpected session status");
-    expect(testSession1.getSessionData("github.uid")).to.equal(1337, "unexpected github info in session data: github.uid");
-
-    let error: FaucetError | null = null;
-    try {
-      await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
-        addr: "0x0000000000000000000000000000000000001337",
-        githubToken: generateTestToken("test-github-token", 1337),
-      });
-    } catch(ex) {
-      error = ex;
-    }
-    expect(error).to.not.equal(null, "no exception thrown");
-    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
-    expect(error?.getCode()).to.equal("GITHUB_LIMIT", "unexpected error code");
-    expect(error?.message).to.matches(/test-message/, "unexpected error message");
-  });
-  */
 
 });

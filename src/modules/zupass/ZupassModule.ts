@@ -48,6 +48,9 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
           event: this.moduleConfig.event,
           watermark: this.pcdWatermark,
           nullifier: this.pcdNullifier,
+          loginLogo: this.moduleConfig.loginLogo,
+          loginLabel: this.moduleConfig.loginLabel,
+          userLabel: this.moduleConfig.userLabel,
           infoHtml: this.moduleConfig.infoHtml,
         };
       }

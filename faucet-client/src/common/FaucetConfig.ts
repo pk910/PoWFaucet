@@ -58,6 +58,9 @@ export interface IZupassModuleConfig {
   };
   watermark: string;
   nullifier: string;
+  loginLogo: string;
+  loginLabel: string;
+  userLabel: string;
   infoHtml: string;
 }
 

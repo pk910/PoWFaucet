@@ -70,7 +70,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
     return (
       <div className='faucet-zupass-auth'>
         <div className='auth-icon'>
-          <div className='logo logo-zupass' style={{backgroundImage: "url('/images/devconnect-ist.png')"}}></div>
+          <div className='logo logo-zupass' style={{backgroundImage: "url('"+ (this.props.faucetConfig.modules.zupass.loginLogo || "/images/zupass_logo.jpg") + "')"}}></div>
         </div>
         {this.state.authInfo ?
           this.renderLoginState() :
@@ -84,7 +84,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
     return (
       <div className='auth-field auth-noauth' onClick={(evt) => this.onLoginClick()}>
         <div>
-          DevConnect attendee? Login with your Ticket.
+          {this.props.faucetConfig.modules.zupass.loginLabel || "Event attendee? Login with your Ticket."}
           {this.props.faucetConfig.modules.zupass.infoHtml ?
             <OverlayTrigger
               placement="bottom"
@@ -117,7 +117,8 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
     return (
       <div className='auth-field auth-profile'>
         <div className='auth-info'>
-          Authenticated with Devconnect Ticket. {this.props.faucetConfig.modules.zupass.infoHtml ?
+          {this.props.faucetConfig.modules.zupass.userLabel || "Authenticated with Zupass Ticket."}
+          {this.props.faucetConfig.modules.zupass.infoHtml ?
             <OverlayTrigger
               placement="bottom"
               overlay={this.renderInfoHtml()}

@@ -424,6 +424,40 @@ modules:
       "Lens": 1
       "ZkSync": 1
 
+  ## Zupass protection
+  zupass:
+    enabled: false
+    zupassUrl: "https://zupass.org/"
+    zupassApiUrl: "https://api.zupass.org/"
+    redirectUrl: "https://sepolia-faucet.pk910.de/"
+    event:
+      name: "Devconnect 2023"
+      eventIds:
+        - "a1c822c4-60bd-11ee-8732-763dbf30819c" # Devconnect Cowork Space
+    verify:
+      signer: ["05e0c4e8517758da3a26c80310ff2fe65b9f85d89dfc9c80e6d0b6477f88173e", "29ae64b615383a0ebb1bc37b3a642d82d37545f0f5b1444330300e4c4eedba3f"]
+    requireLogin: false
+    concurrencyLimit: 2
+    grants:
+      - limitAmount: 100000000000000000000 # 100 ETH
+        duration: 86400
+        skipModules: ["recurring-limits"]
+        rewardFactor: 2
+      - limitCount: 1
+        duration: 86400
+        rewardFactor: 2
+        skipModules: ["recurring-limits", "pow", "faucet-outflow", "faucet-balance", "ipinfo"]
+    loginLogo: "/images/zupass_logo.jpg"
+    loginLabel: "DevConnect attendee? Login with your Ticket."
+    userLabel: "Authenticated with DevConnect Ticket."
+    infoHtml: |
+      Benefits of authenticating with your devconnect ticket:<br>
+      <ul>
+        <li>Request funds without mining (once a day)</li>
+        <li>Skip IP based limitations</li>
+        <li>Mine with double rewards (up to 100ETH/day)</li>
+      </ul>
+
 
 
 ### Fund Management

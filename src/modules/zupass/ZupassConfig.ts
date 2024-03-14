@@ -15,6 +15,9 @@ export interface IZupassConfig extends IBaseModuleConfig {
     eventId?: string[];
   } | null;
   grants: IZupassGrantConfig[];
+  loginLogo: string | null;
+  loginLabel: string | null;
+  userLabel: string | null;
   infoHtml: string | null;
 }
 
@@ -47,5 +50,8 @@ export const defaultConfig: IZupassConfig = {
   event: null,
   verify: null,
   grants: [],
+  loginLogo: null,
+  loginLabel: null,
+  userLabel: null,
   infoHtml: null,
 }
