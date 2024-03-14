@@ -2,7 +2,8 @@ import React from 'react';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { FaucetCaptcha } from '../shared/FaucetCaptcha';
-import { GithubLogin } from './GithubLogin';
+import { GithubLogin } from './github/GithubLogin';
+import { ZupassLogin } from './zupass/ZupassLogin';
 
 export interface IFaucetInputProps {
   faucetContext: IFaucetContext;
@@ -19,6 +20,7 @@ export interface IFaucetInputState {
 export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetInputState> {
   private faucetCaptcha = React.createRef<FaucetCaptcha>();
   private githubLogin = React.createRef<GithubLogin>();
+  private zupassLogin = React.createRef<ZupassLogin>();
 
   constructor(props: IFaucetInputProps, state: IFaucetInputState) {
     super(props);
@@ -31,6 +33,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
 
 	public render(): React.ReactElement<IFaucetInputProps> {
     let needGithubAuth = !!this.props.faucetConfig.modules.github;
+    let needZupassAuth = !!this.props.faucetConfig.modules.zupass && !!this.props.faucetConfig.modules.zupass.event;
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForStart;
     let inputTypes: string[] = [];
     if(this.props.faucetConfig.modules.ensname?.required) {
@@ -64,6 +67,15 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
             faucetContext={this.props.faucetContext} 
             ref={this.githubLogin}
           />
+        : null}
+        {needZupassAuth ? 
+          <React.Suspense fallback={<div>loading...</div>}>
+            <ZupassLogin 
+              faucetConfig={this.props.faucetConfig} 
+              faucetContext={this.props.faucetContext} 
+              ref={this.zupassLogin}
+            />
+          </React.Suspense>
         : null}
         {requestCaptcha ? 
           <div className='faucet-captcha'>
@@ -105,6 +117,9 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       }
       if(this.props.faucetConfig.modules.github) {
         inputData.githubToken = await this.githubLogin.current?.getToken();
+      }
+      if(this.props.faucetConfig.modules.zupass && this.props.faucetConfig.modules.zupass.event) {
+        inputData.zupassToken = await this.zupassLogin.current?.getToken();
       }
 
       await this.props.submitInputs(inputData);

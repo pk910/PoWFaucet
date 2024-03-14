@@ -1,10 +1,10 @@
 
 ClientConfig
-    prio 1: captcha, ensname, github, passport, pow
+    prio 1: captcha, ensname, github, passport, pow, zupass
 
 SessionStart
     prio 1: captcha, *maintenance_mode_check
-    prio 2: whitelist
+    prio 2: whitelist, zupass
     prio 3: ensname
     prio 5: *eth_address_check
     prio 6: concurrency-limit, ethinfo, ipinfo, mainnet-wallet, passport, recurring-limits

@@ -1,12 +1,12 @@
 import React from 'react';
-import { IFaucetConfig } from '../../common/FaucetConfig';
-import { FaucetCaptcha } from '../shared/FaucetCaptcha';
+import { IFaucetConfig } from '../../../common/FaucetConfig';
+import { FaucetCaptcha } from '../../shared/FaucetCaptcha';
 
 import './GithubLogin.css';
-import { toQuery } from '../../utils/QueryUtils';
+import { toQuery } from '../../../utils/QueryUtils';
 import { TypedEmitter } from 'tiny-typed-emitter';
-import { FaucetTime } from '../../common/FaucetTime';
-import { IFaucetContext } from '../../common/FaucetContext';
+import { FaucetTime } from '../../../common/FaucetTime';
+import { IFaucetContext } from '../../../common/FaucetContext';
 
 export interface IGithubLoginProps {
   faucetContext: IFaucetContext;

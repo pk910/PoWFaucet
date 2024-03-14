@@ -25,6 +25,7 @@ export interface IFaucetConfig {
     github?: IGithubModuleConfig;
     pow?: IPoWModuleConfig;
     passport?: IPassportModuleConfig;
+    zupass?: IZupassModuleConfig;
   };
 }
 
@@ -44,6 +45,23 @@ export interface IGithubModuleConfig {
   authTimeout: number;
   redirectUrl: string;
   callbackState: string;
+}
+
+export interface IZupassModuleConfig {
+  url: string;
+  api: string;
+  redirectUrl: string;
+  event: {
+    name: string;
+    eventIds: string[];
+    productIds: string[];
+  };
+  watermark: string;
+  nullifier: string;
+  loginLogo: string;
+  loginLabel: string;
+  userLabel: string;
+  infoHtml: string;
 }
 
 export interface IPoWModuleConfig {
