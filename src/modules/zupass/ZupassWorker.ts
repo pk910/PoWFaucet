@@ -22,6 +22,9 @@ export class ZupassWorker {
 
   private async initLibrary(): Promise<void> {
     let module = await import("../../../libs/groth16.cjs");
+    if(module.default) {
+      module = module.default;
+    }
     await module.init();
     this.groth16 = module.groth16;
   }

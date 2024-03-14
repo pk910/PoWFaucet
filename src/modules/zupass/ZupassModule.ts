@@ -18,7 +18,7 @@ import { ISessionRewardFactor } from "../../session/SessionRewardFactor.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { generateSnarkMessageHash } from "./ZupassUtils.js";
 
-export class ZupassGrantPerks {
+export interface ZupassGrantPerks {
   factor?: number;
   skipModules?: string[];
   overrideMaxDrop?: number;
@@ -73,10 +73,6 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
 
   protected override stopModule(): Promise<void> {
     return Promise.resolve();
-  }
-
-  public getZupassDb(): ZupassDB {
-    return this.zupassDb;
   }
 
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {
@@ -173,13 +169,6 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
     }
 
     let ticket = this.zupassPCD.parseTicket(parsedPCD.pcd);
-    let isValid = await this.zupassPCD.verifyTicket(ticket);
-    if(!isValid) {
-      authResult['errorCode'] = "INVALID_PCD";
-      authResult['errorMessage'] = "Failed validating PCD integrity.";
-      return authResult;
-    }
-
     if(ticket.claim.watermark !== this.pcdWatermark) {
       authResult['errorCode'] = "INVALID_PCD";
       authResult['errorMessage'] = "Invalid PCD watermark.";
@@ -206,14 +195,25 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
       authResult['errorMessage'] = "PCD verification failed: invalid signer.";
       return authResult;
     }
-    if(this.moduleConfig.verify?.productId && (!ticket.claim.partialTicket.productId || this.moduleConfig.verify.productId.indexOf(ticket.claim.partialTicket.productId) === -1)) {
+
+    let productIds = this.moduleConfig.verify?.productId || this.moduleConfig.event.productIds || [];
+    if(productIds.length > 0 && (!ticket.claim.partialTicket.productId || productIds.indexOf(ticket.claim.partialTicket.productId) === -1)) {
       authResult['errorCode'] = "INVALID_PCD";
       authResult['errorMessage'] = "PCD verification failed: invalid productId.";
       return authResult;
     }
-    if(this.moduleConfig.verify?.eventId && (!ticket.claim.partialTicket.eventId || this.moduleConfig.verify.eventId.indexOf(ticket.claim.partialTicket.eventId) === -1)) {
+
+    let eventIds = this.moduleConfig.verify?.eventId || this.moduleConfig.event.eventIds || [];
+    if(eventIds.length > 0 && (!ticket.claim.partialTicket.eventId || eventIds.indexOf(ticket.claim.partialTicket.eventId) === -1)) {
       authResult['errorCode'] = "INVALID_PCD";
       authResult['errorMessage'] = "PCD verification failed: invalid eventId.";
+      return authResult;
+    }
+
+    let isValid = await this.zupassPCD.verifyTicket(ticket);
+    if(!isValid) {
+      authResult['errorCode'] = "INVALID_PCD";
+      authResult['errorMessage'] = "Failed validating PCD integrity.";
       return authResult;
     }
 
@@ -304,26 +304,19 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
       return;
     
     let activeSessions = ServiceManager.GetService(SessionManager).getActiveSessions();
-    let concurrentSessionCount = 0;
-    let concurrentLimitMessage: string = "";
-
-    let sessCount = activeSessions.filter((sess) => {
+    let concurrentSessionCount = activeSessions.filter((sess) => {
       if(sess === session)
         return false;
-      let zupassInfo = session.getSessionData<IZupassPDCData>("zupass.data");
+      let zupassInfo = sess.getSessionData<IZupassPDCData>("zupass.data");
       if(!zupassInfo)
         return false;
       return zupassInfo.attendeeId === zupassData.attendeeId;
     }).length;
-    if(sessCount > concurrentSessionCount) {
-      concurrentSessionCount = sessCount;
-      concurrentLimitMessage = "Only " + this.moduleConfig.concurrencyLimit + " concurrent sessions allowed per ticket holder";
-    }
 
     if(concurrentSessionCount >= this.moduleConfig.concurrencyLimit) {
       throw new FaucetError(
         "ZUPASS_CONCURRENCY_LIMIT", 
-        concurrentLimitMessage,
+        "Only " + this.moduleConfig.concurrencyLimit + " concurrent sessions allowed per ticket holder",
       );
     }
   }

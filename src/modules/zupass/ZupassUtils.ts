@@ -9,16 +9,6 @@ export const BABY_JUB_NEGATIVE_ONE = BigInt(
 );
 
 /**
- * Determines whether a given number (as decimal string) represents -1,
- * either directly, or via a value of p-1 in a Baby Jubjub field.
- *
- * @param value integer encoded in a string
- */
-export function babyJubIsNegativeOne(value: string): boolean {
-  const bigintValue = BigInt(value);
-  return bigintValue === BABY_JUB_NEGATIVE_ONE || bigintValue === BigInt(-1);
-}
-/**
  * Hashes a message to be signed with sha256 and truncates to fit into a
  * baby jub jub field element.  The result includes the top 248 bits of
  * the 256 bit hash.

@@ -166,10 +166,6 @@ export class ZupassPCD {
     this.worker.on("message", (msg) => this.onWorkerMessage(msg))
   }
 
-  private now(): number {
-    return Math.floor((new Date()).getTime() / 1000);
-  }
-
   public parseTicket(pcdData: string): ZKEdDSAEventTicketPCD {
     const { id, claim, proof } = JSONBig({ useNativeBigInt: true }).parse(pcdData);
   
@@ -186,17 +182,7 @@ export class ZupassPCD {
    * strings).  The result always has length VALID_EVENT_IDS_MAX_LEN with
    * unused fields are filled in with a value of BABY_JUB_NEGATIVE_ONE.
    */
-  private snarkInputForValidEventIds(validEventIds?: string[]): string[] {
-    if (validEventIds === undefined) {
-      validEventIds = [];
-    }
-    if (validEventIds.length > VALID_EVENT_IDS_MAX_LEN) {
-      throw new Error(
-        "validEventIds for a ZKEdDSAEventTicketPCD can have up to 100 entries.  " +
-          validEventIds.length +
-          " given."
-      );
-    }
+  private snarkInputForValidEventIds(validEventIds: string[]): string[] {
     const snarkIds = new Array<string>(VALID_EVENT_IDS_MAX_LEN);
     let i = 0;
     for (const validId of validEventIds) {
@@ -253,7 +239,7 @@ export class ZupassPCD {
     ret.push(hexToBigInt(claim.signer[0]).toString());
     ret.push(hexToBigInt(claim.signer[1]).toString());
   
-    for (const eventId of this.snarkInputForValidEventIds(claim.validEventIds)) {
+    for (const eventId of this.snarkInputForValidEventIds(claim.validEventIds || [])) {
       ret.push(eventId);
     }
     ret.push(claim.validEventIds !== undefined ? "1" : "0"); // checkValidEventIds
