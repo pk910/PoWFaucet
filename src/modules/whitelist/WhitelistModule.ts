@@ -74,7 +74,7 @@ export class WhitelistModule extends BaseModule<IWhitelistConfig> {
     if(this.moduleConfig.whitelistFile && this.moduleConfig.whitelistFile.yaml) {
       // load yaml file
       if(Array.isArray(this.moduleConfig.whitelistFile.yaml))
-      this.moduleConfig.whitelistFile.yaml.forEach((file) => this.refreshCachedWhitelistEntriesFromYaml(resolveRelativePath(file)));
+        this.moduleConfig.whitelistFile.yaml.forEach((file) => this.refreshCachedWhitelistEntriesFromYaml(resolveRelativePath(file)));
       else
         this.refreshCachedWhitelistEntriesFromYaml(resolveRelativePath(this.moduleConfig.whitelistFile.yaml));
     }

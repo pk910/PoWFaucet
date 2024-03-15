@@ -11,7 +11,7 @@ export interface IWhitelistConfig extends IBaseModuleConfig {
 }
 
 export interface IWhitelistEntryConfig {
-  reward: number;
+  reward?: number;
   skipModules?: string[];
   msgkey?: string;
   message?: string;
