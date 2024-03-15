@@ -10,11 +10,15 @@ import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, returnDelayedPro
 import { FetchUtil } from '../../src/utils/FetchUtil.js';
 import { ServiceManager } from '../../src/common/ServiceManager.js';
 import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
-import { ModuleManager } from '../../src/modules/ModuleManager.js';
+import { ModuleHookAction, ModuleManager } from '../../src/modules/ModuleManager.js';
 import { SessionManager } from '../../src/session/SessionManager.js';
 import { faucetConfig } from '../../src/config/FaucetConfig.js';
 import { FaucetError } from '../../src/common/FaucetError.js';
 import { IIPInfoConfig } from '../../src/modules/ipinfo/IPInfoConfig.js';
+import { FaucetSession } from '../../src/session/FaucetSession.js';
+import { IPInfoModule } from '../../src/modules/ipinfo/IPInfoModule.js';
+import { sleepPromise } from '../../src/utils/PromiseUtils.js';
+import { FaucetProcess } from '../../src/common/FaucetProcess.js';
 
 
 describe("Faucet module: ipinfo", () => {
@@ -136,6 +140,111 @@ describe("Faucet module: ipinfo", () => {
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
     expect(error?.getCode()).to.equal("INVALID_IPINFO", "unexpected error code");
+  });
+
+  it("Start session from blocked IP", async () => {
+    faucetConfig.modules["ipinfo"] = {
+      enabled: true,
+      apiUrl: "http://test-api-info-check.com/{ip}",
+      cacheTime: 86400,
+      required: true,
+      restrictions: {
+        hosting: 50,
+        US: {
+          reward: 1,
+          blocked: true,
+        },
+      },
+      restrictionsPattern: {},
+      restrictionsFile: null,
+    } as IIPInfoConfig;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve(testIPInfoResponse)
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let error: FaucetError | null = null;
+    try {
+      await sessionManager.createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error).to.not.equal(null, "no exception thrown");
+    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
+    expect(error?.getCode()).to.equal("IPINFO_RESTRICTION", "unexpected error code");
+  });
+
+  it("check ipinfo caching (no double request for same IP)", async () => {
+    faucetConfig.modules["ipinfo"] = {
+      enabled: true,
+      apiUrl: "http://test-api-info-check.com/{ip}",
+      cacheTime: 86400,
+      required: true,
+      restrictions: {
+        hosting: 100,
+        proxy: 50,
+        DE: 50,
+      },
+      restrictionsPattern: {},
+      restrictionsFile: null,
+    } as IIPInfoConfig;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve(testIPInfoResponse)
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession1 = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession1.getSessionStatus()).to.equal("claimable", "unexpected session 1 status");
+    expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count after session 2 start");
+    await sleepPromise(50);
+    let testSession2 = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001338",
+    });
+    expect(testSession2.getSessionStatus()).to.equal("claimable", "unexpected session 2 status");
+    expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count after session 2 start");
+  });
+
+  it("check ipinfo caching (cache timeout)", async () => {
+    faucetConfig.modules["ipinfo"] = {
+      enabled: true,
+      apiUrl: "http://test-api-info-check.com/{ip}",
+      cacheTime: 86400,
+      required: true,
+      restrictions: {
+        hosting: 100,
+        proxy: 50,
+        DE: 50,
+      },
+      restrictionsPattern: {},
+      restrictionsFile: null,
+    } as IIPInfoConfig;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve(testIPInfoResponse)
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession1 = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession1.getSessionStatus()).to.equal("claimable", "unexpected session 1 status");
+    expect(globalStubs["fetch"].callCount).to.equal(1, "unexpected fetch call count after session 2 start");
+
+    let ipinfoModule = ServiceManager.GetService(ModuleManager).getModule<any>("ipinfo");
+    ipinfoModule.ipInfoResolver.ipInfoCacheCleanupTimeout = 0;
+    await ipinfoModule.ipInfoDb.cleanStore();
+    ipinfoModule.ipInfoDb.now = () => { return Math.floor((new Date()).getTime() / 1000) + 86405; };
+    await sleepPromise(1000);
+    ipinfoModule.ipInfoResolver.cleanIpInfoCache();
+
+    let testSession2 = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001338",
+    });
+    expect(testSession2.getSessionStatus()).to.equal("claimable", "unexpected session 2 status");
+    expect(globalStubs["fetch"].callCount).to.equal(2, "unexpected fetch call count after session 2 start");
   });
 
   it("check ipinfo based restriction (no restriction)", async () => {
@@ -277,6 +386,77 @@ describe("Faucet module: ipinfo", () => {
     });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(testSession.getDropAmount()).to.equal(50n, "unexpected drop amount");
+  });
+
+  it("check refreshed restrictions on running session (block session)", async () => {
+    faucetConfig.modules["ipinfo"] = {
+      enabled: true,
+      apiUrl: "http://test-api-info-check.com/{ip}",
+      cacheTime: 86400,
+      required: false,
+      restrictions: {
+      },
+      restrictionsPattern: {},
+      restrictionsFile: null,
+    } as IIPInfoConfig;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve(testIPInfoResponse)
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test1", 1);
+    });
+    ServiceManager.GetService(ModuleManager).getModule<any>("ipinfo").sessionRewardFactorCacheTimeout = 0;
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status before restriction update");
+    await testSession.addReward(50n);
+    (faucetConfig.modules["ipinfo"] as any).restrictions["US"] = {
+      blocked: true,
+    };
+    ServiceManager.GetService(FaucetProcess).emit("reload");
+    await sleepPromise(1000);
+    await testSession.addReward(10n);
+    await sleepPromise(100);
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after restriction update");
+    expect(testSession.getDropAmount()).to.equal(60n, "unexpected drop amount");
+  });
+
+  it("check refreshed restrictions on running session (kill session)", async () => {
+    faucetConfig.modules["ipinfo"] = {
+      enabled: true,
+      apiUrl: "http://test-api-info-check.com/{ip}",
+      cacheTime: 86400,
+      required: false,
+      restrictions: {
+      },
+      restrictionsPattern: {},
+      restrictionsFile: null,
+    } as IIPInfoConfig;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve(testIPInfoResponse)
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test1", 1);
+    });
+    ServiceManager.GetService(ModuleManager).getModule<any>("ipinfo").sessionRewardFactorCacheTimeout = 0;
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status before restriction update");
+    await testSession.addReward(50n);
+    (faucetConfig.modules["ipinfo"] as any).restrictions["US"] = {
+      blocked: "kill",
+      message: "bye bye"
+    };
+    await sleepPromise(1000);
+    await testSession.addReward(10n);
+    await sleepPromise(100);
+    expect(testSession.getSessionStatus()).to.equal("failed", "unexpected session status after restriction update");
   });
 
 });

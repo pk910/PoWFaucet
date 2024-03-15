@@ -45,7 +45,6 @@ export class IPInfoDB extends FaucetModuleDB {
     ) as {Json: string};
     if(!row)
       return null;
-    
     return JSON.parse(row.Json);
   }
 
@@ -58,8 +57,7 @@ export class IPInfoDB extends FaucetModuleDB {
 
     if(row) {
       await this.db.run("UPDATE IPInfoCache SET Json = ?, Timeout = ? WHERE IP = ?", [infoJson, timeout, ip.toLowerCase()]);
-    }
-    else {
+    } else {
       await this.db.run("INSERT INTO IPInfoCache (IP, Json, Timeout) VALUES (?, ?, ?)", [ip.toLowerCase(), infoJson, timeout]);
     }
   }

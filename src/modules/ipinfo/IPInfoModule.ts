@@ -29,6 +29,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   private ipInfoResolver: IPInfoResolver;
   private ipInfoMatchRestrictions: [pattern: string, restriction: number | IIPInfoRestrictionConfig][];
   private ipInfoMatchRestrictionsRefresh: number;
+  private sessionRewardFactorCacheTimeout: number = 30;
 
   protected override async startModule(): Promise<void> {
     this.ipInfoDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(IPInfoDB, this);
@@ -49,6 +50,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
 
   protected override stopModule(): Promise<void> {
     this.ipInfoDb.dispose();
+    this.ipInfoResolver.dispose();
     return Promise.resolve();
   }
 
@@ -67,9 +69,9 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
       if(ipInfo.status !== "success" && this.moduleConfig.required)
         throw new FaucetError("INVALID_IPINFO", "Error while checking your IP: " + ipInfo.status);
     } catch(ex) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Error while fetching IP-Info for " + remoteIp + ": " + ex.toString());
       if(this.moduleConfig.required)
         throw new FaucetError("INVALID_IPINFO", "Error while checking your IP: " + ex.toString());
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Error while fetching IP-Info for " + remoteIp + ": " + ex.toString());
     }
     session.setSessionData("ipinfo.data", ipInfo);
 
@@ -87,7 +89,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     let refreshTime = session.getSessionModuleRef("ipinfo.restriction.time") || 0;
     let now = Math.floor((new Date()).getTime() / 1000);
     let sessionRestriction: IIPInfoRestriction;
-    if(now - refreshTime > 30) {
+    if(now - refreshTime > this.sessionRewardFactorCacheTimeout) {
       sessionRestriction = this.getSessionRestriction(session);
       session.setSessionModuleRef("ipinfo.restriction.time", Math.floor((new Date()).getTime() / 1000));
       session.setSessionModuleRef("ipinfo.restriction.data", sessionRestriction);
