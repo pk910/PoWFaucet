@@ -1,28 +1,13 @@
 
-export enum PCDTypeName {
-  EdDSATicket = "eddsa-ticket-pcd",
-  SemaphoreIdentity = "semaphore-identity-pcd",
-}
-
-export enum ArgumentTypeName {
-  String = "String",
-  Number = "Number",
-  BigInt = "BigInt",
-  Boolean = "Boolean",
-  Object = "Object",
-  StringArray = "StringArray",
-  PCD = "PCD",
-  ToggleList = "ToggleList",
-  Unknown = "Unknown"
-}
+import { ArgsOf, PCDPackage } from "@pcd/pcd-types"
 
 export enum PCDRequestType {
   Get = "Get",
 }
 
 export interface PCDRequest {
-  returnUrl: string;
-  type: PCDRequestType;
+  returnUrl: string
+  type: PCDRequestType
 }
 
 export interface ProveOptions {
@@ -34,10 +19,9 @@ export interface ProveOptions {
   signIn?: boolean;
 }
 
-export interface PCDGetRequest
-  extends PCDRequest {
-  type: PCDRequestType.Get;
-  pcdType: string;
-  args: any;
-  options?: ProveOptions;
+export interface PCDGetRequest<T extends PCDPackage = PCDPackage> extends PCDRequest {
+  type: PCDRequestType.Get
+  pcdType: T["name"]
+  args: ArgsOf<T>
+  options?: ProveOptions
 }

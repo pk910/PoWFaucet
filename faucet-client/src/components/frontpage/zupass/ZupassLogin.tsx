@@ -2,7 +2,12 @@ import React from 'react';
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { IFaucetConfig } from '../../../common/FaucetConfig';
 import { IFaucetContext } from '../../../common/FaucetContext';
-import { ArgumentTypeName, PCDGetRequest, PCDRequestType, PCDTypeName } from "./ZupassTypes";
+import { PCDGetRequest, PCDRequestType } from "./ZupassTypes";
+
+import { EdDSATicketPCDPackage } from "@pcd/eddsa-ticket-pcd";
+import { ArgumentTypeName } from "@pcd/pcd-types";
+import { SemaphoreIdentityPCDPackage } from "@pcd/semaphore-identity-pcd";
+import { ZKEdDSAEventTicketPCDArgs } from "@pcd/zk-eddsa-event-ticket-pcd";
 
 import './ZupassLogin.css';
 
@@ -200,10 +205,10 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
 
   private onLoginClick() {
 
-    const args = {
+    const args: ZKEdDSAEventTicketPCDArgs = {
       ticket: {
         argumentType: ArgumentTypeName.PCD,
-        pcdType: PCDTypeName.EdDSATicket,
+        pcdType: EdDSATicketPCDPackage.name,
         value: undefined,
         userProvided: true,
         validatorParams: {
@@ -214,7 +219,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
       },
       identity: {
         argumentType: ArgumentTypeName.PCD,
-        pcdType: PCDTypeName.SemaphoreIdentity,
+        pcdType: SemaphoreIdentityPCDPackage.name,
         value: undefined,
         userProvided: true
       },

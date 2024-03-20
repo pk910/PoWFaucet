@@ -65,7 +65,11 @@ var webpackBaseConfig = {
   devtool: "source-map",
 
   resolve: {
-    extensions: ['.ts', '.tsx', '.js']
+    extensions: ['.ts', '.tsx', '.js'],
+    fallback: {
+      buffer: require.resolve('buffer/'),
+      assert: require.resolve('assert/'),
+    },
   },
   target: ['web', 'es5'],
 
@@ -124,7 +128,11 @@ var webpackBaseConfig = {
     }),
     new Visualizer({
       filename: 'webpack-stats.html'
-    })
+    }),
+    new webpack.ProvidePlugin({
+      Buffer: ['buffer', 'Buffer'],
+      Assert: ['assert', 'Assert'],
+    }),
   ]
 };
 
