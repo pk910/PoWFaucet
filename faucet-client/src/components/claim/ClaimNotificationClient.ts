@@ -1,7 +1,5 @@
-import { TypedEmitter } from 'tiny-typed-emitter';
+import { TypedEmitter } from "tiny-typed-emitter";
 import { PromiseDfd } from "../../utils/PromiseDfd";
-import { IFaucetConfig, IFaucetStatus } from '../../common/FaucetConfig';
-
 
 export interface IClaimNotificationClientOptions {
   claimWsUrl: string;
@@ -14,8 +12,9 @@ export interface IClaimNotificationUpdateData {
 }
 
 interface ClaimNotificationClientEvents {
-  'open': () => void;
-  'close': () => void;
+  open: () => void;
+  close: () => void;
+
   [command: string]: (message: any) => void;
 }
 
@@ -28,11 +27,11 @@ enum ClaimNotificationClientStatus {
 
 export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClientEvents> {
   private options: IClaimNotificationClientOptions;
-  private clientSocket: WebSocket;
+  private clientSocket: WebSocket | null = null;
   private clientStatus: ClaimNotificationClientStatus;
-  private readyDfd: PromiseDfd<void>;
-  private reconnectTimer: NodeJS.Timeout;
-  private disconnectTimer: NodeJS.Timeout;
+  private readyDfd: PromiseDfd<void> | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private disconnectTimer: NodeJS.Timeout | null = null;
 
   public constructor(options: IClaimNotificationClientOptions) {
     super();
@@ -46,11 +45,11 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
   }
 
   public stop() {
-    if(this.clientSocket) {
+    if (this.clientSocket) {
       this.clientSocket.close();
       this.clientSocket = null;
     }
-    this.clientStatus =ClaimNotificationClientStatus.CLOSED_IDLE;
+    this.clientStatus = ClaimNotificationClientStatus.CLOSED_IDLE;
   }
 
   public isReady(): boolean {
@@ -58,84 +57,92 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
   }
 
   public getReadyPromise(): Promise<void> {
-    if(this.clientStatus === ClaimNotificationClientStatus.READY)
+    if (this.clientStatus === ClaimNotificationClientStatus.READY) {
       return Promise.resolve();
-    if(!this.readyDfd)
+    }
+    if (!this.readyDfd) {
       this.readyDfd = new PromiseDfd<void>();
+    }
     return this.readyDfd.promise;
   }
 
   private startClient() {
     this.clientStatus = ClaimNotificationClientStatus.CONNECTING;
-    this.clientSocket = new WebSocket(this.options.claimWsUrl + "?session=" + this.options.sessionId);
-    this.clientSocket.addEventListener("open", (evt) => {
-      console.log("[ClaimNotificationClient] websocket opened");
+    this.clientSocket = new WebSocket(
+        this.options.claimWsUrl + "?session=" + this.options.sessionId
+    );
+    this.clientSocket.addEventListener("open", (_evt) => {
       this.clientStatus = ClaimNotificationClientStatus.READY;
       this.onClientReady();
     });
-    this.clientSocket.addEventListener("close", (evt) => {
-      console.log("[ClaimNotificationClient] websocket closed");
+    this.clientSocket.addEventListener("close", (_evt) => {
       this.onClientClose();
     });
-    this.clientSocket.addEventListener("error", (evt) => {
-      console.log("[ClaimNotificationClient] websocket error", evt);
+    this.clientSocket.addEventListener("error", (_evt) => {
       this.onClientClose();
     });
-    this.clientSocket.addEventListener("message", (evt) => this.onClientMessage(evt));
+    this.clientSocket.addEventListener("message", (evt) =>
+        this.onClientMessage(evt)
+    );
   }
 
   private reconnectClient() {
-    if(this.reconnectTimer)
+    if (this.reconnectTimer) {
       return;
+    }
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      if(this.clientStatus === ClaimNotificationClientStatus.CLOSED_RECONNECT)
+      if (
+          this.clientStatus === ClaimNotificationClientStatus.CLOSED_RECONNECT
+      ) {
         this.startClient();
-    }, (5 * 1000) + (1000 * 5 * Math.random()));
+      }
+    }, 5 * 1000 + 1000 * 5 * Math.random());
   }
 
   private onClientClose() {
     this.clientSocket = null;
-    if(this.clientStatus !== ClaimNotificationClientStatus.CLOSED_IDLE)
+    if (this.clientStatus !== ClaimNotificationClientStatus.CLOSED_IDLE) {
       this.clientStatus = ClaimNotificationClientStatus.CLOSED_RECONNECT;
-    if(this.disconnectTimer) {
+    }
+    if (this.disconnectTimer) {
       clearTimeout(this.disconnectTimer);
       this.disconnectTimer = null;
     }
     this.emit("close");
-    if(this.clientStatus === ClaimNotificationClientStatus.CLOSED_RECONNECT)
+    if (this.clientStatus === ClaimNotificationClientStatus.CLOSED_RECONNECT) {
       this.reconnectClient();
+    }
   }
 
   private onClientMessage(evt: MessageEvent) {
     var message;
     try {
       message = JSON.parse(evt.data);
-    } catch(ex) {
-      console.error(ex);
+    } catch (ex) {
+      // console.error(ex);
       return;
     }
 
-    if(message.action) {
+    if (message.action !== "error") {
       this.emit(message.action, message);
     }
   }
 
   private onClientReady() {
-    if(this.readyDfd) {
+    if (this.readyDfd) {
       this.readyDfd.resolve();
       this.readyDfd = null;
     }
-    if(!this.disconnectTimer) {
+    if (!this.disconnectTimer) {
       this.disconnectTimer = setTimeout(() => {
         this.disconnectTimer = null;
         // reconnect after 24h
-        if(this.clientSocket) {
+        if (this.clientSocket) {
           this.clientSocket.close(1000, "24h reconnect");
         }
       }, 60 * 60 * 24 * 1000);
     }
     this.emit("open");
   }
-
 }

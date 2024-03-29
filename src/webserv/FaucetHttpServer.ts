@@ -32,6 +32,8 @@ export interface FaucetWssEndpoint {
 
 const MAX_BODY_SIZE = 1024 * 1024 * 10; // 10MB
 
+const CORS_HEADERS = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers', "Access-Control-Allow-Credentials": 'true',"Access-Control-Allow-Methods": "GET,OPTIONS,POST" };
+
 export class FaucetHttpServer {
   private initialized: boolean;
   private httpServer: HttpServer;
@@ -86,6 +88,10 @@ export class FaucetHttpServer {
   }
 
   private onHttpRequest(req: IncomingMessage, rsp: ServerResponse) {
+    if (req.method === 'OPTIONS') {
+      rsp.writeHead(200, CORS_HEADERS);
+      return rsp.end()
+    }
     if(req.method === "GET" || req.method === "POST") {
       let bodyParts = [];
       let bodySize = 0;
@@ -101,21 +107,21 @@ export class FaucetHttpServer {
           let body = req.method === "POST" ? Buffer.concat(bodyParts) : null;
           ServiceManager.GetService(FaucetWebApi).onApiRequest(req, body).then((res: object) => {
             if(res && typeof res === "object" && res instanceof FaucetHttpResponse) {
-              rsp.writeHead(res.code, res.reason, res.headers);
+              rsp.writeHead(res.code, res.reason, {...res.headers, ...CORS_HEADERS });
               rsp.end(res.body);
             }
             else {
               let body = JSON.stringify(res);
-              rsp.writeHead(200, {'Content-Type': 'application/json'});
+              rsp.writeHead(200, {'Content-Type': 'application/json', ...CORS_HEADERS});
               rsp.end(body);
             }
           }).catch((err) => {
             if(err && typeof err === "object" && err instanceof FaucetHttpResponse) {
-              rsp.writeHead(err.code, err.reason, err.headers);
+              rsp.writeHead(err.code, err.reason, {...err.headers, ...CORS_HEADERS });
               rsp.end(err.body);
             }
             else {
-              rsp.writeHead(500, "Internal Server Error");
+              rsp.writeHead(500, "Internal Server Error", CORS_HEADERS);
               rsp.end(err ? err.toString() : "");
             }
           });
@@ -155,7 +161,7 @@ export class FaucetHttpServer {
       socket.destroy();
       return;
     }
-    
+
     this.wssServer.handleUpgrade(req, socket, head, (ws) => {
       let remoteAddr = ServiceManager.GetService(FaucetWebApi).getRemoteAddr(req);
       wssEndpoint.handler(req, ws, remoteAddr);
@@ -166,7 +172,7 @@ export class FaucetHttpServer {
     let indexFile = path.join(faucetConfig.staticPath, "index.html");
     if(!fs.existsSync(indexFile))
       return;
-    
+
     let clientVersion: {version: string, build: number};
     try {
       let clientFile = path.join(faucetConfig.staticPath, "js", "powfaucet.js");
@@ -179,14 +185,14 @@ export class FaucetHttpServer {
     let indexHtml = fs.readFileSync(indexFile, "utf8");
     let seoHtml = [
       '<div class="faucet-title">',
-        '<h1 class="center">' + encode(faucetConfig.faucetTitle) + '</h1>',
+      '<h1 class="center">' + encode(faucetConfig.faucetTitle) + '</h1>',
       '</div>',
       '<div class="pow-header center">',
-        '<div class="pow-status-container">',
-          '<div class="pow-faucet-home">',
-            faucetConfig.faucetImage ? '<img src="' + faucetConfig.faucetImage + '" className="image" />' : '',
-          '</div>',
-        '</div>',
+      '<div class="pow-status-container">',
+      '<div class="pow-faucet-home">',
+      faucetConfig.faucetImage ? '<img src="' + faucetConfig.faucetImage + '" className="image" />' : '',
+      '</div>',
+      '</div>',
       '</div>',
     ].join("");
     let seoMeta = "";
@@ -200,7 +206,7 @@ export class FaucetHttpServer {
     indexHtml = indexHtml.replace(/<!-- pow-faucet-content -->/, seoHtml);
     indexHtml = indexHtml.replace(/<!-- pow-faucet-header -->/, seoMeta);
     indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, ServiceManager.GetService(FaucetWebApi).getFaucetHomeHtml());
-    
+
     if(clientVersion) {
       indexHtml = indexHtml.replace(/"\/js\/powfaucet\.js"/, '"/js/powfaucet.js?' + clientVersion.build + '"');
       indexHtml = indexHtml.replace(/"\/css\/powfaucet\.css"/, '"/css/powfaucet.css?' + clientVersion.build + '"');
