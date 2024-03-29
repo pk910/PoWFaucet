@@ -1,0 +1,2 @@
+npm run build
+cd faucet-client && npm run build

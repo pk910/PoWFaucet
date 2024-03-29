@@ -15,7 +15,7 @@ faucetLogFile: "faucet-events.log"
 faucetPidFile: "faucet-pid.txt"
 
 # faucet http/ws server port
-serverPort: 8080
+serverPort: 8888
 
 # number of http proxies in front of this faucet
 httpProxyCount: 0
@@ -138,7 +138,7 @@ modules:
 
     # require captcha to start claim payout (default: false)
     checkBalanceClaim: false
-  
+
   ## ENS Name
   ensname:
     enabled: true
@@ -147,7 +147,7 @@ modules:
     rpcHost: "https://rpc.flashbots.net/"
     # Custom ENS Resolver contract address
     #ensAddr: "0x"
-    
+
     # require ENS name
     required: false
 
@@ -209,7 +209,7 @@ modules:
     # limits the rewards linearly according to the faucet balance (100% >= targetBalance, 0% <= spareFundsAmount)
     dynamicRestriction:
       targetBalance: 1100000000000000000000 # no restriction with faucet balance > 1100 ETH
-  
+
   ## Faucet Outflow module
   faucet-outflow:
     # enable / disable faucet outflow protection
@@ -278,7 +278,7 @@ modules:
 
     # require minimum number of transactions from mainnet wallet (nonce count)
     minTxCount: 5
-  
+
   ## Recurring Limits module
   recurring-limits:
     # enable / disable recurring limits protection
@@ -287,17 +287,17 @@ modules:
     limits: # array of individual limits, which all need to be passed
       - limitCount: 10
         limitAmount: 10000000000000000000 # 10 ETH
-        duration: 86400 # 1 day 
+        duration: 86400 # 1 day
       - limitCount: 20
         limitAmount: 20000000000000000000 # 20 ETH
         duration: 172800 # 2 days
         byAddrOnly: true
-        
+
   ## Concurrency Limit module
   concurrency-limit:
     # enable / disable concurrency limit
     enabled: true
-    
+
     concurrencyLimit: 1 # only allow 1 concurrent session (sessions in 'running' state at the same time for the same ip / target addr)
     byAddrOnly: false # only check concurrency by target address
     byIPOnly: false # only check concurrency by IP address
@@ -348,7 +348,7 @@ modules:
     trustedIssuers:
       - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
     passportCachePath: "passport-cache"
-    
+
     refreshCooldown: 300 # allow refreshing every 5mins
     cacheTime: 86400 # cache passports for 1 day (does not affect manual refreshing)
 
@@ -484,7 +484,7 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 #denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
 
 
-  
+
 
 
 ### Automatic wallet refill

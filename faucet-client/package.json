@@ -1,6 +1,6 @@
 {
-  "name": "@powfaucet/client",
-  "version": "2.2.0",
+  "name": "@drpcorg/pow-client",
+  "version": "0.0.1",
   "description": "PoW Faucet Client",
   "scripts": {
     "bundle": "webpack",
@@ -9,14 +9,19 @@
     "build": "webpack --mode production",
     "check-types": "tsc"
   },
-  "author": "pk910 (https://pk910.de)",
+  "main": "dist/index.js",
+  "types": "dist/faucet-client/src/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "dist/*"
+  ],
   "license": "AGPL-3.0",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pk910/PoWFaucet"
+    "url": "https://github.com/p2p-org/drpc-pow-faucet"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
@@ -43,11 +48,13 @@
     "@types/react": "^18.2.62",
     "@types/react-dom": "^18.2.19",
     "country-flag-icons": "^1.5.9",
-    "react": "^18.2.0",
     "react-bootstrap": "^2.10.1",
-    "react-dom": "^18.2.0",
     "react-google-recaptcha": "^3.1.0",
     "react-router-dom": "^6.22.2",
     "tiny-typed-emitter": "^2.1.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }

@@ -5,13 +5,14 @@ import { IFaucetSessionInfo, IFaucetSessionStatus } from "./FaucetSession";
 import { FaucetTime } from "./FaucetTime";
 
 export class FaucetApi {
-  private faucetTime: FaucetTime;
+  private readonly faucetTime: FaucetTime;
   private apiBaseUrl: string;
 
   public constructor(apiUrl: string) {
     this.faucetTime = new FaucetTime();
-    if(apiUrl.match(/\/$/))
+    if (apiUrl.match(/\/$/)) {
       apiUrl = apiUrl.substring(0, apiUrl.length - 1);
+    }
     this.apiBaseUrl = apiUrl;
   }
 
@@ -33,61 +34,54 @@ export class FaucetApi {
     return apiUrl;
   }
 
-  private apiGet(endpoint: string, args?: {[arg: string]: string|number}): Promise<any> {
-    if(!endpoint.match(/^\//))
-      endpoint = "/" + endpoint;
-    
-    let argsStr = "";
-    if(args) {
-      let argParts: string[] = [];
-      Object.keys(args).forEach((key) => {
-        if(!args[key])
-          return;
-        argParts.push(key + "=" + encodeURIComponent(args[key].toString()));
-      });
-      if(argParts.length > 0) {
-        argsStr = "?" + argParts.join("&");
+
+  private async apiGet(
+      endpoint: string,
+      args?: {
+        [arg: string]: string | number;
       }
+  ): Promise<any> {
+    if (!endpoint.match(/^\//)) {
+      endpoint = "/" + endpoint;
     }
-    
-    return fetch(this.apiBaseUrl + endpoint + argsStr)
-      .then((rsp) => rsp.json());
+
+    const argsStr = this.prepareArgs(args);
+
+    let rsp = await fetch(this.apiBaseUrl + endpoint + argsStr);
+    return await rsp.json();
   }
 
-  private apiPost(endpoint: string, args?: {[arg: string]: string|number}, data?: any): Promise<any> {
-    if(!endpoint.match(/^\//))
+  private async apiPost(
+      endpoint: string,
+      args?: {
+        [arg: string]: string | number;
+      },
+      data?: any
+  ): Promise<any> {
+    if (!endpoint.match(/^\//)) {
       endpoint = "/" + endpoint;
-    
-    let argsStr = "";
-    if(args) {
-      let argParts: string[] = [];
-      Object.keys(args).forEach((key) => {
-        if(!args[key])
-          return;
-        argParts.push(key + "=" + encodeURIComponent(args[key].toString()));
-      });
-      if(argParts.length > 0) {
-        argsStr = "?" + argParts.join("&");
-      }
     }
-    
-    return fetch(this.apiBaseUrl + endpoint + argsStr, {
+
+    const argsStr = this.prepareArgs(args);
+
+    const rsp = await fetch(this.apiBaseUrl + endpoint + argsStr, {
       method: "POST",
       cache: "no-cache",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
-    }).then((rsp) => rsp.json());
+    });
+
+    return await rsp.json();
   }
 
-  public getFaucetConfig(): Promise<IFaucetConfig> {
-    return this.apiGet("/getFaucetConfig", {
-      cliver: FAUCET_CLIENT_VERSION,
-    }).then((config) => {
-      this.faucetTime.syncTimeOffset(config.time);
-      return config;
+  public async getFaucetConfig(): Promise<IFaucetConfig> {
+    const config = await this.apiGet("/getFaucetConfig", {
+      cliver: 2,
     });
+    this.faucetTime.syncTimeOffset(config.time);
+    return config;
   }
 
   public getSession(sessionId: string): Promise<IFaucetSessionInfo> {
@@ -96,14 +90,20 @@ export class FaucetApi {
     });
   }
 
-  public getSessionStatus(sessionId: string, details?: boolean): Promise<IFaucetSessionStatus> {
+  public getSessionStatus(
+      sessionId: string,
+      details?: boolean
+  ): Promise<IFaucetSessionStatus> {
     return this.apiGet("/getSessionStatus", {
       session: sessionId,
+      // @ts-ignore
       details: details ? 1 : undefined,
     });
   }
 
-  public startSession(inputData: any): Promise<IFaucetSessionInfo> {
+  public startSession(inputData: {
+    addr: string;
+  }): Promise<IFaucetSessionInfo> {
     return this.apiPost("/startSession", {}, inputData);
   }
 
@@ -137,4 +137,21 @@ export class FaucetApi {
     }, json);
   }
 
+  private prepareArgs(args?: { [arg: string]: string | number }) {
+    let argsStr = "";
+    if (args) {
+      let argParts: string[] = [];
+      Object.keys(args).forEach((key) => {
+        if (!args[key]) {
+          return;
+        }
+        argParts.push(key + "=" + encodeURIComponent(args[key].toString()));
+      });
+      if (argParts.length > 0) {
+        argsStr = "?" + argParts.join("&");
+      }
+    }
+
+    return argsStr;
+  }
 }

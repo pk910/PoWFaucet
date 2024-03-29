@@ -9,9 +9,10 @@
     "build": "tsc",
     "build-client": "cd faucet-client && node build-client.js",
     "start": "tsc && node dist/app.js",
+    "start:inspect": "tsc && node --inspect=127.0.0.1:9999 dist/app.js",
     "bundle": "tsc && webpack --mode production",
     "test": "mocha --exit --trace-warnings 'tests/**/*.ts'",
-    "test-coverage": "c8 --reporter=text --reporter=lcov mocha --exit -r ts-node/register 'tests/**/*.ts'"
+    "prepare": "husky"
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",
@@ -49,6 +50,7 @@
     "@types/ws": "^8.5.10",
     "c8": "^9.1.0",
     "chai": "^5.1.0",
+    "husky": "^9.0.11",
     "mocha": "^10.3.0",
     "nyc": "^15.1.0",
     "sinon": "^17.0.1",
