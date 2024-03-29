@@ -9,7 +9,7 @@ import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData, FaucetSessi
 import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
 import { IFaucetResultSharingConfig } from "../config/ConfigShared.js";
 import { FaucetError } from "../common/FaucetError.js";
-import { EthClaimInfo, EthClaimManager } from "../eth/EthClaimManager.js";
+import { EthClaimManager } from "../eth/EthClaimManager.js";
 import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus.js";
 import { sha256 } from "../utils/CryptoUtils.js";
 
@@ -70,7 +70,7 @@ export class FaucetWebApi {
   }} = {};
 
   public async onApiRequest(req: IncomingMessage, body?: Buffer): Promise<any> {
-    let apiUrl = this.parseApiUrl(req.url);
+    const apiUrl = this.parseApiUrl(req.url);
     if (!apiUrl || apiUrl.path.length === 0)
       return new FaucetHttpResponse(404, "Not Found");
     switch (apiUrl.path[0].toLowerCase()) {
@@ -92,6 +92,10 @@ export class FaucetWebApi {
         return this.onGetQueueStatus();
       case "getFaucetStatus".toLowerCase():
         return this.onGetFaucetStatus(apiUrl.query['key'] as string);
+      case "health/readyz":
+        return this.onReadinessCheck();
+      case "health/livez":
+        return this.onLivenessCheck();
       default:
         let handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>;
         if((handler = this.apiEndpoints[apiUrl.path[0].toLowerCase()]))
@@ -160,7 +164,7 @@ export class FaucetWebApi {
     let faucetSession = sessionId ? ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING, FaucetSessionStatus.CLAIMABLE]) : null;
     let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(clientVersion, faucetSession);
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    
+
     let moduleConfig = {};
     ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.ClientConfig, [moduleConfig, sessionId]);
 
@@ -187,9 +191,8 @@ export class FaucetWebApi {
   public async onStartSession(req: IncomingMessage, body: Buffer): Promise<any> {
     if(req.method !== "POST")
       return new FaucetHttpResponse(405, "Method Not Allowed");
-    
+
     let userInput = JSON.parse(body.toString("utf8"));
-    let responseData: any = {};
     let sessionInfo: IClientSessionInfo;
     let session: FaucetSession;
     try {
@@ -221,7 +224,7 @@ export class FaucetWebApi {
         }
       }
     }
-    
+
     return sessionInfo;
   }
 
@@ -260,7 +263,7 @@ export class FaucetWebApi {
   public async onClaimReward(req: IncomingMessage, body: Buffer): Promise<any> {
     if(req.method !== "POST")
       return new FaucetHttpResponse(405, "Method Not Allowed");
-    
+
     let userInput = JSON.parse(body.toString("utf8"));
     let sessionData: FaucetSessionStoreData;
     if(!userInput || !userInput.session || !(sessionData = await ServiceManager.GetService(SessionManager).getSessionData(userInput.session))) {
@@ -270,7 +273,7 @@ export class FaucetWebApi {
         failedReason: "Session not found.",
       }
     }
-    
+
     try {
       await ServiceManager.GetService(EthClaimManager).createSessionClaim(sessionData, userInput);
     } catch(ex) {
@@ -328,7 +331,7 @@ export class FaucetWebApi {
     let sessionData: FaucetSessionStoreData;
     if(!sessionId || !(sessionData = await ServiceManager.GetService(SessionManager).getSessionData(sessionId)))
       return new FaucetHttpResponse(404, "Session not found");
-    
+
     return this.getSessionStatus(sessionData, details);
   }
 
@@ -367,9 +370,18 @@ export class FaucetWebApi {
         ),
       };
     }
-    return cachedRsp.data;  
+    return cachedRsp.data;
   }
 
+  private async onReadinessCheck(): Promise<any> {
+    if (!faucetConfig) {
+      return new FaucetHttpResponse(500, "Not ready yet");
+    }
 
+    return new FaucetHttpResponse(200, "OK");
+  }
 
+  private async onLivenessCheck(): Promise<any> {
+    return new FaucetHttpResponse(200, "OK");
+  }
 }
