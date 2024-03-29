@@ -1,10 +1,7 @@
 # PoWFaucet
 
 Modularized faucet for EVM chains with different protection methods (Captcha, Mining, IP, Mainnet Balance, Gitcoin Passport and more)
-
-# Run backend
-
-[Faucet Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)
+Forked from https://github.com/pk910/PoWFaucet
 
 ```sh
 npm i

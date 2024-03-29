@@ -20,3 +20,6 @@ export * from './utils/PromiseDfd';
 export * from './utils/QueryUtils';
 
 export * from './worker/PoWWorker';
+
+export * from './components/mining/PowMinerStatusContainer';
+export * from './components/claim/ClaimContainer';
