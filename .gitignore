@@ -18,3 +18,4 @@ faucet-events.log
 faucet-pid.txt
 tmp*
 .idea
+.env

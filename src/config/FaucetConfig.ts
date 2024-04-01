@@ -8,6 +8,8 @@ import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
 import { IConfigSchema } from './ConfigSchema.js';
 import { getDefaultConfig } from './DefaultConfig.js';
 
+import 'dotenv/config';
+
 let cliArgs = (function() {
   let args = {};
   let arg, key;
@@ -95,7 +97,9 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   }
 
   if(config) {
-    if(!config.faucetSecret) config.faucetSecret = randomBytes(40).toString("hex");
+    config.faucetSecret = process.env.FAUCET_SECRET;
+    config.ethWalletKey = process.env.ETH_WALLET_KEY;
+
     if(config.staticPath) config.staticPath = resolveRelativePath(config.staticPath);
     if(config.faucetPidFile) config.faucetPidFile = resolveRelativePath(config.faucetPidFile);
     if(config.faucetLogFile) config.faucetLogFile = resolveRelativePath(config.faucetLogFile);
