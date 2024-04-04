@@ -115,7 +115,7 @@ export class FaucetStatus {
         else if(typeof faucetStatusYaml === "object" && Array.isArray(faucetStatusYaml))
           Array.prototype.push.apply(this.localStatusEntries, faucetStatusYaml);
       } catch(ex) {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "cannot read local faucet statu from yaml: " + ex.toString());
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "cannot read local faucet status from yaml: " + ex.toString());
       }
     }
 
