@@ -99,6 +99,8 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   if(config) {
     config.faucetSecret = process.env.FAUCET_SECRET;
     config.ethWalletKey = process.env.ETH_WALLET_KEY;
+    // @ts-ignore
+    config.database.file = process.env.DB_FILE_PATH;
 
     if(config.staticPath) config.staticPath = resolveRelativePath(config.staticPath);
     if(config.faucetPidFile) config.faucetPidFile = resolveRelativePath(config.faucetPidFile);
