@@ -76,7 +76,7 @@ export class ConnectionAlert extends React.PureComponent<IConnectionAlertProps, 
         ) : null}
         {timeout < 0 ? (
           <div className='reconnect-info'>
-            Connection couln't be restored in time. Session timed out.
+            Connection couldn't be restored in time. Session timed out.
           </div>
         ) : null}
       </div>

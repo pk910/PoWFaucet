@@ -171,7 +171,7 @@ describe("ETH Wallet Manager", () => {
     expect(walletState.nativeBalance).equal(2000n, "unexpected balance in wallet state");
   });
 
-  it("check wallet state unavailibility", async () => {
+  it("check wallet state unavailability", async () => {
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_chainId", 1337);
     fakeProvider.injectResponse("eth_blockNumber", "0x1000");
