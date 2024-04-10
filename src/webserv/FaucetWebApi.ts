@@ -12,6 +12,7 @@ import { FaucetError } from "../common/FaucetError.js";
 import { EthClaimManager } from "../eth/EthClaimManager.js";
 import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus.js";
 import { sha256 } from "../utils/CryptoUtils.js";
+import {FaucetLogLevel, FaucetProcess} from "../common/FaucetProcess.js";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -73,7 +74,33 @@ export class FaucetWebApi {
     const apiUrl = this.parseApiUrl(req.url);
     if (!apiUrl || apiUrl.path.length === 0)
       return new FaucetHttpResponse(404, "Not Found");
-    switch (apiUrl.path[0].toLowerCase()) {
+
+    // k8s health check
+    if (apiUrl.path[0].toLowerCase() === "health") {
+        if(req.method !== "GET")
+          return new FaucetHttpResponse(405, "Method Not Allowed");
+
+        switch (apiUrl.path[1].toLowerCase()) {
+          case "readyz":  return this.onReadinessCheck();
+          case "livez": return this.onLivenessCheck();
+          default: return new FaucetHttpResponse(404, "Not Found");
+        }
+    }
+
+    const endpoint = apiUrl.path[0];
+    const apiKey = process.env.CLIENT_API_KEY;
+
+    if (!apiKey) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `CLIENT_API_KEY is missing`);
+      return new FaucetHttpResponse(403, "Access denied");
+    }
+
+    if (req.headers["api-key"] !== apiKey) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, `Unauthorized request to "${endpoint}"`);
+      return new FaucetHttpResponse(403, "Access denied");
+    }
+
+    switch (endpoint.toLowerCase()) {
       case "getVersion".toLowerCase():
         return this.onGetVersion();
       case "getMaxReward".toLowerCase():
@@ -92,10 +119,6 @@ export class FaucetWebApi {
         return this.onGetQueueStatus();
       case "getFaucetStatus".toLowerCase():
         return this.onGetFaucetStatus(apiUrl.query['key'] as string);
-      case "health/readyz":
-        return this.onReadinessCheck();
-      case "health/livez":
-        return this.onLivenessCheck();
       default:
         let handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>;
         if((handler = this.apiEndpoints[apiUrl.path[0].toLowerCase()]))
