@@ -93,6 +93,21 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
     }
   }
 
+  public async getTimeToNewSessionStart(userId: string): Promise<number> {
+    const limit = this.moduleConfig.limits[0];
+    if (!limit) {
+      throw new FaucetError(
+          "RECURRING_LIMIT",
+          'Limit is not set'
+      );
+    }
+    const lastStartTime = await ServiceManager.GetService(FaucetDatabase).getLastFinishedSessionStartTime(userId,  limit.duration);
+    if (!lastStartTime) {
+      return 0;
+    }
+    return lastStartTime * 1000 + limit.duration * 1000;
+  }
+
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]) {
     if(session.getSessionData<string[]>("skip.modules", []).indexOf(this.moduleName) !== -1)
       return;

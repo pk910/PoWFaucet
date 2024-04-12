@@ -357,6 +357,19 @@ export class FaucetDatabase {
     return this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claimable','claiming','finished')", whereArgs, skipData);
   }
 
+  public async getLastFinishedSessionStartTime(userId: string, timeout: number): Promise<null | number> {
+    const now = Math.floor(new Date().getTime() / 1000);
+    const whereSql: string[] = ["UserId = ?"];
+    const whereArgs: any[] = [userId, now - timeout];
+
+    const finishedSessions = await this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claimable','claiming','finished')", whereArgs, true);
+    if (!finishedSessions || !finishedSessions.length) {
+      return null;
+    }
+    const lastSession = finishedSessions[finishedSessions.length - 1];
+    return lastSession.startTime;
+  }
+
   public async getSession(sessionId: string): Promise<FaucetSessionStoreData> {
     const row = await this.db.get("SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData,UserId FROM Sessions WHERE SessionId = ?", [sessionId]) as {
       SessionId: string;

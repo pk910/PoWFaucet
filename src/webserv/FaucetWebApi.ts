@@ -13,6 +13,7 @@ import { EthClaimManager } from "../eth/EthClaimManager.js";
 import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus.js";
 import { sha256 } from "../utils/CryptoUtils.js";
 import {FaucetLogLevel, FaucetProcess} from "../common/FaucetProcess.js";
+import {RecurringLimitsModule} from "../modules/recurring-limits/RecurringLimitsModule";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -119,6 +120,8 @@ export class FaucetWebApi {
         return this.onGetQueueStatus();
       case "getFaucetStatus".toLowerCase():
         return this.onGetFaucetStatus(apiUrl.query['key'] as string);
+      case "getUserLimit".toLowerCase():
+        return this.onCheckUserLimits(req, apiUrl.query['userId'] as string);
       default:
         let handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>;
         if((handler = this.apiEndpoints[apiUrl.path[0].toLowerCase()]))
@@ -252,6 +255,24 @@ export class FaucetWebApi {
     }
 
     return sessionInfo;
+  }
+
+  public async onCheckUserLimits(req: IncomingMessage, userId: string): Promise<any> {
+    if(req.method !== "GET")
+      return new FaucetHttpResponse(405, "Method Not Allowed");
+
+    if (!userId) {
+      return new FaucetHttpResponse(500, "userId is missing");
+    }
+
+    const moduleManager = ServiceManager.GetService(ModuleManager);
+    const time = await moduleManager.getModule<RecurringLimitsModule>("recurring-limits")?.getTimeToNewSessionStart(userId);
+    return time ? {
+      allowed: false,
+      canBeStartedAt: time
+    } : {
+      allowed: true,
+    }
   }
 
   public async onGetSession(sessionId: string): Promise<any> {
