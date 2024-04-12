@@ -215,7 +215,10 @@ export class FaucetWebApi {
     if(req.method !== "POST")
       return new FaucetHttpResponse(405, "Method Not Allowed");
 
-    let userInput = JSON.parse(body.toString("utf8"));
+    const userInput = JSON.parse(body.toString("utf8"));
+    if (!userInput.userId) {
+      return new FaucetHttpResponse(500, "userId is missing");
+    }
     let sessionInfo: IClientSessionInfo;
     let session: FaucetSession;
     try {
