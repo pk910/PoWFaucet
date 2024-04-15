@@ -354,7 +354,7 @@ export class FaucetDatabase {
       throw new Error("invalid query");
 
     whereArgs.push(now - timeout);
-    return this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claimable','claiming','finished')", whereArgs, skipData);
+    return this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claiming','finished')", whereArgs, skipData);
   }
 
   public async getLastFinishedSessionStartTime(userId: string, timeout: number): Promise<null | number> {
@@ -362,7 +362,7 @@ export class FaucetDatabase {
     const whereSql: string[] = ["UserId = ?"];
     const whereArgs: any[] = [userId, now - timeout];
 
-    const finishedSessions = await this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claimable','claiming','finished')", whereArgs, true);
+    const finishedSessions = await this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claiming','finished')", whereArgs, true);
     if (!finishedSessions || !finishedSessions.length) {
       return null;
     }
