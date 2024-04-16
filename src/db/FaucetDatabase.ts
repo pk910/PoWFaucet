@@ -197,15 +197,13 @@ export class FaucetDatabase {
           [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsRemoteIPIdx ON Sessions (RemoteIP	ASC, StartTime	ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsRemoteIPIdx (RemoteIP, StartTime);`,
         }));
-        break;
       }
       case 1: { // upgrade to version 2
         schemaVersion = 2;
-        this.db.exec(SQL.driverSql({
+        await this.db.exec(SQL.driverSql({
           [FaucetDbDriver.SQLITE]: `ALTER TABLE Sessions ADD UserId TEXT;`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD UserId TEXT;`,
         }));
-        break;
       }
     }
     if(schemaVersion !== oldVersion) {
@@ -213,7 +211,6 @@ export class FaucetDatabase {
       await this.db.run("UPDATE SchemaVersion SET Version = ? WHERE Module IS NULL", [schemaVersion]);
     }
   }
-
 
   private now(): number {
     return Math.floor((new Date()).getTime() / 1000);
