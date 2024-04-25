@@ -130,8 +130,7 @@ export class PassportModule extends BaseModule<IPassportConfig> {
 
       address = session.getTargetAddr();
       refreshCooldown = this.moduleConfig.refreshCooldown;
-    }
-    else if(!sessionId) {
+    } else {
       if (!this.moduleConfig.allowGuestRefresh) {
         return {
           code: "NOT_ALLOWED",
@@ -195,7 +194,7 @@ export class PassportModule extends BaseModule<IPassportConfig> {
     return {
       passport: passportInfo,
       score: passportScore,
-      cooldown: now + this.moduleConfig.refreshCooldown,
+      cooldown: now + refreshCooldown,
     };
   }
 

@@ -1,6 +1,7 @@
 
 export class FaucetError extends Error {
   private code: string;
+  public data: {[key: string]: any};
 
   public constructor(code: string, message: string) {
     super(message);

@@ -212,8 +212,8 @@ export class FaucetWebApi {
           failedCode: ex.getCode(),
           failedReason: ex.message,
         }
-        if(ex.hasOwnProperty("data")) {
-          data.data = (ex as any).data;
+        if(ex.data) {
+          data.failedData = (ex as any).data;
         }
 
         return data;

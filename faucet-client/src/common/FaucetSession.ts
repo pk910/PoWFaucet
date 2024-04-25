@@ -38,6 +38,7 @@ export interface IFaucetSessionInfo {
   modules?: {[module: string]: any};
   failedCode?: string;
   failedReason?: string;
+  failedData?: {[key: string]: any};
 }
 
 export interface IFaucetSessionRecoveryInfo {

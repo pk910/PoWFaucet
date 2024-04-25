@@ -92,7 +92,10 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     if(sessionRestriction.blocked) {
       let err = new FaucetError("IPINFO_RESTRICTION", "IP Blocked: " + sessionRestriction.messages.map((msg) => msg.text).join(", "));
       if(sessionRestriction.hostingBased || sessionRestriction.proxyBased) {
-        (err as any).data = [ sessionRestriction.hostingBased, sessionRestriction.proxyBased ];
+        err.data = { 
+          "address": session.getTargetAddr(),
+          "ipflags": [ sessionRestriction.hostingBased, sessionRestriction.proxyBased ],
+        };
       }
       throw err;
     }
