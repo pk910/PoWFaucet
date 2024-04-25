@@ -85,12 +85,12 @@ export class EthWalletManager {
     this.startWeb3();
     if(typeof faucetConfig.ethChainId === "number")
       this.initChainCommon(BigInt(faucetConfig.ethChainId));
-    
+
     let privkey = faucetConfig.ethWalletKey;
     if(privkey.match(/^0x/))
       privkey = privkey.substring(2);
     this.walletKey = Buffer.from(privkey, "hex");
-    this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
+    this.walletAddr = faucetConfig.ethWalletAddr;
 
     await this.loadWalletState();
 
@@ -171,14 +171,14 @@ export class EthWalletManager {
     let chainIdPromise = typeof faucetConfig.ethChainId === "number" ? Promise.resolve(faucetConfig.ethChainId) : this.web3.eth.getChainId();
     let tokenBalancePromise = this.tokenState?.getBalance(this.walletAddr);
     return Promise.all([
-      this.web3.eth.getBalance(this.walletAddr, "pending"),
+      this.getFaucetWalletBalance("pending"),
       this.web3.eth.getTransactionCount(this.walletAddr, "pending"),
       chainIdPromise,
       tokenBalancePromise,
     ]).catch((ex) => {
       if(ex.toString().match(/"pending" is not yet supported/)) {
         return Promise.all([
-          this.web3.eth.getBalance(this.walletAddr),
+          this.getFaucetWalletBalance(),
           this.web3.eth.getTransactionCount(this.walletAddr),
           chainIdPromise,
           tokenBalancePromise,
@@ -277,6 +277,10 @@ export class EthWalletManager {
       return await this.tokenState.getBalance(addr);
     else
       return BigInt(await this.web3.eth.getBalance(addr));
+  }
+
+  public async getFaucetWalletBalance(blockNumber?: string) {
+    return this.web3.eth.getBalance(this.walletAddr, blockNumber)
   }
 
   public checkIsContract(addr: string): Promise<boolean> {
@@ -451,7 +455,7 @@ export class EthWalletManager {
       txStatus = 2;
       receiptDfd.resolve(receipt);
     });
-    
+
     let errorHandler = (error) => {
       if(txStatus === 0)
         txhashDfd.reject(error);

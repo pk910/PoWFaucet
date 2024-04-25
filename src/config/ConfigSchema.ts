@@ -32,6 +32,7 @@ export interface IConfigSchema {
 
   ethRpcHost: string; // ETH execution layer RPC host
   ethWalletKey: string; // faucet wallet private key
+  ethWalletAddr: string; // faucet wallet address
   ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)
   ethLegacyTx: boolean; // use legacy (non-eip1559) transaction type

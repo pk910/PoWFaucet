@@ -33,6 +33,7 @@ export function getDefaultConfig(): IConfigSchema {
 
     ethRpcHost: null, // mandatory
     ethWalletKey: null, // mandatory
+    ethWalletAddr: null,
     ethChainId: null,
     ethTxGasLimit: 100000,
     ethLegacyTx: false,

@@ -126,6 +126,29 @@ export class FaucetHttpServer {
             }
           });
         }
+        else if((req.url + "").match(/^\/metrics$/)) {
+          ServiceManager.GetService(FaucetWebApi).onMetricsRequest(req).then((res: object) => {
+            if(res && typeof res === "object" && res instanceof FaucetHttpResponse) {
+              rsp.writeHead(res.code, res.reason, {...res.headers, ...CORS_HEADERS });
+              rsp.end(res.body);
+            }
+            else {
+              const { contentType, metrics } = res as { contentType: string, metrics: string } & Record<string, any>;
+
+              rsp.writeHead(200, {'Content-Type': contentType ?? 'application/json', ...CORS_HEADERS});
+              rsp.end(metrics);
+            }
+          }).catch((err) => {
+            if(err && typeof err === "object" && err instanceof FaucetHttpResponse) {
+              rsp.writeHead(err.code, err.reason, {...err.headers, ...CORS_HEADERS });
+              rsp.end(err.body);
+            }
+            else {
+              rsp.writeHead(500, "Internal Server Error", CORS_HEADERS);
+              rsp.end(err ? err.toString() : "");
+            }
+          });
+        }
         else {
           switch(req.url) {
             case "/":

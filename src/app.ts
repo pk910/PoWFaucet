@@ -1,6 +1,6 @@
-import path, { dirname, basename } from "path";
+import path, { dirname } from "path";
 import { fileURLToPath } from "url";
-import { isMainThread, workerData } from "node:worker_threads";
+import { isMainThread } from "node:worker_threads";
 import { faucetConfig, loadFaucetConfig, setAppBasePath } from "./config/FaucetConfig.js";
 import { FaucetWorkers } from "./common/FaucetWorker.js";
 import { EthWalletManager } from "./eth/EthWalletManager.js";
@@ -13,6 +13,7 @@ import { EthClaimManager } from "./eth/EthClaimManager.js";
 import { ModuleManager } from "./modules/ModuleManager.js";
 import { SessionManager } from "./session/SessionManager.js";
 import { FaucetStatus } from "./services/FaucetStatus.js";
+import { PromMetricsService } from "./services/PromMetrics.js";
 
 (async () => {
   if(!isMainThread) {
@@ -41,6 +42,7 @@ import { FaucetStatus } from "./services/FaucetStatus.js";
       await ServiceManager.GetService(SessionManager).initialize();
       await ServiceManager.GetService(EthClaimManager).initialize();
       ServiceManager.GetService(FaucetHttpServer).initialize();
+      ServiceManager.GetService(PromMetricsService).initialize();
 
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
     } catch(ex) {

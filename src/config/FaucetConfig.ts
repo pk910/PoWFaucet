@@ -9,6 +9,7 @@ import { IConfigSchema } from './ConfigSchema.js';
 import { getDefaultConfig } from './DefaultConfig.js';
 
 import 'dotenv/config';
+import * as EthUtil from "ethereumjs-util";
 
 let cliArgs = (function() {
   let args = {};
@@ -99,6 +100,13 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   if(config) {
     config.faucetSecret = process.env.FAUCET_SECRET;
     config.ethWalletKey = process.env.ETH_WALLET_KEY;
+
+    let privkey = config.ethWalletKey;
+    if (privkey.match(/^0x/))
+      privkey = privkey.substring(2);
+    const walletKey = Buffer.from(privkey, "hex");
+    config.ethWalletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(walletKey).toString("hex"));
+
     // @ts-ignore
     config.database.file = process.env.DB_FILE_PATH;
 
