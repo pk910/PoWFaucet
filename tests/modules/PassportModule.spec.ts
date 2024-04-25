@@ -68,7 +68,7 @@ describe("Faucet module: passport", () => {
     expect(clientConfig.modules['passport'].manualVerification).to.equal(true, "client config missmatch: manualVerification");
     expect(JSON.stringify(clientConfig.modules['passport'].stampScoring)).to.equal(JSON.stringify((faucetConfig.modules["passport"] as any).stampScoring), "client config missmatch: stampScoring");
     expect(JSON.stringify(clientConfig.modules['passport'].overrideScores)).to.equal(JSON.stringify([10, 20]), "client config missmatch: overrideScores");
-    expect(JSON.stringify(clientConfig.modules['passport'].guestRefresh)).to.equal(60, "client config missmatch: guestRefresh");
+    expect(clientConfig.modules['passport'].guestRefresh).to.equal(60, "client config missmatch: guestRefresh");
   }).timeout(6000); // might take longer than the other passport tests, because the didkit lib is loaded when the module gets enabled first
 
   it("Start session with successful passport request", async () => {
