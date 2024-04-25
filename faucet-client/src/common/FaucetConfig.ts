@@ -106,6 +106,8 @@ export interface IPassportModuleConfig {
   manualVerification: boolean;
   stampScoring: {[stamp: string]: number};
   boostFactor: {[score: number]: number};
+  overrideScores: [number, number];
+  guestRefresh: number | boolean;
 }
 
 

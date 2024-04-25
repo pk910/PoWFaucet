@@ -14,7 +14,7 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
 
   protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionStart, 6, "Recurring limits check", 
+      this, ModuleHookAction.SessionStart, 7, "Recurring limits check", 
       (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput)
     );
     this.moduleManager.addActionHook(

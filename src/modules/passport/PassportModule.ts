@@ -29,6 +29,8 @@ export class PassportModule extends BaseModule<IPassportConfig> {
           manualVerification: (this.moduleConfig.trustedIssuers && this.moduleConfig.trustedIssuers.length > 0),
           stampScoring: this.moduleConfig.stampScoring,
           boostFactor: this.moduleConfig.boostFactor,
+          overrideScores: [ this.moduleConfig.skipHostingCheckScore, this.moduleConfig.skipProxyCheckScore ],
+          guestRefresh: this.moduleConfig.allowGuestRefresh ? (this.moduleConfig.guestRefreshCooldown > 0 ? this.moduleConfig.guestRefreshCooldown : this.moduleConfig.refreshCooldown) : false,
         };
       }
     );
@@ -75,7 +77,15 @@ export class PassportModule extends BaseModule<IPassportConfig> {
     let passportInfo = await this.passportResolver.getPassport(targetAddr);
     session.setSessionData("passport.refresh", Math.floor(new Date().getTime() / 1000));
     session.setSessionData("passport.data", passportInfo);
-    session.setSessionData("passport.score", this.passportResolver.getPassportScore(passportInfo));
+    let score = this.passportResolver.getPassportScore(passportInfo);
+    session.setSessionData("passport.score", score);
+
+    if(this.moduleConfig.skipHostingCheckScore > 0 && score.score >= this.moduleConfig.skipHostingCheckScore) {
+      session.setSessionData("ipinfo.override_hosting", false);
+    }
+    if(this.moduleConfig.skipProxyCheckScore > 0 && score.score >= this.moduleConfig.skipProxyCheckScore) {
+      session.setSessionData("ipinfo.override_proxy", false);
+    }
   }
 
   private async processSessionInfo(session: FaucetSession, moduleState: any): Promise<void> {
@@ -107,18 +117,43 @@ export class PassportModule extends BaseModule<IPassportConfig> {
   private async processPassportRefresh(req: IncomingMessage, url: IFaucetApiUrl, body: Buffer): Promise<any> {
     let sessionId = url.query['session'] as string;
     let session: FaucetSession;
-    if(!sessionId || !(session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]))) {
-      return {
-        code: "INVALID_SESSION",
-        error: "Session not found"
-      };
+    let address: string;
+    let refreshCooldown: number;
+    
+    if(sessionId) {
+      if(!(session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]))) {
+        return {
+          code: "INVALID_SESSION",
+          error: "Session not found"
+        };
+      }
+
+      address = session.getTargetAddr();
+      refreshCooldown = this.moduleConfig.refreshCooldown;
+    } else {
+      if (!this.moduleConfig.allowGuestRefresh) {
+        return {
+          code: "NOT_ALLOWED",
+          error: "Passport refresh not allowed without active session"
+        };
+      }
+
+      address = url.query['address'] as string;
+      if (!address || !address.match(/^0x[0-9a-fA-F]{40}$/) || address.match(/^0x0{40}$/i)) {
+        return {
+          code: "INVALID_ADDRESS",
+          error: "Invalid address"
+        };
+      }
+
+      refreshCooldown = this.moduleConfig.guestRefreshCooldown > 0 ? this.moduleConfig.guestRefreshCooldown : this.moduleConfig.refreshCooldown;
     }
 
     let now = Math.floor(new Date().getTime() / 1000);
     let passportInfo: IPassportInfo;
     if(req.method === "POST") {
       // manual refresh
-      let verifyResult = await this.passportResolver.verifyUserPassport(session.getTargetAddr(), JSON.parse(body.toString("utf8")));
+      let verifyResult = await this.passportResolver.verifyUserPassport(address, JSON.parse(body.toString("utf8")));
       if(!verifyResult.valid) {
         return {
           code: "PASSPORT_VALIDATION",
@@ -130,46 +165,77 @@ export class PassportModule extends BaseModule<IPassportConfig> {
     }
     else {
       // auto refresh
-      let lastRefresh = session.getSessionData("passport.refresh") || 0;
-      if(now - lastRefresh < this.moduleConfig.refreshCooldown) {
+      let lastRefresh: number;
+      if(session) {
+        lastRefresh = session.getSessionData("passport.refresh") || 0;
+      } else {
+        let cachedPassport = await this.passportResolver.getCachedPassport(address);
+        lastRefresh = cachedPassport ? cachedPassport.parsed : 0;
+      }
+
+      if(now - lastRefresh < refreshCooldown) {
         return {
           code: "REFRESH_COOLDOWN",
-          error: "Passport has been refreshed recently. Please wait " + (lastRefresh + this.moduleConfig.refreshCooldown - now) + " sec",
-          cooldown: lastRefresh + this.moduleConfig.refreshCooldown,
+          error: "Passport has been refreshed recently. Please wait " + (lastRefresh + refreshCooldown - now) + " sec",
+          cooldown: lastRefresh + refreshCooldown,
         };
       }
 
-      passportInfo = await this.passportResolver.getPassport(session.getTargetAddr(), true);
+      passportInfo = await this.passportResolver.getPassport(address, true);
     }
 
     let passportScore = this.passportResolver.getPassportScore(passportInfo);
-    session.setSessionData("passport.refresh", now);
-    session.setSessionData("passport.data", passportInfo);
-    session.setSessionData("passport.score", passportScore);
+    if(session) {
+      session.setSessionData("passport.refresh", now);
+      session.setSessionData("passport.data", passportInfo);
+      session.setSessionData("passport.score", passportScore);
+    }
 
     return {
       passport: passportInfo,
       score: passportScore,
-      cooldown: now + this.moduleConfig.refreshCooldown,
+      cooldown: now + refreshCooldown,
     };
   }
 
   private async processGetPassportInfo(req: IncomingMessage, url: IFaucetApiUrl, body: Buffer): Promise<any> {
     let sessionId = url.query['session'] as string;
-    let session: FaucetSession;
-    if(!sessionId || !(session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]))) {
-      return {
-        code: "INVALID_SESSION",
-        error: "Session not found"
-      };
+    let passportInfo: IPassportInfo
+
+    if(sessionId) {
+      let session: FaucetSession;
+      if(!(session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]))) {
+        return {
+          code: "INVALID_SESSION",
+          error: "Session not found"
+        };
+      }
+
+      passportInfo = session.getSessionData("passport.data");
+      if(!passportInfo) {
+        return {
+          code: "INVALID_PASSPORT",
+          error: "Passport not found"
+        };
+      }
     }
-    
-    let passportInfo: IPassportInfo = session.getSessionData("passport.data");
-    if(!passportInfo) {
-      return {
-        code: "INVALID_PASSPORT",
-        error: "Passport not found"
-      };
+    else if(!sessionId) {
+      if (!this.moduleConfig.allowGuestRefresh) {
+        return {
+          code: "NOT_ALLOWED",
+          error: "Passport info not allowed without active session"
+        };
+      }
+
+      let address = url.query['address'] as string;
+      if (!address || !address.match(/^0x[0-9a-fA-F]{40}$/) || address.match(/^0x0{40}$/i)) {
+        return {
+          code: "INVALID_ADDRESS",
+          error: "Invalid address"
+        };
+      }
+
+      passportInfo = await this.passportResolver.getCachedPassport(address);
     }
     
     return {

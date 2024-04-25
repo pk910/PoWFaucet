@@ -8,10 +8,11 @@ import "./PassportInfo.css";
 
 export interface IPassportInfoProps {
   targetAddr: string;
-  sessionId: string;
+  sessionId?: string;
   faucetConfig: IFaucetConfig;
   pageContext: IFaucetContext;
   refreshFn: (score: IPassportScoreInfo) => void;
+  children?: React.ReactElement;
 }
 
 export interface IPassportInfoState {
@@ -64,7 +65,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
     });
 
     try {
-      let passportInfo = await this.props.pageContext.faucetApi.getPassportInfo(this.props.sessionId);
+      let passportInfo = await this.props.pageContext.faucetApi.getPassportInfo(this.props.sessionId, this.props.targetAddr);
       this.setState({
         loadingPassport: false,
         passportInfo: passportInfo,
@@ -107,7 +108,10 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
 
     return (
       <div className="pow-boost-info">
-        <div className="boost-descr">Increase your passport score by verifying stamps on your <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Gitcoin Passport</a>.</div>
+        {this.props.children ?
+          this.props.children :
+          <div className="boost-descr">Increase your passport score by verifying stamps on your <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Gitcoin Passport</a>.</div>
+        }
         <div className="boost-passport">
           <div className="passport-summary container">
             <div className="row">
@@ -158,7 +162,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                   onClick={(evt) => this.onRefreshPassportClick()} 
                   disabled={this.state.refreshCooldownSec > 0 || this.state.refreshProcessing || this.state.manualRefreshRunning}
                   >
-                    Refresh Passport Automatically{this.state.refreshCooldownSec > 0 ? " (" + this.state.refreshCooldownSec + ")" : ""}
+                    Refresh Passport {this.state.refreshCooldownSec > 0 ? " (" + this.state.refreshCooldownSec + ")" : ""}
                 </button>
               </div>
               {this.props.faucetConfig.modules["passport"].manualVerification ?
@@ -335,7 +339,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
       showRefreshForm: false,
     });
     
-    this.props.pageContext.faucetApi.refreshPassport(this.props.sessionId).then((res: any) => {
+    this.props.pageContext.faucetApi.refreshPassport(this.props.sessionId, this.props.targetAddr).then((res: any) => {
       if(res.error)
         throw res;
       
@@ -378,7 +382,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
       manualRefreshRunning: true,
     });
 
-    this.props.pageContext.faucetApi.refreshPassportJson(this.props.sessionId, this.state.passportJson).then((res: any) => {
+    this.props.pageContext.faucetApi.refreshPassportJson(this.props.sessionId, this.props.targetAddr, this.state.passportJson).then((res: any) => {
       if(res.error)
         throw res;
       

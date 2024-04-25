@@ -119,21 +119,24 @@ export class FaucetApi {
     return this.apiGet("/getFaucetStatus");
   }
 
-  public getPassportInfo(sessionId: string): Promise<IPassportInfo> {
+  public getPassportInfo(sessionId: string, address: string): Promise<IPassportInfo> {
     return this.apiGet("/getPassportInfo", {
-      session: sessionId
+      session: sessionId,
+      address: address,
     });
   }
 
-  public refreshPassport(sessionId: string): Promise<IPassportInfo> {
+  public refreshPassport(sessionId: string, address: string): Promise<IPassportInfo> {
     return this.apiGet("/refreshPassport", {
-      session: sessionId
+      session: sessionId,
+      address: address,
     });
   }
 
-  public refreshPassportJson(sessionId: string, json: string): Promise<IPassportInfo> {
+  public refreshPassportJson(sessionId: string, address: string, json: string): Promise<IPassportInfo> {
     return this.apiPost("/refreshPassport", {
-      session: sessionId
+      session: sessionId,
+      address: address,
     }, json);
   }
 

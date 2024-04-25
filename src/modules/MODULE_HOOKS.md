@@ -7,7 +7,8 @@ SessionStart
     prio 2: whitelist, zupass
     prio 3: ensname
     prio 5: *eth_address_check
-    prio 6: concurrency-limit, ethinfo, ipinfo, mainnet-wallet, passport, recurring-limits
+    prio 6: passport
+    prio 7: concurrency-limit, ethinfo, ipinfo, mainnet-wallet, recurring-limits
     prio 10: pow
 
 SessionRestore

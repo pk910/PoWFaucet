@@ -207,11 +207,16 @@ export class FaucetWebApi {
       sessionInfo = await session.getSessionInfo();
     } catch(ex) {
       if(ex instanceof FaucetError) {
-        return {
+        let data: any = {
           status: FaucetSessionStatus.FAILED,
           failedCode: ex.getCode(),
           failedReason: ex.message,
         }
+        if(ex.data) {
+          data.failedData = (ex as any).data;
+        }
+
+        return data;
       }
       else {
         return {
