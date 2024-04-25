@@ -14,6 +14,7 @@ import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/f
 import { sha256 } from "../utils/CryptoUtils.js";
 import {FaucetLogLevel, FaucetProcess} from "../common/FaucetProcess.js";
 import {RecurringLimitsModule} from "../modules/recurring-limits/RecurringLimitsModule";
+import {PromMetricsService} from "../services/PromMetrics.js";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -21,11 +22,8 @@ export interface IFaucetApiUrl {
 }
 
 export interface IClientFaucetConfig {
-  faucetTitle: string;
   faucetStatus: IFaucetStatus[];
   faucetStatusHash: string;
-  faucetImage: string;
-  faucetHtml: string;
   faucetCoinSymbol: string;
   faucetCoinType: string;
   faucetCoinContract: string;
@@ -34,8 +32,8 @@ export interface IClientFaucetConfig {
   maxClaim: number;
   sessionTimeout: number;
   ethTxExplorerLink: string;
+  ethWalletAddr: string;
   time: number;
-  resultSharing: IFaucetResultSharingConfig;
   modules: {
     [module: string]: any;
   },
@@ -195,11 +193,8 @@ export class FaucetWebApi {
     ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.ClientConfig, [moduleConfig, sessionId]);
 
     return {
-      faucetTitle: faucetConfig.faucetTitle,
       faucetStatus: faucetStatus.status,
       faucetStatusHash: faucetStatus.hash,
-      faucetImage: faucetConfig.faucetImage,
-      faucetHtml: this.getFaucetHomeHtml(),
       faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
       faucetCoinType: faucetConfig.faucetCoinType,
       faucetCoinContract: faucetConfig.faucetCoinContract,
@@ -208,8 +203,8 @@ export class FaucetWebApi {
       maxClaim: faucetConfig.maxDropAmount,
       sessionTimeout: faucetConfig.sessionTimeout,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
+      ethWalletAddr: faucetConfig.ethWalletAddr,
       time: Math.floor((new Date()).getTime() / 1000),
-      resultSharing: faucetConfig.resultSharing,
       modules: moduleConfig,
     };
   }
@@ -418,6 +413,34 @@ export class FaucetWebApi {
       };
     }
     return cachedRsp.data;
+  }
+
+  public async onMetricsRequest(req: IncomingMessage,): Promise<any> {
+      if(req.method !== "GET")
+        return new FaucetHttpResponse(405, "Method Not Allowed");
+
+      const auth = req.headers.authorization;
+
+      if (!auth) {
+        return new FaucetHttpResponse(403, "Access denied");
+      }
+
+      const [type, token] = auth.split(" ");
+
+      if (
+          type.toLowerCase() !== "bearer" ||
+          !token ||
+          token === "" ||
+          token !== process.env.PROMETHEUS_AUTH_TOKEN
+      ) {
+        return new FaucetHttpResponse(403, "Access denied");
+      }
+
+
+    const metrics = await ServiceManager.GetService(PromMetricsService).getWalletBalanceMetric();
+    const contentType = ServiceManager.GetService(PromMetricsService).getContentType();
+
+    return { contentType, metrics}
   }
 
   private async onReadinessCheck(): Promise<any> {
