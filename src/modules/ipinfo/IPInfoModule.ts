@@ -21,6 +21,8 @@ export interface IIPInfoRestriction {
     notify: boolean|string;
   }[];
   blocked: false|"close"|"kill";
+  hostingBased: boolean;
+  proxyBased: boolean;
 }
 
 export class IPInfoModule extends BaseModule<IIPInfoConfig> {
@@ -88,7 +90,11 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
 
     let sessionRestriction = this.getSessionRestriction(session);
     if(sessionRestriction.blocked) {
-      throw new FaucetError("IPINFO_RESTRICTION", "IP Blocked: " + sessionRestriction.messages.map((msg) => msg.text).join(", "));
+      let err = new FaucetError("IPINFO_RESTRICTION", "IP Blocked: " + sessionRestriction.messages.map((msg) => msg.text).join(", "));
+      if(sessionRestriction.hostingBased || sessionRestriction.proxyBased) {
+        (err as any).data = [ sessionRestriction.hostingBased, sessionRestriction.proxyBased ];
+      }
+      throw err;
     }
     session.setSessionModuleRef("ipinfo.restriction.time", Math.floor((new Date()).getTime() / 1000));
     session.setSessionModuleRef("ipinfo.restriction.data", sessionRestriction);
@@ -206,6 +212,8 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
       reward: 100,
       messages: [],
       blocked: false,
+      hostingBased: false,
+      proxyBased: false,
     };
     let msgKeyDict = {};
     let sessionIpInfo: IIPInfo = session.getSessionData("ipinfo.data");
@@ -234,10 +242,14 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     };
 
     if(sessionIpInfo && this.moduleConfig.restrictions) {
-      if(sessionIpInfo.hosting && this.moduleConfig.restrictions.hosting)
+      if(sessionIpInfo.hosting && this.moduleConfig.restrictions.hosting) {
         applyRestriction(this.moduleConfig.restrictions.hosting);
-      if(sessionIpInfo.proxy && this.moduleConfig.restrictions.proxy)
+        restriction.hostingBased = true;
+      }
+      if(sessionIpInfo.proxy && this.moduleConfig.restrictions.proxy) {
         applyRestriction(this.moduleConfig.restrictions.proxy);
+        restriction.proxyBased = true;
+      }
       if(sessionIpInfo.countryCode && typeof this.moduleConfig.restrictions[sessionIpInfo.countryCode] !== "undefined")
         applyRestriction(this.moduleConfig.restrictions[sessionIpInfo.countryCode]);
     }
