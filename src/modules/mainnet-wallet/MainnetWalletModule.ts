@@ -13,7 +13,7 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
 
   protected override startModule(): Promise<void> {
     this.startWeb3();
-    this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 6, "Mainnet Wallet check", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));
+    this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 7, "Mainnet Wallet check", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));
     return Promise.resolve();
   }
 

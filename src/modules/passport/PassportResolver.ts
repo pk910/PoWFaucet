@@ -85,6 +85,13 @@ export class PassportResolver {
     this.passportScoreNonce++;
   }
 
+  public getCachedPassport(addr: string): Promise<IPassportInfo> {
+    if(this.passportCache.hasOwnProperty(addr))
+      return this.passportCache[addr];
+
+    return this.module.getPassportDb().getPassportInfo(addr);
+  }
+
   public getPassport(addr: string, refresh?: boolean): Promise<IPassportInfo> {
     if(this.passportCache.hasOwnProperty(addr))
       return this.passportCache[addr];

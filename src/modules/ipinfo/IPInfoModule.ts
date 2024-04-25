@@ -35,7 +35,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     this.ipInfoDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(IPInfoDB, this);
     this.ipInfoResolver = new IPInfoResolver(this.ipInfoDb, this.moduleConfig.apiUrl);
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionStart, 6, "IP Info check", 
+      this, ModuleHookAction.SessionStart, 7, "IP Info check", 
       (session: FaucetSession) => this.processSessionStart(session)
     );
     this.moduleManager.addActionHook(
@@ -73,6 +73,17 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
       if(this.moduleConfig.required)
         throw new FaucetError("INVALID_IPINFO", "Error while checking your IP: " + ex.toString());
     }
+
+    let overrideHosting = session.getSessionData<boolean>("ipinfo.override_hosting", undefined);
+    if(overrideHosting !== undefined) {
+      ipInfo.hosting = overrideHosting;
+    }
+
+    let overrideProxy = session.getSessionData<boolean>("ipinfo.override_proxy", undefined);
+    if(overrideProxy !== undefined) {
+      ipInfo.proxy = overrideProxy;
+    }
+
     session.setSessionData("ipinfo.data", ipInfo);
 
     let sessionRestriction = this.getSessionRestriction(session);

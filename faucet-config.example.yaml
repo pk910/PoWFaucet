@@ -354,6 +354,11 @@ modules:
 
     stampDeduplicationTime: 604800 # allow reusing a stamp in another passport after 7 days
 
+    skipProxyCheckScore: 0  # skip proxy check for IP when wallet score exceeds this
+    skipHostingCheckScore: 0 # skip hosting check for IP when wallet score exceeds this
+    allowGuestRefresh: false # allow passport refresh without active session (ie. refresh for skippimg hosting/proxy check)
+    guestRefreshCooldown: 0 # refresh cooldown without active session (default to refreshCooldown if 0)
+
     boostFactor:
       1: 1.1 # x1.1 if score >= 1
       5: 1.5 # x1.5 if score >= 5

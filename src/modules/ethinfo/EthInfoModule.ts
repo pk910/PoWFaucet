@@ -10,7 +10,7 @@ export class EthInfoModule extends BaseModule<IEthInfoConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
 
   protected override startModule(): Promise<void> {
-    this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 6, "ETH Info check", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));
+    this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 7, "ETH Info check", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));
     return Promise.resolve();
   }
 
