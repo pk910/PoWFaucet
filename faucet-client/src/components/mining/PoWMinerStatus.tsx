@@ -7,6 +7,7 @@ import { renderTimespan } from '../../utils/DateUtils';
 import { FaucetTime } from '../../common/FaucetTime';
 import { PoWClient } from '../../pow/PoWClient';
 import { IPassportScoreInfo } from '../../types/PassportInfo';
+import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 
 export interface IPoWMinerStatusProps {
   powClient: PoWClient;
@@ -28,6 +29,7 @@ export interface IPoWMinerStatusState {
   startTime: number;
   lastShareTime: number;
   showBoostInfoDialog: boolean;
+  disableProgressGif: boolean;
 }
 
 export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IPoWMinerStatusState> {
@@ -49,6 +51,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       startTime: this.props.powSession.getStartTime(),
       lastShareTime: 0,
       showBoostInfoDialog: false,
+      disableProgressGif: false,
 		};
   }
 
@@ -86,6 +89,12 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
         balance: this.props.powSession.getBalance(),
       });
     });
+
+    if(localStorage.getItem("powMinerDisableGif")) {
+      this.setState({
+        disableProgressGif: true,
+      });
+    }
   }
 
   public componentWillUnmount() {
@@ -142,7 +151,30 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       <div className='grid pow-status'>
         <div className='row'>
           <div className='col pow-status-image'>
-            <img src="/images/progress.gif" />
+            <div className='pow-progress-actions'>
+              <OverlayTrigger
+                placement="bottom"
+                overlay={
+                  <Tooltip>
+                    Stop animation for better performance
+                  </Tooltip>
+                }
+              >
+                <a href='#' onClick={(evt) => { this.onProgressGifToggle(); evt.preventDefault(); }}>
+                {this.state.disableProgressGif ?
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-play-fill" viewBox="0 0 16 16">
+                    <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+                  </svg> :
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-x-square" viewBox="0 0 16 16">
+                    <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
+                    <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>
+                  </svg>
+                }
+                </a>
+              </OverlayTrigger>
+            </div>
+
+            <img src={this.state.disableProgressGif ? "/images/progress.png" : "/images/progress.gif" } />
           </div>
         </div>
 
@@ -245,6 +277,20 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       workerCountInput: value,
     });
     this.props.powMiner.setWorkerCount(value);
+  }
+
+  private onProgressGifToggle() {
+    if(this.state.disableProgressGif) {
+      localStorage.removeItem("powMinerDisableGif")
+      this.setState({
+        disableProgressGif: false,
+      });
+    } else {
+      localStorage.setItem("powMinerDisableGif", "true")
+      this.setState({
+        disableProgressGif: true,
+      });
+    }
   }
 
 }

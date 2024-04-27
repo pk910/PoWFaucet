@@ -179,6 +179,10 @@ html, body {
   padding: 8px;
 }
 
+.faucet-page .pow-status .pow-progress-actions {
+  float: right;
+}
+
 .faucet-page .pow-status .pow-status-addr {
   margin-bottom: 8px;
 }
