@@ -11,6 +11,7 @@ import { IncomingMessage } from 'http';
 import { SessionManager } from '../../session/SessionManager.js';
 import { PassportDB } from './PassportDB.js';
 import { FaucetDatabase } from '../../db/FaucetDatabase.js';
+import { FaucetError } from '../../common/FaucetError.js';
 
 export class PassportModule extends BaseModule<IPassportConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -29,7 +30,7 @@ export class PassportModule extends BaseModule<IPassportConfig> {
           manualVerification: (this.moduleConfig.trustedIssuers && this.moduleConfig.trustedIssuers.length > 0),
           stampScoring: this.moduleConfig.stampScoring,
           boostFactor: this.moduleConfig.boostFactor,
-          overrideScores: [ this.moduleConfig.skipHostingCheckScore, this.moduleConfig.skipProxyCheckScore ],
+          overrideScores: [ this.moduleConfig.skipHostingCheckScore, this.moduleConfig.skipProxyCheckScore, this.moduleConfig.requireMinScore ],
           guestRefresh: this.moduleConfig.allowGuestRefresh ? (this.moduleConfig.guestRefreshCooldown > 0 ? this.moduleConfig.guestRefreshCooldown : this.moduleConfig.refreshCooldown) : false,
         };
       }
@@ -85,6 +86,13 @@ export class PassportModule extends BaseModule<IPassportConfig> {
     }
     if(this.moduleConfig.skipProxyCheckScore > 0 && score.score >= this.moduleConfig.skipProxyCheckScore) {
       session.setSessionData("ipinfo.override_proxy", false);
+    }
+    if(this.moduleConfig.requireMinScore > 0 && score.score < this.moduleConfig.requireMinScore) {
+      let err = new FaucetError("PASSPORT_SCORE", "You need a passport score of at least " + this.moduleConfig.requireMinScore + " to use this faucet.");
+      err.data = { 
+        "address": session.getTargetAddr(),
+      };
+      throw err;
     }
   }
 

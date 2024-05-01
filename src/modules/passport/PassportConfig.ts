@@ -9,6 +9,7 @@ export interface IPassportConfig extends IBaseModuleConfig {
   stampDeduplicationTime: number;
   stampScoring: {[stamp: string]: number};
   boostFactor: {[score: number]: number};
+  requireMinScore: number;
   skipProxyCheckScore: number;
   skipHostingCheckScore: number;
   allowGuestRefresh: boolean;
@@ -25,6 +26,7 @@ export const defaultConfig: IPassportConfig = {
   stampDeduplicationTime: 86400 * 3,
   stampScoring: {},
   boostFactor: {},
+  requireMinScore: 0,
   skipProxyCheckScore: 0,
   skipHostingCheckScore: 0,
   allowGuestRefresh: false,
