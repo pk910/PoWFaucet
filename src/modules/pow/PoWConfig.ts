@@ -20,7 +20,7 @@ export interface IPoWConfig extends IBaseModuleConfig {
   Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
   As that can lead to a huge verification work load on the server, this faucet can redistribute shares back to other miners for verification.
   These randomly selected miners need to check the share and return its validity to the server within 10 seconds or they're penalized.
-  If there is a missmatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
+  If there is a mismatch in validity-result the share is checked again locally and miners returning a bad verification result are slashed.
   Bad shares always result in a slashing (termination of session and loss of all collected mining balance)
   */
   verifyLocalPercent: number; // percentage of shares validated locally (0 - 100)
