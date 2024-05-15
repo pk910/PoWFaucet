@@ -251,9 +251,9 @@ describe("Session Management with MySQL DB Driver", () => {
     await testSession.subPenalty(1000n);
     expect(testSession.getDropAmount()).to.equal(50n, "unexpected drop amount after subPenalty on failed session");
     let sessionInfo = await testSession.getSessionInfo();
-    expect(sessionInfo.session).to.equal(testSession.getSessionId(), "invalid sessioninfo: id missmatch");
-    expect(sessionInfo.balance).to.equal(testSession.getDropAmount().toString(), "invalid sessioninfo: balance missmatch");
-    expect(sessionInfo.failedCode).to.equal("AMOUNT_TOO_LOW", "invalid sessioninfo: failedCode missmatch");
+    expect(sessionInfo.session).to.equal(testSession.getSessionId(), "invalid sessioninfo: id mismatch");
+    expect(sessionInfo.balance).to.equal(testSession.getDropAmount().toString(), "invalid sessioninfo: balance mismatch");
+    expect(sessionInfo.failedCode).to.equal("AMOUNT_TOO_LOW", "invalid sessioninfo: failedCode mismatch");
   });
 
   it("Check invalid balance change on failed session", async () => {

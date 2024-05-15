@@ -45,10 +45,10 @@ describe("Faucet module: captcha", () => {
     await ServiceManager.GetService(ModuleManager).initialize();
     let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['captcha']).to.equal(true, "no captcha config exported");
-    expect(clientConfig.modules['captcha'].provider).to.equal("hcaptcha", "client config missmatch: provider");
-    expect(clientConfig.modules['captcha'].siteKey).to.equal("test-site-key", "client config missmatch: siteKey");
-    expect(clientConfig.modules['captcha'].requiredForStart).to.equal(true, "client config missmatch: requiredForStart");
-    expect(clientConfig.modules['captcha'].requiredForClaim).to.equal(true, "client config missmatch: requiredForClaim");
+    expect(clientConfig.modules['captcha'].provider).to.equal("hcaptcha", "client config mismatch: provider");
+    expect(clientConfig.modules['captcha'].siteKey).to.equal("test-site-key", "client config mismatch: siteKey");
+    expect(clientConfig.modules['captcha'].requiredForStart).to.equal(true, "client config mismatch: requiredForStart");
+    expect(clientConfig.modules['captcha'].requiredForClaim).to.equal(true, "client config mismatch: requiredForClaim");
   });
 
   it("Require hcaptcha for session start", async () => {
