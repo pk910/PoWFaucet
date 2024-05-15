@@ -59,7 +59,7 @@ describe("Faucet Module Management", () => {
       let modObj = moduleManager.getModule<BaseModule>(module);
       expect(!!modObj).to.equal(true, "module not loaded: " + module);
       expect(modObj.isEnabled()).to.equal(true, "module not enabled: " + module);
-      expect(modObj.getModuleName()).to.equal(module, "module name missmatch: " + module);
+      expect(modObj.getModuleName()).to.equal(module, "module name mismatch: " + module);
       faucetConfig.modules[module].enabled = false;
     });
     ServiceManager.GetService(FaucetProcess).emit("reload");

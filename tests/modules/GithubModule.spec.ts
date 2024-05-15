@@ -148,10 +148,10 @@ describe("Faucet module: github", () => {
     await ServiceManager.GetService(ModuleManager).initialize();
     let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['github']).to.equal(true, "no github config exported");
-    expect(clientConfig.modules['github'].clientId).to.equal("test-client-id", "client config missmatch: clientId");
-    expect(clientConfig.modules['github'].authTimeout).to.equal(86400, "client config missmatch: authTimeout");
-    expect(clientConfig.modules['github'].redirectUrl).to.equal("test-redirect-url", "client config missmatch: redirectUrl");
-    expect(clientConfig.modules['github'].callbackState).to.equal("test-callback-state", "client config missmatch: callbackState");
+    expect(clientConfig.modules['github'].clientId).to.equal("test-client-id", "client config mismatch: clientId");
+    expect(clientConfig.modules['github'].authTimeout).to.equal(86400, "client config mismatch: authTimeout");
+    expect(clientConfig.modules['github'].redirectUrl).to.equal("test-redirect-url", "client config mismatch: redirectUrl");
+    expect(clientConfig.modules['github'].callbackState).to.equal("test-callback-state", "client config mismatch: callbackState");
   });
 
   it("Start session with github token", async () => {
