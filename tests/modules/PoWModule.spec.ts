@@ -49,15 +49,15 @@ describe("Faucet module: pow", () => {
     await moduleManager.initialize();
     let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['pow']).to.equal(true, "no pow config exported");
-    expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config missmatch: powTimeout");
-    expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.SCRYPT, "client config missmatch: powParams.a");
-    expect(clientConfig.modules['pow'].powParams.n).to.equal(4096, "client config missmatch: powParams.n");
-    expect(clientConfig.modules['pow'].powParams.r).to.equal(8, "client config missmatch: powParams.r");
-    expect(clientConfig.modules['pow'].powParams.p).to.equal(1, "client config missmatch: powParams.p");
-    expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config missmatch: powParams.l");
-    expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config missmatch: powDifficulty");
-    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config missmatch: powNonceCount");
-    expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config missmatch: powHashrateLimit");
+    expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config mismatch: powTimeout");
+    expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.SCRYPT, "client config mismatch: powParams.a");
+    expect(clientConfig.modules['pow'].powParams.n).to.equal(4096, "client config mismatch: powParams.n");
+    expect(clientConfig.modules['pow'].powParams.r).to.equal(8, "client config mismatch: powParams.r");
+    expect(clientConfig.modules['pow'].powParams.p).to.equal(1, "client config mismatch: powParams.p");
+    expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
+    expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
+    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config mismatch: powNonceCount");
+    expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
     let powModule = moduleManager.getModule<PoWModule>("pow");
     expect(powModule.getPoWParamsStr()).to.equal("scrypt|4096|8|1|16|11", "invalid powParams string");
   });
@@ -81,14 +81,14 @@ describe("Faucet module: pow", () => {
     await moduleManager.initialize();
     let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['pow']).to.equal(true, "no pow config exported");
-    expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config missmatch: powTimeout");
-    expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.CRYPTONIGHT, "client config missmatch: powParams.a");
-    expect(clientConfig.modules['pow'].powParams.c).to.equal(0, "client config missmatch: powParams.c");
-    expect(clientConfig.modules['pow'].powParams.v).to.equal(1, "client config missmatch: powParams.v");
-    expect(clientConfig.modules['pow'].powParams.h).to.equal(10, "client config missmatch: powParams.h");
-    expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config missmatch: powDifficulty");
-    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config missmatch: powNonceCount");
-    expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config missmatch: powHashrateLimit");
+    expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config mismatch: powTimeout");
+    expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.CRYPTONIGHT, "client config mismatch: powParams.a");
+    expect(clientConfig.modules['pow'].powParams.c).to.equal(0, "client config mismatch: powParams.c");
+    expect(clientConfig.modules['pow'].powParams.v).to.equal(1, "client config mismatch: powParams.v");
+    expect(clientConfig.modules['pow'].powParams.h).to.equal(10, "client config mismatch: powParams.h");
+    expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
+    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config mismatch: powNonceCount");
+    expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
     let powModule = moduleManager.getModule<PoWModule>("pow");
     expect(powModule.getPoWParamsStr()).to.equal("cryptonight|0|1|10|11", "invalid powParams string");
   });
@@ -115,17 +115,17 @@ describe("Faucet module: pow", () => {
     await moduleManager.initialize();
     let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['pow']).to.equal(true, "no pow config exported");
-    expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config missmatch: powTimeout");
-    expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.ARGON2, "client config missmatch: powParams.a");
-    expect(clientConfig.modules['pow'].powParams.t).to.equal(0, "client config missmatch: powParams.t");
-    expect(clientConfig.modules['pow'].powParams.v).to.equal(13, "client config missmatch: powParams.v");
-    expect(clientConfig.modules['pow'].powParams.i).to.equal(4, "client config missmatch: powParams.i");
-    expect(clientConfig.modules['pow'].powParams.m).to.equal(4096, "client config missmatch: powParams.m");
-    expect(clientConfig.modules['pow'].powParams.p).to.equal(1, "client config missmatch: powParams.p");
-    expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config missmatch: powParams.l");
-    expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config missmatch: powDifficulty");
-    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config missmatch: powNonceCount");
-    expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config missmatch: powHashrateLimit");
+    expect(clientConfig.modules['pow'].powTimeout).to.equal(60, "client config mismatch: powTimeout");
+    expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.ARGON2, "client config mismatch: powParams.a");
+    expect(clientConfig.modules['pow'].powParams.t).to.equal(0, "client config mismatch: powParams.t");
+    expect(clientConfig.modules['pow'].powParams.v).to.equal(13, "client config mismatch: powParams.v");
+    expect(clientConfig.modules['pow'].powParams.i).to.equal(4, "client config mismatch: powParams.i");
+    expect(clientConfig.modules['pow'].powParams.m).to.equal(4096, "client config mismatch: powParams.m");
+    expect(clientConfig.modules['pow'].powParams.p).to.equal(1, "client config mismatch: powParams.p");
+    expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
+    expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
+    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config mismatch: powNonceCount");
+    expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
     let powModule = moduleManager.getModule<PoWModule>("pow");
     expect(powModule.getPoWParamsStr()).to.equal("argon2|0|13|4|4096|1|16|11", "invalid powParams string");
   });
@@ -767,8 +767,8 @@ describe("Faucet module: pow", () => {
       await awaitSleepPromise(500, () => fakeSocket2.getSentMessage("verify").length > 0);
       let verifyMsg = fakeSocket2.getSentMessage("verify");
       expect(verifyMsg.length).to.equal(1, "unexpected number of verify messages sent");
-      expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage missmatch");
-      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces missmatch");
+      expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage mismatch");
+      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces mismatch");
       // send verify result
       fakeSocket2.emit("message", JSON.stringify({
         id: 43,
@@ -836,8 +836,8 @@ describe("Faucet module: pow", () => {
       await awaitSleepPromise(1000, () => fakeSocket2.getSentMessage("verify").length > 0);
       let verifyMsg = fakeSocket2.getSentMessage("verify");
       expect(verifyMsg.length).to.equal(1, "unexpected number of verify messages sent");
-      expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage missmatch");
-      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces missmatch");
+      expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage mismatch");
+      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces mismatch");
       // send verify result
       fakeSocket2.emit("message", JSON.stringify({
         id: 43,
@@ -906,8 +906,8 @@ describe("Faucet module: pow", () => {
       await awaitSleepPromise(500, () => fakeSocket2.getSentMessage("verify").length > 0);
       let verifyMsg = fakeSocket2.getSentMessage("verify");
       expect(verifyMsg.length).to.equal(1, "unexpected number of verify messages sent");
-      expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage missmatch");
-      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces missmatch");
+      expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage mismatch");
+      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces mismatch");
       await awaitSleepPromise(1500, () => fakeSocket1.getSentMessage("ok").length > 0);
       let okMsg2 = fakeSocket1.getSentMessage("ok");
       expect(okMsg2.length).to.equal(1, "no ok message sent");

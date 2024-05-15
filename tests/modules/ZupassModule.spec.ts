@@ -123,18 +123,18 @@ describe("Faucet module: zupass", () => {
     await ServiceManager.GetService(ModuleManager).initialize();
     let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['zupass']).to.equal(true, "no zupass config exported");
-    expect(clientConfig.modules['zupass'].url).to.equal("https://zupass.org/", "client config missmatch: url");
-    expect(clientConfig.modules['zupass'].api).to.equal("https://api.zupass.org/", "client config missmatch: api");
-    expect(clientConfig.modules['zupass'].redirectUrl).to.equal("https://faucets.pk910.de/", "client config missmatch: redirectUrl");
-    expect(!!clientConfig.modules['zupass'].event).to.equal(true, "client config missmatch: event missing");
-    expect(clientConfig.modules['zupass'].event.name).to.equal("Devconnect 2023", "client config missmatch: event.name");
-    expect(clientConfig.modules['zupass'].event.eventIds[0]).to.equal("a1c822c4-60bd-11ee-8732-763dbf30819c", "client config missmatch: event.eventIds");
-    expect(clientConfig.modules['zupass'].event.eventIds[1]).to.equal("140b208c-6d1d-11ee-8320-126a2f5f3c5e", "client config missmatch: event.eventIds");
-    expect(clientConfig.modules['zupass'].event.eventIds.length).to.equal(2, "client config missmatch: event.eventIds");
-    expect(clientConfig.modules['zupass'].event.productIds.length).to.equal(0, "client config missmatch: event.productIds");
-    expect(clientConfig.modules['zupass'].watermark).to.equal("337635737515449575428187860496846766607298173824839204522817527605290000567", "client config missmatch: event.watermark");
-    expect(clientConfig.modules['zupass'].nullifier).to.equal("436406636072292623482634608279337780777116908402682507662237447074993329383", "client config missmatch: event.nullifier");
-    expect(clientConfig.modules['zupass'].infoHtml).to.matches(/zupass info/, "client config missmatch: infoHtml");
+    expect(clientConfig.modules['zupass'].url).to.equal("https://zupass.org/", "client config mismatch: url");
+    expect(clientConfig.modules['zupass'].api).to.equal("https://api.zupass.org/", "client config mismatch: api");
+    expect(clientConfig.modules['zupass'].redirectUrl).to.equal("https://faucets.pk910.de/", "client config mismatch: redirectUrl");
+    expect(!!clientConfig.modules['zupass'].event).to.equal(true, "client config mismatch: event missing");
+    expect(clientConfig.modules['zupass'].event.name).to.equal("Devconnect 2023", "client config mismatch: event.name");
+    expect(clientConfig.modules['zupass'].event.eventIds[0]).to.equal("a1c822c4-60bd-11ee-8732-763dbf30819c", "client config mismatch: event.eventIds");
+    expect(clientConfig.modules['zupass'].event.eventIds[1]).to.equal("140b208c-6d1d-11ee-8320-126a2f5f3c5e", "client config mismatch: event.eventIds");
+    expect(clientConfig.modules['zupass'].event.eventIds.length).to.equal(2, "client config mismatch: event.eventIds");
+    expect(clientConfig.modules['zupass'].event.productIds.length).to.equal(0, "client config mismatch: event.productIds");
+    expect(clientConfig.modules['zupass'].watermark).to.equal("337635737515449575428187860496846766607298173824839204522817527605290000567", "client config mismatch: event.watermark");
+    expect(clientConfig.modules['zupass'].nullifier).to.equal("436406636072292623482634608279337780777116908402682507662237447074993329383", "client config mismatch: event.nullifier");
+    expect(clientConfig.modules['zupass'].infoHtml).to.matches(/zupass info/, "client config mismatch: infoHtml");
   });
 
   it("Check database cleanup", async () => {

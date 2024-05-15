@@ -41,7 +41,7 @@ describe("Faucet module: ensname", () => {
     await ServiceManager.GetService(ModuleManager).initialize();
     let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
     expect(!!clientConfig.modules['ensname']).to.equal(true, "no ensname config exported");
-    expect(clientConfig.modules['ensname'].required).to.equal(true, "client config missmatch: required");
+    expect(clientConfig.modules['ensname'].required).to.equal(true, "client config mismatch: required");
   });
 
   it("Start session with optional ENS name", async () => {
