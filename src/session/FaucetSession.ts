@@ -2,7 +2,7 @@ import { FaucetError } from "../common/FaucetError.js";
 import { ServiceManager } from "../common/ServiceManager.js";
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
-import { EthClaimData, EthClaimManager } from "../eth/EthClaimManager.js";
+import { EthClaimData } from "../eth/EthClaimManager.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
 import { getNewGuid } from "../utils/GuidUtils.js";
 import { SessionManager } from "./SessionManager.js";
@@ -189,7 +189,7 @@ export class FaucetSession {
   }
 
   public async setSessionFailed(code: string, reason: string, stack?: string): Promise<void> {
-    let oldStatus = this.status;
+    const oldStatus = this.status;
     this.setSessionData("failed.code", code);
     this.setSessionData("failed.reason", reason);
     this.setSessionData("failed.stack", stack);
@@ -209,7 +209,7 @@ export class FaucetSession {
       clearTimeout(this.sessionTimer);
       this.sessionTimer = null;
     }
-    let now = Math.floor((new Date()).getTime() / 1000);
+    const now = Math.floor((new Date()).getTime() / 1000);
 
     if(this.status === FaucetSessionStatus.RUNNING) {
       let minTaskTimeout = 0;
@@ -217,7 +217,7 @@ export class FaucetSession {
         if(task.timeout > now && (minTaskTimeout === 0 || task.timeout < minTaskTimeout))
           minTaskTimeout = task.timeout;
       });
-      let sessionTimeout = this.startTime + faucetConfig.sessionTimeout;
+      const sessionTimeout = this.startTime + faucetConfig.sessionTimeout;
       let timerDelay = (Math.min(minTaskTimeout, sessionTimeout) - now) + 1;
       if(timerDelay < 1)
         timerDelay = 1;
@@ -226,8 +226,8 @@ export class FaucetSession {
   }
 
   public async tryProceedSession(): Promise<void> {
-    let now = Math.floor((new Date()).getTime() / 1000);
-    let sessionTimeout = this.startTime + faucetConfig.sessionTimeout;
+    const now = Math.floor((new Date()).getTime() / 1000);
+    const sessionTimeout = this.startTime + faucetConfig.sessionTimeout;
 
     if(this.status === FaucetSessionStatus.RUNNING) {
       if(now >= sessionTimeout) {
@@ -293,7 +293,7 @@ export class FaucetSession {
       remoteIP = remoteIP.substring(7);
     if(this.remoteIP === remoteIP)
       return;
-    let oldRemoteIP = this.remoteIP;
+    const oldRemoteIP = this.remoteIP;
     this.remoteIP = remoteIP;
 
     try {
@@ -375,7 +375,7 @@ export class FaucetSession {
     if(this.getSessionStatus() === FaucetSessionStatus.CLAIMING || this.getSessionStatus() === FaucetSessionStatus.FINISHED || this.getSessionStatus() === FaucetSessionStatus.FAILED)
       return 0n;
 
-    let rewardFactors: ISessionRewardFactor[] = [];
+    const rewardFactors: ISessionRewardFactor[] = [];
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewardFactor, [this, rewardFactors]);
     this.setSessionData("reward.factors", rewardFactors);
 
@@ -386,7 +386,7 @@ export class FaucetSession {
       rewardFactor *= factor?.factor
     });
 
-    let rewardAmount = amount * BigInt(Math.floor(rewardFactor * 100000)) / 100000n;
+    const rewardAmount = amount * BigInt(Math.floor(rewardFactor * 100000)) / 100000n;
     ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewarded, [this, rewardAmount, rewardFactors]);
 
     if(this.getSessionStatus() === FaucetSessionStatus.CLAIMING || this.getSessionStatus() === FaucetSessionStatus.FINISHED || this.getSessionStatus() === FaucetSessionStatus.FAILED)
@@ -413,9 +413,9 @@ export class FaucetSession {
   }
 
   public async getSessionInfo(): Promise<IClientSessionInfo> {
-    let moduleData: any = {};
+    const moduleData: any = {};
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionInfo, [this, moduleData]);
-    let sessionInfo: IClientSessionInfo = {
+    const sessionInfo: IClientSessionInfo = {
       session: this.getSessionId(),
       status: this.getSessionStatus(),
       start: this.getStartTime(),

@@ -1,9 +1,6 @@
 
 export interface IFaucetConfig {
-  faucetTitle: string;
   faucetStatus: IFaucetStatus[];
-  faucetImage: string;
-  faucetHtml: string;
   faucetCoinSymbol: string;
   faucetCoinType: string;
   faucetCoinContract: string;
@@ -13,31 +10,11 @@ export interface IFaucetConfig {
   sessionTimeout: number;
   ethTxExplorerLink: string;
   time: number;
-  resultSharing: {
-    preHtml?: string;
-    postHtml?: string;
-    caption?: string;
-    [provider: string]: string;
-  };
   modules: {
-    captcha?: ICaptchaModuleConfig;
-    ensname?: IEnsNameModuleConfig;
     github?: IGithubModuleConfig;
     pow?: IPoWModuleConfig;
     passport?: IPassportModuleConfig;
-    zupass?: IZupassModuleConfig;
   };
-}
-
-export interface ICaptchaModuleConfig {
-  provider: string;
-  siteKey: string;
-  requiredForStart: boolean;
-  requiredForClaim: boolean;
-}
-
-export interface IEnsNameModuleConfig {
-  required: boolean;
 }
 
 export interface IGithubModuleConfig {
@@ -45,23 +22,6 @@ export interface IGithubModuleConfig {
   authTimeout: number;
   redirectUrl: string;
   callbackState: string;
-}
-
-export interface IZupassModuleConfig {
-  url: string;
-  api: string;
-  redirectUrl: string;
-  event: {
-    name: string;
-    eventIds: string[];
-    productIds: string[];
-  };
-  watermark: string;
-  nullifier: string;
-  loginLogo: string;
-  loginLabel: string;
-  userLabel: string;
-  infoHtml: string;
 }
 
 export interface IPoWModuleConfig {

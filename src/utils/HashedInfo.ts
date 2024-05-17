@@ -1,11 +1,14 @@
 import * as crypto from "crypto";
+import { faucetConfig } from "../config/FaucetConfig.js";
 
-export function getHashedIp(remoteAddr: string, secret: string): string {
+export function getHashedIp(remoteAddr: string): string {
   let ipMatch: RegExpExecArray;
-  let hashParts: string[] = [];
+  const hashParts: string[] = [];
   let hashGlue: string;
-  let getHash = (input: string, len?: number) => {
-    let hash = crypto.createHash("sha256");
+  const secret = faucetConfig.faucetSecret;
+
+  const getHash = (input: string, len?: number) => {
+    const hash = crypto.createHash("sha256");
     hash.update(secret + "\r\n");
     hash.update("iphash\r\n");
     hash.update(input);
@@ -29,11 +32,11 @@ export function getHashedIp(remoteAddr: string, secret: string): string {
     // IPv6
     hashGlue = ":";
 
-    let ipSplit = remoteAddr.split(":");
-    let ipParts: string[] = [];
+    const ipSplit = remoteAddr.split(":");
+    const ipParts: string[] = [];
     for(let i = 0; i < ipSplit.length; i++) {
       if(ipSplit[i] === "") {
-        let skipLen = 8 - ipSplit.length + 1;
+        const skipLen = 8 - ipSplit.length + 1;
         for(let j = 0; j < skipLen; j++)
           ipParts.push("0");
         break;
@@ -50,7 +53,7 @@ export function getHashedIp(remoteAddr: string, secret: string): string {
 }
 
 export function getHashedSessionId(sessionId: string, secret: string): string {
-  let sessionIdHash = crypto.createHash("sha256");
+  const sessionIdHash = crypto.createHash("sha256");
   sessionIdHash.update(secret + "\r\n");
   sessionIdHash.update(sessionId);
   return sessionIdHash.digest("hex").substring(0, 20);

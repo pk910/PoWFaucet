@@ -7,7 +7,6 @@ import { FaucetHttpResponse } from "./FaucetHttpServer.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData, FaucetSessionTask, IClientSessionInfo } from "../session/FaucetSession.js";
 import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
-import { IFaucetResultSharingConfig } from "../config/ConfigShared.js";
 import { FaucetError } from "../common/FaucetError.js";
 import { EthClaimManager } from "../eth/EthClaimManager.js";
 import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus.js";
@@ -173,15 +172,6 @@ export class FaucetWebApi {
 
   private onGetMaxReward(): number {
     return faucetConfig.maxDropAmount;
-  }
-
-  public getFaucetHomeHtml(): string {
-    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    let faucetHtml = faucetConfig.faucetHomeHtml || "";
-    faucetHtml = faucetHtml.replace(/{faucetWallet}/, () => {
-      return ethWalletManager.getFaucetAddress();
-    });
-    return faucetHtml;
   }
 
   public onGetFaucetConfig(clientVersion?: string, sessionId?: string): IClientFaucetConfig {

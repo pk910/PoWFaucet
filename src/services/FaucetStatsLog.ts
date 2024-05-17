@@ -59,7 +59,7 @@ export class FaucetStatsLog {
     let loopIndex = Math.floor(now / loopInterval);
     let nextLoopTime = (loopIndex + 1) * loopInterval;
     let loopDelay = nextLoopTime - now + 10;
-    
+
     if(this.statsTimer)
       clearTimeout(this.statsTimer);
     this.statsTimer = setTimeout(() => {
@@ -93,7 +93,7 @@ export class FaucetStatsLog {
         h: ipinfo.hosting ? 1 : undefined,
         p: ipinfo.proxy ? 1 : undefined,
       } : null,
-      in: session.getSessionData("captcha.ident"),
+      in: undefined,
       id: session.getSessionId(),
       ps: boostinfo ? boostinfo.score : 0,
       pf: boostinfo ? boostinfo.factor : 1,
