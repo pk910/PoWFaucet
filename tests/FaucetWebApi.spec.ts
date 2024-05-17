@@ -107,7 +107,6 @@ describe("Faucet Web API", () => {
       remoteAddr: "8.8.8.8"
     }));
     expect(!!apiResponse).equal(true, "no api response");
-    expect(apiResponse.faucetTitle).equal(faucetConfig.faucetTitle, "unexpected response value");
   });
 
   it("check /api/startSession", async () => {

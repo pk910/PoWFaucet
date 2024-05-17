@@ -59,13 +59,6 @@ export class FaucetHttpServer {
     this.staticServer = new StaticServer(faucetConfig.staticPath, {
       serverInfo: Buffer.from("pow-faucet/" + faucetConfig.faucetVersion)
     });
-
-    if(faucetConfig.buildSeoIndex) {
-      this.buildSeoIndex();
-      ServiceManager.GetService(FaucetProcess).addListener("reload", () => {
-        this.buildSeoIndex();
-      });
-    }
   }
 
   public getListenPort(): number {
@@ -130,12 +123,7 @@ export class FaucetHttpServer {
           switch(req.url) {
             case "/":
             case "/index.html":
-              if(faucetConfig.buildSeoIndex && this.cachedSeoIndex) {
-                rsp.writeHead(200, {'Content-Type': 'text/html'});
-                rsp.end(this.cachedSeoIndex);
-              }
-              else
-                this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
+              this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
               break;
             default:
               this.staticServer.serve(req, rsp);
@@ -166,58 +154,5 @@ export class FaucetHttpServer {
       let remoteAddr = ServiceManager.GetService(FaucetWebApi).getRemoteAddr(req);
       wssEndpoint.handler(req, ws, remoteAddr);
     });
-  }
-
-  private buildSeoIndex() {
-    let indexFile = path.join(faucetConfig.staticPath, "index.html");
-    if(!fs.existsSync(indexFile))
-      return;
-
-    let clientVersion: {version: string, build: number};
-    try {
-      let clientFile = path.join(faucetConfig.staticPath, "js", "powfaucet.js");
-      let clientSrc = fs.readFileSync(clientFile, "utf8");
-      let match = /@pow-faucet-client: ({[^}]+})/.exec(clientSrc);
-      if(match)
-        clientVersion = JSON.parse(match[1]);
-    } catch(ex) {}
-
-    let indexHtml = fs.readFileSync(indexFile, "utf8");
-    let seoHtml = [
-      '<div class="faucet-title">',
-      '<h1 class="center">' + encode(faucetConfig.faucetTitle) + '</h1>',
-      '</div>',
-      '<div class="pow-header center">',
-      '<div class="pow-status-container">',
-      '<div class="pow-faucet-home">',
-      faucetConfig.faucetImage ? '<img src="' + faucetConfig.faucetImage + '" className="image" />' : '',
-      '</div>',
-      '</div>',
-      '</div>',
-    ].join("");
-    let seoMeta = "";
-    if(faucetConfig.buildSeoMeta) {
-      seoMeta = Object.keys(faucetConfig.buildSeoMeta).filter((metaName) => faucetConfig.buildSeoMeta.hasOwnProperty(metaName)).map((metaName) => {
-        return '<meta name="' + metaName + '" content="' + faucetConfig.buildSeoMeta[metaName] + '">';
-      }).join("");
-    }
-
-    indexHtml = indexHtml.replace(/<title>.*?<\/title>/, '<title>' + encode(faucetConfig.faucetTitle) + '</title>');
-    indexHtml = indexHtml.replace(/<!-- pow-faucet-content -->/, seoHtml);
-    indexHtml = indexHtml.replace(/<!-- pow-faucet-header -->/, seoMeta);
-    indexHtml = indexHtml.replace(/<!-- pow-faucet-footer -->/, ServiceManager.GetService(FaucetWebApi).getFaucetHomeHtml());
-
-    if(clientVersion) {
-      indexHtml = indexHtml.replace(/"\/js\/powfaucet\.js"/, '"/js/powfaucet.js?' + clientVersion.build + '"');
-      indexHtml = indexHtml.replace(/"\/css\/powfaucet\.css"/, '"/css/powfaucet.css?' + clientVersion.build + '"');
-    }
-
-    this.cachedSeoIndex = indexHtml;
-    try {
-      let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
-      fs.writeFileSync(seoFile, indexHtml);
-    } catch(ex) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Could not write seo index to disk, because static folder is not writable. Serving seo index from memory.");
-    }
   }
 }

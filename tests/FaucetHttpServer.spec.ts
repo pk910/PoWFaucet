@@ -32,43 +32,16 @@ describe("Faucet Web Server", () => {
     await unbindTestStubs(globalStubs);
   });
 
-  it("generate SEO index.html", async () => {
-    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
-    faucetConfig.buildSeoIndex = true;
-    faucetConfig.serverPort = 0;
-    let webServer = ServiceManager.GetService(FaucetHttpServer);
-    webServer.initialize();
-    let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
-    expect(fs.existsSync(seoFile), "seo file not found");
-    let seoContent = fs.readFileSync(seoFile, "utf8");
-    expect(seoContent).contains(faucetConfig.faucetTitle, "uncustomized seo index");
-  });
-
-  it("check basic http call", async () => {
-    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
-    faucetConfig.buildSeoIndex = true;
-    faucetConfig.serverPort = 0;
-    let webServer = ServiceManager.GetService(FaucetHttpServer);
-    webServer.initialize();
-    let listenPort = webServer.getListenPort();
-    let indexData = await fetch("http://localhost:" + listenPort, {method: "GET"}).then((rsp) => rsp.text());
-    expect(indexData).contains(faucetConfig.faucetTitle, "not index contents");
-  });
-
   it("check api call (GET)", async () => {
-    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
-    faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
     let listenPort = webServer.getListenPort();
     let configData = await fetch("http://localhost:" + listenPort + "/api/getFaucetConfig", {method: "GET"}).then((rsp) => rsp.json());
     expect(!!configData).equals(true, "no api response");
-    expect((configData as any).faucetTitle).equals(faucetConfig.faucetTitle, "api response mismatch");
   });
 
   it("check api call (POST)", async () => {
-    faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
@@ -89,7 +62,6 @@ describe("Faucet Web Server", () => {
   });
 
   it("check api call (POST, body size limit)", async () => {
-    faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
@@ -113,7 +85,6 @@ describe("Faucet Web Server", () => {
   });
 
   it("check api call (custom response)", async () => {
-    faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
@@ -127,7 +98,6 @@ describe("Faucet Web Server", () => {
   });
 
   it("check api call (rejection)", async () => {
-    faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
@@ -142,7 +112,6 @@ describe("Faucet Web Server", () => {
   });
 
   it("check api call (rejection with custom response)", async () => {
-    faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
@@ -156,8 +125,6 @@ describe("Faucet Web Server", () => {
   });
 
   it("check ws call", async () => {
-    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
-    faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
     await ServiceManager.GetService(EthClaimManager).initialize();
     let webServer = ServiceManager.GetService(FaucetHttpServer);
@@ -182,8 +149,6 @@ describe("Faucet Web Server", () => {
   });
 
   it("check ws call (invalid endpoint)", async () => {
-    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
-    faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
     await ServiceManager.GetService(EthClaimManager).initialize();
     let webServer = ServiceManager.GetService(FaucetHttpServer);

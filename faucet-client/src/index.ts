@@ -2,7 +2,6 @@ export * from './common/FaucetApi';
 export * from './common/FaucetConfig';
 export * from './common/FaucetSession';
 export * from './common/FaucetTime';
-export * from './common/FaucetContext';
 
 export * from './components/claim/ClaimNotificationClient';
 

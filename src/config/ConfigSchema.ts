@@ -1,8 +1,6 @@
-
 import { IBaseModuleConfig } from '../modules/BaseModule.js';
 import { FaucetCoinType } from '../eth/EthWalletManager.js';
 import { IFaucetStatsConfig } from '../services/FaucetStatsLog.js';
-import { IFaucetResultSharingConfig } from './ConfigShared.js';
 import { FaucetDatabaseOptions } from '../db/FaucetDatabase.js';
 import { IFaucetStatusConfig } from '../services/FaucetStatus.js';
 
@@ -14,13 +12,8 @@ export interface IConfigSchema {
   staticPath: string; // path to the /static directory (set automatically)
   faucetPidFile: string; // path to file to write the process pid to
 
-  buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
-  buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
   database: FaucetDatabaseOptions;
 
-  faucetTitle: string; // title of the faucet
-  faucetImage: string; // faucet image displayed on the startpage
-  faucetHomeHtml: string; // some additional html to show on the startpage
   faucetCoinSymbol: string; // symbol (short name) of the coin that can be mined
   faucetCoinType: FaucetCoinType; // coin type (native / erc20)
   faucetCoinContract: string; // erc20 coin contract (for erc20 coins)
@@ -80,6 +73,5 @@ export interface IConfigSchema {
 
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
   faucetStatus: IFaucetStatusConfig | null; // faucet status config or null to disable status
-  resultSharing: IFaucetResultSharingConfig; // result sharing settings (eg. twitter tweet)
 };
 

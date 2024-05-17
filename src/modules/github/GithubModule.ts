@@ -25,7 +25,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
     this.githubDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(GithubDB, this);
     this.githubResolver = new GithubResolver(this);
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.ClientConfig, 1, "github login config", 
+      this, ModuleHookAction.ClientConfig, 1, "github login config",
       async (clientConfig: any) => {
         clientConfig[this.moduleName] = {
           clientId: this.moduleConfig.appClientId,
@@ -36,19 +36,19 @@ export class GithubModule extends BaseModule<IGithubConfig> {
       }
     );
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionStart, 6, "Github login check", 
+      this, ModuleHookAction.SessionStart, 6, "Github login check",
       (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput)
     );
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionComplete, 5, "Github save session", 
+      this, ModuleHookAction.SessionComplete, 5, "Github save session",
       (session: FaucetSession) => this.processSessionComplete(session)
     );
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionRewardFactor, 5, "Github reward factor", 
+      this, ModuleHookAction.SessionRewardFactor, 5, "Github reward factor",
       (session: FaucetSession, rewardFactors: ISessionRewardFactor[]) => this.processSessionRewardFactor(session, rewardFactors)
     );
     ServiceManager.GetService(FaucetWebApi).registerApiEndpoint(
-      "githubCallback", 
+      "githubCallback",
       (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => this.processGithubAuthCallback(req, url, body)
     );
     return Promise.resolve();
@@ -119,7 +119,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
         else
           errMsg = "Your github account does not meet the minimum requirements: " + errmsg;
         throw new FaucetError(
-          "GITHUB_CHECK", 
+          "GITHUB_CHECK",
           errMsg,
         );
       }
@@ -177,7 +177,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
       authResult['errorCode'] = "UNKNOWN";
       authResult['errorMessage'] = "Unknown error in github oauth authentication flow.";
     }
-    
+
     let pageHtml = this.buildCallbackPage(authResult);
     return new FaucetHttpResponse(200, "OK", pageHtml, {
       "Content-Type": "text/html; charset=utf-8",
@@ -190,7 +190,6 @@ export class GithubModule extends BaseModule<IGithubConfig> {
       '<html>',
         '<head>',
           '<meta charset="UTF-8">',
-          '<title>' + faucetConfig.faucetTitle + ': Github Auth</title>',
         '</head>',
         '<body>',
           '<script type="text/javascript">',
@@ -219,12 +218,12 @@ export class GithubModule extends BaseModule<IGithubConfig> {
       let errMsg = restriction.message || [
         "You have already created ",
         finishedSessions.length,
-        (finishedSessions.length > 1 ? " sessions" : " session"), 
+        (finishedSessions.length > 1 ? " sessions" : " session"),
         " in the last ",
         renderTimespan(restriction.duration)
       ].join("");
       throw new FaucetError(
-        "GITHUB_LIMIT", 
+        "GITHUB_LIMIT",
         errMsg,
       );
     }
@@ -240,7 +239,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
           renderTimespan(restriction.duration)
         ].join("");
         throw new FaucetError(
-          "GITHUB_LIMIT", 
+          "GITHUB_LIMIT",
           errMsg,
         );
       }

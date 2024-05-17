@@ -1,4 +1,3 @@
-
 import { Worker } from "node:worker_threads";
 import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig.js';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
@@ -13,6 +12,7 @@ import { WorkerDriver } from './driver/WorkerDriver.js';
 import { FaucetWorkers } from '../common/FaucetWorker.js';
 import { IMySQLOptions, MySQLDriver } from "./driver/MySQLDriver.js";
 import { SQL } from "./SQL.js";
+import { getHashedIp } from "../utils/HashedInfo.js";
 
 export type FaucetDatabaseOptions = ISQLiteOptions | IMySQLOptions;
 
@@ -62,7 +62,7 @@ export class FaucetDatabase {
         await this.db.open(Object.assign({}, faucetConfig.database));
         break;
       default:
-        throw "unknown database driver: " + (faucetConfig.database as any).driver;
+        throw new Error("unknown database driver: " + (faucetConfig.database as any).driver);
     }
     await this.upgradeSchema();
   }
@@ -76,7 +76,7 @@ export class FaucetDatabase {
   }
 
   public async createModuleDb<TModDB extends FaucetModuleDB>(dbClass: new(module: BaseModule, faucetStore: FaucetDatabase) => TModDB, module: BaseModule): Promise<TModDB> {
-    let modName = module.getModuleName();
+    const modName = module.getModuleName();
     let modDb: TModDB;
     if(!(modDb = this.moduleDBs[modName] as TModDB)) {
       modDb = this.moduleDBs[modName] = new dbClass(module, this);
@@ -97,17 +97,17 @@ export class FaucetDatabase {
   public async upgradeIfNeeded(module: string, latestVersion: number, upgrade: (version: number) => Promise<number>): Promise<void> {
     let schemaVersion: number = 0;
 
-    let res = await this.db.get("SELECT Version FROM SchemaVersion WHERE Module = ?", [module]) as {Version: number};
+    const res = await this.db.get("SELECT Version FROM SchemaVersion WHERE Module = ?", [module]) as {Version: number};
     if(res)
       schemaVersion = res.Version;
     else
       await this.db.run("INSERT INTO SchemaVersion (Module, Version) VALUES (?, ?)", [module, 0]);
 
     let upgradedVersion = schemaVersion;
-    if(schemaVersion != latestVersion) {
+    if(schemaVersion !== latestVersion) {
       upgradedVersion = await upgrade(schemaVersion);
     }
-    if(upgradedVersion != schemaVersion) {
+    if(upgradedVersion !== schemaVersion) {
       await this.db.run("UPDATE SchemaVersion SET Version = ? WHERE Module = ?", [upgradedVersion, module]);
     }
   }
@@ -128,14 +128,14 @@ export class FaucetDatabase {
         )`,
     }));
 
-    let res = await this.db.get("SELECT Version FROM SchemaVersion WHERE Module IS NULL") as {Version: number};
+    const res = await this.db.get("SELECT Version FROM SchemaVersion WHERE Module IS NULL") as {Version: number};
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Current FaucetStore schema version: " + (res ? res.Version : "uninitialized"));
     if(res)
       schemaVersion = res.Version;
     else
       await this.db.run("INSERT INTO SchemaVersion (Module, Version) VALUES (NULL, ?)", [0]);
 
-    let oldVersion = schemaVersion;
+    const oldVersion = schemaVersion;
     switch(schemaVersion) {
       case 0: { // upgrade to version 1
         schemaVersion = 1;
@@ -217,7 +217,7 @@ export class FaucetDatabase {
   }
 
   public cleanStore() {
-    let now = this.now();
+    const now = this.now();
     this.db.run("DELETE FROM Sessions WHERE StartTime < ?", [now - faucetConfig.sessionCleanup]);
 
     Object.values(this.moduleDBs).forEach((modDb) => {
@@ -227,7 +227,7 @@ export class FaucetDatabase {
 
   public async dropAllTables() {
     // for tests only! this drops the whole DB.
-    let tables = await this.db.all(
+    const tables = await this.db.all(
       SQL.driverSql({
         [FaucetDbDriver.SQLITE]: "SELECT name FROM sqlite_schema WHERE type ='table' AND name NOT LIKE 'sqlite_%'",
         [FaucetDbDriver.MYSQL]: "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE()",
@@ -236,7 +236,7 @@ export class FaucetDatabase {
       name: string;
     }[];
 
-    let dropPromises = tables.map((table) => {
+    const dropPromises = tables.map((table) => {
       return this.db.run("DROP TABLE " + table.name);
     });
 
@@ -244,7 +244,7 @@ export class FaucetDatabase {
   }
 
   public async getKeyValueEntry(key: string): Promise<string> {
-    let row = await this.db.get("SELECT " + SQL.field("Value") + " FROM KeyValueStore WHERE " + SQL.field("Key") + " = ?", [key]) as {Value: string};
+    const row = await this.db.get("SELECT " + SQL.field("Value") + " FROM KeyValueStore WHERE " + SQL.field("Key") + " = ?", [key]) as {Value: string};
     return row?.Value;
   }
 
@@ -268,7 +268,7 @@ export class FaucetDatabase {
 
 
   private selectSessions(whereSql: string, whereArgs: any[], skipData?: boolean): Promise<FaucetSessionStoreData[]> {
-    let sql = [
+    const sql = [
       "FROM Sessions WHERE ",
       whereSql
     ].join("");
@@ -276,17 +276,17 @@ export class FaucetDatabase {
   }
 
   public async selectSessionsSql(selectSql: string, args: any[], skipData?: boolean): Promise<FaucetSessionStoreData[]> {
-    let fields = ["SessionId","Status","StartTime","TargetAddr","DropAmount","RemoteIP","Tasks","UserId"];
+    const fields = ["SessionId","Status","StartTime","TargetAddr","DropAmount","RemoteIP","Tasks","UserId"];
     if(!skipData)
       fields.push("Data","ClaimData");
 
-    let sql = [
+    const sql = [
       "SELECT ",
       fields.map((f) => "Sessions." + f).join(","),
       " ",
       selectSql
     ].join("");
-    let rows = await this.db.all(sql, args) as {
+    const rows = await this.db.all(sql, args) as {
       SessionId: string;
       Status: string;
       StartTime: number;
@@ -323,12 +323,12 @@ export class FaucetDatabase {
   }
 
   public async getAllSessions(timeLimit: number): Promise<FaucetSessionStoreData[]> {
-    let now = Math.floor(new Date().getTime() / 1000);
+    const now = Math.floor(new Date().getTime() / 1000);
     return this.selectSessions("Status NOT IN ('finished', 'failed') OR StartTime > ?", [now - timeLimit]);
   }
 
   public async getTimedOutSessions(timeout: number): Promise<FaucetSessionStoreData[]> {
-    let now = Math.floor(new Date().getTime() / 1000);
+    const now = Math.floor(new Date().getTime() / 1000);
     return this.selectSessions("Status NOT IN ('finished', 'failed') AND StartTime <= ?", [now - timeout]);
   }
 
@@ -345,13 +345,13 @@ export class FaucetDatabase {
     }
     if(remoteIP) {
       whereSql.push("RemoteIP LIKE ?");
-      whereArgs.push(remoteIP);
+      whereArgs.push(getHashedIp(remoteIP));
     }
     if(whereSql.length === 0)
       throw new Error("invalid query");
 
     whereArgs.push(now - timeout);
-    return this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claiming','finished')", whereArgs, skipData);
+    return this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claimable','claiming','finished')", whereArgs, skipData);
   }
 
   public async getLastFinishedSessionStartTime(userId: string, timeout: number): Promise<null | number> {
@@ -399,6 +399,7 @@ export class FaucetDatabase {
   }
 
   public async updateSession(sessionData: FaucetSessionStoreData): Promise<void> {
+    const hashedIp = getHashedIp(sessionData.remoteIP);
     await this.db.run(
       SQL.driverSql({
         [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData,UserId) VALUES (?,?,?,?,?,?,?,?,?,?)",
@@ -410,7 +411,7 @@ export class FaucetDatabase {
         sessionData.startTime,
         sessionData.targetAddr,
         sessionData.dropAmount,
-        sessionData.remoteIP,
+        hashedIp,
         JSON.stringify(sessionData.tasks),
         JSON.stringify(sessionData.data),
         sessionData.claim ? JSON.stringify(sessionData.claim) : null,
@@ -440,7 +441,7 @@ export class FaucetDatabase {
   }
 
   public async getClaimableAmount(): Promise<bigint> {
-    let row = await this.db.get("SELECT SUM(CAST(DropAmount AS FLOAT)) AS TotalAmount FROM Sessions WHERE Status = 'claimable'") as {
+    const row = await this.db.get("SELECT SUM(CAST(DropAmount AS FLOAT)) AS TotalAmount FROM Sessions WHERE Status = 'claimable'") as {
       TotalAmount: string;
     };
     if(!row || !row.TotalAmount)

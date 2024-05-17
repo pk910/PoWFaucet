@@ -7,7 +7,6 @@ import { FaucetHttpResponse } from "./FaucetHttpServer.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData, FaucetSessionTask, IClientSessionInfo } from "../session/FaucetSession.js";
 import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
-import { IFaucetResultSharingConfig } from "../config/ConfigShared.js";
 import { FaucetError } from "../common/FaucetError.js";
 import { EthClaimManager } from "../eth/EthClaimManager.js";
 import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus.js";
@@ -21,11 +20,8 @@ export interface IFaucetApiUrl {
 }
 
 export interface IClientFaucetConfig {
-  faucetTitle: string;
   faucetStatus: IFaucetStatus[];
   faucetStatusHash: string;
-  faucetImage: string;
-  faucetHtml: string;
   faucetCoinSymbol: string;
   faucetCoinType: string;
   faucetCoinContract: string;
@@ -35,7 +31,6 @@ export interface IClientFaucetConfig {
   sessionTimeout: number;
   ethTxExplorerLink: string;
   time: number;
-  resultSharing: IFaucetResultSharingConfig;
   modules: {
     [module: string]: any;
   },
@@ -177,15 +172,6 @@ export class FaucetWebApi {
     return faucetConfig.maxDropAmount;
   }
 
-  public getFaucetHomeHtml(): string {
-    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    let faucetHtml = faucetConfig.faucetHomeHtml || "";
-    faucetHtml = faucetHtml.replace(/{faucetWallet}/, () => {
-      return ethWalletManager.getFaucetAddress();
-    });
-    return faucetHtml;
-  }
-
   public onGetFaucetConfig(clientVersion?: string, sessionId?: string): IClientFaucetConfig {
     let faucetSession = sessionId ? ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING, FaucetSessionStatus.CLAIMABLE]) : null;
     let faucetStatus = ServiceManager.GetService(FaucetStatus).getFaucetStatus(clientVersion, faucetSession);
@@ -195,11 +181,8 @@ export class FaucetWebApi {
     ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.ClientConfig, [moduleConfig, sessionId]);
 
     return {
-      faucetTitle: faucetConfig.faucetTitle,
       faucetStatus: faucetStatus.status,
       faucetStatusHash: faucetStatus.hash,
-      faucetImage: faucetConfig.faucetImage,
-      faucetHtml: this.getFaucetHomeHtml(),
       faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
       faucetCoinType: faucetConfig.faucetCoinType,
       faucetCoinContract: faucetConfig.faucetCoinContract,
@@ -209,7 +192,6 @@ export class FaucetWebApi {
       sessionTimeout: faucetConfig.sessionTimeout,
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
       time: Math.floor((new Date()).getTime() / 1000),
-      resultSharing: faucetConfig.resultSharing,
       modules: moduleConfig,
     };
   }

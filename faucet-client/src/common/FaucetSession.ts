@@ -1,4 +1,4 @@
-import { IFaucetContext } from "./FaucetContext";
+import {FaucetApi} from "./FaucetApi";
 
 export interface IFaucetSessionStatus {
   session: string;
@@ -64,23 +64,23 @@ export class FaucetSession {
   }
 
   public static recoverSessionInfo(): IFaucetSessionRecoveryInfo {
-    let statusJson = localStorage.getItem("powSessionStatus");
+    const statusJson = localStorage.getItem("powSessionStatus");
     if(!statusJson)
       return null;
-    let recoveryInfo = JSON.parse(statusJson);
+    const recoveryInfo = JSON.parse(statusJson);
     if(!recoveryInfo || recoveryInfo.v !== 2)
       return null;
     return recoveryInfo;
   }
 
 
-  private faucetContext: IFaucetContext;
+  private faucetApi: FaucetApi;
   private sessionId: string;
   private sessionInfo: IFaucetSessionInfo;
   private sessionInfoPromise: Promise<IFaucetSessionInfo>;
 
-  public constructor(faucetContext: IFaucetContext, sessionId: string, sessionInfo?: IFaucetSessionInfo) {
-    this.faucetContext = faucetContext;
+  public constructor(faucetApi: FaucetApi, sessionId: string, sessionInfo?: IFaucetSessionInfo) {
+    this.faucetApi = faucetApi;
     this.sessionId = sessionId;
     this.sessionInfo = sessionInfo;
   }
@@ -94,7 +94,7 @@ export class FaucetSession {
   public refreshSessionInfo(): Promise<IFaucetSessionInfo> {
     if(this.sessionInfoPromise)
       return this.sessionInfoPromise;
-    return this.sessionInfoPromise = this.faucetContext.faucetApi.getSession(this.sessionId).then((sessionInfo) => {
+    return this.sessionInfoPromise = this.faucetApi.getSession(this.sessionId).then((sessionInfo) => {
       if((sessionInfo as any).error)
         throw sessionInfo;
       this.sessionInfo = sessionInfo;

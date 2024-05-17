@@ -20,33 +20,6 @@ serverPort: 8888
 # number of http proxies in front of this faucet
 httpProxyCount: 0
 
-# title of the faucet
-faucetTitle: "Holesky PoW Faucet"
-
-# url to image displayed on the startpage
-faucetImage: "/images/fauceth_420.jpg"
-
-# some additional html to show on the startpage
-faucetHomeHtml: |
-  <div class='pow-info'>
-    <h5>What is a PoW Faucet?</h5>
-    This is an Ethereum Faucet running on the Holesky Testnet.<br>
-    To prevent malicious actors from exhausting all available funds or 
-    accumulating enough Ether to mount long running spam attacks, 
-    this faucet requires some mining work to be done in exchange for 
-    free testnet funds.
-  </div>
-  <div class='pow-info'>
-    <h5>How does this work?</h5>
-    Just enter your ETH Address and start mining. 
-    When you've collected enough ETH, stop mining and claim your rewards.
-  </div>
-  <div class='pow-info'>
-    <h5>How to help the faucet?</h5>
-    Replenish the faucet by sending funds you don't need anymore to:<br>
-    {faucetWallet}
-  </div>
-
 # random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 # use a random string and do not share / reuse it anywhere. Everyone knowing this secret is theoretically able to claim rewards from the faucet without mining.
 faucetSecret: "RandomStringThatShouldBeVerySecret!"
@@ -116,41 +89,6 @@ sessionSaveTime: 120
 
 ### Protection mechanisms
 modules:
-
-  ## Captcha Protection
-  captcha:
-    # enable / disable captcha protection
-    enabled: true
-
-    # captcha provider
-    # hcaptcha:  HCaptcha (https://hcaptcha.com)
-    # recaptcha: ReCAPTCHA (https://developers.google.com/recaptcha)
-    provider: "hcaptcha"
-
-    # captcha site key
-    siteKey: "00000000-0000-0000-0000-000000000000"
-
-    # captcha secret key
-    secret: "0xCensoredHCaptchaSecretKey"
-
-    # require captcha to start a new session (default: false)
-    checkSessionStart: false
-
-    # require captcha to start claim payout (default: false)
-    checkBalanceClaim: false
-
-  ## ENS Name
-  ensname:
-    enabled: true
-
-    # RPC Host for ENS name resolver (mainnet)
-    rpcHost: "https://rpc.flashbots.net/"
-    # Custom ENS Resolver contract address
-    #ensAddr: "0x"
-
-    # require ENS name
-    required: false
-
   ## IP-Info module
   ipinfo:
     # enable / disable IP-Info protection
@@ -424,42 +362,6 @@ modules:
       "Lens": 1
       "ZkSync": 1
 
-  ## Zupass protection
-  zupass:
-    enabled: false
-    zupassUrl: "https://zupass.org/"
-    zupassApiUrl: "https://api.zupass.org/"
-    redirectUrl: "https://sepolia-faucet.pk910.de/"
-    event:
-      name: "Devconnect 2023"
-      eventIds:
-        - "a1c822c4-60bd-11ee-8732-763dbf30819c" # Devconnect Cowork Space
-    verify:
-      signer: ["05e0c4e8517758da3a26c80310ff2fe65b9f85d89dfc9c80e6d0b6477f88173e", "29ae64b615383a0ebb1bc37b3a642d82d37545f0f5b1444330300e4c4eedba3f"]
-    requireLogin: false
-    concurrencyLimit: 2
-    grants:
-      - limitAmount: 100000000000000000000 # 100 ETH
-        duration: 86400
-        skipModules: ["recurring-limits"]
-        rewardFactor: 2
-      - limitCount: 1
-        duration: 86400
-        rewardFactor: 2
-        skipModules: ["recurring-limits", "pow", "faucet-outflow", "faucet-balance", "ipinfo"]
-    loginLogo: "/images/zupass_logo.jpg"
-    loginLabel: "DevConnect attendee? Login with your Ticket."
-    userLabel: "Authenticated with DevConnect Ticket."
-    infoHtml: |
-      Benefits of authenticating with your devconnect ticket:<br>
-      <ul>
-        <li>Request funds without mining (once a day)</li>
-        <li>Skip IP based limitations</li>
-        <li>Mine with double rewards (up to 100ETH/day)</li>
-      </ul>
-
-
-
 ### Fund Management
 
 # minimum balance to keep in the faucet wallet (in wei)
@@ -515,26 +417,3 @@ ethRefillContract:
 faucetStats:
   # faucet stats file
   logfile: "faucet-stats.log"
-
-# build SEO optimized index.seo.html and deliver as index page
-# the blank loader page just looks bad when parsed by search engines
-buildSeoIndex: true
-
-# some additional meta tags to add to the SEO optimized page
-buildSeoMeta:
-  keywords: "powfaucet,faucet,ethereum,ethereum faucet,evm,eth,pow"
-
-resultSharing:
-  preHtml: |
-    <div class="sh-opt">
-      Did you like the faucet? Give that project a 
-      <iframe src="https://ghbtns.com/github-btn.html?user=pk910&repo=PoWFaucet&type=star&count=true" frameborder="0" scrolling="0" width="150" height="20" title="GitHub"></iframe>
-    </div>
-  #postHtml: |
-  #  <div class="sh-opt">
-  #  </div>
-  caption: "Or support this faucet by sharing your result with a "
-
-  # result sharing buttons
-  twitter: "Boom! Just got {amount} Holesky ETH from {url} (Mining for {duration} with {hashrate} H/s) #holesky #faucet"
-  mastodon: "Boom! Just got {amount} Holesky ETH from {url} (Mining for {duration} with {hashrate} H/s)"

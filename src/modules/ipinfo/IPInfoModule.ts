@@ -35,15 +35,15 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     this.ipInfoDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(IPInfoDB, this);
     this.ipInfoResolver = new IPInfoResolver(this.ipInfoDb, this.moduleConfig.apiUrl);
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionStart, 6, "IP Info check", 
+      this, ModuleHookAction.SessionStart, 6, "IP Info check",
       (session: FaucetSession) => this.processSessionStart(session)
     );
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionIpChange, 6, "IP Info check", 
+      this, ModuleHookAction.SessionIpChange, 6, "IP Info check",
       (session: FaucetSession) => this.processSessionStart(session)
     );
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionRewardFactor, 6, "IP restrictions", 
+      this, ModuleHookAction.SessionRewardFactor, 6, "IP restrictions",
       (session: FaucetSession, rewardFactors: ISessionRewardFactor[]) => this.processSessionRewardFactor(session, rewardFactors)
     );
   }
@@ -105,7 +105,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     }
     else
       sessionRestriction = session.getSessionModuleRef("ipinfo.restriction.data");
-    
+
     if(sessionRestriction.reward !== 100) {
       rewardFactors.push({
         factor: sessionRestriction.reward / 100,
@@ -118,7 +118,6 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     let infoStr = [
       "ETH: " + session.getTargetAddr(),
       "IP: " + session.getRemoteIP(),
-      "Ident: " + (session.getSessionData("captcha.ident") || ""),
     ];
     if(ipinfo) {
       infoStr.push(
@@ -140,13 +139,13 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     let refresh = this.moduleConfig.restrictionsFile ? this.moduleConfig.restrictionsFile.refresh : 30;
     if(this.ipInfoMatchRestrictionsRefresh > now - refresh && !force)
       return;
-    
+
     this.ipInfoMatchRestrictionsRefresh = now;
     this.ipInfoMatchRestrictions = [];
     Object.keys(this.moduleConfig.restrictionsPattern).forEach((pattern) => {
       this.ipInfoMatchRestrictions.push([pattern, this.moduleConfig.restrictionsPattern[pattern]]);
     });
-    
+
     if(this.moduleConfig.restrictionsFile && this.moduleConfig.restrictionsFile.file && fs.existsSync(resolveRelativePath(this.moduleConfig.restrictionsFile.file))) {
       // load restrictions list
       fs.readFileSync(this.moduleConfig.restrictionsFile.file, "utf8").split(/\r?\n/).forEach((line) => {
@@ -168,7 +167,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   private refreshIpInfoMatchRestrictionsFromYaml(yamlFile: string) {
     if(!fs.existsSync(yamlFile))
       return;
-    
+
     let yamlSrc = fs.readFileSync(yamlFile, "utf8");
     let yamlObj = YAML.parse(yamlSrc);
 
@@ -240,7 +239,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
         }
       });
     }
-    
+
     return restriction;
   }
 

@@ -67,7 +67,6 @@ describe("Faucet Services", () => {
       });
       testSession.setSessionData("pow.hashrate", 123);
       testSession.setSessionData("pow.lastNonce", 1337);
-      testSession.setSessionData("captcha.ident", "test123");
       testSession.resolveBlockingTask("test", "test1");
       await testSession.tryProceedSession();
       expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");
@@ -139,7 +138,7 @@ describe("Faucet Services", () => {
       testSession2.setSessionData("pow.hashrate", 100);
       testSession2.setSessionModuleRef("pow.client", true);
       expect(testSession2.getSessionStatus()).to.equal(FaucetSessionStatus.RUNNING, "unexpected session status");
-      
+
       statsLog.statShareCount = 42;
       statsLog.statShareRewards = 133700n;
       statsLog.statVerifyCount = 22;
@@ -363,5 +362,5 @@ describe("Faucet Services", () => {
 
   });
 
-  
+
 });
