@@ -28,7 +28,7 @@ export function initializeFaucet(container: Element, faucetProps: IFaucetPagePro
   };
 
   var container = document.querySelector(".pow-faucet");
-  if(container) {
+  if(container && container.hasAttribute("data-powfaucet")) {
     let faucetProps: IFaucetPageProps = {
       apiUrl: "/api",
     };
