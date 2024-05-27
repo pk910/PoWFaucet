@@ -14,7 +14,7 @@ import DetailsPage from './details/DetailsPage';
 import FaucetStatusPage from './status/FaucetStatusPage';
 import QueueStatusPage from './status/QueueStatusPage';
 
-import './FaucetPage.css'
+import './FaucetPage.scss'
 import { PoWMinerWorkerSrc } from '../types/PoWMinerSrc';
 
 export interface IFaucetPageProps {
@@ -62,6 +62,7 @@ export const FaucetConfigContext = React.createContext<IFaucetConfig>(null);
 
 export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPageState> {
   private configRefreshInterval: NodeJS.Timer;
+  private faucetContainerElement: HTMLElement;
   private lastConfigRefresh = 0;
   private statusAlertIdCounter = 0;
   private notificationIdCounter = 0;
@@ -152,7 +153,9 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       );
     }
     return (
-      <div className='faucet-page'>
+      <div className='faucet-page' ref={(ref) => {
+        this.faucetContainerElement = ref;
+      }}>
         <FaucetConfigContext.Provider value={this.state.faucetConfig}>
           <FaucetPageContext.Provider value={this.pageContext}>
             <div className="faucet-title">
@@ -357,6 +360,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       <FaucetDialog 
         key={dialog.id} 
         {...dialog.dialog}
+        container={this.faucetContainerElement}
       />
     ));
   }

@@ -15,20 +15,24 @@ export interface IFaucetDialogProps {
   closeFn?: () => void,
 }
 
+export interface IFaucetDialogFullProps extends IFaucetDialogProps {
+  container: HTMLElement;
+}
+
 export interface IFaucetDialogState {
 }
 
-export class FaucetDialog extends React.PureComponent<IFaucetDialogProps, IFaucetDialogState> {
+export class FaucetDialog extends React.PureComponent<IFaucetDialogFullProps, IFaucetDialogState> {
 
-  constructor(props: IFaucetDialogProps, state: IFaucetDialogState) {
+  constructor(props: IFaucetDialogFullProps, state: IFaucetDialogState) {
     super(props);
 
     this.state = {};
   }
 
-	public render(): React.ReactElement<IFaucetDialogProps> {
+	public render(): React.ReactElement<IFaucetDialogFullProps> {
     return (
-      <Modal show centered className="faucet-dialog" size={(this.props.size || undefined) as any} onHide={() => {
+      <Modal container={this.props.container} show centered className="faucet-dialog" size={(this.props.size || undefined) as any} onHide={() => {
         if(this.props.closeFn)
           this.props.closeFn();
       }}>
