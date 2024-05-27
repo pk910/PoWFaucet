@@ -21,7 +21,7 @@ export class FaucetHttpResponse {
     this.code = code;
     this.reason = reason;
     this.body = body;
-    this.headers = headers;
+    this.headers = headers || {};
   }
 }
 
