@@ -1,3 +1,4 @@
+import { PoWHashAlgo } from "../types/PoWMinerSrc";
 
 export interface IFaucetConfig {
   faucetTitle: string;
@@ -72,12 +73,6 @@ export interface IPoWModuleConfig {
   powDifficulty: number;
   powNonceCount: number;
   powHashrateLimit: number;
-}
-
-export enum PoWHashAlgo {
-  SCRYPT      = "scrypt",
-  CRYPTONIGHT = "cryptonight",
-  ARGON2      = "argon2",
 }
 
 export type PoWParams = {

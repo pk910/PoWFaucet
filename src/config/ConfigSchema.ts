@@ -59,6 +59,8 @@ export interface IConfigSchema {
   rpcConnectionError: string | boolean; // RPC unreachable error message / true to show the generic message / false to disable the error
   denyNewSessions: string | boolean; // prevent creation of new sessions (used for maintenance)
 
+  corsAllowOrigin: string[]; // Access-Control-Allow-Origin header, empty to disable cors
+
   ethRefillContract: null | { // refill from vault contract or null to disable automatic refilling
     contract: string; // vault contract address
     abi: string; // vault contract abi

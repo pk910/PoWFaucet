@@ -17,6 +17,7 @@ export interface IClaimPageProps {
   faucetConfig: IFaucetConfig;
   navigateFn: NavigateFunction;
   sessionId: string;
+  wsBaseUrl?: string;
 }
 
 export interface IClaimPageState {
@@ -43,7 +44,11 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   constructor(props: IClaimPageProps, state: IClaimPageState) {
     super(props);
 
-    let claimWsEndpoint = "/ws/claim";
+    let claimWsEndpoint: string;
+    if(this.props.wsBaseUrl) 
+      claimWsEndpoint = this.props.wsBaseUrl + "/claim";
+    else
+      claimWsEndpoint = "/ws/claim";
     if(claimWsEndpoint.match(/^\//))
       claimWsEndpoint = location.origin.replace(/^http/, "ws") + claimWsEndpoint;
     this.notificationClient = new ClaimNotificationClient({
@@ -216,7 +221,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src="/images/spinner.gif" className="spinner" />
+            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
             <span className="spinner-text">Loading Claim...</span>
           </div>
         </div>

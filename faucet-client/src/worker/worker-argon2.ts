@@ -1,7 +1,7 @@
 
 import { PoWWorker } from "./PoWWorker";
 import { getArgon2, getArgon2ReadyPromise } from "../../../libs/argon2_wasm.cjs";
-import { PoWHashAlgo } from "../common/FaucetConfig";
+import { PoWHashAlgo } from "../types/PoWMinerSrc";
 
 (() => {
   getArgon2ReadyPromise().then(() => {

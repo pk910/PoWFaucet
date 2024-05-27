@@ -8,8 +8,10 @@ import { FaucetTime } from '../../common/FaucetTime';
 import { PoWClient } from '../../pow/PoWClient';
 import { IPassportScoreInfo } from '../../types/PassportInfo';
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { IFaucetContext } from '../../common/FaucetContext';
 
 export interface IPoWMinerStatusProps {
+  pageContext: IFaucetContext;
   powClient: PoWClient;
   powMiner: PoWMiner;
   powSession: PoWSession;
@@ -174,7 +176,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
               </OverlayTrigger>
             </div>
 
-            <img src={this.state.disableProgressGif ? "/images/progress.png" : "/images/progress.gif" } />
+            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + (this.state.disableProgressGif ? "/progress.png" : "/progress.gif")} />
           </div>
         </div>
 

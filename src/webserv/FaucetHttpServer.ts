@@ -86,7 +86,7 @@ export class FaucetHttpServer {
   }
 
   private onHttpRequest(req: IncomingMessage, rsp: ServerResponse) {
-    if(req.method === "GET" || req.method === "POST") {
+    if(req.method === "GET" || req.method === "POST" || req.method === "OPTIONS") {
       let bodyParts = [];
       let bodySize = 0;
       req.on("data", (chunk: Buffer) => {
@@ -99,26 +99,24 @@ export class FaucetHttpServer {
       req.on("end", () => {
         if((req.url + "").match(/^\/api\//i)) {
           let body = req.method === "POST" ? Buffer.concat(bodyParts) : null;
-          ServiceManager.GetService(FaucetWebApi).onApiRequest(req, body).then((res: object) => {
-            if(res && typeof res === "object" && res instanceof FaucetHttpResponse) {
-              rsp.writeHead(res.code, res.reason, res.headers);
-              rsp.end(res.body);
-            }
-            else {
-              let body = JSON.stringify(res);
-              rsp.writeHead(200, {'Content-Type': 'application/json'});
-              rsp.end(body);
-            }
-          }).catch((err) => {
-            if(err && typeof err === "object" && err instanceof FaucetHttpResponse) {
-              rsp.writeHead(err.code, err.reason, err.headers);
-              rsp.end(err.body);
-            }
-            else {
-              rsp.writeHead(500, "Internal Server Error");
-              rsp.end(err ? err.toString() : "");
-            }
-          });
+          if(req.method === "OPTIONS") {
+            this.sendApiResponse(req, rsp, 200, "OK", {}, null);
+          } else {
+            ServiceManager.GetService(FaucetWebApi).onApiRequest(req, body).then((res: object) => {
+              if(res && typeof res === "object" && res instanceof FaucetHttpResponse)
+                this.sendApiResponse(req, rsp, res.code, res.reason, res.headers, res.body);
+              else
+                this.sendApiResponse(req, rsp, 200, "OK", {'Content-Type': 'application/json'}, JSON.stringify(res));
+            }).catch((err) => {
+              if(err && typeof err === "object" && err instanceof FaucetHttpResponse)
+                this.sendApiResponse(req, rsp, err.code, err.reason, err.headers, err.body);
+              else
+                this.sendApiResponse(req, rsp, 500, "Internal Server Error", {}, err ? err.toString() : "")
+            });
+          }
+        }
+        else if(req.method === "OPTIONS") {
+          this.sendApiResponse(req, rsp, 200, "OK", {}, null);
         }
         else {
           switch(req.url) {
@@ -132,13 +130,42 @@ export class FaucetHttpServer {
                 this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
               break;
             default:
-              this.staticServer.serve(req, rsp);
+              let pathname = decodeURI(new URL(req.url, 'http://localhost').pathname);
+              this.staticServer.servePath(pathname, 200, this.getCorsHeaders(req), req, rsp, function() {});
               break;
           }
         }
       });
     }
     req.resume();
+  }
+
+  private sendApiResponse(req: IncomingMessage, rsp: ServerResponse, code: number, reason: string, headers: OutgoingHttpHeaders, body: string) {
+    Object.assign(headers, this.getCorsHeaders(req));
+    rsp.writeHead(code, reason, headers);
+    rsp.end(body);
+  }
+
+  private getCorsHeaders(req: IncomingMessage): OutgoingHttpHeaders {
+    let headers: OutgoingHttpHeaders = {};
+    if(faucetConfig.corsAllowOrigin.length > 0) {
+      let rspAllowOrigin: string;
+      for(let i = 0; i < faucetConfig.corsAllowOrigin.length; i++) {
+        let allowOrigin = faucetConfig.corsAllowOrigin[i];
+        if(allowOrigin == "*" || allowOrigin == req.headers.origin) {
+          rspAllowOrigin = allowOrigin;
+          break;
+        }
+      }
+
+      if(rspAllowOrigin) {
+        headers["Access-Control-Allow-Origin"] = rspAllowOrigin;
+        headers["Access-Control-Allow-Methods"] = "GET, POST";
+        headers["Access-Control-Allow-Headers"] = "Content-Type";
+      }
+    }
+
+    return headers;
   }
 
   private onHttpUpgrade(req: IncomingMessage, socket: stream.Duplex, head: Buffer) {

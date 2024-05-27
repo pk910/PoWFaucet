@@ -138,7 +138,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src="/images/spinner.gif" className="spinner" />
+            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
             <span className="spinner-text">Loading Session...</span>
           </div>
         </div>

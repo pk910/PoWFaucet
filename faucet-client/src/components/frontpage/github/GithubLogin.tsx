@@ -91,7 +91,7 @@ export class GithubLogin extends React.PureComponent<IGithubLoginProps, IGithubL
           <a href="#" onClick={(evt) => evt.preventDefault()}>
             {this.state.popupOpen ?
               <span className='inline-spinner'>
-                <img src="/images/spinner.gif" className="spinner" />
+                <img src={(this.props.faucetContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
               </span>
             : null}
             Login with Github

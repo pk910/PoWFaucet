@@ -99,7 +99,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src="/images/spinner.gif" className="spinner" />
+            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
             <span className="spinner-text">Loading passport details...</span>
           </div>
         </div>

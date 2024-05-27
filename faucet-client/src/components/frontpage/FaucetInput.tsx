@@ -93,7 +93,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
             disabled={this.state.submitting}>
               {this.state.submitting ?
               <span className='inline-spinner'>
-                <img src="/images/spinner.gif" className="spinner" />
+                <img src={(this.props.faucetContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
               </span>
               : null}
               {submitBtnCaption}

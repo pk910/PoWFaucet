@@ -1,4 +1,4 @@
-import { IFaucetConfig, PoWHashAlgo } from '../../common/FaucetConfig';
+import { IFaucetConfig } from '../../common/FaucetConfig';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 import React, { useContext } from 'react';
 import { useParams, useNavigate, NavigateFunction } from "react-router-dom";
@@ -12,6 +12,7 @@ import { PoWMinerStatus } from './PoWMinerStatus';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { PassportInfo } from '../passport/PassportInfo';
 import { ConnectionAlert } from './ConnectionAlert';
+import { PoWMinerDefaultSrc, PoWMinerWorkerSrc } from '../../types/PoWMinerSrc';
 
 export interface IMiningPageProps {
   pageContext: IFaucetContext;
@@ -100,7 +101,13 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
     else
       this.faucetSession = new FaucetSession(this.props.pageContext, this.props.sessionId);
     
-    let powWsEndpoint = this.props.faucetConfig.modules.pow.powWsUrl || "/ws/pow";
+    let powWsEndpoint: string;
+    if(this.props.faucetConfig.modules.pow.powWsUrl)
+      powWsEndpoint = this.props.faucetConfig.modules.pow.powWsUrl;
+    else if(this.props.pageContext.faucetUrls.wsBaseUrl) 
+      powWsEndpoint = this.props.pageContext.faucetUrls.wsBaseUrl + "/pow";
+    else
+      powWsEndpoint = "/ws/pow";
     if(powWsEndpoint.match(/^\//))
       powWsEndpoint = location.origin.replace(/^http/, "ws") + powWsEndpoint;
     this.powClient = new PoWClient({
@@ -124,11 +131,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
       powParams: this.props.faucetConfig.modules.pow.powParams,
       difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-      workerSrc: {
-        [PoWHashAlgo.SCRYPT]: "/js/powfaucet-worker-sc.js?" + FAUCET_CLIENT_BUILDTIME,
-        [PoWHashAlgo.CRYPTONIGHT]: "/js/powfaucet-worker-cn.js?" + FAUCET_CLIENT_BUILDTIME,
-        [PoWHashAlgo.ARGON2]: "/js/powfaucet-worker-a2.js?" + FAUCET_CLIENT_BUILDTIME,
-      }
+      workerSrc: this.props.pageContext.faucetUrls.minerSrc || PoWMinerDefaultSrc,
     });
   }
 
@@ -222,7 +225,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src="/images/spinner.gif" className="spinner" />
+            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
             <span className="spinner-text">Loading...</span>
           </div>
         </div>
@@ -243,6 +246,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       <div className='page-mining'>
         <div className="pow-status-container">
           <PoWMinerStatus 
+            pageContext={this.props.pageContext}
             powClient={this.powClient}
             powMiner={this.powMiner} 
             powSession={this.powSession} 

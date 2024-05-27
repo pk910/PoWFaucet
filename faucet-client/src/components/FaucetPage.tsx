@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ReactElement } from 'react';
 import { HashRouter as Router, Routes, Route, Link } from "react-router-dom";
 
 import { FaucetApi } from '../common/FaucetApi';
@@ -15,9 +15,15 @@ import FaucetStatusPage from './status/FaucetStatusPage';
 import QueueStatusPage from './status/QueueStatusPage';
 
 import './FaucetPage.css'
+import { PoWMinerWorkerSrc } from '../types/PoWMinerSrc';
 
 export interface IFaucetPageProps {
   apiUrl: string;
+  wsBaseUrl?: string; 
+  minerSrc?: PoWMinerWorkerSrc;
+  imagesUrl?: string;
+  children?: ReactElement | ReactElement[];
+  ref?: (ref: FaucetPage) => void;
 }
 
 export interface IFaucetPageState {
@@ -71,6 +77,12 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
 
     let faucetApi = new FaucetApi(props.apiUrl);
     this.pageContext = {
+      faucetUrls: {
+        apiUrl: props.apiUrl,
+        wsBaseUrl: props.wsBaseUrl,
+        minerSrc: props.minerSrc,
+        imagesUrl: props.imagesUrl,
+      },
       faucetApi: faucetApi,
       showStatusAlert: (level: string, prio: number, body: React.ReactElement) => this.showStatusAlert(level, prio, body),
       hideStatusAlert: (statusAlertId: number) => this.hideStatusAlert(statusAlertId),
@@ -88,6 +100,10 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       dialogs: [],
       notifications: [],
 		};
+
+    if(props.ref) {
+      props.ref(this);
+    }
   }
 
   public componentDidMount() {
@@ -129,7 +145,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       return (
         <div className="faucet-loading">
           <div className="loading-spinner">
-            <img src="/images/spinner.gif" className="spinner" />
+            <img src={(this.pageContext.faucetUrls.imagesUrl || "/images") + "/spinner.gif"} className="spinner" />
             <span className="spinner-text">Loading...</span>
           </div>
         </div>
@@ -145,6 +161,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
             </div>
             {this.renderStatusAlerts()}
             <div className="faucet-body">
+              {this.props.children && (!Array.isArray(this.props.children) || this.props.children.length > 0) ? this.props.children :
               <Router>
                 <Routes>
                   <Route
@@ -185,6 +202,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
                   />
                 </Routes>
               </Router>
+              }
             </div>
             {this.renderDialogs()}
             {this.renderNotifications()}
