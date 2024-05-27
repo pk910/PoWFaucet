@@ -78,11 +78,19 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
   }
 
 	public render(): React.ReactElement<IFrontPageProps> {
+    let faucetImage: string;
+    if(this.props.faucetConfig.faucetImage) {
+      faucetImage = this.props.faucetConfig.faucetImage;
+      if(faucetImage.match(/^\/images\//) && this.props.faucetContext.faucetUrls.imagesUrl) {
+        faucetImage = this.props.faucetContext.faucetUrls.imagesUrl + faucetImage.substring(7);
+      }
+    }
+
     return (
       <div className='page-frontpage'>
         <div className='faucet-frontimage'>
-          {this.props.faucetConfig.faucetImage ?
-            <img src={this.props.faucetConfig.faucetImage} className="image" />
+          {faucetImage ?
+            <img src={faucetImage} className="image" />
           : null}
         </div>
         <FaucetInput 
