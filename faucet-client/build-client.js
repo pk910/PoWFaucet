@@ -49,6 +49,10 @@ function copyIfFoundOrRemove(filename, dstpath, dstname) {
   console.log(res);
   
   let staticPath = path.join(__dirname, "..", "static");
+  if(!fs.existsSync(path.join(staticPath, "js")))
+    fs.mkdirSync(path.join(staticPath, "js"));
+  if(!fs.existsSync(path.join(staticPath, "css")))
+    fs.mkdirSync(path.join(staticPath, "css"));
 
   copyIfFound("powfaucet.css", path.join(staticPath, "css"));
   copyIfFoundOrRemove("powfaucet.css.map", path.join(staticPath, "css"));
