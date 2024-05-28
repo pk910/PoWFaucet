@@ -17,7 +17,6 @@ export interface IClaimPageProps {
   faucetConfig: IFaucetConfig;
   navigateFn: NavigateFunction;
   sessionId: string;
-  wsBaseUrl?: string;
 }
 
 export interface IClaimPageState {
@@ -45,8 +44,8 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     super(props);
 
     let claimWsEndpoint: string;
-    if(this.props.wsBaseUrl) 
-      claimWsEndpoint = this.props.wsBaseUrl + "/claim";
+    if(this.props.pageContext.faucetUrls.wsBaseUrl) 
+      claimWsEndpoint = this.props.pageContext.faucetUrls.wsBaseUrl + "/claim";
     else
       claimWsEndpoint = "/ws/claim";
     if(claimWsEndpoint.match(/^\//))
