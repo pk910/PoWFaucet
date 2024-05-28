@@ -156,6 +156,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             <div className='pow-progress-actions'>
               <OverlayTrigger
                 placement="bottom"
+                container={this.props.pageContext.getContainer()}
                 overlay={
                   <Tooltip>
                     Stop animation for better performance

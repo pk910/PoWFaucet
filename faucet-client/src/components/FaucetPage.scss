@@ -24,6 +24,7 @@ html.powfaucet, html.powfaucet body {
 
 @import "../../node_modules/bootstrap/scss/functions";
 @import "../../node_modules/bootstrap/scss/variables";
+@import "../../node_modules/bootstrap/scss/variables-dark";
 @import "../../node_modules/bootstrap/scss/maps";
 @import "../../node_modules/bootstrap/scss/mixins";
 @import "../../node_modules/bootstrap/scss/utilities";
@@ -37,7 +38,6 @@ html.powfaucet, html.powfaucet body {
   @import "../../node_modules/bootstrap/scss/grid";
   @import "../../node_modules/bootstrap/scss/tables";
   @import "../../node_modules/bootstrap/scss/forms";
-
   @import "../../node_modules/bootstrap/scss/buttons";
   @import "../../node_modules/bootstrap/scss/transitions";
   @import "../../node_modules/bootstrap/scss/dropdown";
@@ -51,6 +51,8 @@ html.powfaucet, html.powfaucet body {
   @import "../../node_modules/bootstrap/scss/close";
   @import "../../node_modules/bootstrap/scss/placeholders";
   @import "../../node_modules/bootstrap/scss/helpers";
+  @import "../../node_modules/bootstrap/scss/utilities/api";
+  
 }
 
 .faucet-loading .loading-spinner {

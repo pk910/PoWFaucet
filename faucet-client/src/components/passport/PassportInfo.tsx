@@ -133,6 +133,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                     (Reward Factor: {this.state.passportInfo.score.factor || 1} 
                     <OverlayTrigger
                       placement="bottom"
+                      container={this.props.pageContext.getContainer()}
                       overlay={
                         <Tooltip>
                           {this.renderFactorInfo()}
@@ -250,6 +251,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                 {stamp.expiration <= now ?
                   <OverlayTrigger
                     placement="bottom"
+                    container={this.props.pageContext.getContainer()}
                     overlay={
                       <Tooltip>
                         This stamp has been expired. Please refresh it on passport.gitcoin.co
@@ -262,6 +264,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                 {stamp.duplicate ?
                   <OverlayTrigger
                     placement="bottom"
+                    container={this.props.pageContext.getContainer()}
                     overlay={
                       <Tooltip>
                         This stamp has already been used in the passport for {stamp.duplicate}

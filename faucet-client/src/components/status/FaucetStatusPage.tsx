@@ -289,6 +289,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         <OverlayTrigger
           placement="auto"
           delay={{ show: 250, hide: 400 }}
+          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderRestrictionInfo(session, props)}
         >
           <span key="limit" className={["badge", restrClass].join(" ")}>{session.restr.reward} %</span>
@@ -305,6 +306,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         <OverlayTrigger
           placement="auto"
           delay={{ show: 250, hide: 400 }}
+          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderFactorInfo(session, props)}
         >
           <span key="factor" className={["badge", "bg-info"].join(" ")}>x{Math.round(totalFactor * 100) / 100}</span>
@@ -319,6 +321,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
           <OverlayTrigger
             placement="right"
             delay={{ show: 250, hide: 400 }}
+            container={this.props.pageContext.getContainer()}
             overlay={(props) => this.renderSessionIpInfo(session, props)}
           >
             <span className='ipaddr'>
@@ -491,6 +494,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         claimStatus = <OverlayTrigger
           placement="left"
           delay={{ show: 250, hide: 400 }}
+          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderClaimFailInfo(claim, props)}
         >
           <span className="badge bg-danger">Failed</span>

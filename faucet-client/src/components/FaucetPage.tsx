@@ -91,6 +91,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       hideNotification: (notificationId: number) => this.hideNotification(notificationId),
       showDialog: (dialogProps: IFaucetDialogProps) => this.showDialog(dialogProps),
       hideDialog: (dialogId: number) => this.hideDialog(dialogId),
+      getContainer: () => this.faucetContainerElement,
     };
 
     this.state = {

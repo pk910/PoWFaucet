@@ -21,5 +21,6 @@ export interface IFaucetContext {
 
   showDialog(dialogProps: IFaucetDialogProps): number;
   hideDialog(dialogId: number): void;
+  getContainer(): HTMLElement;
 
 }

@@ -123,6 +123,7 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
         claimStatus = <OverlayTrigger
           placement="left"
           delay={{ show: 250, hide: 400 }}
+          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderClaimFailInfo(claim, props)}
         >
           <span className="badge bg-danger">Failed</span>

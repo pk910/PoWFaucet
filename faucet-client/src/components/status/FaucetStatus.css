@@ -25,15 +25,16 @@
   min-width: 50px;
 }
 
-.faucet-page .status-sessions td, .pow-faucet .status-sessions th {
+.faucet-page .faucet-status .status-sessions td, 
+.faucet-page .faucet-status .status-sessions th {
   padding: 0 12px;
 }
 
-.faucet-page .status-general {
+.faucet-page .faucet-status .status-general {
   max-width: none;
 }
 
-.faucet-page .status-general .status-title {
+.faucet-page .faucet-status .status-general .status-title {
   display: inline-block;
   width: 180px;
 }

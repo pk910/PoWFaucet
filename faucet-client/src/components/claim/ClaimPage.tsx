@@ -346,6 +346,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
               <div className='col'>
                 <OverlayTrigger
                   placement="auto"
+                  container={this.props.pageContext.getContainer()}
                   overlay={
                     <Tooltip>
                       {((this.state.sessionStatus.claimIdx || 0) - (this.state.claimNotification?.processedIdx || 0) - 1)} claims will be processed before yours.
