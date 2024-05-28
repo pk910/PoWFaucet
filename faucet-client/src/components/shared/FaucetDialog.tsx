@@ -1,6 +1,5 @@
 import React, { ReactElement } from 'react';
 import { Button, Modal } from 'react-bootstrap';
-import 'bootstrap/js/dist/modal';
 
 export interface IFaucetDialogProps {
   title: string;

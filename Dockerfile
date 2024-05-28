@@ -1,5 +1,5 @@
 # build-server env
-FROM node:20-slim AS build-server-env
+FROM node:21-slim AS build-server-env
 WORKDIR /build
 COPY package*.json ./
 RUN npm install
@@ -10,7 +10,7 @@ COPY ./src src
 RUN npm run bundle
 
 # build-client env
-FROM node:20-slim AS build-client-env
+FROM node:21-slim AS build-client-env
 WORKDIR /build
 COPY faucet-client/package*.json ./faucet-client/
 COPY ./libs libs

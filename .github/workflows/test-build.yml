@@ -32,7 +32,7 @@ jobs:
 
     - uses: actions/setup-node@v3
       with:
-        node-version: 20
+        node-version: 21
     - run: npm install -g pkg
 
     - run: npm install
