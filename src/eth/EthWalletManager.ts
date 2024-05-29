@@ -1,6 +1,4 @@
-
 import Web3, { ContractAbi, AbiFragment, TransactionReceipt, TransactionNotFound } from 'web3';
-import net from 'net';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
 import * as EthUtil from 'ethereumjs-util';
@@ -11,8 +9,7 @@ import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
 import { FaucetStatus, FaucetStatusLevel } from '../services/FaucetStatus.js';
 import { strFormatPlaceholder } from '../utils/StringUtils.js';
-import { PromiseDfd } from '../utils/PromiseDfd.js';
-import { sleepPromise, timeoutPromise } from '../utils/PromiseUtils.js';
+import { sleepPromise } from '../utils/PromiseUtils.js';
 import { EthClaimInfo } from './EthClaimManager.js';
 import { Erc20Abi } from '../abi/ERC20.js';
 import IpcProvider from 'web3-providers-ipc';
@@ -48,7 +45,6 @@ export interface TransactionResult {
 }
 
 export class EthWalletManager {
-
   public static getWeb3Provider(rpcHost: any): any {
     if(rpcHost && typeof rpcHost === "object")
       return rpcHost as any;
@@ -85,7 +81,7 @@ export class EthWalletManager {
     this.startWeb3();
     if(typeof faucetConfig.ethChainId === "number")
       this.initChainCommon(BigInt(faucetConfig.ethChainId));
-    
+
     let privkey = faucetConfig.ethWalletKey;
     if(privkey.match(/^0x/))
       privkey = privkey.substring(2);
@@ -107,12 +103,12 @@ export class EthWalletManager {
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Web3 ChainCommon initialized with chainId " + chainId);
     this.chainCommon = EthCom.Common.custom({
       networkId: chainId,
-      chainId: chainId,
+      chainId,
     });
   }
 
   private startWeb3() {
-    let provider = EthWalletManager.getWeb3Provider(faucetConfig.ethRpcHost);
+    const provider = EthWalletManager.getWeb3Provider(faucetConfig.ethRpcHost);
     this.web3 = new Web3(provider);
 
     if(faucetConfig.faucetCoinType !== FaucetCoinType.NATIVE)
@@ -132,13 +128,15 @@ export class EthWalletManager {
           this.startWeb3();
         }, 2000);
       });
-    } catch(ex) {}
+    } catch(ex) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 startWeb3() error, " + ex.toString());
+    }
   }
 
   private initWeb3Token() {
     switch(faucetConfig.faucetCoinType) {
       case FaucetCoinType.ERC20:
-        let tokenContract = new this.web3.eth.Contract(Erc20Abi, faucetConfig.faucetCoinContract, {
+        const tokenContract = new this.web3.eth.Contract(Erc20Abi, faucetConfig.faucetCoinContract, {
           from: this.walletAddr,
         });
         this.tokenState = {
@@ -146,7 +144,7 @@ export class EthWalletManager {
           contract: tokenContract,
           decimals: 0,
           getBalance: (addr: string) => tokenContract.methods.balanceOf(addr).call(),
-          getTransferData: (addr: string, amount: bigint) => tokenContract.methods['transfer'](addr, amount).encodeABI(),
+          getTransferData: (addr: string, amount: bigint) => tokenContract.methods.transfer(addr, amount).encodeABI(),
         };
         tokenContract.methods.decimals().call().then((res) => {
           this.tokenState.decimals = Number(res);
@@ -168,8 +166,8 @@ export class EthWalletManager {
 
   public loadWalletState(): Promise<void> {
     this.lastWalletRefresh = Math.floor(new Date().getTime() / 1000);
-    let chainIdPromise = typeof faucetConfig.ethChainId === "number" ? Promise.resolve(faucetConfig.ethChainId) : this.web3.eth.getChainId();
-    let tokenBalancePromise = this.tokenState?.getBalance(this.walletAddr);
+    const chainIdPromise = typeof faucetConfig.ethChainId === "number" ? Promise.resolve(faucetConfig.ethChainId) : this.web3.eth.getChainId();
+    const tokenBalancePromise = this.tokenState?.getBalance(this.walletAddr);
     return Promise.all([
       this.web3.eth.getBalance(this.walletAddr, "pending"),
       this.web3.eth.getTransactionCount(this.walletAddr, "pending"),
@@ -262,13 +260,14 @@ export class EthWalletManager {
   }
 
   public decimalUnitAmount(amount: bigint, native?: boolean): number {
-    let decimals = this.getFaucetDecimals(native);
-    let factor = Math.pow(10, decimals);
+    const decimals = this.getFaucetDecimals(native);
+    const factor = Math.pow(10, decimals);
+    // tslint:disable-next-line:radix
     return parseInt(amount.toString()) / factor;
   }
 
   public readableAmount(amount: bigint, native?: boolean): string {
-    let amountStr = (Math.floor(this.decimalUnitAmount(amount, native) * 1000) / 1000).toString();
+    const amountStr = (Math.floor(this.decimalUnitAmount(amount, native) * 1000) / 1000).toString();
     return amountStr + " " + (native ? "ETH" : faucetConfig.faucetCoinSymbol);
   }
 
@@ -303,7 +302,7 @@ export class EthWalletManager {
     receipt: TransactionReceipt;
   }> {
     return this.awaitTransactionReceipt(claimInfo.claim.txHash, claimInfo.claim.txNonce).then((receipt) => {
-      let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+      const txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
       this.walletState.nativeBalance -= txfee;
       if(!this.tokenState)
         this.walletState.balance -= txfee;
@@ -311,7 +310,7 @@ export class EthWalletManager {
         status: Number(receipt.status) > 0,
         block: Number(receipt.blockNumber),
         fee: txfee,
-        receipt: receipt,
+        receipt,
       };
     });
   }
@@ -320,7 +319,7 @@ export class EthWalletManager {
     let txPromise: Promise<TransactionReceipt>;
     let retryCount = 0;
     let txError: Error;
-    let buildTx = () => {
+    const buildTx = () => {
       claimInfo.claim.txNonce = this.walletState.nonce;
       if(this.tokenState)
         return this.buildEthTx(this.tokenState.address, 0n, claimInfo.claim.txNonce, this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount)));
@@ -331,7 +330,7 @@ export class EthWalletManager {
     do {
       try {
         claimInfo.claim.txHex = await buildTx();
-        let txResult = await this.sendTransaction(claimInfo.claim.txHex, claimInfo.claim.txNonce);
+        const txResult = await this.sendTransaction(claimInfo.claim.txHex, claimInfo.claim.txNonce);
         claimInfo.claim.txHash = txResult[0];
         txPromise = txResult[1];
       } catch(ex) {
@@ -353,7 +352,7 @@ export class EthWalletManager {
     return {
       txHash: claimInfo.claim.txHash,
       txPromise : txPromise.then((receipt) => {
-        let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+        const txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
         this.walletState.nativeBalance -= txfee;
         if(!this.tokenState)
           this.walletState.balance -= txfee;
@@ -361,20 +360,20 @@ export class EthWalletManager {
           status: Number(receipt.status) > 0,
           block: Number(receipt.blockNumber),
           fee: txfee,
-          receipt: receipt,
+          receipt,
         };
       }),
     };
   }
 
   public async sendCustomTx(target: string, amount: bigint, data?: string, gasLimit?: number): Promise<TransactionResult> {
-    let txHex = await this.buildEthTx(target, amount, this.walletState.nonce, data, gasLimit);
-    let txResult = await this.sendTransaction(txHex, this.walletState.nonce);
+    const txHex = await this.buildEthTx(target, amount, this.walletState.nonce, data, gasLimit);
+    const txResult = await this.sendTransaction(txHex, this.walletState.nonce);
     this.walletState.nonce++;
     return {
       txHash: txResult[0],
       txPromise : txResult[1].then((receipt) => {
-        let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+        const txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
         this.walletState.nativeBalance -= txfee;
         if(!this.tokenState)
           this.walletState.balance -= txfee;
@@ -382,7 +381,7 @@ export class EthWalletManager {
           status: Number(receipt.status) > 0,
           block: Number(receipt.blockNumber),
           fee: txfee,
-          receipt: receipt,
+          receipt,
         };
       }),
     };
@@ -401,9 +400,9 @@ export class EthWalletManager {
         gasPrice = BigInt(faucetConfig.ethTxMaxFee);
 
       tx = EthTx.LegacyTransaction.fromTxData({
-        nonce: nonce,
+        nonce,
         gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
-        gasPrice: gasPrice,
+        gasPrice,
         to: target,
         value: "0x" + amount.toString(16),
         data: data ? data : "0x"
@@ -414,7 +413,7 @@ export class EthWalletManager {
     else {
       // eip1559 transaction
       tx = EthTx.FeeMarketEIP1559Transaction.fromTxData({
-        nonce: nonce,
+        nonce,
         gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
         maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
         maxFeePerGas: faucetConfig.ethTxMaxFee,
@@ -431,7 +430,7 @@ export class EthWalletManager {
   }
 
   private async sendTransaction(txhex: string, txnonce: number): Promise<[string, Promise<TransactionReceipt>]> {
-    let txHash = await ethRpcMethods.sendRawTransaction(this.web3.eth.requestManager, "0x" + txhex);
+    const txHash = await ethRpcMethods.sendRawTransaction(this.web3.eth.requestManager, "0x" + txhex);
 
     return [txHash, this.awaitTransactionReceipt(txHash, txnonce)];
   }
@@ -451,7 +450,7 @@ export class EthWalletManager {
       txStatus = 2;
       receiptDfd.resolve(receipt);
     });
-    
+
     let errorHandler = (error) => {
       if(txStatus === 0)
         txhashDfd.reject(error);
@@ -469,7 +468,6 @@ export class EthWalletManager {
   private async awaitTransactionReceipt(txhash: string, txnonce: number): Promise<TransactionReceipt> {
 
     while(true) {
-      let receipt: TransactionReceipt;
       try {
         return await this.web3.eth.getTransactionReceipt(txhash);
       } catch(ex) {
