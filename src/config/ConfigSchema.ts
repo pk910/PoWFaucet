@@ -27,8 +27,7 @@ export interface IConfigSchema {
   ethWalletKey: string; // faucet wallet private key
   ethWalletAddr: string; // faucet wallet address
   ethChainId: number | null; // ETH chain id
-  ethTxGasLimit: number; // transaction gas limit (wei)
-  ethLegacyTx: boolean; // use legacy (non-eip1559) transaction type
+  ethTxGasLimit: number | null; // transaction gas limit (wei)
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously

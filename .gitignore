@@ -19,3 +19,5 @@ faucet-pid.txt
 tmp*
 .idea
 .env
+
+*.db

@@ -31,7 +31,6 @@ export function getDefaultConfig(): IConfigSchema {
     ethWalletAddr: null,
     ethChainId: null,
     ethTxGasLimit: 100000,
-    ethLegacyTx: false,
     ethTxMaxFee: 100000000000,
     ethTxPrioFee: 2000000000,
     ethMaxPending: 20,

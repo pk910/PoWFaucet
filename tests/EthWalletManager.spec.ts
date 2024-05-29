@@ -249,7 +249,7 @@ describe("ETH Wallet Manager", () => {
     await ethClaimManager.processQueue();
     await awaitSleepPromise(200, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");
-    expect(rawTxReq[0].params[0]).to.equal("0x02f86f8205392a847735940085174876e80082520894000000000000000000000000000000000000133782053980c001a04787689fdfc3803c758feaaa7989761900c274488f1f656ec7aa277ae37294efa038b6fc22a7a4c1f0bf537a989f00c907413f5c3e333807e1bbadfb08f74926f5", "unexpected transaction hex");    
+    expect(rawTxReq[0].params[0]).to.equal("0x02f86f8205392a847735940085174876e80082520894000000000000000000000000000000000000133782053980c001a04787689fdfc3803c758feaaa7989761900c274488f1f656ec7aa277ae37294efa038b6fc22a7a4c1f0bf537a989f00c907413f5c3e333807e1bbadfb08f74926f5", "unexpected transaction hex");
     expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
@@ -326,7 +326,7 @@ describe("ETH Wallet Manager", () => {
     receiptResponseMode = "receipt"; // now return the receipt
     await awaitSleepPromise(1000, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");
-    expect(rawTxReq[0].params[0]).to.equal("0x02f86f8205392a847735940085174876e80082520894000000000000000000000000000000000000133782053980c001a04787689fdfc3803c758feaaa7989761900c274488f1f656ec7aa277ae37294efa038b6fc22a7a4c1f0bf537a989f00c907413f5c3e333807e1bbadfb08f74926f5", "unexpected transaction hex");    
+    expect(rawTxReq[0].params[0]).to.equal("0x02f86f8205392a847735940085174876e80082520894000000000000000000000000000000000000133782053980c001a04787689fdfc3803c758feaaa7989761900c274488f1f656ec7aa277ae37294efa038b6fc22a7a4c1f0bf537a989f00c907413f5c3e333807e1bbadfb08f74926f5", "unexpected transaction hex");
     expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");
@@ -342,7 +342,6 @@ describe("ETH Wallet Manager", () => {
     faucetConfig.ethTxGasLimit = 21000;
     faucetConfig.ethTxMaxFee = 100000000000; // 100 gwei
     faucetConfig.ethTxPrioFee = 2000000000; // 2 gwei
-    faucetConfig.ethLegacyTx = true;
     faucetConfig.minDropAmount = 1000;
     await ServiceManager.GetService(FaucetDatabase).initialize();
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
