@@ -46,12 +46,8 @@ faucetCoinType: "native"
 #faucetCoinContract: "0x94373a4919B3240D86eA41593D5eBa789FEF3848" # WETH9 on holesky
 
 # transaction gas limit
-# use 21000 to prevent transactions to contracts
+# use 21000 to prevent transactions to contracts, null for dynamic calculation
 ethTxGasLimit: 21000
-
-# use legacy (non-eip1559) transaction type
-# true: Type 0 (Legacy Transactions), false: Type 2 (EIP1559 Transactions)
-ethLegacyTx: false
 
 # max transaction gas fee (in wei)
 # used as limit for legacy transactions (faucet won't build transactions with higher gas price)

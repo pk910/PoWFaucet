@@ -38,17 +38,17 @@ export class EthWalletRefill {
       refillAction = "overflow";
     else if(walletBalance < BigInt(faucetConfig.ethRefillContract.triggerBalance))
       refillAction = "refill";
-    
+
     if(!refillAction)
       return;
-    
+
     try {
       let txResult: TransactionResult;
       if(refillAction == "refill")
         txResult = await this.refillWallet();
       else if(refillAction == "overflow")
         txResult = await this.overflowWallet(walletBalance - BigInt(faucetConfig.ethRefillContract.overflowBalance));
-      
+
       this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
 
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult.txHash);
@@ -111,12 +111,14 @@ export class EthWalletRefill {
         refillAmount = contractBalance;
     }
 
-    let callArgs = getCallArgs(faucetConfig.ethRefillContract.withdrawFnArgs || ["{amount}"]);
+    const callArgs = getCallArgs(faucetConfig.ethRefillContract.withdrawFnArgs || ["{amount}"]);
     return await ethWalletManager.sendCustomTx(
-      faucetConfig.ethRefillContract.contract,
-      0n,
-      refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI(),
-      faucetConfig.ethRefillContract.withdrawGasLimit
+        {
+          target: faucetConfig.ethRefillContract.contract,
+          amount: 0n,
+          data: refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI(),
+          gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit
+        }
     );
   }
 
@@ -142,12 +144,14 @@ export class EthWalletRefill {
       })
     };
 
-    let callArgs = getCallArgs(faucetConfig.ethRefillContract.depositFnArgs || []);
+    const callArgs = getCallArgs(faucetConfig.ethRefillContract.depositFnArgs || []);
     return await ethWalletManager.sendCustomTx(
-      faucetConfig.ethRefillContract.contract,
-      amount,
-      faucetConfig.ethRefillContract.depositFn ? refillContract.methods[faucetConfig.ethRefillContract.depositFn].apply(this, callArgs).encodeABI() : undefined,
-      faucetConfig.ethRefillContract.withdrawGasLimit
+        {
+          target: faucetConfig.ethRefillContract.contract,
+          amount,
+          data: faucetConfig.ethRefillContract.depositFn ? refillContract.methods[faucetConfig.ethRefillContract.depositFn].apply(this, callArgs).encodeABI() : undefined,
+          gasLimit: faucetConfig.ethRefillContract.withdrawGasLimit
+        }
     );
   }
 

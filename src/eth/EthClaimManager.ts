@@ -237,13 +237,16 @@ export class EthClaimManager {
       return;
     this.queueProcessing = true;
 
+    const ethWalletManager = ServiceManager.GetService(EthWalletManager);
     try {
-      const walletState = ServiceManager.GetService(EthWalletManager).getWalletState();
+      const walletState = ethWalletManager.getWalletState();
+      const gasLimit = await ethWalletManager.getApproximateGasLimitForClaimTx();
+
       while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
         if(faucetConfig.ethQueueNoFunds && (
             !walletState.ready ||
             walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(this.claimTxQueue[0].amount) ||
-            walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
+            walletState.nativeBalance <= BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee)
         )) {
           break; // skip processing (out of funds)
         }
@@ -255,8 +258,8 @@ export class EthClaimManager {
 
       const now = Math.floor(new Date().getTime() / 1000);
       const walletRefreshTime = walletState.ready ? 600 : 10;
-      if(Object.keys(this.pendingTxQueue).length === 0 && now - ServiceManager.GetService(EthWalletManager).getLastWalletRefresh() > walletRefreshTime) {
-        await ServiceManager.GetService(EthWalletManager).loadWalletState();
+      if(Object.keys(this.pendingTxQueue).length === 0 && now - ethWalletManager.getLastWalletRefresh() > walletRefreshTime) {
+        await ethWalletManager.loadWalletState();
       }
 
       if(faucetConfig.ethRefillContract && walletState.ready)
@@ -290,9 +293,11 @@ export class EthClaimManager {
       this.updateClaimStatus(claimTx);
       return;
     }
+    const gasLimit = await ethWalletManager.getApproximateGasLimitForClaimTx();
+
     if(
         walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(claimTx.amount) ||
-        walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
+        walletState.nativeBalance <= BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee)
     ) {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Faucet wallet is out of funds.";

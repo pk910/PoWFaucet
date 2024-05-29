@@ -206,11 +206,11 @@ export class EthWalletManager {
     });
   }
 
-  private updateFaucetStatus() {
+  private async updateFaucetStatus() {
     let statusMessage: string = null;
     let statusLevel: FaucetStatusLevel = null;
     if(this.walletState) {
-      if(!statusLevel && !this.walletState.ready) {
+      if(!this.walletState.ready) {
         if(typeof faucetConfig.rpcConnectionError === "string")
           statusMessage = faucetConfig.rpcConnectionError;
         else if(faucetConfig.rpcConnectionError)
@@ -220,9 +220,14 @@ export class EthWalletManager {
           statusLevel = FaucetStatusLevel.ERROR;
         }
       }
+
+      const gasLimit = await this.getGasLimitForClaimTx({
+        nonce: this.walletState.nonce, target: this.walletAddr, amount: BigInt(faucetConfig.maxDropAmount)
+      });
+
       if(!statusLevel && (
         this.walletState.balance <= faucetConfig.noFundsBalance ||
-        this.walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
+        this.walletState.nativeBalance <= BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee)
       )) {
         if(typeof faucetConfig.noFundsError === "string")
           statusMessage = faucetConfig.noFundsError;
@@ -322,9 +327,18 @@ export class EthWalletManager {
     const buildTx = () => {
       claimInfo.claim.txNonce = this.walletState.nonce;
       if(this.tokenState)
-        return this.buildEthTx(this.tokenState.address, 0n, claimInfo.claim.txNonce, this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount)));
+        return this.buildClaimTx({
+          target: this.tokenState.address,
+          amount: 0n,
+          nonce: claimInfo.claim.txNonce,
+          data: this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount))
+        });
       else
-        return this.buildEthTx(claimInfo.target, BigInt(claimInfo.amount), claimInfo.claim.txNonce);
+        return this.buildClaimTx({
+          target: claimInfo.target,
+          amount: BigInt(claimInfo.amount),
+          nonce: claimInfo.claim.txNonce}
+        );
     };
 
     do {
@@ -366,8 +380,11 @@ export class EthWalletManager {
     };
   }
 
-  public async sendCustomTx(target: string, amount: bigint, data?: string, gasLimit?: number): Promise<TransactionResult> {
-    const txHex = await this.buildEthTx(target, amount, this.walletState.nonce, data, gasLimit);
+  public async sendCustomTx(params: {target: string, amount: bigint, data?: string, gasLimit: number}): Promise<TransactionResult> {
+    const {target, amount, data, gasLimit} = params;
+    const txHex = await this.buildEthTx({
+      target, amount, nonce: this.walletState.nonce, data, gasLimit
+    });
     const txResult = await this.sendTransaction(txHex, this.walletState.nonce);
     this.walletState.nonce++;
     return {
@@ -387,43 +404,46 @@ export class EthWalletManager {
     };
   }
 
-  private async buildEthTx(target: string, amount: bigint, nonce: number, data?: string, gasLimit?: number): Promise<string> {
-    if(target.match(/^0X/))
-      target = "0x" + target.substring(2);
+  private getTxParams({target, amount, data = '0x', ...restParams }: {target: string, amount: bigint, nonce: number, data?: string}) {
+    const to = target.match(/^0X/) ? "0x" + target.substring(2) : target;
+    const value = "0x" + amount.toString(16);
+    return {to, value, data, ...restParams};
+  }
 
-    let tx: EthTx.LegacyTransaction | EthTx.FeeMarketEIP1559Transaction;
-    if(faucetConfig.ethLegacyTx) {
-      // legacy transaction
-      let gasPrice = await this.web3.eth.getGasPrice();
-      gasPrice += BigInt(faucetConfig.ethTxPrioFee);
-      if(faucetConfig.ethTxMaxFee > 0 && gasPrice > faucetConfig.ethTxMaxFee)
-        gasPrice = BigInt(faucetConfig.ethTxMaxFee);
+  public getApproximateGasLimitForClaimTx() {
+    return this.getGasLimitForClaimTx({
+      nonce: this.walletState.nonce, target: this.walletAddr, amount: BigInt(faucetConfig.maxDropAmount)
+    });
+  }
 
-      tx = EthTx.LegacyTransaction.fromTxData({
-        nonce,
-        gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
-        gasPrice,
-        to: target,
-        value: "0x" + amount.toString(16),
-        data: data ? data : "0x"
-      }, {
-        common: this.chainCommon
-      });
-    }
-    else {
-      // eip1559 transaction
-      tx = EthTx.FeeMarketEIP1559Transaction.fromTxData({
-        nonce,
-        gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
-        maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
-        maxFeePerGas: faucetConfig.ethTxMaxFee,
-        to: target,
-        value: "0x" + amount.toString(16),
-        data: data ? data : "0x"
-      }, {
-        common: this.chainCommon
-      });
-    }
+  private getGasLimitForClaimTx(params: {target: string, amount: bigint, nonce: number, data?: string}) {
+    const {to, value, data,  nonce } = this.getTxParams(params)
+
+    return faucetConfig.ethTxGasLimit ? faucetConfig.ethTxGasLimit : this.web3.eth.estimateGas({
+      nonce, to, value, data, from: this.walletAddr
+    });
+  }
+
+  private async buildClaimTx(params: {target: string, amount: bigint, nonce: number, data?: string}): Promise<string> {
+    const gasLimit = await this.getGasLimitForClaimTx(params);
+
+    return this.buildEthTx({ ...params, gasLimit})
+  }
+
+  private async buildEthTx(params: {target: string, amount: bigint, nonce: number, data?: string, gasLimit: number | bigint}): Promise<string> {
+    const {to, value, data,  nonce } = this.getTxParams(params);
+
+    let tx = EthTx.FeeMarketEIP1559Transaction.fromTxData({
+      nonce,
+      gasLimit: params.gasLimit,
+      maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
+      maxFeePerGas: faucetConfig.ethTxMaxFee,
+      to,
+      value,
+      data,
+    }, {
+      common: this.chainCommon
+    });
 
     tx = tx.sign(this.walletKey);
     return Buffer.from(tx.serialize()).toString('hex');
