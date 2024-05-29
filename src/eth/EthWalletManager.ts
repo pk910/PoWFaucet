@@ -120,7 +120,7 @@ export class EthWalletManager {
       provider.on('error', e => {
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 provider error: " + e.toString());
       });
-      provider.on('end', e => {
+      provider.on('end', () => {
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 connection lost...");
         this.web3 = null;
 
@@ -129,7 +129,7 @@ export class EthWalletManager {
         }, 2000);
       });
     } catch(ex) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 startWeb3() error, " + ex.toString());
+      // Do nothing
     }
   }
 
@@ -485,7 +485,7 @@ export class EthWalletManager {
   }
   */
 
-  private async awaitTransactionReceipt(txhash: string, txnonce: number): Promise<TransactionReceipt> {
+  private async awaitTransactionReceipt(txhash: string, _txnonce: number): Promise<TransactionReceipt> {
 
     while(true) {
       try {
