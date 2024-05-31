@@ -240,9 +240,9 @@ export class EthClaimManager {
     const ethWalletManager = ServiceManager.GetService(EthWalletManager);
     try {
       const walletState = ethWalletManager.getWalletState();
-      const gasLimit = await ethWalletManager.getApproximateGasLimitForClaimTx();
-
       while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
+        const gasLimit = await ethWalletManager.getApproximateGasLimitForClaimTx();
+
         if(faucetConfig.ethQueueNoFunds && (
             !walletState.ready ||
             walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(this.claimTxQueue[0].amount) ||
