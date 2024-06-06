@@ -12,9 +12,9 @@ export interface IPoWConfig extends IBaseModuleConfig {
   powCryptoNightParams: IPoWCryptoNightParams; // cryptonight parameters
   powArgon2Params: IPoWArgon2Params; // argon2 parameters
   powDifficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
-  powNonceCount: number; // number of scrypt hashs to pack into a share (should be low as that just increases verification load on server side)
+  powNonceCount: number; // number of scrypt hashes to pack into a share (should be low as that just increases verification load on server side)
   powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
-  powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceet the limit)
+  powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceed the limit)
 
   /* PoW-share verification
   Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
