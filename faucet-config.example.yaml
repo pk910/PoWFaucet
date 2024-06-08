@@ -490,7 +490,12 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 
 
   
+### Advanced WebServer config
 
+# allow external sites embedding this faucet
+corsAllowOrigin:
+#- "*"  # allow all - for development only!
+#- "https://faucets.pk910.de"
 
 ### Automatic wallet refill
 
