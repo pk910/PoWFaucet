@@ -1,4 +1,14 @@
 
+export function joinUrl(base: string, add: string): string {
+  let result = (base || "").replace(/\/+$/, "");
+  add = add || "";
+  if(add.match(/^\//))
+    result += add;
+  else
+    result += "/" + add.replace(/^\/+/, "");
+  return result;
+}
+
 export function toQuery(params, delimiter = '&'): string {
   const keys = Object.keys(params);
 

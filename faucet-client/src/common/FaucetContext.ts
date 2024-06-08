@@ -3,13 +3,16 @@ import { PoWMinerWorkerSrc } from "../types/PoWMinerSrc";
 import { FaucetApi } from "./FaucetApi";
 import { FaucetSession } from "./FaucetSession";
 
+export interface IFaucetContextUrls {
+  baseUrl: string;
+  apiUrl: string;
+  wsBaseUrl: string; 
+  minerSrc: PoWMinerWorkerSrc;
+  imagesUrl: string;
+}
+
 export interface IFaucetContext {
-  faucetUrls: {
-    apiUrl: string;
-    wsBaseUrl?: string; 
-    minerSrc?: PoWMinerWorkerSrc;
-    imagesUrl?: string;
-  };
+  faucetUrls: IFaucetContextUrls;
   faucetApi: FaucetApi;
   activeSession?: FaucetSession;
 

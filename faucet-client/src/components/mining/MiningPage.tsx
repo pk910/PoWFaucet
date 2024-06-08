@@ -12,7 +12,6 @@ import { PoWMinerStatus } from './PoWMinerStatus';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { PassportInfo } from '../passport/PassportInfo';
 import { ConnectionAlert } from './ConnectionAlert';
-import { PoWMinerDefaultSrc, PoWMinerWorkerSrc } from '../../types/PoWMinerSrc';
 
 export interface IMiningPageProps {
   pageContext: IFaucetContext;
@@ -131,7 +130,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       nonceCount: this.props.faucetConfig.modules.pow.powNonceCount,
       powParams: this.props.faucetConfig.modules.pow.powParams,
       difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
-      workerSrc: this.props.pageContext.faucetUrls.minerSrc || PoWMinerDefaultSrc,
+      workerSrc: this.props.pageContext.faucetUrls.minerSrc,
     });
   }
 

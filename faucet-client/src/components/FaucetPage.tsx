@@ -3,7 +3,7 @@ import { HashRouter as Router, Routes, Route, Link } from "react-router-dom";
 
 import { FaucetApi } from '../common/FaucetApi';
 import { IFaucetConfig, IFaucetStatus } from '../common/FaucetConfig';
-import { IFaucetContext } from '../common/FaucetContext';
+import { IFaucetContext, IFaucetContextUrls } from '../common/FaucetContext';
 import { FaucetNotification } from './shared/FaucetNotification';
 import { FaucetDialog, IFaucetDialogProps } from './shared/FaucetDialog';
 
@@ -15,13 +15,17 @@ import FaucetStatusPage from './status/FaucetStatusPage';
 import QueueStatusPage from './status/QueueStatusPage';
 
 import './FaucetPage.scss'
-import { PoWMinerWorkerSrc } from '../types/PoWMinerSrc';
+import { PoWMinerWorkerSrc, getPoWMinerDefaultSrc } from '../types/PoWMinerSrc';
+import path from 'path';
+import { URL } from 'url';
+import { joinUrl } from '../utils/QueryUtils';
 
 export interface IFaucetPageProps {
-  apiUrl: string;
-  wsBaseUrl?: string; 
+  baseUrl?: string; // base url (default: "/")
+  apiUrl?: string;  // api url  (default: "{baseUrl}/api")
+  wsBaseUrl?: string; // ws url (default: "{baseUrl}/ws")
+  imagesUrl?: string; // images (default: "{baseUrl}/images")
   minerSrc?: PoWMinerWorkerSrc;
-  imagesUrl?: string;
   children?: ReactElement | ReactElement[];
   ref?: (ref: FaucetPage) => void;
 }
@@ -77,12 +81,14 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
     super(props);
 
     let faucetApi = new FaucetApi(props.apiUrl);
+    let baseUrl = props.baseUrl || "/";
     this.pageContext = {
       faucetUrls: {
-        apiUrl: props.apiUrl,
-        wsBaseUrl: props.wsBaseUrl,
-        minerSrc: props.minerSrc,
-        imagesUrl: props.imagesUrl,
+        baseUrl: baseUrl,
+        apiUrl: props.apiUrl || joinUrl(baseUrl, "/api"),
+        wsBaseUrl: props.wsBaseUrl || joinUrl(baseUrl.replace(/^http/, "ws"), "/ws"),
+        minerSrc: props.minerSrc || getPoWMinerDefaultSrc(baseUrl),
+        imagesUrl: props.imagesUrl || joinUrl(baseUrl, "/images"),
       },
       faucetApi: faucetApi,
       showStatusAlert: (level: string, prio: number, body: React.ReactElement) => this.showStatusAlert(level, prio, body),
