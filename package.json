@@ -1,6 +1,6 @@
 {
   "name": "@powfaucet/server",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "PoW Faucet Server",
   "main": "dist/app.js",
   "bin": "bundle/powfaucet.cjs",
@@ -69,7 +69,7 @@
     "hcaptcha": "^0.1.1",
     "html-entities": "^2.5.2",
     "json-bigint": "^1.0.0",
-    "mysql2": "^3.9.2",
+    "mysql2": "^3.10.0",
     "node-fetch": "^3.3.2",
     "randombytes": "^2.1.0",
     "tiny-typed-emitter": "^2.1.0",
