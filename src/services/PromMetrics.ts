@@ -29,8 +29,8 @@ export class PromMetricsService {
 
     void this.updateWalletBalance();
 
-    // Update balance every 10 minutes
-    this.intervalID = setInterval(() => this.updateWalletBalance(), 10 * 60 * 1000);
+    // Update balance every 60 minutes
+    this.intervalID = setInterval(() => this.updateWalletBalance(), 60 * 60 * 1000);
   }
 
   public dispose() {
