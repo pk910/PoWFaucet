@@ -98,4 +98,41 @@ describe("Faucet module: mainnet-wallet", () => {
     expect(error?.getCode()).to.equal("MAINNET_TXCOUNT_LIMIT", "unexpected error code");
   });
 
+  it("Start session with too low erc20 token balance", async () => {
+    faucetConfig.modules["mainnet-wallet"] = {
+      enabled: true,
+      rpcHost: fakeProvider,
+      minTxCount: 0,
+      minErc20Balances: [
+        {
+          address: "0x0000000000000000000000000000000000000042",
+          name: "TestToken",
+          decimals: 12,
+          minBalance: 2000000000000, // 5 TestToken
+        }
+      ],
+    } as IMainnetWalletConfig;
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x70a08231": // balanceOf()
+          return "0x000000000000000000000000000000000000000000000000000000e8d4a51000"; // 1000000000000
+        default:
+          console.log("unknown call: ", payload);
+      }
+    });
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let error: FaucetError | null = null;
+    try {
+      await sessionManager.createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error).to.not.equal(null, "no exception thrown");
+    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
+    expect(error?.getCode()).to.equal("MAINNET_BALANCE_LIMIT", "unexpected error code");
+  });
+
 });
