@@ -278,6 +278,14 @@ modules:
 
     # require minimum number of transactions from mainnet wallet (nonce count)
     minTxCount: 5
+
+    # require minimal erc20 token balances on mainnet wallet
+    minErc20Balances: []
+      #- name: "TestToken"
+      #  address: "0x94373a4919B3240D86eA41593D5eBa789FEF3848" # WETH9 on holesky
+      #  decimals: 18
+      #  minBalance: 10000000000000000 # 0.01 WETH
+
   
   ## Recurring Limits module
   recurring-limits:
