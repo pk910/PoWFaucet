@@ -80,8 +80,8 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
   constructor(props: IFaucetPageProps, state: IFaucetPageState) {
     super(props);
 
-    let faucetApi = new FaucetApi(props.apiUrl);
     let baseUrl = props.baseUrl || "/";
+    let faucetApi = new FaucetApi(props.apiUrl || joinUrl(baseUrl, "/api"));
     this.pageContext = {
       faucetUrls: {
         baseUrl: baseUrl,
