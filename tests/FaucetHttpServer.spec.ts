@@ -198,4 +198,104 @@ describe("Faucet Web Server", () => {
     expect(!!errorResponse).equals(true, "no websocket error");
   });
 
+  it("check cors api call", async () => {
+    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
+    faucetConfig.buildSeoIndex = true;
+    faucetConfig.serverPort = 0;
+    faucetConfig.corsAllowOrigin = ["https://example.com", "https://example2.com"];
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    let listenPort = webServer.getListenPort();
+    let configOptionsRsp = await fetch(
+      "http://localhost:" + listenPort + "/api/getFaucetConfig", 
+      {
+        method: "OPTIONS",
+        headers: {
+          "Origin": "https://example.com"
+        }
+      }
+    )
+    expect(configOptionsRsp.headers.get("access-control-allow-origin")).equals("https://example.com", "access-control-allow-origin mismatch");
+    expect(configOptionsRsp.headers.get("access-control-allow-methods")).equals("GET, POST", "access-control-allow-methods mismatch");
+
+    let configRsp = await fetch(
+      "http://localhost:" + listenPort + "/api/getFaucetConfig", 
+      {
+        method: "GET",
+        headers: {
+          "Origin": "https://example2.com"
+        }
+      }
+    )
+    expect(configRsp.headers.get("access-control-allow-origin")).equals("https://example2.com", "access-control-allow-origin mismatch 2");
+    expect(configRsp.headers.get("access-control-allow-methods")).equals("GET, POST", "access-control-allow-methods mismatch 2");
+    let configData = await configRsp.json();
+    expect(!!configData).equals(true, "no api response");
+    expect((configData as any).faucetTitle).equals(faucetConfig.faucetTitle, "api response mismatch");
+  });
+
+  it("check cors api call (invalid origin)", async () => {
+    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
+    faucetConfig.buildSeoIndex = true;
+    faucetConfig.serverPort = 0;
+    faucetConfig.corsAllowOrigin = ["https://example.com"];
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    let listenPort = webServer.getListenPort();
+    let configOptionsRsp = await fetch(
+      "http://localhost:" + listenPort + "/api/getFaucetConfig", 
+      {
+        method: "OPTIONS",
+        headers: {
+          "Origin": "https://example2.com"
+        }
+      }
+    )
+    expect(configOptionsRsp.headers.get("access-control-allow-origin")).equals(null, "access-control-allow-origin mismatch");
+    expect(configOptionsRsp.headers.get("access-control-allow-methods")).equals(null, "access-control-allow-methods mismatch");
+  });
+
+  it("check cors resource calls", async () => {
+    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
+    faucetConfig.buildSeoIndex = true;
+    faucetConfig.serverPort = 0;
+    faucetConfig.corsAllowOrigin = ["https://example.com", "https://example2.com"];
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    let listenPort = webServer.getListenPort();
+
+    let checkResources = [
+      "/js/powfaucet.js",
+      "/css/powfaucet.css",
+    ];
+
+    for(let i = 0; i < checkResources.length; i++) {
+      let resource = checkResources[i];
+
+      let optionsRsp = await fetch(
+        "http://localhost:" + listenPort + resource, 
+        {
+          method: "OPTIONS",
+          headers: {
+            "Origin": "https://example.com"
+          }
+        }
+      )
+      expect(optionsRsp.headers.get("access-control-allow-origin")).equals("https://example.com", "access-control-allow-origin mismatch");
+      expect(optionsRsp.headers.get("access-control-allow-methods")).equals("GET, POST", "access-control-allow-methods mismatch");
+
+      let dataRsp = await fetch(
+        "http://localhost:" + listenPort + resource, 
+        {
+          method: "GET",
+          headers: {
+            "Origin": "https://example2.com"
+          }
+        }
+      )
+      expect(dataRsp.headers.get("access-control-allow-origin")).equals("https://example2.com", "access-control-allow-origin mismatch 2");
+      expect(dataRsp.headers.get("access-control-allow-methods")).equals("GET, POST", "access-control-allow-methods mismatch 2");
+    }
+  });
+
 });
