@@ -148,10 +148,11 @@ export class FaucetHttpServer {
 
   private getCorsHeaders(req: IncomingMessage): OutgoingHttpHeaders {
     let headers: OutgoingHttpHeaders = {};
-    if(faucetConfig.corsAllowOrigin.length > 0) {
+    let corsAllowOrigin = faucetConfig.corsAllowOrigin || [];
+    if(corsAllowOrigin.length > 0) {
       let rspAllowOrigin: string;
-      for(let i = 0; i < faucetConfig.corsAllowOrigin.length; i++) {
-        let allowOrigin = faucetConfig.corsAllowOrigin[i];
+      for(let i = 0; i < corsAllowOrigin.length; i++) {
+        let allowOrigin = corsAllowOrigin[i];
         if(allowOrigin == "*" || allowOrigin == req.headers.origin) {
           rspAllowOrigin = allowOrigin;
           break;
