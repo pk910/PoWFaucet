@@ -11,7 +11,7 @@ import { IncomingHttpHeaders, IncomingMessage } from 'http';
 import { PromiseDfd } from '../src/utils/PromiseDfd.js';
 import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
 import { ModuleManager } from '../src/modules/ModuleManager.js';
-import { faucetConfig } from '../src/config/FaucetConfig.js';
+import { faucetConfig, resolveRelativePath } from '../src/config/FaucetConfig.js';
 import { FaucetHttpResponse, FaucetHttpServer } from '../src/webserv/FaucetHttpServer.js';
 import { EthClaimManager } from '../src/eth/EthClaimManager.js';
 import { sha256 } from '../src/utils/CryptoUtils.js';
@@ -255,7 +255,7 @@ describe("Faucet Web Server", () => {
     expect(configOptionsRsp.headers.get("access-control-allow-methods")).equals(null, "access-control-allow-methods mismatch");
   });
 
-  it("check cors resource calls", async () => {
+  it("check cors resource calls", async function() {
     faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
     faucetConfig.buildSeoIndex = true;
     faucetConfig.serverPort = 0;
@@ -264,13 +264,25 @@ describe("Faucet Web Server", () => {
     webServer.initialize();
     let listenPort = webServer.getListenPort();
 
+    let staticPath = resolveRelativePath(faucetConfig.staticPath, process.cwd());
     let checkResources = [
       "/js/powfaucet.js",
       "/css/powfaucet.css",
     ];
 
+    // create dirs (might be missing if client hasn't been compiled)
+    [ "js", "css" ].forEach((dir) => {
+      let dirPath = path.join(staticPath, dir);
+      if(!fs.existsSync(dirPath))
+        fs.mkdirSync(dirPath);
+    })
+
     for(let i = 0; i < checkResources.length; i++) {
       let resource = checkResources[i];
+
+      let resourcePath = path.join(staticPath, resource);
+      if(!fs.existsSync(resourcePath))
+        fs.writeFileSync(resourcePath, "test");
 
       let optionsRsp = await fetch(
         "http://localhost:" + listenPort + resource, 
