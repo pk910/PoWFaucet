@@ -43,10 +43,14 @@ export class PromMetricsService {
 
   private async updateWalletBalance() {
     const ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    const balanceInWei = await ethWalletManager.getFaucetWalletBalance();
-    const balanceInEth = Web3.utils.fromWei(balanceInWei, 'ether');
-    this.balanceMetric.set(Number(balanceInEth));
-    console.log(`Updated balance for wallet: ${balanceInEth} ETH`);
+    try {
+      const balanceInWei = await ethWalletManager.getFaucetWalletBalance();
+      const balanceInEth = Web3.utils.fromWei(balanceInWei, 'ether');
+      this.balanceMetric.set(Number(balanceInEth));
+      console.log(`Updated balance for wallet: ${balanceInEth} ETH`);
+    } catch (e) {
+      console.warn(`Wallet balance wasn't updated. Reason: ${e.message}`);
+    }
   }
 
   public getWalletBalanceMetric() {
