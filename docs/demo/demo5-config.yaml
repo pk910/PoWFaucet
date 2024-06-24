@@ -121,6 +121,7 @@ modules:
     # captcha provider
     # hcaptcha:  HCaptcha (https://hcaptcha.com)
     # recaptcha: ReCAPTCHA (https://developers.google.com/recaptcha)
+    # turnstile: Turnstile (https://www.cloudflare.com/products/turnstile)
     provider: "hcaptcha"
 
     # captcha site key

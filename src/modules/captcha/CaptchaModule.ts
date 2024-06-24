@@ -77,6 +77,8 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
         return await this.verifyHCaptchaToken(token, remoteIp);
       case "recaptcha":
         return await this.verifyReCaptchaToken(token, remoteIp);
+      case "turnstile":
+        return await this.verifyTurnstileToken(token, remoteIp);
       case "custom":
         return await this.verifyCustomToken(token, remoteIp, variant);
       default:
@@ -96,6 +98,23 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
     verifyData.append("remoteip", remoteIp);
 
     let verifyRsp = await FetchUtil.fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: 'POST',
+      body: verifyData,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+    }).then((rsp) => rsp.json()) as any;
+
+    if(!verifyRsp || !verifyRsp.success)
+      return false;
+    return true;
+  }
+
+  private async verifyTurnstileToken(token: string, remoteIp: string): Promise<boolean> {
+    let verifyData = new URLSearchParams();
+    verifyData.append("secret", this.moduleConfig.secret);
+    verifyData.append("response", token);
+    verifyData.append("remoteip", remoteIp);
+
+    let verifyRsp = await FetchUtil.fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: 'POST',
       body: verifyData,
       headers: {'Content-Type': 'application/x-www-form-urlencoded'}

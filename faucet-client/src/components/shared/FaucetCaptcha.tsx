@@ -2,6 +2,7 @@ import { IFaucetConfig } from '../../common/FaucetConfig';
 import React from 'react';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import ReCAPTCHA from "react-google-recaptcha";
+import Turnstile from "react-turnstile";
 
 export interface IFaucetCaptchaProps {
   faucetConfig: IFaucetConfig;
@@ -33,6 +34,7 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
   private lastToken: string;
   private hcapControl: HCaptcha;
   private recapControl: ReCAPTCHA;
+  private turnstileWidgetId: string;
   private customControl: IFaucetCustomCaptcha;
 
   constructor(props: IFaucetCaptchaProps, state: IFaucetCaptchaState) {
@@ -56,6 +58,8 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
       this.hcapControl.resetCaptcha();
     if(this.recapControl)
       this.recapControl.reset();
+    if(this.turnstileWidgetId)
+      (window as any).turnstile.reset(this.turnstileWidgetId);
     if(this.customControl)
       this.customControl.reset();
   }
@@ -70,6 +74,10 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
     if(this.hcapControl) {
       this.hcapControl.removeCaptcha();
       this.hcapControl = null;
+    }
+    if(this.turnstileWidgetId) {
+      (window as any).turnstile.remove(this.turnstileWidgetId);
+      this.turnstileWidgetId = null;
     }
     if(this.customControl) {
       this.customControl.unmount();
@@ -88,6 +96,9 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
         break;
       case "recaptcha":
         captchaEl = this.renderReCaptcha();
+        break;
+      case "turnstile":
+        captchaEl = this.renderTurnstile();
         break;
       case "custom":
         captchaEl = this.renderCustomCaptcha();
@@ -117,6 +128,16 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
         sitekey={this.props.faucetConfig.modules.captcha.siteKey}
         onChange={(token) => this.onTokenChange(token)}
         ref={(cap) => this.recapControl = cap}
+      />
+    );
+  }
+
+  private renderTurnstile(): React.ReactElement {
+    return (
+      <Turnstile
+        sitekey={this.props.faucetConfig.modules.captcha.siteKey}
+        onVerify={(token) => this.onTokenChange(token)}
+        onLoad={(widgetId) => { this.turnstileWidgetId = widgetId; }}
       />
     );
   }
