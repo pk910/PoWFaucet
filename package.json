@@ -45,7 +45,7 @@
     "@types/node-static": "^0.7.11",
     "@types/randombytes": "^2.0.3",
     "@types/sinon": "^17.0.3",
-    "@types/uuid": "^9.0.8",
+    "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.10",
     "c8": "^10.0.0",
     "chai": "^5.1.0",
