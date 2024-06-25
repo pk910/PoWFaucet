@@ -73,7 +73,7 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
         }
         if(walletBalance < minBalance) {
           let factor = Math.pow(10, erc20Token.decimals || 18);
-          let amountStr = (Math.floor(parseInt(walletBalance.toString()) / factor * 1000) / 1000).toString();
+          let amountStr = (Math.floor(parseInt(minBalance.toString()) / factor * 1000) / 1000).toString();
           throw new FaucetError("MAINNET_BALANCE_LIMIT", "You need to hold at least " + amountStr + " " + erc20Token.name + " in your wallet on mainnet to use this faucet.");
         }
       }
