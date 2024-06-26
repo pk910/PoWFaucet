@@ -60,7 +60,7 @@ export interface IClientSessionStatus {
 }
 
 
-const FAUCETSTATUS_CACHE_TIME = 10;
+export const FAUCETSTATUS_CACHE_TIME = 10;
 
 export class FaucetWebApi {
   private apiEndpoints: {[endpoint: string]: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>} = {};
@@ -279,20 +279,10 @@ export class FaucetWebApi {
     try {
       await ServiceManager.GetService(EthClaimManager).createSessionClaim(sessionData, userInput);
     } catch(ex) {
-      if(ex instanceof FaucetError) {
-        return {
-          status: FaucetSessionStatus.FAILED,
-          failedCode: ex.getCode(),
-          failedReason: ex.message,
-        }
-      }
-      else {
-        console.error(ex, ex.stack);
-        return {
-          status: FaucetSessionStatus.FAILED,
-          failedCode: "INTERNAL_ERROR",
-          failedReason: ex.toString(),
-        }
+      return {
+        status: FaucetSessionStatus.FAILED,
+        failedCode: ex instanceof FaucetError ? ex.getCode() : "",
+        failedReason: ex.message,
       }
     }
 
@@ -308,9 +298,9 @@ export class FaucetWebApi {
       balance: sessionData.dropAmount,
       target: sessionData.targetAddr,
     };
-    if(sessionData.status === FaucetSessionStatus.FAILED) {
-      sessionStatus.failedCode = sessionData.data ? sessionData.data['failed.code'] : null;
-      sessionStatus.failedReason = sessionData.data ? sessionData.data['failed.reason'] : null;
+    if(sessionData.status === FaucetSessionStatus.FAILED && sessionData.data) {
+      sessionStatus.failedCode =  sessionData.data['failed.code'];
+      sessionStatus.failedReason = sessionData.data['failed.reason'];
     }
     if(sessionData.claim) {
       sessionStatus.claimIdx = sessionData.claim.claimIdx;

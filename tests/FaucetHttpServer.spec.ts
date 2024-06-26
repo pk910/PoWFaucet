@@ -15,6 +15,7 @@ import { faucetConfig, resolveRelativePath } from '../src/config/FaucetConfig.js
 import { FaucetHttpResponse, FaucetHttpServer } from '../src/webserv/FaucetHttpServer.js';
 import { EthClaimManager } from '../src/eth/EthClaimManager.js';
 import { sha256 } from '../src/utils/CryptoUtils.js';
+import { FaucetProcess } from '../src/common/FaucetProcess.js';
 
 describe("Faucet Web Server", () => {
   let globalStubs;
@@ -36,16 +37,39 @@ describe("Faucet Web Server", () => {
     faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
     faucetConfig.buildSeoIndex = true;
     faucetConfig.serverPort = 0;
+
+    let clientFile = path.join(faucetConfig.staticPath, "js", "powfaucet.js");
+    let oldClientFile;
+    if(!fs.existsSync(path.join(faucetConfig.staticPath, "js")))
+      fs.mkdirSync(path.join(faucetConfig.staticPath, "js"));
+    if(fs.existsSync(clientFile)) {
+      oldClientFile = fs.readFileSync(clientFile, "utf8");
+    }
+    fs.writeFileSync(clientFile, '/* @pow-faucet-client: {"version":"0.0.0","build":1337} */');
+
     let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
     webServer.initialize();
     let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
     expect(fs.existsSync(seoFile), "seo file not found");
     let seoContent = fs.readFileSync(seoFile, "utf8");
     expect(seoContent).contains(faucetConfig.faucetTitle, "uncustomized seo index");
+
+    // drop & check re-generation after config refresh
+    fs.unlinkSync(seoFile);
+    ServiceManager.GetService(FaucetProcess).emit("reload");
+    expect(fs.existsSync(seoFile), "seo file not found after refresh");
+
+    if(oldClientFile) {
+      fs.writeFileSync(clientFile, oldClientFile);
+    }
   });
 
   it("check basic http call", async () => {
     faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
+    faucetConfig.buildSeoMeta = {
+      "test1": "1234567890"
+    };
     faucetConfig.buildSeoIndex = true;
     faucetConfig.serverPort = 0;
     let webServer = ServiceManager.GetService(FaucetHttpServer);
@@ -53,6 +77,20 @@ describe("Faucet Web Server", () => {
     let listenPort = webServer.getListenPort();
     let indexData = await fetch("http://localhost:" + listenPort, {method: "GET"}).then((rsp) => rsp.text());
     expect(indexData).contains(faucetConfig.faucetTitle, "not index contents");
+  });
+
+  it("check basic http call (without SEO index)", async () => {
+    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
+    faucetConfig.buildSeoIndex = false;
+    faucetConfig.serverPort = 0;
+    let seoFile = path.join(faucetConfig.staticPath, "index.seo.html");
+    if(fs.existsSync(seoFile))
+      fs.unlinkSync(seoFile);
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    let listenPort = webServer.getListenPort();
+    let indexData = await fetch("http://localhost:" + listenPort, {method: "GET"}).then((rsp) => rsp.text());
+    expect(indexData).contains("<!-- pow-faucet-header -->", "not index contents");
   });
 
   it("check api call (GET)", async () => {
@@ -153,6 +191,20 @@ describe("Faucet Web Server", () => {
     let testRsp = await fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
     expect(testRsp.status).to.equal(500, "unexpected http response code");
     expect(testRsp.statusText).to.matches(/Test Error 4267/, "unexpected http response code");
+  });
+
+  it("check api call (unexpected error)", async () => {
+    faucetConfig.buildSeoIndex = false;
+    faucetConfig.serverPort = 0;
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    ServiceManager.GetService(FaucetWebApi).registerApiEndpoint("testEndpoint", async (req, url, body) => {
+      throw "unexpected error";
+    });
+    let listenPort = webServer.getListenPort();
+    let testRsp = await fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
+    expect(testRsp.status).to.equal(500, "unexpected http response code");
+    expect(testRsp.statusText).to.matches(/Internal Server Error/, "unexpected http response code");
   });
 
   it("check ws call", async () => {
