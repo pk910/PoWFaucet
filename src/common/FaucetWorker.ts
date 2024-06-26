@@ -1,10 +1,17 @@
 
-import { Worker, parentPort, workerData } from "node:worker_threads";
+import { MessagePort, Worker, parentPort, workerData } from "node:worker_threads";
 import { DatabaseWorker } from "../db/DatabaseWorker.js";
 import { PoWValidatorWorker } from "../modules/pow/validator/PoWValidatorWorker.js";
 import { ZupassWorker } from "../modules/zupass/ZupassWorker.js";
 
+class TestWorker {
+  constructor(port: MessagePort) {
+    port.postMessage({ action: "test" })
+  }
+}
+
 const WORKER_CLASSES = {
+  "test": TestWorker,
   "database": DatabaseWorker,
   "pow-validator": PoWValidatorWorker,
   "zupass-worker": ZupassWorker,
@@ -37,7 +44,7 @@ export class FaucetWorkers {
     let worker = new Worker(this.workerSrc, {
       workerData: {
         classKey: classKey,
-      } as IFaucetWorkerData
+      } as IFaucetWorkerData,
     });
     return worker;
   }

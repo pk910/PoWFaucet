@@ -33,7 +33,7 @@ export function bindTestStubs(stubs?) {
       let worker: Worker = channel.port1 as any;
       worker.terminate = () => Promise.resolve(0);
       setTimeout(() => {
-        FaucetWorkers.loadWorkerClass(classKey, channel.port2);
+        FaucetWorkers.loadWorkerClass(classKey, channel.port2 as any);
       }, 1);
       return worker;
     }),

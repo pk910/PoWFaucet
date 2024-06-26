@@ -8,7 +8,7 @@ import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
 import { IConfigSchema } from './ConfigSchema.js';
 import { getDefaultConfig } from './DefaultConfig.js';
 
-let cliArgs = (function() {
+export let cliArgs = (function() {
   let args = {};
   let arg, key;
   for(let i = 0; i < process.argv.length; i++) {
@@ -26,35 +26,39 @@ let cliArgs = (function() {
 
 
 let internalBasePath = path.join(".");
-let basePath: string;
-if(cliArgs['datadir']) {
-  basePath = cliArgs['datadir'];
-  if(!path.isAbsolute(basePath))
-    basePath = resolveRelativePath(basePath, process.cwd());
-}
-else
-  basePath = process.cwd();
-
-
-export let faucetConfigFile: string;
-if(cliArgs['config']) {
-  if(path.isAbsolute(cliArgs['config']))
-    faucetConfigFile = cliArgs['config'];
-  else
-    faucetConfigFile = path.join(basePath, cliArgs['config']);
-}
-else
-  faucetConfigFile = path.join(basePath, "faucet-config.yaml");
-
 export let faucetConfig: IConfigSchema = null;
+
+export function getAppDataDir(): string {
+  let datadir: string;
+
+  if(cliArgs['datadir']) {
+    datadir = cliArgs['datadir'];
+    if(!path.isAbsolute(datadir))
+      datadir = resolveRelativePath(datadir, process.cwd());
+  }
+  else
+    datadir = process.cwd();
+
+  return datadir;
+}
 
 export function setAppBasePath(basePath: string) {
   internalBasePath = basePath;
 }
 
 export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
+  let datadir = getAppDataDir();
   let config: IConfigSchema;
-  let configFile = faucetConfigFile;
+  let configFile: string;
+
+  if(cliArgs['config']) {
+    if(path.isAbsolute(cliArgs['config']))
+      configFile = cliArgs['config'];
+    else
+      configFile = path.join(datadir, cliArgs['config']);
+  }
+  else
+    configFile = path.join(datadir, "faucet-config.yaml");
 
   let faucetVersion: string;
   if(typeof POWFAUCET_VERSION !== "undefined") {
@@ -75,7 +79,7 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     exampleYamlSrc = exampleYamlSrc.replace(/^faucetSecret:.*$/m, 'faucetSecret: "' + randomBytes(40).toString("hex") + '"');
 
     fs.writeFileSync(configFile, exampleYamlSrc);
-    console.log("Created default config at " + configFile);
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Created default config at " + configFile);
   }
   if(cliArgs['create-config']) {
     process.exit(0);
@@ -108,7 +112,7 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   if(!faucetConfig)
     faucetConfig = {} as any;
   Object.assign(faucetConfig, getDefaultConfig(), config, {
-    appBasePath: basePath,
+    appBasePath: datadir,
     faucetVersion: faucetVersion,
   } as any);
 }
@@ -116,12 +120,12 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
 export function resolveRelativePath(inputPath: string, customBasePath?: string): string {
   if(!inputPath || typeof inputPath !== "string" || inputPath === ":memory:")
     return inputPath;
+
   let outputPath: string = inputPath;
-  if(!customBasePath)
-    customBasePath = basePath;
   if(inputPath.match(/^~app\//))
     outputPath = path.join(internalBasePath, inputPath.replace(/^~app\//, ""));
   else if(!path.isAbsolute(inputPath))
-    outputPath = path.join(customBasePath, inputPath);
+    outputPath = path.join(customBasePath || getAppDataDir(), inputPath);
+
   return outputPath;
 }
