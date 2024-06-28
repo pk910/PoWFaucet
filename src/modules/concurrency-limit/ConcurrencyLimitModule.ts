@@ -5,6 +5,7 @@ import { ModuleHookAction } from "../ModuleManager.js";
 import { defaultConfig, IConcurrencyLimitConfig } from './ConcurrencyLimitConfig.js';
 import { FaucetError } from '../../common/FaucetError.js';
 import { SessionManager } from "../../session/SessionManager.js";
+import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 
 export class ConcurrencyLimitModule extends BaseModule<IConcurrencyLimitConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -37,11 +38,20 @@ export class ConcurrencyLimitModule extends BaseModule<IConcurrencyLimitConfig> 
 
     const activeSessions = ServiceManager.GetService(SessionManager).getActiveSessions();
 
-    const sessCount = activeSessions.filter((sess) => {
+    const sessionsFromTheSameUser = activeSessions.filter((sess) => {
       return sess !== session && (sess.getRemoteIP() === session.getRemoteIP() || sess.getTargetAddr() === session.getTargetAddr() || sess.getUserId() === session.getUserId())
-    }).length;
+    });
+
+    const sessCount = sessionsFromTheSameUser.length;
 
     if(sessCount >= this.moduleConfig.concurrencyLimit) {
+      const sessionsFromTheSameUserData = sessionsFromTheSameUser.map((s => ({
+        ip: s.getRemoteIP(),
+        addr: s.getTargetAddr(),
+        userId: s.getUserId()
+      })))
+
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, `Concurrency limit met. IP ${session.getRemoteIP()}, address: ${session.getTargetAddr()}, userId: ${session.getUserId()}. Active sessions: ${JSON.stringify(sessionsFromTheSameUserData)}`);
       throw new FaucetError(
         "CONCURRENCY_LIMIT",
           "Only " + this.moduleConfig.concurrencyLimit + " concurrent sessions allowed per user",
