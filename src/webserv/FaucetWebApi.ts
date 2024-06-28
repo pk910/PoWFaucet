@@ -160,9 +160,15 @@ export class FaucetWebApi {
       if(clientIpIdx < 0)
         clientIpIdx = 0;
       remoteAddr = proxyChain[clientIpIdx];
+
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `[getRemoteAddr] x-forwarded-for: ${req.headers['x-forwarded-for']}` );
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `[getRemoteAddr] x-forwarded-for, remoteAddr: ${remoteAddr}` );
     }
-    if(!remoteAddr)
+    if(!remoteAddr) {
       remoteAddr = req.socket.remoteAddress;
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `[getRemoteAddr] remoteAddr taken from socket: ${remoteAddr}` );
+    }
+
     return remoteAddr;
   }
 
