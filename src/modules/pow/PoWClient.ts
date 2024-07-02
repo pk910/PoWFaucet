@@ -175,7 +175,7 @@ export class PoWClient {
     let lastNonce = this.session.lastNonce;
     for(let i = 0; i < shareData.nonces.length; i++) {
       if(shareData.nonces[i] <= lastNonce)
-        return this.sendErrorResponse("INVALID_SHARE", "Nonce too low", message);
+        return this.sendErrorResponse("INVALID_SHARE", "Nonce too low", `${JSON.stringify(message)}, session.lastNonce: ${lastNonce}, shareData.nonces[i]: ${shareData.nonces[i]}`);
       lastNonce = shareData.nonces[i];
     }
     this.session.lastNonce = lastNonce;
