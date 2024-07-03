@@ -359,7 +359,9 @@ export class FaucetDatabase {
     const whereSql: string[] = ["UserId = ?"];
     const whereArgs: any[] = [userId, now - timeout];
 
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani 11: before select")
     const finishedSessions = await this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claiming','finished')", whereArgs, true);
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani 12: after select")
     if (!finishedSessions || !finishedSessions.length) {
       return null;
     }
