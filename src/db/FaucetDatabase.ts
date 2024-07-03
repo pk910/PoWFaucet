@@ -286,6 +286,8 @@ export class FaucetDatabase {
       " ",
       selectSql
     ].join("");
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani 13: before db.all");
+    let now = Date.now();
     const rows = await this.db.all(sql, args) as {
       SessionId: string;
       Status: string;
@@ -298,6 +300,8 @@ export class FaucetDatabase {
       Data: string;
       ClaimData: string;
     }[];
+    let newNow = Date.now() - now;
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani 14: after db.all:" + newNow);
 
     if(rows.length === 0)
       return [];
@@ -359,9 +363,9 @@ export class FaucetDatabase {
     const whereSql: string[] = ["UserId = ?"];
     const whereArgs: any[] = [userId, now - timeout];
 
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani 11: before select")
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani 11: before select:" + userId)
     const finishedSessions = await this.selectSessions("(" + whereSql.join(" OR ") + ") AND StartTime > ? AND Status IN ('claiming','finished')", whereArgs, true);
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani 12: after select")
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani 12: after select:" + userId)
     if (!finishedSessions || !finishedSessions.length) {
       return null;
     }
