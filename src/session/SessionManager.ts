@@ -79,11 +79,12 @@ export class SessionManager {
     addr: string;
     userId: string;
   }): Promise<FaucetSession> {
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani: creating new session for " + remoteIP);
+    let info = (action: string, additional?: string) => `${action} new session for IP: ${remoteIP}; UserId: ${userInput.userId}; ${additional ? `${additional}` : ''}`;
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, info("Creating"));
     let session = new FaucetSession(this);
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "nani: start session for " + remoteIP);
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, info("Starting"));
     await session.startSession(remoteIP, userInput);
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "New session for " + session.getTargetAddr() + " (IP: " + session.getRemoteIP() + ", ID: " + session.getSessionId() + ")");
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, info("Started", `Target address: ${session.getTargetAddr()}; SessionId: ${session.getSessionId()}`));
     return session;
   }
 
