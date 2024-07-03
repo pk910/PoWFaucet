@@ -98,8 +98,6 @@ export class FaucetWebApi {
       return new FaucetHttpResponse(403, "Access denied");
     }
 
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `nani 1: endpoint: ${endpoint}` );
-
     switch (endpoint.toLowerCase()) {
       case "getVersion".toLowerCase():
         return this.onGetVersion();
@@ -248,7 +246,6 @@ export class FaucetWebApi {
   }
 
   public async onCheckUserLimits(req: IncomingMessage, userId: string): Promise<any> {
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `nani 2: method: ${req.method}, userId: ${userId}` );
     if(req.method !== "GET")
       return new FaucetHttpResponse(405, "Method Not Allowed");
 
@@ -256,11 +253,8 @@ export class FaucetWebApi {
       return new FaucetHttpResponse(500, "userId is missing");
     }
 
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `nani 3: get module manager` )
     const moduleManager = ServiceManager.GetService(ModuleManager);
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `nani 4: await get time to new session start` )
     const time = await moduleManager.getModule<RecurringLimitsModule>("recurring-limits")?.getTimeToNewSessionStart(userId);
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `nani 5: return time` )
     return time ? {
       allowed: false,
       canBeStartedAt: time

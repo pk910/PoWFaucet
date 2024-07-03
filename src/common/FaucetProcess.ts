@@ -107,4 +107,21 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
       console.log(logLine);
   }
 
+  // No writing to the log file
+  public emitLogTime(level: FaucetLogLevel, timeName: string) {
+    if(level === FaucetLogLevel.HIDDEN)
+      return;
+
+    if(!this.hideLogOutput)
+      console.time(timeName);
+  }
+
+  public emitLogTimeEnd(level: FaucetLogLevel, timeName: string) {
+    if(level === FaucetLogLevel.HIDDEN)
+      return;
+
+    if(!this.hideLogOutput)
+      console.timeEnd(timeName);
+  }
+
 }
