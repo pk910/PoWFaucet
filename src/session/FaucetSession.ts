@@ -118,8 +118,10 @@ export class FaucetSession {
         }},
       ], ModuleHookAction.SessionStart, [this, userInput]);
     } catch(ex) {
-      if(ex instanceof FaucetError) 
+      if(ex instanceof FaucetError) {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `[PROCESS_ACTIONS_HOOKS_ERROR]: FaucetError. Exception code: ${ex.getCode()}; UserId: ${userInput.userId}`);
         await this.setSessionFailed(ex.getCode(), ex.message);
+      }
       else
         await this.setSessionFailed("INTERNAL_ERROR", "sessionStart failed: " + ex.toString());
       throw ex;
