@@ -81,8 +81,10 @@ export class FaucetSession {
   }
 
   public async startSession(remoteIP: string, userInput: ISessionStartUserInput): Promise<void> {
-    if(this.status !== FaucetSessionStatus.UNKNOWN)
+    if(this.status !== FaucetSessionStatus.UNKNOWN) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `[INVALID_STATE]: Cannot start session: session already in ${this.status} state; IP: ${remoteIP}; UserId: ${userInput.userId}`);
       throw new FaucetError("INVALID_STATE", "cannot start session: session already in '" + this.status + "' state");
+    }
     this.status = FaucetSessionStatus.STARTING;
     this.sessionId = getNewGuid();
     this.startTime = Math.floor((new Date()).getTime() / 1000);
@@ -97,21 +99,26 @@ export class FaucetSession {
         {prio: 1, hook: () => { // prio 1: check if faucet is in maintenance mode
           if(faucetConfig.denyNewSessions) {
             const denyMessage = typeof faucetConfig.denyNewSessions === "string" ? faucetConfig.denyNewSessions : "The faucet is currently not allowing new sessions";
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `[FAUCET_DISABLED]: ${denyMessage}; IP: ${remoteIP}; UserId: ${userInput.userId}`);
             throw new FaucetError("FAUCET_DISABLED", denyMessage);
           }
         }},
         {prio: 5, hook: () => { // prio 5: get target address from userInput if not set provided by a module
           const targetAddr = this.targetAddr || userInput.addr;
-          if(typeof targetAddr !== "string")
+          if(typeof targetAddr !== "string") {
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `[INVALID_ADDR]: Missing target address; IP: ${remoteIP}; UserId: ${userInput.userId}`);
             throw new FaucetError("INVALID_ADDR", "Missing target address.");
-          if(!targetAddr.match(/^0x[0-9a-fA-F]{40}$/) || targetAddr.match(/^0x0{40}$/i))
+          }
+          if(!targetAddr.match(/^0x[0-9a-fA-F]{40}$/) || targetAddr.match(/^0x0{40}$/i)) {
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `[INVALID_ADDR]: Invalid target address: ${targetAddr}; IP: ${remoteIP}; UserId: ${userInput.userId}`);
             throw new FaucetError("INVALID_ADDR", "Invalid target address: " + targetAddr);
+          }
           if(!this.targetAddr)
             this.setTargetAddr(targetAddr);
         }},
       ], ModuleHookAction.SessionStart, [this, userInput]);
     } catch(ex) {
-      if(ex instanceof FaucetError)
+      if(ex instanceof FaucetError) 
         await this.setSessionFailed(ex.getCode(), ex.message);
       else
         await this.setSessionFailed("INTERNAL_ERROR", "sessionStart failed: " + ex.toString());
