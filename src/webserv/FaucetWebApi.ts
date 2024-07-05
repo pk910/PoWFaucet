@@ -216,7 +216,7 @@ export class FaucetWebApi {
       session = await ServiceManager.GetService(SessionManager).createSession(this.getRemoteAddr(req), userInput);
       if(session.getSessionStatus() === FaucetSessionStatus.FAILED) {
         let failedCode = session.getSessionData("failed.code");
-        ServiceManager.GetService(FaucetProcess).emitLogTime(FaucetLogLevel.INFO, `[FaucetWebApi.onStartSession]: Session status failed: ${failedCode}; UserId: ${userInput.userId}`);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `[FaucetWebApi.onStartSession]: Session status failed: ${failedCode}; UserId: ${userInput.userId}`);
 
         return {
           status: FaucetSessionStatus.FAILED,
@@ -231,7 +231,7 @@ export class FaucetWebApi {
     } catch(ex) {
       if(ex instanceof FaucetError) {
         let failedCode = ex.getCode();
-        ServiceManager.GetService(FaucetProcess).emitLogTime(FaucetLogLevel.INFO, `[FaucetWebApi.onStartSession]: Failed getting session info: ${failedCode}; UserId: ${userInput.userId}`);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `[FaucetWebApi.onStartSession]: Failed getting session info: ${failedCode}; UserId: ${userInput.userId}`);
 
         return {
           status: FaucetSessionStatus.FAILED,
@@ -284,7 +284,7 @@ export class FaucetWebApi {
     } catch(ex) {
       if(ex instanceof FaucetError) {
         let failedCode = ex.getCode();
-        ServiceManager.GetService(FaucetProcess).emitLogTime(FaucetLogLevel.INFO, `[FaucetWebApi.onGetSession]: Failed getting session info: ${failedCode}; sessionId: ${sessionId}`);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `[FaucetWebApi.onGetSession]: Failed getting session info: ${failedCode}; sessionId: ${sessionId}`);
         return {
           status: FaucetSessionStatus.FAILED,
           failedCode,
@@ -322,7 +322,7 @@ export class FaucetWebApi {
     } catch(ex) {
       if(ex instanceof FaucetError) {
         let failedCode = ex.getCode();
-        ServiceManager.GetService(FaucetProcess).emitLogTime(FaucetLogLevel.INFO, `[FaucetWebApi.onClaimReward]: Got FaucetError: ${failedCode}; UserId: ${userInput.userId}`);
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `[FaucetWebApi.onClaimReward]: Got FaucetError: ${failedCode}; UserId: ${userInput.userId}`);
 
         return {
           status: FaucetSessionStatus.FAILED,
