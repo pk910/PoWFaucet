@@ -83,6 +83,8 @@ describe("Faucet module: passport", () => {
       boostFactor: {
         2: 4,
       },
+      skipHostingCheckScore: 2,
+      skipProxyCheckScore: 2,
     } as any;
     globalStubs["fetch"].returns(returnDelayedPromise(true, {
       json: () => Promise.resolve((testData as any).testPassport1Rsp)
@@ -102,6 +104,41 @@ describe("Faucet module: passport", () => {
     expect(passportScore?.factor).to.equal(4, "unexpected passport factor");
     let clientInfo = await testSession.getSessionInfo();
     expect(!!(clientInfo.modules as any)["passport"]).to.equal(false, "unexpected passport info in client session info");
+    expect(testSession.getSessionData("ipinfo.override_hosting")).to.equal(false, "unexpected ipinfo.override_hosting value");
+    expect(testSession.getSessionData("ipinfo.override_proxy")).to.equal(false, "unexpected ipinfo.override_proxy value");
+  });
+
+  it("Start session with too low passport score", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+      requireMinScore: 4,
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve((testData as any).testPassport1Rsp)
+    }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+
+    let error;
+    try {
+      await sessionManager.createSession("::ffff:8.8.8.8", {
+        addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
+      });
+    } catch(ex) {
+      error = ex;
+    }
+
+    expect(!!error).to.equal(true, "no error thrown");
+    expect(error.code).to.equal("PASSPORT_SCORE", "unexpected error code");
   });
 
   it("Start session with passport api error", async () => {
@@ -210,6 +247,127 @@ describe("Faucet module: passport", () => {
     expect(passportDetailsRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
     expect(!!passportDetailsRsp.error).to.equal(true, "no error returned");
     expect(passportDetailsRsp.code).to.equal("INVALID_SESSION", "unexpected error code");
+  });
+
+  it("Get passport details for session without passport", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test", 1);
+    });
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x1eA692E68a7765dE26FC03A6D74EE5B56A7e2b4d",
+    });
+    expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+    testSession.setSessionData("passport.data", null);
+    
+    let passportDetailsRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/getPassportInfo?session=" + testSession.getSessionId(),
+    } as any, undefined);
+    expect(passportDetailsRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(!!passportDetailsRsp.error).to.equal(true, "no error returned");
+    expect(passportDetailsRsp.code).to.equal("INVALID_PASSPORT", "unexpected error code");
+  });
+
+  it("Get passport details for address (disabled)", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test", 1);
+    });
+    
+    let passportDetailsRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/getPassportInfo?address=0x332E43696A505EF45b9319973785F837ce5267b9",
+    } as any, undefined);
+    expect(passportDetailsRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(!!passportDetailsRsp.error).to.equal(true, "no error returned");
+    expect(passportDetailsRsp.code).to.equal("NOT_ALLOWED", "unexpected error code");
+  });
+
+  it("Get passport details for address (invalid address)", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      allowGuestRefresh: true,
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test", 1);
+    });
+    
+    let passportDetailsRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/getPassportInfo?address=0x332E43696A505EF45b9319973785F837ce5267xx",
+    } as any, undefined);
+    expect(passportDetailsRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(!!passportDetailsRsp.error).to.equal(true, "no error returned");
+    expect(passportDetailsRsp.code).to.equal("INVALID_ADDRESS", "unexpected error code");
+  });
+
+  it("Get passport details for address (valid)", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      allowGuestRefresh: true,
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve((testData as any).testPassport1Rsp)
+    }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test", 1);
+    });
+    
+    let passportDetailsRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/getPassportInfo?address=0x332E43696A505EF45b9319973785F837ce5267b9",
+    } as any, undefined);
+    expect(passportDetailsRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(passportDetailsRsp.passport).to.equal(null, "unexpected response");
   });
 
   it("Refresh passport details for unknown session", async () => {
@@ -695,6 +853,99 @@ describe("Faucet module: passport", () => {
     expect(passportRefreshRsp.errors[0]).to.match(/integrity check failed/, "unexpected verification error returned");
     expect(passportRefreshRsp.errors[1]).to.match(/integrity check failed/, "unexpected verification error returned");
     expect(passportRefreshRsp.errors[2]).to.match(/integrity check failed/, "unexpected verification error returned");
+  });
+
+  it("Refresh passport without session (disabled)", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      refreshCooldown: 0,
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let passportRefreshRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/refreshPassport?address=0x332E43696A505EF45b9319973785F837ce5267b9",
+    } as any, undefined);
+    expect(passportRefreshRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(!!passportRefreshRsp.error).to.equal(true, "no error returned");
+    expect(passportRefreshRsp.code).to.equal("NOT_ALLOWED", "unexpected error code returned");
+    expect(passportRefreshRsp.error).to.match(/not allowed without active session/, "unexpected error returned");
+  });
+
+  it("Refresh passport without session (invalid address)", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      refreshCooldown: 0,
+      allowGuestRefresh: true,
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let passportRefreshRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/refreshPassport?address=0x332E43696A505EF45b9319973785F837ce5267xx",
+    } as any, undefined);
+    expect(passportRefreshRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(!!passportRefreshRsp.error).to.equal(true, "no error returned");
+    expect(passportRefreshRsp.code).to.equal("INVALID_ADDRESS", "unexpected error code returned");
+    expect(passportRefreshRsp.error).to.match(/Invalid address/, "unexpected error returned");
+  });
+
+  it("Refresh passport without session (cooldown)", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      refreshCooldown: 0,
+      allowGuestRefresh: true,
+      guestRefreshCooldown: 10,
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve((testData as any).testPassport1Rsp)
+    }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let passportRefreshRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/refreshPassport?address=0x332E43696A505EF45b9319973785F837ce5267b9",
+    } as any, undefined);
+    expect(passportRefreshRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(passportRefreshRsp.passport?.found).to.equal(true, "no passport details returned in refresh result");
+    expect(passportRefreshRsp.score.score).to.equal(2, "unexpected passport score in refresh result");
+    expect(passportRefreshRsp.score.factor).to.equal(4, "unexpected passport factor in refresh result");
+
+    let passportRefreshRsp2 = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/refreshPassport?address=0x332E43696A505EF45b9319973785F837ce5267b9",
+    } as any, undefined);
+    expect(passportRefreshRsp2 instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(!!passportRefreshRsp2.error).to.equal(true, "no error returned");
+    expect(passportRefreshRsp2.code).to.equal("REFRESH_COOLDOWN", "unexpected error code returned");
+    expect(passportRefreshRsp2.error).to.match(/has been refreshed recently/, "unexpected error returned");
+
   });
 
 });
