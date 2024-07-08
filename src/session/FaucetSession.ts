@@ -56,6 +56,8 @@ export interface ISessionStartUserInput {
   userId: string;
 }
 
+const sessionRestrictionsErorrs = ['BALANCE_LIMIT', 'RECURRING_LIMIT', 'CONCURRENCY_LIMIT'];
+
 export class FaucetSession {
   private manager: SessionManager;
   private status: FaucetSessionStatus;
@@ -119,11 +121,19 @@ export class FaucetSession {
       ], ModuleHookAction.SessionStart, [this, userInput]);
     } catch(ex) {
       if(ex instanceof FaucetError) {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `[PROCESS_ACTIONS_HOOKS_ERROR]: FaucetError. Exception code: ${ex.getCode()}; UserId: ${userInput.userId}`);
-        await this.setSessionFailed(ex.getCode(), ex.message);
+        const code = ex.getCode();
+
+        if (!sessionRestrictionsErorrs.includes(code)) {
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `[SessionStart]: FaucetError. Exception code: ${code}; UserId: ${userInput.userId}`);
+        }
+
+        await this.setSessionFailed(code, ex.message);
       }
-      else
+      else {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, `[SessionStart]: FaucetError ${ex.toString()}. Exception code: INTERNAL_ERROR; UserId: ${userInput.userId}`);
         await this.setSessionFailed("INTERNAL_ERROR", "sessionStart failed: " + ex.toString());
+      }
+        
       throw ex;
     }
 
