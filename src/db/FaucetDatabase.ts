@@ -204,6 +204,10 @@ export class FaucetDatabase {
           [FaucetDbDriver.SQLITE]: `ALTER TABLE Sessions ADD UserId TEXT;`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD UserId TEXT;`,
         }));
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX UserIdIdx ON Sessions (UserId ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX UserIdIdx (UserId);`,
+        }));
       }
     }
     if(schemaVersion !== oldVersion) {
