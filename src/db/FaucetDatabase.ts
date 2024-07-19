@@ -182,19 +182,19 @@ export class FaucetDatabase {
             );`,
         }));
         await this.db.exec(SQL.driverSql({
-          [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsTimeIdx ON Sessions (StartTime	ASC);`,
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX IF NOT EXISTS SessionsTimeIdx ON Sessions (StartTime	ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsTimeIdx (StartTime);`,
         }));
         await this.db.exec(SQL.driverSql({
-          [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsStatusIdx ON Sessions (Status	ASC);`,
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX IF NOT EXISTS SessionsStatusIdx ON Sessions (Status	ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsStatusIdx (Status);`,
         }));
         await this.db.exec(SQL.driverSql({
-          [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsTargetAddrIdx ON Sessions (TargetAddr	ASC, StartTime	ASC);`,
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX IF NOT EXISTS SessionsTargetAddrIdx ON Sessions (TargetAddr	ASC, StartTime	ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsTargetAddrIdx (TargetAddr, StartTime);`,
         }));
         await this.db.exec(SQL.driverSql({
-          [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsRemoteIPIdx ON Sessions (RemoteIP	ASC, StartTime	ASC);`,
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX IF NOT EXISTS SessionsRemoteIPIdx ON Sessions (RemoteIP	ASC, StartTime	ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsRemoteIPIdx (RemoteIP, StartTime);`,
         }));
       }
@@ -208,7 +208,7 @@ export class FaucetDatabase {
       case 2: { // upgrade to version 3
         schemaVersion = 3;
         await this.db.exec(SQL.driverSql({
-          [FaucetDbDriver.SQLITE]: `CREATE INDEX UserIdIdx ON Sessions (UserId ASC);`,
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX IF NOT EXISTS UserIdIdx ON Sessions (UserId ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX UserIdIdx (UserId);`,
         }));
       }
@@ -293,8 +293,6 @@ export class FaucetDatabase {
       " ",
       selectSql
     ].join("");
-    const timeEndName = `SQL query in FaucetDatabase.selectSessionsSql`;
-    ServiceManager.GetService(FaucetProcess).emitLogTime(FaucetLogLevel.INFO, timeEndName);
     const rows = await this.db.all(sql, args) as {
       SessionId: string;
       Status: string;
@@ -307,7 +305,6 @@ export class FaucetDatabase {
       Data: string;
       ClaimData: string;
     }[];
-    ServiceManager.GetService(FaucetProcess).emitLogTimeEnd(FaucetLogLevel.INFO, timeEndName);
 
     if(rows.length === 0)
       return [];
