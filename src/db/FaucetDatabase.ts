@@ -209,7 +209,7 @@ export class FaucetDatabase {
         schemaVersion = 3;
         await this.db.exec(SQL.driverSql({
           [FaucetDbDriver.SQLITE]: `CREATE INDEX IF NOT EXISTS UserIdIdx ON Sessions (UserId ASC);`,
-          [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX UserIdIdx (UserId);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX UserIdIdx (UserId(255));`,
         }));
       }
     }
