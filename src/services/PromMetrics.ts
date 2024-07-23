@@ -1,4 +1,4 @@
-import client from 'prom-client';
+import client from "prom-client";
 import Web3 from "web3";
 import { EthWalletManager } from "../eth/EthWalletManager.js";
 import { ServiceManager } from "../common/ServiceManager.js";
@@ -11,8 +11,7 @@ export class PromMetricsService {
   balanceMetric: client.Gauge;
 
   public initialize() {
-    if(this.initialized)
-      return;
+    if (this.initialized) return;
     this.initialized = true;
 
     // Initialize Prometheus metrics
@@ -20,8 +19,8 @@ export class PromMetricsService {
     client.collectDefaultMetrics({ register: this.register });
 
     this.balanceMetric = new client.Gauge({
-      name: 'wallet_balance',
-      help: 'Wallet balance in ETH',
+      name: "wallet_balance",
+      help: "Wallet balance in ETH",
     });
 
     // Add custom metric to the register
@@ -30,22 +29,24 @@ export class PromMetricsService {
     void this.updateWalletBalance();
 
     // Update balance every 60 minutes
-    this.intervalID = setInterval(() => this.updateWalletBalance(), 60 * 60 * 1000);
+    this.intervalID = setInterval(
+      () => this.updateWalletBalance(),
+      60 * 60 * 1000
+    );
   }
 
   public dispose() {
-    if(!this.initialized)
-      return;
+    if (!this.initialized) return;
     this.initialized = false;
 
     clearTimeout(this.intervalID);
   }
 
   private async updateWalletBalance() {
-    const ethWalletManager = ServiceManager.GetService(EthWalletManager);
     try {
+      const ethWalletManager = ServiceManager.GetService(EthWalletManager);
       const balanceInWei = await ethWalletManager.getFaucetWalletBalance();
-      const balanceInEth = Web3.utils.fromWei(balanceInWei, 'ether');
+      const balanceInEth = Web3.utils.fromWei(balanceInWei, "ether");
       this.balanceMetric.set(Number(balanceInEth));
       console.log(`Updated balance for wallet: ${balanceInEth} ETH`);
     } catch (e) {
