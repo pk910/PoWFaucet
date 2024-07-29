@@ -1,7 +1,8 @@
 import { IBaseModuleConfig } from "../BaseModule.js";
 
 export interface IConcurrencyLimitConfig extends IBaseModuleConfig {
-  concurrencyLimit: number;
+  concurrencyLimitByIP: number;
+  concurrencyLimitByUserAndTargetAddress: number;
   byAddrOnly: boolean;
   byIPOnly: boolean;
   messageByAddr: string;
@@ -10,9 +11,10 @@ export interface IConcurrencyLimitConfig extends IBaseModuleConfig {
 
 export const defaultConfig: IConcurrencyLimitConfig = {
   enabled: false,
-  concurrencyLimit: 0,
+  concurrencyLimitByIP: 0,
+  concurrencyLimitByUserAndTargetAddress: 0,
   byAddrOnly: false,
   byIPOnly: false,
   messageByAddr: null,
   messageByIP: null,
-}
+};
