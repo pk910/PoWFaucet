@@ -232,7 +232,10 @@ modules:
     # enable / disable concurrency limit
     enabled: true
 
-    concurrencyLimit: 1 # only allow 1 concurrent session (sessions in 'running' state at the same time for the same ip / target addr)
+    # Concurrency limits are checked one after another
+    concurrencyLimitByIP: 1 # only allow 1 concurrent session (sessions in 'running' state at the same time for the same ip)
+    concurrencyLimitByUserAndTargetAddress: 1 # only allow 1 concurrent session (sessions in 'running' state at the same time for the same userId + target addr)
+
     byAddrOnly: false # only check concurrency by target address
     byIPOnly: false # only check concurrency by IP address
     #messageByAddr: "" # custom error message when limit is exceeded by same target address
