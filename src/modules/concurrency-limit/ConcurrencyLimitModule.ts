@@ -114,7 +114,7 @@ export class ConcurrencyLimitModule extends BaseModule<IConcurrencyLimitConfig> 
         throw new FaucetError(
           "CONCURRENCY_LIMIT",
           "Only " +
-            concurrentLimitByIP +
+            concurrentLimitByUserAndTargetAddress +
             " concurrent sessions allowed per user and wallet address"
         );
       }
