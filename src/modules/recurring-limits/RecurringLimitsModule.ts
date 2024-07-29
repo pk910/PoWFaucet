@@ -60,12 +60,25 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
 
   private async checkLimit(
     session: FaucetSession,
-    limit: IRecurringLimitConfig
+    config: IRecurringLimitConfig
   ): Promise<void> {
     let remoteIP = session.getRemoteIP();
+    const targetAddr = session.getTargetAddr();
     const userId = session.getUserId();
-    if (limit.ip4Subnet && remoteIP.match(/^[0-9.]+$/)) {
-      const ipParts = remoteIP.split(".").slice(0, limit.ip4Subnet / 8);
+    const {
+      ip4Subnet,
+      duration,
+      limitCount,
+      limitAmount,
+      action,
+      message,
+      rewards,
+    } = config;
+
+    const noActionOrBlock = !action || action === "block";
+
+    if (ip4Subnet && remoteIP.match(/^[0-9.]+$/)) {
+      const ipParts = remoteIP.split(".").slice(0, ip4Subnet / 8);
       if (ipParts.length < 4) {
         ipParts.push("%");
         remoteIP = ipParts.join(".");
@@ -76,57 +89,62 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
       FaucetDatabase
     ).getFinishedSessions(
       {
-        targetAddr: session.getTargetAddr(),
+        targetAddr,
         remoteIP,
         userId,
       },
-      limit.duration,
+      duration,
       true
     );
 
     let limitApplies = false;
-    if (limit.limitCount > 0 && finishedSessions.length >= limit.limitCount) {
+    // Check if user can create a new session based on the limit count
+    if (limitCount > 0 && finishedSessions.length >= limitCount) {
       limitApplies = true;
-      if (!limit.action || limit.action === "block") {
+      if (noActionOrBlock) {
         const errMsg =
-          limit.message ||
+          message ||
           [
             "You have already created ",
             finishedSessions.length,
             finishedSessions.length > 1 ? " sessions" : " session",
             " in the last ",
-            renderTimespan(limit.duration),
+            renderTimespan(duration),
           ].join("");
         throw new FaucetError("RECURRING_LIMIT", errMsg);
       }
     }
-    if (limit.limitAmount > 0) {
+
+    // Check limit for amount of tokens/eth requested
+    if (limitAmount > 0) {
       let totalAmount = 0n;
       finishedSessions.forEach(
         (session) => (totalAmount += BigInt(session.dropAmount))
       );
-      if (totalAmount >= BigInt(limit.limitAmount)) {
+
+      // Already requested more tokens/eth than the limit allows
+      if (totalAmount >= BigInt(limitAmount)) {
         limitApplies = true;
-        if (!limit.action || limit.action === "block") {
+        if (noActionOrBlock) {
           const errMsg =
-            limit.message ||
+            message ||
             [
               "You have already requested ",
               ServiceManager.GetService(EthWalletManager).readableAmount(
                 totalAmount
               ),
               " in the last ",
-              renderTimespan(limit.duration),
+              renderTimespan(duration),
             ].join("");
           throw new FaucetError("RECURRING_LIMIT", errMsg);
         }
       }
     }
 
-    if (limitApplies && typeof limit.rewards !== "undefined") {
+    if (limitApplies && typeof rewards !== "undefined") {
       const cfactor = session.getSessionData("recurring-limits.factor");
-      if (typeof cfactor === "undefined" || limit.rewards < cfactor)
-        session.setSessionData("recurring-limits.factor", limit.rewards);
+      if (typeof cfactor === "undefined" || rewards < cfactor)
+        session.setSessionData("recurring-limits.factor", rewards);
     }
   }
 
