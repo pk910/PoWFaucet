@@ -52,7 +52,7 @@ export class ConcurrencyLimitModule extends BaseModule<IConcurrencyLimitConfig> 
 
     // Unlimited!
     if (
-      concurrentLimitByIP === 0 ||
+      concurrentLimitByIP === 0 &&
       concurrentLimitByUserAndTargetAddress === 0
     )
       return;
@@ -99,7 +99,7 @@ export class ConcurrencyLimitModule extends BaseModule<IConcurrencyLimitConfig> 
       });
 
       // Check if we have more than allowed sessions
-      if (sessions.length >= concurrentLimitByIP) {
+      if (sessions.length >= concurrentLimitByUserAndTargetAddress) {
         const sessionsFromTheSameUserData = sessions.map((s) => ({
           addr: s.getTargetAddr(),
           userId: s.getUserId(),
