@@ -32,7 +32,7 @@
     "css-loader": "^7.0.0",
     "mini-css-extract-plugin": "^2.8.0",
     "sass": "^1.77.2",
-    "sass-loader": "^14.2.1",
+    "sass-loader": "^16.0.0",
     "style-loader": "^4.0.0",
     "typescript": "^5.3.3",
     "url-loader": "^4.1.1",
