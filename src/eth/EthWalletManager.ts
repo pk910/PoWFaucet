@@ -13,6 +13,7 @@ import { sleepPromise } from '../utils/PromiseUtils.js';
 import { EthClaimInfo } from './EthClaimManager.js';
 import { Erc20Abi } from '../abi/ERC20.js';
 import IpcProvider from 'web3-providers-ipc';
+import { nowSeconds } from '../utils/DateUtils.js';
 
 export interface WalletState {
   ready: boolean;
@@ -34,14 +35,16 @@ export enum FaucetCoinType {
   ERC20 = "erc20",
 }
 
+export interface TransactionPromiseResult {
+  status: boolean;
+  block: number;
+  fee: bigint;
+  receipt: TransactionReceipt;
+}
+
 export interface TransactionResult {
   txHash: string;
-  txPromise: Promise<{
-    status: boolean;
-    block: number;
-    fee: bigint;
-    receipt: TransactionReceipt;
-  }>;
+  txPromise: Promise<TransactionPromiseResult>;
 }
 
 export class EthWalletManager {
@@ -67,8 +70,10 @@ export class EthWalletManager {
   private txReceiptPollInterval = 12000;
 
   public async initialize(): Promise<void> {
-    if(this.initialized)
+    if(this.initialized) {
+      console.log("EthWalletManager already initialized");
       return;
+    }
     this.initialized = true;
 
     this.walletState = {
@@ -165,7 +170,7 @@ export class EthWalletManager {
   }
 
   public loadWalletState(): Promise<void> {
-    this.lastWalletRefresh = Math.floor(new Date().getTime() / 1000);
+    this.lastWalletRefresh = nowSeconds()
     const chainIdPromise = typeof faucetConfig.ethChainId === "number" ? Promise.resolve(faucetConfig.ethChainId) : this.web3.eth.getChainId();
     const tokenBalancePromise = this.tokenState?.getBalance(this.walletAddr);
     return Promise.all([
@@ -328,6 +333,7 @@ export class EthWalletManager {
     let txPromise: Promise<TransactionReceipt>;
     let retryCount = 0;
     let txError: Error;
+
     const buildTx = () => {
       claimInfo.claim.txNonce = this.walletState.nonce;
       if(this.tokenState)
@@ -384,7 +390,72 @@ export class EthWalletManager {
     };
   }
 
-  public async sendCustomTx(params: {target: string, amount: bigint, data?: string, gasLimit: number}): Promise<TransactionResult> {
+  private async buildTx(target: string, amount: number | string) {
+    const nonce = this.walletState.nonce;
+    const txHex = this.tokenState ? await this.buildClaimTx({
+      target: this.tokenState.address,
+      amount: 0n,
+      nonce,
+      data: this.tokenState.getTransferData(target, BigInt(amount))
+    }) : await this.buildClaimTx({
+      target,
+      amount: BigInt(amount),
+      nonce
+    });
+
+    return {
+      txHex,
+      nonce
+    };
+  };
+
+  public async sendGitcoinClaimTx(target: string): Promise<TransactionResult> {
+    const amount = faucetConfig.maxDropAmount;
+    let txPromise: Promise<TransactionReceipt>;
+    let retryCount = 0;
+    let txError: Error;
+    let txHash: string;
+
+    do {
+      try {
+        const { txHex, nonce } = await this.buildTx(target, amount);
+        const txResult = await this.sendTransaction(txHex, nonce);
+        txHash = txResult[0];
+        txPromise = txResult[1];
+      } catch(ex) {
+        if(!txError)
+          txError = ex;
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "[sendGitcoinClaimTx]: Sending TX for " + target + " failed [try: " + retryCount + "]: " + ex.toString());
+        await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
+        await this.loadWalletState();
+      }
+    } while(!txPromise && retryCount++ < 3);
+    if(!txPromise)
+      throw txError;
+
+    this.walletState.nonce++;
+    this.walletState.balance -= BigInt(amount);
+    if(!this.tokenState)
+      this.walletState.nativeBalance -= BigInt(amount);
+    this.updateFaucetStatus();
+    return {
+      txHash,
+      txPromise : txPromise.then((receipt) => {
+        const txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+        this.walletState.nativeBalance -= txfee;
+        if(!this.tokenState)
+          this.walletState.balance -= txfee;
+        return {
+          status: Number(receipt.status) > 0,
+          block: Number(receipt.blockNumber),
+          fee: txfee,
+          receipt,
+        };
+      }),
+    };
+  }
+
+  public async sendCustomTx(params: {target: string, amount: bigint, data?: string, gasLimit: number | bigint}): Promise<TransactionResult> {
     const {target, amount, data, gasLimit} = params;
     const txHex = await this.buildEthTx({
       target, amount, nonce: this.walletState.nonce, data, gasLimit
@@ -421,7 +492,7 @@ export class EthWalletManager {
   }
 
   private getGasLimitForClaimTx(params: {target: string, amount: bigint, nonce: number, data?: string}) {
-    const {to, value, data,  nonce } = this.getTxParams(params)
+    const {to, value, data, nonce } = this.getTxParams(params)
 
     return faucetConfig.ethTxGasLimit ? faucetConfig.ethTxGasLimit : this.web3.eth.estimateGas({
       nonce, to, value, data, from: this.walletAddr
@@ -455,39 +526,8 @@ export class EthWalletManager {
 
   private async sendTransaction(txhex: string, txnonce: number): Promise<[string, Promise<TransactionReceipt>]> {
     const txHash = await ethRpcMethods.sendRawTransaction(this.web3.eth.requestManager, "0x" + txhex);
-
     return [txHash, this.awaitTransactionReceipt(txHash, txnonce)];
   }
-
-  /*
-  private async sendTransaction(txhex: string, nonce: number): Promise<[string, Promise<TransactionReceipt>]> {
-    let txhashDfd = new PromiseDfd<string>();
-    let receiptDfd = new PromiseDfd<TransactionReceipt>();
-    let txStatus = 0;
-
-    let txPromise = this.web3.eth.sendSignedTransaction("0x" + txhex);
-    txPromise.once('transactionHash', (hash) => {
-      txStatus = 1;
-      txhashDfd.resolve(hash);
-    });
-    txPromise.once('receipt', (receipt) => {
-      txStatus = 2;
-      receiptDfd.resolve(receipt);
-    });
-
-    let errorHandler = (error) => {
-      if(txStatus === 0)
-        txhashDfd.reject(error);
-      else
-        receiptDfd.reject(error);
-    };
-    txPromise.on('error', errorHandler);
-    txPromise.catch(errorHandler);
-
-    let txHash = await txhashDfd.promise;
-    return [txHash, receiptDfd.promise];
-  }
-  */
 
   private async awaitTransactionReceipt(txhash: string, _txnonce: number): Promise<TransactionReceipt> {
 
