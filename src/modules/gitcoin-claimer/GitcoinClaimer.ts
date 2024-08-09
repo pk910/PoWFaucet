@@ -1,0 +1,415 @@
+// Gitcoin Passport API has known limits by default, so we need to comsider that when implementing this module.
+// For example, allow to run getScore and submitPassport only once per X minutes.
+// By default X will be 2 minutes.
+// More about rate limits here:
+// https://docs.passport.xyz/building-with-passport/passport-api/api-reference#rate-limits
+
+import LRUCache from "lru-cache";
+import { z } from "zod";
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { FaucetDatabase } from "../../db/FaucetDatabase.js";
+import {
+  EthWalletManager,
+  TransactionPromiseResult,
+  TransactionResult,
+} from "../../eth/EthWalletManager.js";
+import { FetchUtil } from "../../utils/FetchUtil.js";
+import { faucetConfig } from "../../config/FaucetConfig.js";
+import { zodSchemaBodyValidation } from "../../utils/zodSchemaBodyValidation.js";
+import { SessionManager } from "../../session/SessionManager.js";
+import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
+import { ModuleManager } from "../ModuleManager.js";
+import { RecurringLimitsModule } from "../recurring-limits/RecurringLimitsModule.js";
+import { isValidAddress } from "ethereumjs-util";
+import { nowSeconds } from "../../utils/DateUtils.js";
+import { FaucetError } from "../../common/FaucetError.js";
+
+type Address = string;
+
+type ScoreResponse = {
+  address: Address;
+  score: string;
+  status: "DONE" | "PROCESSING";
+  last_score_timestamp: string;
+  expiration_date: string;
+  evidence: {
+    type: string;
+    success: boolean;
+    rawScore: string;
+    threshold: string;
+  } | null;
+  error: string | null;
+  stamp_scores: Record<string, string> | null;
+};
+
+const zodGitcoinSigningMessage = z.object({
+  message: z.string(),
+  nonce: z.string(),
+});
+
+type GitcoinSigningMessage = Required<z.infer<typeof zodGitcoinSigningMessage>>;
+
+const zodPassportSubmitData = z.object({
+  address: z.string(),
+});
+
+type PassportSubmitData = Required<z.infer<typeof zodPassportSubmitData>>;
+
+// Cache for Gitcoin scores. We need it to avoid multiple requests to the Gitcoin API.
+const GitcoinScoreCache = new LRUCache<Address, number>({
+  ttl: 1000 * 60 * 2, // 2 minutes
+  ttlAutopurge: true,
+});
+
+const GitcoinPassportSubmissions = new LRUCache<
+  Address,
+  {
+    timestamp: number;
+  }
+>({
+  ttl: 1000 * 60 * 5, // 5 minutes
+  ttlAutopurge: true,
+});
+
+class GitcoinAPI {
+  private baseUrl: string = "https://api.scorer.gitcoin.co";
+  private accessToken: string;
+  private scorerId: string;
+  private headers: Record<string, string>;
+
+  constructor(accessToken: string, scorerId: string) {
+    if (!accessToken)
+      throw new FaucetError(
+        "GITCOIN_API_ERROR",
+        "Gitcoin API access token is required"
+      );
+    if (!scorerId)
+      throw new FaucetError(
+        "GITCOIN_API_ERROR",
+        "Gitcoin API scorer ID is required"
+      );
+    this.accessToken = accessToken;
+    this.scorerId = scorerId;
+    this.headers = {
+      "Content-Type": "application/json",
+      "x-api-key": `${this.accessToken}`,
+    };
+  }
+
+  public async getScore(address: Address): Promise<{
+    value: number;
+    needToSubmit: boolean;
+  }> {
+    const cachedScore = GitcoinScoreCache.get(address);
+    if (cachedScore) {
+      return {
+        value: cachedScore,
+        needToSubmit: false,
+      };
+    }
+
+    const headers = this.headers;
+    const url = `${this.baseUrl}/registry/score/${this.scorerId}/${address}`;
+    const response = await FetchUtil.fetch(url, {
+      headers,
+      method: "GET",
+    });
+
+    // Handle errors
+    if (response.status !== 200) {
+      let reason = response.statusText;
+      try {
+        const respBody = (await response.json()) as any;
+        if (respBody.detail && typeof respBody.detail === "string") {
+          reason = respBody.detail;
+        }
+      } catch (e) {}
+
+      return { value: 0, needToSubmit: true };
+    }
+
+    const score = (await response.json()) as ScoreResponse;
+    const scoreNumber = Number(score.score);
+    GitcoinScoreCache.set(address, scoreNumber);
+    return {
+      value: scoreNumber,
+      needToSubmit: false,
+    };
+  }
+
+  public async getSigningMessage(): Promise<GitcoinSigningMessage> {
+    const url = `${this.baseUrl}/registry/score/${this.scorerId}/signing-message`;
+    const response = await FetchUtil.fetch(url, {
+      headers: this.headers,
+      method: "GET",
+    });
+
+    // Not ok
+    if (response.status !== 200) {
+      const errorMessage = `Failed to get Gitcoin signing message: ${response.statusText}`;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        errorMessage
+      );
+      throw new FaucetError("GITCOIN_API_ERROR", errorMessage);
+    }
+
+    const signingMessage = (await response.json()) as GitcoinSigningMessage;
+    return signingMessage;
+  }
+
+  public async submitPassport(
+    passport: Omit<PassportSubmitData, "scorer_id">
+  ): Promise<{ result: "success" }> {
+    const url = `${this.baseUrl}/registry/submit-passport`;
+
+    const response = await FetchUtil.fetch(url, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify({
+        address: passport.address,
+        scorer_id: this.scorerId,
+      }),
+    });
+
+    // Not ok
+    if (response.status !== 200) {
+      const errorMessage = `Failed to submit Gitcoin passport for address ${passport.address}: ${response.statusText}`;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        errorMessage
+      );
+      throw new FaucetError("GITCOIN_API_ERROR", errorMessage);
+    }
+
+    // Cache the submission
+    GitcoinPassportSubmissions.set(passport.address, {
+      timestamp: Date.now(),
+    });
+
+    return { result: "success" };
+  }
+}
+
+export class GitcoinClaimer {
+  private _db: FaucetDatabase;
+  private _ethWallet: EthWalletManager;
+  private _gitcoinApi: GitcoinAPI;
+  private _sessionManager: SessionManager;
+  private _moduleManager: ModuleManager;
+
+  public async initialize(): Promise<void> {
+    const gitcoinApiToken = faucetConfig.gitcoinApiToken;
+    const gitcoinScorerId = faucetConfig.gitcoinScorerId;
+    if (!gitcoinApiToken)
+      throw new FaucetError(
+        "GITCOIN_CLAIM_INIT",
+        "Gitcoin API access token is required (gitcoinApiToken)"
+      );
+    if (!gitcoinScorerId)
+      throw new FaucetError(
+        "GITCOIN_CLAIM_INIT",
+        "Gitcoin API scorer ID is required (gitcoinScorerId)"
+      );
+
+    this._db = ServiceManager.GetService(FaucetDatabase);
+    this._ethWallet = ServiceManager.GetService(EthWalletManager);
+    this._gitcoinApi = new GitcoinAPI(gitcoinApiToken, gitcoinScorerId);
+    this._sessionManager = ServiceManager.GetService(SessionManager);
+    this._moduleManager = ServiceManager.GetService(ModuleManager);
+  }
+
+  public async getAddressScore(body: Buffer): Promise<{
+    value: number;
+    needToSubmit: boolean;
+  }> {
+    const validated = zodSchemaBodyValidation(
+      body,
+      z.object({ address: z.string() })
+    );
+    const result = await this._gitcoinApi.getScore(validated.address);
+    return result;
+  }
+
+  public async getSingingMessage(): Promise<GitcoinSigningMessage> {
+    return this._gitcoinApi.getSigningMessage();
+  }
+
+  public async submitPassport(body: Buffer): Promise<{
+    result: "pending" | "success";
+    canSubmitAt?: number;
+  }> {
+    const validated = zodSchemaBodyValidation(
+      body,
+      zodPassportSubmitData
+    ) as PassportSubmitData;
+
+    // Validate address
+    if (!isValidAddress(validated.address)) {
+      throw new FaucetError(
+        "GITCOIN_ADDRESS_ERROR",
+        "Invalid address for Gitcoin passport submission"
+      );
+    }
+
+    const cachedSubmission = GitcoinPassportSubmissions.get(validated.address);
+    if (cachedSubmission) {
+      const canSubmitAt = cachedSubmission.timestamp + 1000 * 60 * 5; // 5 minutes from the last submission
+      return {
+        result: "pending",
+        canSubmitAt,
+      };
+    }
+
+    const result = await this._gitcoinApi.submitPassport(validated);
+    return result;
+  }
+
+  private async checkIfUserCanClaimGitcoin(
+    userId: string,
+    remoteIP: string
+  ): Promise<boolean> {
+    const activeSessions = this._sessionManager
+      .getActiveSessions()
+      .filter((activeSession) => {
+        return activeSession.getUserId() === userId;
+      });
+
+    if (activeSessions.length > 0) {
+      return false;
+    }
+
+    const recurringLimitsModule =
+      this._moduleManager.getModule<RecurringLimitsModule>("recurring-limits");
+    const time = await recurringLimitsModule?.getTimeToNewSessionStart(
+      userId,
+      remoteIP
+    );
+    if (time > 0) {
+      return false;
+    }
+
+    // Any claimable sessions at that moment?
+    const claimableSessions = await ServiceManager.GetService(
+      FaucetDatabase
+    ).getClaimableSessions(userId);
+    if (claimableSessions.length > 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  public async claimGitcoin(
+    body: Buffer,
+    userId: string,
+    remoteIP: string
+  ): Promise<string> {
+    // Check address score
+    const { value: score } = await this.getAddressScore(body);
+    // Check if the score is enough
+    if (score < faucetConfig.gitcoinMinimumScore) {
+      throw new FaucetError(
+        "GITCOIN_CLAIM_ERROR",
+        `Gitcoin score is too low: ${score} (minimum required: ${faucetConfig.gitcoinMinimumScore})`
+      );
+    }
+    // Check if can claim
+    const canClaim = await this.checkIfUserCanClaimGitcoin(userId, remoteIP);
+    if (!canClaim) {
+      throw new FaucetError(
+        "GITCOIN_CLAIM_ERROR",
+        "You have active sessions or reached the limit"
+      );
+    }
+
+    // Extract target address
+    let targetAddress: string;
+    const validatedTargetAddress = zodSchemaBodyValidation(
+      body,
+      z.object({ address: z.string() })
+    );
+
+    // Validate more
+    if (
+      !validatedTargetAddress.address ||
+      !isValidAddress(validatedTargetAddress.address)
+    ) {
+      const message = `GITCOIN_CLAIM_ERROR: Invalid target address by user ${userId}`;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        message
+      );
+      throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
+    }
+    targetAddress = validatedTargetAddress.address;
+
+    // Create claim record
+    let claimRecordId;
+    try {
+      claimRecordId = await this._db.createGitcoinClaim(
+        userId,
+        targetAddress,
+        remoteIP
+      );
+    } catch (ex) {
+      const message = `Failed to create GitcoinClaim record: ${
+        ex.message
+      } || ${JSON.stringify(ex)}`;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        message
+      );
+      throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
+    }
+    // If no Uuid returned, throw an error
+    if (!claimRecordId) {
+      throw new FaucetError(
+        "GITCOIN_CLAIM_ERROR",
+        "Failed to create GitcoinClaim record. Returned null value."
+      );
+    }
+
+    // Send transaction
+    let transactionResult: TransactionResult;
+    try {
+      transactionResult = await this._ethWallet.sendGitcoinClaimTx(
+        targetAddress
+      );
+    } catch (ex) {
+      // If the transaction fails, delete the claim record
+      await this._db.deleteGitcoinClaimRecord(claimRecordId);
+      // Log and throw
+      const message = `Failed to send GitcoinClaim transaction: ${
+        ex.message
+      } || ${JSON.stringify(ex)}`;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        message
+      );
+      throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
+    }
+
+    const txHash = transactionResult.txHash;
+    const txReceipt: TransactionPromiseResult =
+      await transactionResult.txPromise;
+
+    // We don't wait for the transaction (transactionResult.txPromise) to be mined, since it takes a lot of time
+    // If the transaction is successful, update the claim record
+    try {
+      await this._db.updateGitcoinClaimRecordTxHash(claimRecordId, txHash);
+    } catch (ex) {
+      // Log and throw
+      const message = `Failed to update GitcoinClaim record with txHash: ${
+        ex.message
+      } || ${JSON.stringify(ex)}`;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        message
+      );
+      throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
+    }
+
+    return txHash;
+  }
+}
