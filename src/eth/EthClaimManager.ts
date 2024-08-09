@@ -15,6 +15,8 @@ import { EthClaimNotificationClient, IEthClaimNotificationData } from './EthClai
 import { FaucetOutflowModule } from '../modules/faucet-outflow/FaucetOutflowModule.js';
 import { clearInterval } from 'timers';
 import { TransactionReceipt } from 'web3';
+import { nowSeconds } from '../utils/DateUtils.js';
+import { GitcoinClaimStatus } from '../modules/gitcoin-claimer/GitcoinClaimerTypes.js';
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -44,6 +46,7 @@ export interface EthClaimInfo {
   amount: string;
   claim: EthClaimData;
 }
+
 
 export interface EthClaimData {
   claimIdx: number;
@@ -80,6 +83,7 @@ export class EthClaimManager {
     const storedSession = await  ServiceManager.GetService(FaucetDatabase).getSessions([
       FaucetSessionStatus.CLAIMING,
     ]);
+
     storedSession.forEach((sessionData) => {
       const claimInfo: EthClaimInfo = {
         session: sessionData.sessionId,
@@ -220,7 +224,7 @@ export class EthClaimManager {
     claimInfo.claim = {
       claimIdx: this.lastClaimTxIdx++,
       claimStatus: ClaimTxStatus.QUEUE,
-      claimTime: Math.floor(new Date().getTime() / 1000),
+      claimTime: nowSeconds()
     };
     sessionData.status = FaucetSessionStatus.CLAIMING;
     sessionData.dropAmount = claimInfo.amount;
@@ -256,7 +260,7 @@ export class EthClaimManager {
         await this.processQueueTx(claimTx);
       }
 
-      const now = Math.floor(new Date().getTime() / 1000);
+      const now = nowSeconds();
       const walletRefreshTime = walletState.ready ? 600 : 10;
       if(Object.keys(this.pendingTxQueue).length === 0 && now - ethWalletManager.getLastWalletRefresh() > walletRefreshTime) {
         await ethWalletManager.loadWalletState();

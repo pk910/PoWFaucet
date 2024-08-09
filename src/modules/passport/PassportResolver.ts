@@ -268,7 +268,6 @@ export class PassportResolver {
 
     verifyResult.valid = (verifyResult.errors.length === 0);
     verifyResult.passport = passport;
-    //console.log("[PassportVerifier] verify info ", verifyResult.info);
     
     return verifyResult;
   }

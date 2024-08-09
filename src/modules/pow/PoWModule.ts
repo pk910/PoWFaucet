@@ -13,6 +13,7 @@ import { PoWClient } from "./PoWClient.js";
 import { PoWSession } from "./PoWSession.js";
 import { FaucetError } from "../../common/FaucetError.js";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
+import { nowSeconds } from "../../utils/DateUtils.js";
 
 export class PoWModule extends BaseModule<IPoWConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -278,7 +279,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       session.idleTimer = null;
     }
     else if(!hasActiveClient && !idleTimer && session.idleTime && this.moduleConfig.powIdleTimeout) {
-      let now = Math.floor(new Date().getTime() / 1000);
+      let now = nowSeconds();
       let timeout = session.idleTime + this.moduleConfig.powIdleTimeout - now;
       if(timeout < 0)
         timeout = 0;
