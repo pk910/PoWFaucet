@@ -15,6 +15,7 @@ export interface IFaucetConfig {
     pow?: IPoWModuleConfig;
     passport?: IPassportModuleConfig;
   };
+  gitcoinMinimumScore?: number;
 }
 
 export interface IGithubModuleConfig {
