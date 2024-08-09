@@ -58,6 +58,9 @@ export function getDefaultConfig(): IConfigSchema {
       json: "faucet-status.json",
       yaml: "faucet-status.yaml",
     },
+
+    gitcoinApiToken: null,
+    gitcoinScorerId: null,
+    gitcoinMinimumScore: 3,
   };
 }
-
