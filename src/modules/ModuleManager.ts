@@ -47,31 +47,39 @@ export class ModuleManager {
   }
 
   private async loadModules(): Promise<void> {
+    // Create a copy of the loaded modules
     let loadedDict = Object.assign({}, this.loadedModules);
+    
+    // Iterate over all modules in the config
     for(let modName in faucetConfig.modules) {
-      if(!faucetConfig.modules.hasOwnProperty(modName))
+      if(!faucetConfig.modules.hasOwnProperty(modName) || !faucetConfig.modules[modName]?.enabled) {
         continue;
-      if(!faucetConfig.modules[modName].enabled)
-        continue;
+      }
       
-      let module: BaseModule
-      if(!(module = loadedDict[modName])) {
-        let modClass = MODULE_CLASSES[modName];
-        if(!modClass) {
+      let module: BaseModule = loadedDict[modName];
+      
+      // If the module is not loaded, create a new instance of it
+      if (!module) {
+        let ModuleClass = MODULE_CLASSES[modName];
+        if(!ModuleClass) {
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Cannot load module '" + modName + "': unknown module");
           continue;
         }
-        module = this.loadedModules[modName] = new modClass(this, modName);
+        module = this.loadedModules[modName] = new ModuleClass(this, modName);
       }
+      // If the module is already loaded, remove it from the loadedDict
       else {
         delete loadedDict[modName];
       }
+      // Set module config and enable it if it is not enabled
       module.setModuleConfig(faucetConfig.modules[modName]);
       if(!module.isEnabled()) {
         await module.enableModule();
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Enabled module: " + modName);
       }
     }
+
+    // Disable all remaining modules
     for(let modName in loadedDict) {
       let module = loadedDict[modName];
       await module.disableModule();
