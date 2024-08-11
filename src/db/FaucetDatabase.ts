@@ -406,9 +406,7 @@ export class FaucetDatabase {
     whereArgs: any[]
   ): Promise<GitcoinClaimTableType[]> {
     return this.db.all(
-      "SELECT " +
-        GitcoinClaimsColumns.join(",") +
-        " FROM GitcoinClaims WHERE " +
+      "SELECT * FROM GitcoinClaims WHERE " +
         whereSql,
       whereArgs
     ) as Promise<GitcoinClaimTableType[]>;

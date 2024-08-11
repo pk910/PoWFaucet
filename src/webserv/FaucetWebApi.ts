@@ -460,41 +460,19 @@ export class FaucetWebApi {
   > {
     if (req.method !== "POST")
       return new FaucetHttpResponse(405, "Method Not Allowed");
-
-    const moduleManager = ServiceManager.GetService(ModuleManager);
-    const recurringLimitsModule =
-      moduleManager.getModule<RecurringLimitsModule>("recurring-limits");
+    
     const remoteIP = this.getRemoteAddr(req);
-
-    // Check limits
-    const time = await recurringLimitsModule?.getTimeToNewSessionStart(
-      userId,
-      remoteIP
+    const gitcoinClaimer = ServiceManager.GetService(
+      GitcoinClaimer
     );
-    if (time > 0) {
-      throw new Error(`User has reached the limit of sessions`);
+    const canClaim = await gitcoinClaimer.checkIfUserCanClaimGitcoin(userId, remoteIP);
+    // If user can't claim, throw an error
+    if (!canClaim.can) {
+      throw new FaucetError("GITCOIN_CLAIM_ERROR", canClaim.reason);
     }
-
-    // Check active sessions
-    const activeSessions = ServiceManager.GetService(SessionManager)
-      .getActiveSessions()
-      .filter(
-        (session) =>
-          session.getSessionStatus() === FaucetSessionStatus.RUNNING &&
-          session.getUserId() === userId
-      );
-    if (activeSessions.length > 0) {
-      throw new FaucetError(
-        "GITCOIN_CLAIM_ERROR",
-        "Please stop your active mining session before claiming Gitcoin rewards."
-      );
-    }
-
+    
     try {
-      const txHash = await ServiceManager.GetService(
-        GitcoinClaimer
-      ).claimGitcoin(body, userId, remoteIP);
-
+      const txHash = await gitcoinClaimer.claimGitcoin(body, userId, remoteIP);
       return { txHash };
     } catch (ex) {
       let failedReason = ex.toString();

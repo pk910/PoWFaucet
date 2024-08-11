@@ -197,6 +197,8 @@ export class GitcoinClaimer {
   private _gitcoinApi: GitcoinAPI;
   private _sessionManager: SessionManager;
   private _moduleManager: ModuleManager;
+  // Set of users currently claiming Gitcoin rewards
+  private _currentlyClaimingUsers: Set<string> = new Set();
 
   public async initialize(): Promise<void> {
     const gitcoinApiToken = faucetConfig.gitcoinApiToken;
@@ -265,10 +267,10 @@ export class GitcoinClaimer {
     return result;
   }
 
-  private async checkIfUserCanClaimGitcoin(
+  public async checkIfUserCanClaimGitcoin(
     userId: string,
     remoteIP: string
-  ): Promise<boolean> {
+  ): Promise<{ can: boolean; reason: string }> {
     const activeSessions = this._sessionManager
       .getActiveSessions()
       .filter((activeSession) => {
@@ -276,7 +278,11 @@ export class GitcoinClaimer {
       });
 
     if (activeSessions.length > 0) {
-      return false;
+      return {
+        can: false,
+        reason:
+          "Please stop your active mining session before claiming Gitcoin rewards",
+      };
     }
 
     const recurringLimitsModule =
@@ -286,7 +292,7 @@ export class GitcoinClaimer {
       remoteIP
     );
     if (time > 0) {
-      return false;
+      return { can: false, reason: "User has reached the limit of sessions" };
     }
 
     // Any claimable sessions at that moment?
@@ -294,10 +300,13 @@ export class GitcoinClaimer {
       FaucetDatabase
     ).getClaimableSessions(userId);
     if (claimableSessions.length > 0) {
-      return false;
+      return {
+        can: false,
+        reason: "User already has claimable mining sessions",
+      };
     }
 
-    return true;
+    return { can: true, reason: "No limiting conditions" };
   }
 
   public async claimGitcoin(
@@ -307,6 +316,7 @@ export class GitcoinClaimer {
   ): Promise<string> {
     // Check address score
     const { value: score } = await this.getAddressScore(body);
+
     // Check if the score is enough
     if (score < faucetConfig.gitcoinMinimumScore) {
       throw new FaucetError(
@@ -315,12 +325,12 @@ export class GitcoinClaimer {
       );
     }
     // Check if can claim
-    const canClaim = await this.checkIfUserCanClaimGitcoin(userId, remoteIP);
+    const { can: canClaim, reason } = await this.checkIfUserCanClaimGitcoin(
+      userId,
+      remoteIP
+    );
     if (!canClaim) {
-      throw new FaucetError(
-        "GITCOIN_CLAIM_ERROR",
-        "You have active sessions or reached the limit"
-      );
+      throw new FaucetError("GITCOIN_CLAIM_ERROR", reason);
     }
 
     // Extract target address
@@ -344,6 +354,18 @@ export class GitcoinClaimer {
     }
     targetAddress = validatedTargetAddress.address;
 
+    // Check if the user is already claiming
+    if (this._hasClaimingByUser(userId)) {
+      throw new FaucetError(
+        "GITCOIN_CLAIM_ERROR",
+        "User is already claiming Gitcoin rewards"
+      );
+    }
+
+    // Add user to the claiming set
+    this._addClaimingByUser(userId);
+    const clearClaiming = () => this._removeClaimingByUser(userId);
+
     // Create claim record
     let claimRecordId;
     try {
@@ -360,10 +382,12 @@ export class GitcoinClaimer {
         FaucetLogLevel.ERROR,
         message
       );
+      clearClaiming();
       throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
     }
     // If no Uuid returned, throw an error
     if (!claimRecordId) {
+      clearClaiming();
       throw new FaucetError(
         "GITCOIN_CLAIM_ERROR",
         "Failed to create GitcoinClaim record. Returned null value."
@@ -377,6 +401,7 @@ export class GitcoinClaimer {
         targetAddress
       );
     } catch (ex) {
+      clearClaiming();
       // If the transaction fails, delete the claim record
       await this._db.deleteGitcoinClaimRecord(claimRecordId);
       // Log and throw
@@ -391,10 +416,6 @@ export class GitcoinClaimer {
     }
 
     const txHash = transactionResult.txHash;
-    const txReceipt: TransactionPromiseResult =
-      await transactionResult.txPromise;
-
-    // We don't wait for the transaction (transactionResult.txPromise) to be mined, since it takes a lot of time
     // If the transaction is successful, update the claim record
     try {
       await this._db.updateGitcoinClaimRecordTxHash(claimRecordId, txHash);
@@ -407,9 +428,23 @@ export class GitcoinClaimer {
         FaucetLogLevel.ERROR,
         message
       );
+      clearClaiming();
       throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
     }
 
+    clearClaiming();
     return txHash;
+  }
+
+  private _addClaimingByUser(userId: string) {
+    this._currentlyClaimingUsers.add(userId);
+  }
+
+  private _removeClaimingByUser(userId: string) {
+    this._currentlyClaimingUsers.delete(userId);
+  }
+
+  private _hasClaimingByUser(userId: string) {
+    return this._currentlyClaimingUsers.has(userId);
   }
 }

@@ -71,7 +71,7 @@ export class EthWalletManager {
 
   public async initialize(): Promise<void> {
     if(this.initialized) {
-      console.log("EthWalletManager already initialized");
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "EthWalletManager already initialized");
       return;
     }
     this.initialized = true;
@@ -334,26 +334,11 @@ export class EthWalletManager {
     let retryCount = 0;
     let txError: Error;
 
-    const buildTx = () => {
-      claimInfo.claim.txNonce = this.walletState.nonce;
-      if(this.tokenState)
-        return this.buildClaimTx({
-          target: this.tokenState.address,
-          amount: 0n,
-          nonce: claimInfo.claim.txNonce,
-          data: this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount))
-        });
-      else
-        return this.buildClaimTx({
-          target: claimInfo.target,
-          amount: BigInt(claimInfo.amount),
-          nonce: claimInfo.claim.txNonce}
-        );
-    };
-
     do {
       try {
-        claimInfo.claim.txHex = await buildTx();
+        const { txHex, nonce } = await this.buildTx(claimInfo.target, claimInfo.amount);
+        claimInfo.claim.txNonce = nonce;
+        claimInfo.claim.txHex = txHex;
         const txResult = await this.sendTransaction(claimInfo.claim.txHex, claimInfo.claim.txNonce);
         claimInfo.claim.txHash = txResult[0];
         txPromise = txResult[1];
@@ -368,25 +353,11 @@ export class EthWalletManager {
     if(!txPromise)
       throw txError;
 
-    this.walletState.nonce++;
-    this.walletState.balance -= BigInt(claimInfo.amount);
-    if(!this.tokenState)
-      this.walletState.nativeBalance -= BigInt(claimInfo.amount);
-    this.updateFaucetStatus();
     return {
       txHash: claimInfo.claim.txHash,
-      txPromise : txPromise.then((receipt) => {
-        const txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
-        this.walletState.nativeBalance -= txfee;
-        if(!this.tokenState)
-          this.walletState.balance -= txfee;
-        return {
-          status: Number(receipt.status) > 0,
-          block: Number(receipt.blockNumber),
-          fee: txfee,
-          receipt,
-        };
-      }),
+      txPromise: this.postProcessTxResult({
+        amount: claimInfo.amount, txPromise
+      }, true)
     };
   }
 
@@ -408,6 +379,37 @@ export class EthWalletManager {
       nonce
     };
   };
+
+  private postProcessTxResult(
+    params: {
+      amount: number | string, txPromise: Promise<TransactionReceipt>
+    },
+    shouldUpdateBalance: boolean = true
+  ): Promise<TransactionPromiseResult> {
+    const { amount, txPromise } = params;
+
+    // Update nonce and balance
+    if (shouldUpdateBalance) {
+      this.walletState.nonce++;
+      this.walletState.balance -= BigInt(amount);
+      if(!this.tokenState)
+        this.walletState.nativeBalance -= BigInt(amount);
+      this.updateFaucetStatus();      
+    }
+
+    return txPromise.then((receipt) => {
+      const txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+      this.walletState.nativeBalance -= txfee;
+      if(!this.tokenState)
+        this.walletState.balance -= txfee;
+      return {
+        status: Number(receipt.status) > 0,
+        block: Number(receipt.blockNumber),
+        fee: txfee,
+        receipt,
+      };
+    });
+  }
 
   public async sendGitcoinClaimTx(target: string): Promise<TransactionResult> {
     const amount = faucetConfig.maxDropAmount;
@@ -433,25 +435,11 @@ export class EthWalletManager {
     if(!txPromise)
       throw txError;
 
-    this.walletState.nonce++;
-    this.walletState.balance -= BigInt(amount);
-    if(!this.tokenState)
-      this.walletState.nativeBalance -= BigInt(amount);
-    this.updateFaucetStatus();
     return {
       txHash,
-      txPromise : txPromise.then((receipt) => {
-        const txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
-        this.walletState.nativeBalance -= txfee;
-        if(!this.tokenState)
-          this.walletState.balance -= txfee;
-        return {
-          status: Number(receipt.status) > 0,
-          block: Number(receipt.blockNumber),
-          fee: txfee,
-          receipt,
-        };
-      }),
+      txPromise: this.postProcessTxResult({
+        amount, txPromise
+      }, true)
     };
   }
 
@@ -462,6 +450,7 @@ export class EthWalletManager {
     });
     const txResult = await this.sendTransaction(txHex, this.walletState.nonce);
     this.walletState.nonce++;
+
     return {
       txHash: txResult[0],
       txPromise : txResult[1].then((receipt) => {
@@ -530,7 +519,6 @@ export class EthWalletManager {
   }
 
   private async awaitTransactionReceipt(txhash: string, _txnonce: number): Promise<TransactionReceipt> {
-
     while(true) {
       try {
         return await this.web3.eth.getTransactionReceipt(txhash);
