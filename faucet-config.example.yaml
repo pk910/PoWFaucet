@@ -385,7 +385,10 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 #denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
 
 
-
+# Gitcoin claimer settings
+gitcoinApiToken: "example.value"
+gitcoinScorerId: 7833
+gitcoinMinimumScore: 3
 
 
 ### Automatic wallet refill
