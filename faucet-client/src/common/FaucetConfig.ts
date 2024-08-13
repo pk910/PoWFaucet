@@ -16,6 +16,7 @@ export interface IFaucetConfig {
     passport?: IPassportModuleConfig;
   };
   gitcoinMinimumScore?: number;
+  gitcoinClaimerEnabled?: boolean;
 }
 
 export interface IGithubModuleConfig {

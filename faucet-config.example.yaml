@@ -386,6 +386,7 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 
 
 # Gitcoin claimer settings
+gitcoinClaimerEnabled: false
 gitcoinApiToken: "example.value"
 gitcoinScorerId: 7833
 gitcoinMinimumScore: 3

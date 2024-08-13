@@ -76,6 +76,7 @@ export interface IConfigSchema {
   faucetStatus: IFaucetStatusConfig | null; // faucet status config or null to disable status
 
   // Gitcoin claimer config
+  gitcoinClaimerEnabled?: boolean; // Enable Gitcoin claimer
   gitcoinApiToken: string; // Gitcoin API token
   gitcoinScorerId: string; // Gitcoin Scorer ID
   gitcoinMinimumScore: number; // Minimum score required to claim from Gitcoin

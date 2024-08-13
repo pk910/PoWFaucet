@@ -191,7 +191,32 @@ class GitcoinAPI {
   }
 }
 
+function makeGitcoinClaimerError(
+  reason: "disabled" | "noScorerId" | "noApiToken"
+) {
+  let code = "GITCOIN_CLAIM_INIT";
+  let reasonText = "";
+  //
+  switch (reason) {
+    case "disabled": {
+      reasonText = "Gitcoin claimer is disabled";
+      break;
+    }
+    case "noScorerId": {
+      reasonText = "Gitcoin API scorer ID is required (gitcoinScorerId)";
+      break;
+    }
+    case "noApiToken": {
+      reasonText = "Gitcoin API access token is required (gitcoinApiToken)";
+      break;
+    }
+  }
+
+  return new FaucetError(code, reasonText);
+}
+
 export class GitcoinClaimer {
+  private _isEnabled: boolean = false;
   private _db: FaucetDatabase;
   private _ethWallet: EthWalletManager;
   private _gitcoinApi: GitcoinAPI;
@@ -201,18 +226,16 @@ export class GitcoinClaimer {
   private _currentlyClaimingUsers: Set<string> = new Set();
 
   public async initialize(): Promise<void> {
+    // Check if the Gitcoin claimer is enabled
+    const gitcoinClaimerEnabled = faucetConfig.gitcoinClaimerEnabled;
+    this._isEnabled = gitcoinClaimerEnabled;
+
     const gitcoinApiToken = faucetConfig.gitcoinApiToken;
     const gitcoinScorerId = faucetConfig.gitcoinScorerId;
-    if (!gitcoinApiToken)
-      throw new FaucetError(
-        "GITCOIN_CLAIM_INIT",
-        "Gitcoin API access token is required (gitcoinApiToken)"
-      );
-    if (!gitcoinScorerId)
-      throw new FaucetError(
-        "GITCOIN_CLAIM_INIT",
-        "Gitcoin API scorer ID is required (gitcoinScorerId)"
-      );
+    if (this._isEnabled && !gitcoinApiToken)
+      throw makeGitcoinClaimerError("noApiToken");
+    if (this._isEnabled && !gitcoinScorerId)
+      throw makeGitcoinClaimerError("noScorerId");
 
     this._db = ServiceManager.GetService(FaucetDatabase);
     this._ethWallet = ServiceManager.GetService(EthWalletManager);
@@ -221,10 +244,22 @@ export class GitcoinClaimer {
     this._moduleManager = ServiceManager.GetService(ModuleManager);
   }
 
+  public isEnabled(): boolean {
+    return this._isEnabled;
+  }
+
+  // TODO: Implement decorator/HoF for guarding methods
+  private guard() {
+    if (!this._isEnabled) {
+      throw makeGitcoinClaimerError("disabled");
+    }
+  }
+
   public async getAddressScore(body: Buffer): Promise<{
     value: number;
     needToSubmit: boolean;
   }> {
+    this.guard();
     const validated = zodSchemaBodyValidation(
       body,
       z.object({ address: z.string() })
@@ -234,6 +269,7 @@ export class GitcoinClaimer {
   }
 
   public async getSingingMessage(): Promise<GitcoinSigningMessage> {
+    this.guard();
     return this._gitcoinApi.getSigningMessage();
   }
 
@@ -241,6 +277,7 @@ export class GitcoinClaimer {
     result: "pending" | "success";
     canSubmitAt?: number;
   }> {
+    this.guard();
     const validated = zodSchemaBodyValidation(
       body,
       zodPassportSubmitData
@@ -271,6 +308,7 @@ export class GitcoinClaimer {
     userId: string,
     remoteIP: string
   ): Promise<{ can: boolean; reason: string }> {
+    this.guard();
     const activeSessions = this._sessionManager
       .getActiveSessions()
       .filter((activeSession) => {
@@ -314,6 +352,7 @@ export class GitcoinClaimer {
     userId: string,
     remoteIP: string
   ): Promise<string> {
+    this.guard();
     // Check address score
     const { value: score } = await this.getAddressScore(body);
 

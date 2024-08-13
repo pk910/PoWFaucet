@@ -49,6 +49,7 @@ export interface IClientFaucetConfig {
     [module: string]: any;
   };
   gitcoinMinimumScore?: number;
+  gitcoinClaimerEnabled?: boolean;
 }
 
 export interface IClientSessionStatus {
@@ -311,6 +312,7 @@ export class FaucetWebApi {
       ethTxExplorerLink: faucetConfig.ethTxExplorerLink,
       ethWalletAddr: faucetConfig.ethWalletAddr,
       gitcoinMinimumScore: faucetConfig.gitcoinMinimumScore,
+      gitcoinClaimerEnabled: faucetConfig.gitcoinClaimerEnabled,
       time: nowSeconds(),
       modules: moduleConfig,
     };

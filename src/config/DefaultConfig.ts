@@ -62,5 +62,6 @@ export function getDefaultConfig(): IConfigSchema {
     gitcoinApiToken: null,
     gitcoinScorerId: null,
     gitcoinMinimumScore: 3,
+    gitcoinClaimerEnabled: false,
   };
 }
