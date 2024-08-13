@@ -10,6 +10,6 @@ export function zodSchemaBodyValidation<Schema extends z.ZodObject<any, any>>(
   if (parsed.success) {
     return parsed.data as Required<z.infer<Schema>>;
   } else {
-    throw new Error(parsed.error?.errors[0]?.message || "Invalid request body");
+    throw new Error("Invalid request body");
   }
 }
