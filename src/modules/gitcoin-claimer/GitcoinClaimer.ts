@@ -10,7 +10,6 @@ import { ServiceManager } from "../../common/ServiceManager.js";
 import { FaucetDatabase } from "../../db/FaucetDatabase.js";
 import {
   EthWalletManager,
-  TransactionPromiseResult,
   TransactionResult,
 } from "../../eth/EthWalletManager.js";
 import { FetchUtil } from "../../utils/FetchUtil.js";
@@ -21,9 +20,7 @@ import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 import { ModuleManager } from "../ModuleManager.js";
 import { RecurringLimitsModule } from "../recurring-limits/RecurringLimitsModule.js";
 import { isValidAddress } from "ethereumjs-util";
-import { nowSeconds } from "../../utils/DateUtils.js";
 import { FaucetError } from "../../common/FaucetError.js";
-import { format } from "date-fns";
 
 type Address = string;
 
