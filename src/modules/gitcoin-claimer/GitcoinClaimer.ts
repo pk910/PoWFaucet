@@ -171,7 +171,19 @@ class GitcoinAPI {
   private clearScoreCache(address: Address, timeout: number = 0) {
     return new Promise<void>((resolve) => {
       setTimeout(() => {
-        GitcoinScoreCache.delete(address);
+        // Clear the cache record
+        if (GitcoinScoreCache && GitcoinScoreCache.delete) {
+          ServiceManager.GetService(FaucetProcess).emitLog(
+            FaucetLogLevel.INFO,
+            `typeof GitcoinScoreCache.delete: `,
+            typeof GitcoinScoreCache.delete
+          );
+          ServiceManager.GetService(FaucetProcess).emitLog(
+            FaucetLogLevel.INFO,
+            `Clearing Gitcoin score cache for ${address}`
+          );
+          GitcoinScoreCache.delete(address);
+        }
         resolve();
       }, timeout);
     });
