@@ -182,7 +182,12 @@ export class FaucetWebApi {
   private async onPassportSubmitData(
     req: IncomingMessage,
     body: Buffer
-  ): Promise<any> {
+  ): Promise<
+    | {
+        canSubmitAgainAt: number;
+      }
+    | FaucetHttpResponse
+  > {
     if (req.method !== "POST")
       return new FaucetHttpResponse(405, "Method Not Allowed");
 
@@ -462,17 +467,18 @@ export class FaucetWebApi {
   > {
     if (req.method !== "POST")
       return new FaucetHttpResponse(405, "Method Not Allowed");
-    
+
     const remoteIP = this.getRemoteAddr(req);
-    const gitcoinClaimer = ServiceManager.GetService(
-      GitcoinClaimer
+    const gitcoinClaimer = ServiceManager.GetService(GitcoinClaimer);
+    const canClaim = await gitcoinClaimer.checkIfUserCanClaimGitcoin(
+      userId,
+      remoteIP
     );
-    const canClaim = await gitcoinClaimer.checkIfUserCanClaimGitcoin(userId, remoteIP);
     // If user can't claim, throw an error
     if (!canClaim.can) {
       throw new FaucetError("GITCOIN_CLAIM_ERROR", canClaim.reason);
     }
-    
+
     try {
       const txHash = await gitcoinClaimer.claimGitcoin(body, userId, remoteIP);
       return { txHash };

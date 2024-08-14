@@ -23,6 +23,7 @@ import { RecurringLimitsModule } from "../recurring-limits/RecurringLimitsModule
 import { isValidAddress } from "ethereumjs-util";
 import { nowSeconds } from "../../utils/DateUtils.js";
 import { FaucetError } from "../../common/FaucetError.js";
+import { format } from "date-fns";
 
 type Address = string;
 
@@ -101,6 +102,12 @@ class GitcoinAPI {
     needToSubmit: boolean;
   }> {
     const cachedScore = GitcoinScoreCache.get(address);
+
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO,
+      `Cached Gitcoin Score for ${address}: ${cachedScore}`
+    );
+
     if (cachedScore) {
       return {
         value: cachedScore,
@@ -129,6 +136,12 @@ class GitcoinAPI {
     }
 
     const score = (await response.json()) as ScoreResponse;
+
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO,
+      `Score from Gitcoin for ${address}: ${JSON.stringify(score)}`
+    );
+
     const scoreNumber = Number(score.score);
     GitcoinScoreCache.set(address, scoreNumber);
     return {
@@ -158,6 +171,15 @@ class GitcoinAPI {
     return signingMessage;
   }
 
+  private clearScoreCache(address: Address, timeout: number = 0) {
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        GitcoinScoreCache.delete(address);
+        resolve();
+      }, timeout);
+    });
+  }
+
   public async submitPassport(
     passport: Omit<PassportSubmitData, "scorer_id">
   ): Promise<{ result: "success" }> {
@@ -182,10 +204,21 @@ class GitcoinAPI {
       throw new FaucetError("GITCOIN_API_ERROR", errorMessage);
     }
 
+    try {
+      const respBody = (await response.json()) as any;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.INFO,
+        JSON.stringify(respBody)
+      );
+    } catch (error) {}
+
     // Cache the submission
     GitcoinPassportSubmissions.set(passport.address, {
       timestamp: Date.now(),
     });
+
+    // Clear the score cache, fire and forget
+    this.clearScoreCache(passport.address, 1000 * 5);
 
     return { result: "success" };
   }
@@ -227,8 +260,7 @@ export class GitcoinClaimer {
 
   public async initialize(): Promise<void> {
     // Check if the Gitcoin claimer is enabled
-    const gitcoinClaimerEnabled = faucetConfig.gitcoinClaimerEnabled;
-    this._isEnabled = gitcoinClaimerEnabled;
+    this._isEnabled = faucetConfig.gitcoinClaimerEnabled ?? false;
 
     const gitcoinApiToken = faucetConfig.gitcoinApiToken;
     const gitcoinScorerId = faucetConfig.gitcoinScorerId;
@@ -274,8 +306,7 @@ export class GitcoinClaimer {
   }
 
   public async submitPassport(body: Buffer): Promise<{
-    result: "pending" | "success";
-    canSubmitAt?: number;
+    canSubmitAgainAt: number;
   }> {
     this.guard();
     const validated = zodSchemaBodyValidation(
@@ -292,16 +323,31 @@ export class GitcoinClaimer {
     }
 
     const cachedSubmission = GitcoinPassportSubmissions.get(validated.address);
+
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO,
+      `Cached passport submit for ${validated.address}: ${JSON.stringify(
+        cachedSubmission
+      )}. ${
+        cachedSubmission?.timestamp
+          ? `Submitted: ${
+              (Date.now() - cachedSubmission.timestamp) / 1000
+            } seconds ago`
+          : ""
+      }`
+    );
+
     if (cachedSubmission) {
-      const canSubmitAt = cachedSubmission.timestamp + 1000 * 60 * 5; // 5 minutes from the last submission
+      const canSubmitAgainAt = cachedSubmission.timestamp + 1000 * 60 * 5; // 5 minutes from the last submission
       return {
-        result: "pending",
-        canSubmitAt,
+        canSubmitAgainAt,
       };
     }
 
     const result = await this._gitcoinApi.submitPassport(validated);
-    return result;
+    return {
+      canSubmitAgainAt: Date.now() + 1000 * 60 * 5, // 5 minutes from now
+    };
   }
 
   public async checkIfUserCanClaimGitcoin(
