@@ -15,6 +15,8 @@ export interface IFaucetConfig {
     pow?: IPoWModuleConfig;
     passport?: IPassportModuleConfig;
   };
+  gitcoinMinimumScore?: number;
+  gitcoinClaimerEnabled?: boolean;
 }
 
 export interface IGithubModuleConfig {

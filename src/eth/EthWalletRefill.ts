@@ -4,6 +4,7 @@ import { ServiceManager } from "../common/ServiceManager.js";
 import { EthClaimManager } from "./EthClaimManager.js";
 import { EthWalletManager, TransactionResult } from "./EthWalletManager.js";
 import { SessionManager } from "../session/SessionManager.js";
+import { nowSeconds } from "../utils/DateUtils.js";
 
 export class EthWalletRefill {
   private lastWalletRefill: number;
@@ -23,7 +24,7 @@ export class EthWalletRefill {
   private async tryRefillWallet() {
     if(!faucetConfig.ethRefillContract)
       return;
-    let now = Math.floor(new Date().getTime() / 1000);
+    let now = nowSeconds();
     if(this.lastWalletRefillTry && now - this.lastWalletRefillTry < 60)
       return;
     if(this.lastWalletRefill && faucetConfig.ethRefillContract.cooldownTime && now - this.lastWalletRefill < faucetConfig.ethRefillContract.cooldownTime)
@@ -49,7 +50,7 @@ export class EthWalletRefill {
       else if(refillAction == "overflow")
         txResult = await this.overflowWallet(walletBalance - BigInt(faucetConfig.ethRefillContract.overflowBalance));
 
-      this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
+      this.lastWalletRefill = nowSeconds();
 
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult.txHash);
 
@@ -156,7 +157,7 @@ export class EthWalletRefill {
   }
 
   public getFaucetRefillCooldown(): number {
-    let now = Math.floor(new Date().getTime() / 1000);
+    let now = nowSeconds();
     if(!faucetConfig.ethRefillContract || !faucetConfig.ethRefillContract.cooldownTime)
       return 0;
     if(!this.lastWalletRefill)

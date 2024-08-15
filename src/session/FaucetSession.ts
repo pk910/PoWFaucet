@@ -9,6 +9,7 @@ import { SessionManager } from "./SessionManager.js";
 import { ISessionRewardFactor } from "./SessionRewardFactor.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
+import { nowSeconds } from "../utils/DateUtils.js";
 
 export enum FaucetSessionStatus {
   UNKNOWN = "unknown",
@@ -89,7 +90,7 @@ export class FaucetSession {
     }
     this.status = FaucetSessionStatus.STARTING;
     this.sessionId = getNewGuid();
-    this.startTime = Math.floor((new Date()).getTime() / 1000);
+    this.startTime = nowSeconds();
     if(remoteIP.match(/^::ffff:/))
       remoteIP = remoteIP.substring(7);
     this.remoteIP = remoteIP;
@@ -228,7 +229,7 @@ export class FaucetSession {
       clearTimeout(this.sessionTimer);
       this.sessionTimer = null;
     }
-    const now = Math.floor((new Date()).getTime() / 1000);
+    const now = nowSeconds();
 
     if(this.status === FaucetSessionStatus.RUNNING) {
       let minTaskTimeout = 0;
@@ -245,7 +246,7 @@ export class FaucetSession {
   }
 
   public async tryProceedSession(): Promise<void> {
-    const now = Math.floor((new Date()).getTime() / 1000);
+    const now = nowSeconds();
     const sessionTimeout = this.startTime + faucetConfig.sessionTimeout;
 
     if(this.status === FaucetSessionStatus.RUNNING) {
@@ -282,7 +283,7 @@ export class FaucetSession {
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
     this.manager.notifySessionUpdate(this);
-    this.setSessionData("close.time", Math.floor((new Date()).getTime() / 1000));
+    this.setSessionData("close.time", nowSeconds());
     this.saveSession();
     this.isDisposed = true;
   }
@@ -359,7 +360,7 @@ export class FaucetSession {
     this.blockingTasks.push({
       module: moduleName,
       name: taskName,
-      timeout: timeLimit ? Math.floor((new Date()).getTime() / 1000) + timeLimit : 0,
+      timeout: timeLimit ? nowSeconds() + timeLimit : 0,
     });
     this.resetSessionTimer();
   }

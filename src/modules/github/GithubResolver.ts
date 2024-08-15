@@ -2,6 +2,7 @@ import { FetchUtil } from '../../utils/FetchUtil.js';
 import { faucetConfig } from "../../config/FaucetConfig.js";
 import { decryptStr, encryptStr } from "../../utils/CryptoUtils.js";
 import { GithubModule } from "./GithubModule.js";
+import { nowSeconds } from '../../utils/DateUtils.js';
 
 export interface IGithubAuthInfo {
   time: number;
@@ -50,10 +51,6 @@ export class GithubResolver {
     this.module = module;
   }
 
-  private now(): number {
-    return Math.floor((new Date()).getTime() / 1000);
-  }
-
   public async createAuthInfo(authCode: string): Promise<IGithubAuthInfo> {
     // get access token
     let accessToken: string;
@@ -79,7 +76,7 @@ export class GithubResolver {
     }
 
     let userInfo = await this.fetchProfileInfo(accessToken);
-    let now = Math.floor(new Date().getTime() / 1000);
+    let now = nowSeconds();
     let faucetToken = this.generateFaucetToken(accessToken, userInfo.uid, now);
     return {
       time: now,
@@ -135,7 +132,7 @@ export class GithubResolver {
     let tokenData = this.parseFaucetToken(token);
     if(!tokenData)
       throw "invalid github token";
-    if(tokenData[2] + this.module.getModuleConfig().authTimeout < this.now())
+    if(tokenData[2] + this.module.getModuleConfig().authTimeout < nowSeconds())
       throw "github token expired";
     let accessToken = tokenData[0];
     let userId = tokenData[1];
@@ -150,7 +147,7 @@ export class GithubResolver {
     let userInfo = await this.fetchProfileInfo(accessToken);
     let promises: Promise<void>[] = [];
     let githubInfo: IGithubInfo = {
-      time: this.now(),
+      time: nowSeconds(),
       uid: userInfo.uid,
       user: userInfo.user,
       loaded: [],

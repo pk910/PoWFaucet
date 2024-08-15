@@ -45,3 +45,7 @@ export const renderTimespan = (time: number, maxParts?: number): string => {
   }
   return resParts.join(" ");
 }
+
+export function nowSeconds(): number {
+  return Math.floor((new Date()).getTime() / 1000);
+}

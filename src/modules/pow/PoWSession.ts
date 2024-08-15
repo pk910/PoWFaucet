@@ -1,4 +1,5 @@
 import { FaucetSession } from "../../session/FaucetSession.js";
+import { nowSeconds } from "../../utils/DateUtils.js";
 import { PoWClient } from "./PoWClient.js";
 
 export class PoWSession {
@@ -21,7 +22,7 @@ export class PoWSession {
     if(value)
       this.session.setSessionData("pow.idleTime", null);
     else
-      this.session.setSessionData("pow.idleTime", Math.floor(new Date().getTime() / 1000));
+      this.session.setSessionData("pow.idleTime", nowSeconds());
   }
 
   public get idleTime(): number {

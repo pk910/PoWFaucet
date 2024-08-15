@@ -14,6 +14,7 @@ import { ModuleManager } from "./modules/ModuleManager.js";
 import { SessionManager } from "./session/SessionManager.js";
 import { FaucetStatus } from "./services/FaucetStatus.js";
 import { PromMetricsService } from "./services/PromMetrics.js";
+import { GitcoinClaimer } from "./modules/gitcoin-claimer/GitcoinClaimer.js";
 
 (async () => {
   if(!isMainThread) {
@@ -41,6 +42,7 @@ import { PromMetricsService } from "./services/PromMetrics.js";
       await ServiceManager.GetService(ModuleManager).initialize();
       await ServiceManager.GetService(SessionManager).initialize();
       await ServiceManager.GetService(EthClaimManager).initialize();
+      await ServiceManager.GetService(GitcoinClaimer).initialize();
       ServiceManager.GetService(FaucetHttpServer).initialize();
       ServiceManager.GetService(PromMetricsService).initialize();
 

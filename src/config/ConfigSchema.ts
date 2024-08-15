@@ -1,8 +1,8 @@
-import { IBaseModuleConfig } from '../modules/BaseModule.js';
-import { FaucetCoinType } from '../eth/EthWalletManager.js';
-import { IFaucetStatsConfig } from '../services/FaucetStatsLog.js';
-import { FaucetDatabaseOptions } from '../db/FaucetDatabase.js';
-import { IFaucetStatusConfig } from '../services/FaucetStatus.js';
+import { IBaseModuleConfig } from "../modules/BaseModule.js";
+import { FaucetCoinType } from "../eth/EthWalletManager.js";
+import { IFaucetStatsConfig } from "../services/FaucetStatsLog.js";
+import { FaucetDatabaseOptions } from "../db/FaucetDatabase.js";
+import { IFaucetStatusConfig } from "../services/FaucetStatus.js";
 
 export interface IConfigSchema {
   version?: 2;
@@ -42,7 +42,7 @@ export interface IConfigSchema {
 
   modules: {
     [moduleName: string]: IBaseModuleConfig;
-  }
+  };
 
   spareFundsAmount: number; // minimum balance to leave in the faucet wallet
   noFundsBalance: number; // minimum balance to show the empty faucet error message
@@ -52,7 +52,8 @@ export interface IConfigSchema {
   rpcConnectionError: string | boolean; // RPC unreachable error message / true to show the generic message / false to disable the error
   denyNewSessions: string | boolean; // prevent creation of new sessions (used for maintenance)
 
-  ethRefillContract: null | { // refill from vault contract or null to disable automatic refilling
+  ethRefillContract: null | {
+    // refill from vault contract or null to disable automatic refilling
     contract: string; // vault contract address
     abi: string; // vault contract abi
     allowanceFn: string; // vault contract getAllowance function name
@@ -73,5 +74,10 @@ export interface IConfigSchema {
 
   faucetStats: IFaucetStatsConfig | null; // faucet stats config or null to disable stats
   faucetStatus: IFaucetStatusConfig | null; // faucet status config or null to disable status
-};
 
+  // Gitcoin claimer config
+  gitcoinClaimerEnabled?: boolean; // Enable Gitcoin claimer
+  gitcoinApiToken: string; // Gitcoin API token
+  gitcoinScorerId: string; // Gitcoin Scorer ID
+  gitcoinMinimumScore: number; // Minimum score required to claim from Gitcoin
+}

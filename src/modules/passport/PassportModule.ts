@@ -11,6 +11,7 @@ import { IncomingMessage } from 'http';
 import { SessionManager } from '../../session/SessionManager.js';
 import { PassportDB } from './PassportDB.js';
 import { FaucetDatabase } from '../../db/FaucetDatabase.js';
+import { nowSeconds } from '../../utils/DateUtils.js';
 
 export class PassportModule extends BaseModule<IPassportConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -73,7 +74,7 @@ export class PassportModule extends BaseModule<IPassportConfig> {
       return;
     let targetAddr = session.getTargetAddr();
     let passportInfo = await this.passportResolver.getPassport(targetAddr);
-    session.setSessionData("passport.refresh", Math.floor(new Date().getTime() / 1000));
+    session.setSessionData("passport.refresh", nowSeconds());
     session.setSessionData("passport.data", passportInfo);
     session.setSessionData("passport.score", this.passportResolver.getPassportScore(passportInfo));
   }
@@ -114,7 +115,7 @@ export class PassportModule extends BaseModule<IPassportConfig> {
       };
     }
 
-    let now = Math.floor(new Date().getTime() / 1000);
+    let now = nowSeconds();
     let passportInfo: IPassportInfo;
     if(req.method === "POST") {
       // manual refresh
