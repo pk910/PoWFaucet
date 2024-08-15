@@ -333,7 +333,7 @@ export class GitcoinClaimer {
     }
 
     return {
-      canSubmitAgainAt: Date.now(),
+      canSubmitAgainAt: Date.now() - 1000,
     };
   }
 
