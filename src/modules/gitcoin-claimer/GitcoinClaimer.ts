@@ -172,17 +172,17 @@ class GitcoinAPI {
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         // Clear the cache record
-        if (GitcoinScoreCache && GitcoinScoreCache.delete) {
-          ServiceManager.GetService(FaucetProcess).emitLog(
-            FaucetLogLevel.INFO,
-            `typeof GitcoinScoreCache.delete: `,
-            typeof GitcoinScoreCache.delete
-          );
+        try {
+          GitcoinScoreCache.delete(address);
           ServiceManager.GetService(FaucetProcess).emitLog(
             FaucetLogLevel.INFO,
             `Clearing Gitcoin score cache for ${address}`
           );
-          GitcoinScoreCache.delete(address);
+        } catch (e) {
+          ServiceManager.GetService(FaucetProcess).emitLog(
+            FaucetLogLevel.WARNING,
+            `Could not clear Gitcoin score cache for ${address}`
+          );
         }
         resolve();
       }, timeout);
