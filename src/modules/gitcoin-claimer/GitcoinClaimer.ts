@@ -314,6 +314,29 @@ export class GitcoinClaimer {
     return this._gitcoinApi.getSigningMessage();
   }
 
+  public async checkPassportSubmitCache(body: Buffer): Promise<{
+    canSubmitAgainAt: number;
+  }> {
+    this.guard();
+    const validated = zodSchemaBodyValidation(
+      body,
+      zodPassportSubmitData
+    ) as PassportSubmitData;
+
+    const cachedSubmission = GitcoinPassportSubmissions.get(validated.address);
+
+    if (cachedSubmission) {
+      const canSubmitAgainAt = cachedSubmission.timestamp + 1000 * 60 * 5; // 5 minutes from the last submission
+      return {
+        canSubmitAgainAt,
+      };
+    }
+
+    return {
+      canSubmitAgainAt: Date.now(),
+    };
+  }
+
   public async submitPassport(body: Buffer): Promise<{
     canSubmitAgainAt: number;
   }> {

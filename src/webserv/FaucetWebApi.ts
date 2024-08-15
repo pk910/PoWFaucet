@@ -161,6 +161,8 @@ export class FaucetWebApi {
         return this.getSingingMessage(req, body);
       case "passportSubmitData".toLowerCase():
         return this.onPassportSubmitData(req, body);
+      case "checkPassportSubmitCache".toLowerCase():
+        return this.onCheckPassportSubmitCache(req, body);
       case "claimRewardByGitcoin".toLowerCase():
         return this.onClaimRewardByGitcoin(
           req,
@@ -193,6 +195,22 @@ export class FaucetWebApi {
 
     const GitcoinClaimerService = ServiceManager.GetService(GitcoinClaimer);
     return GitcoinClaimerService.submitPassport(body);
+  }
+
+  private async onCheckPassportSubmitCache(
+    req: IncomingMessage,
+    body: Buffer
+  ): Promise<
+    | {
+        canSubmitAgainAt: number;
+      }
+    | FaucetHttpResponse
+  > {
+    if (req.method !== "POST")
+      return new FaucetHttpResponse(405, "Method Not Allowed");
+
+    const GitcoinClaimerService = ServiceManager.GetService(GitcoinClaimer);
+    return GitcoinClaimerService.checkPassportSubmitCache(body);
   }
 
   private async getSingingMessage(
