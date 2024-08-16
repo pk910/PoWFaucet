@@ -429,7 +429,7 @@ export class GitcoinClaimer {
     body: Buffer,
     userId: string,
     remoteIP: string
-  ): Promise<string> {
+  ): Promise<{ txHash: string; targetAddress: string }> {
     this.guard();
     // Check address score
     const { value: score } = await this.getAddressScore(body);
@@ -550,7 +550,7 @@ export class GitcoinClaimer {
     }
 
     clearClaiming();
-    return txHash;
+    return { txHash, targetAddress };
   }
 
   private _addClaimingByUser(userId: string) {

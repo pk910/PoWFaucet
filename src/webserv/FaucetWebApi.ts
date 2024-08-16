@@ -498,7 +498,11 @@ export class FaucetWebApi {
     }
 
     try {
-      const txHash = await gitcoinClaimer.claimGitcoin(body, userId, remoteIP);
+      const { txHash, targetAddress } = await gitcoinClaimer.claimGitcoin(body, userId, remoteIP);
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.INFO,
+        `[GITCOIN_CLAIM_SUCCESS]: User: ${userId}; Address: ${targetAddress};`
+      );
       return { txHash };
     } catch (ex) {
       let failedReason = ex.toString();
