@@ -1,7 +1,7 @@
 import 'mocha';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import testDatabase from '@databases/mysql-test';
+import { createDB } from 'mysql-memory-server';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from './common.js';
 import { ServiceManager } from '../src/common/ServiceManager.js';
 import { FaucetDatabase, FaucetDbDriver } from '../src/db/FaucetDatabase.js';
@@ -16,21 +16,15 @@ import { FaucetSession, FaucetSessionStatus } from '../src/session/FaucetSession
 describe("Session Management with MySQL DB Driver", () => {
   let globalStubs;
   let fakeProvider;
-  let mysqlKill;
+  let mysqlDb;
 
   before(async function() {
     this.timeout(120000);
-    let {kill} = await (testDatabase as any).default({
-      connectTimeoutSeconds: 120,
-      mysqlUser: "powfaucet",
-      mysqlPassword: "test123",
-      mysqlDb: "powfaucet",
-    });
-    mysqlKill = kill;
+    mysqlDb = await createDB();
   });
   after(async function() {
     this.timeout(10000);
-    await mysqlKill();
+    await mysqlDb.stop();
   });
 
   beforeEach(async function() {
@@ -43,9 +37,10 @@ describe("Session Management with MySQL DB Driver", () => {
     faucetConfig.database = {
       driver: FaucetDbDriver.MYSQL,
       host: "localhost",
-      username: "powfaucet",
-      password: "test123",
-      database: "powfaucet",
+      port: mysqlDb.port,
+      username: mysqlDb.username,
+      password: "",
+      database: mysqlDb.dbName,
     };
 
     await ServiceManager.GetService(FaucetDatabase).initialize();
