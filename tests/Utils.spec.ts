@@ -32,9 +32,9 @@ describe("Utility Functions", () => {
   });
 
   it("DateUtils.renderDate", async () => {
-    expect(renderDate(new Date(12000), true)).to.equal("1970-01-01 01:00", "unexpected result 1");
-    expect(renderDate(new Date(12000), false)).to.equal("1970-01-01", "unexpected result 2");
-    expect(renderDate(new Date(12000), true, true)).to.equal("1970-01-01 01:00:12", "unexpected result 3");
+    expect(renderDate(new Date(1970, 2, 3, 5, 11, 12), true)).to.equal("1970-03-03 05:11", "unexpected result 1");
+    expect(renderDate(new Date(1970, 2, 3, 5, 11, 12), false)).to.equal("1970-03-03", "unexpected result 2");
+    expect(renderDate(new Date(1970, 2, 3, 5, 11, 12), true, true)).to.equal("1970-03-03 05:11:12", "unexpected result 3");
   });
 
   it("HashedInfo.getHashedIp", async () => {
