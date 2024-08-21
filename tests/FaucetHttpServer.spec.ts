@@ -16,6 +16,7 @@ import { FaucetHttpResponse, FaucetHttpServer } from '../src/webserv/FaucetHttpS
 import { EthClaimManager } from '../src/eth/EthClaimManager.js';
 import { sha256 } from '../src/utils/CryptoUtils.js';
 import { FaucetProcess } from '../src/common/FaucetProcess.js';
+import { FetchUtil } from '../src/utils/FetchUtil.js';
 
 describe("Faucet Web Server", () => {
   let globalStubs;
@@ -75,7 +76,7 @@ describe("Faucet Web Server", () => {
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
     let listenPort = webServer.getListenPort();
-    let indexData = await fetch("http://localhost:" + listenPort, {method: "GET"}).then((rsp) => rsp.text());
+    let indexData = await FetchUtil.fetch("http://localhost:" + listenPort, {method: "GET"}).then((rsp) => rsp.text());
     expect(indexData).contains(faucetConfig.faucetTitle, "not index contents");
   });
 
@@ -89,7 +90,7 @@ describe("Faucet Web Server", () => {
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
     let listenPort = webServer.getListenPort();
-    let indexData = await fetch("http://localhost:" + listenPort, {method: "GET"}).then((rsp) => rsp.text());
+    let indexData = await FetchUtil.fetch("http://localhost:" + listenPort, {method: "GET"}).then((rsp) => rsp.text());
     expect(indexData).contains("<!-- pow-faucet-header -->", "not index contents");
   });
 
@@ -100,7 +101,7 @@ describe("Faucet Web Server", () => {
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
     let listenPort = webServer.getListenPort();
-    let configData = await fetch("http://localhost:" + listenPort + "/api/getFaucetConfig", {method: "GET"}).then((rsp) => rsp.json());
+    let configData = await FetchUtil.fetch("http://localhost:" + listenPort + "/api/getFaucetConfig", {method: "GET"}).then((rsp) => rsp.json());
     expect(!!configData).equals(true, "no api response");
     expect((configData as any).faucetTitle).equals(faucetConfig.faucetTitle, "api response mismatch");
   });
@@ -116,7 +117,7 @@ describe("Faucet Web Server", () => {
       return sha256(body.toString());
     });
     let listenPort = webServer.getListenPort();
-    let responseData = await fetch("http://localhost:" + listenPort + "/api/testEndpoint", {
+    let responseData = await FetchUtil.fetch("http://localhost:" + listenPort + "/api/testEndpoint", {
       method: 'POST',
       body: JSON.stringify({test: 1}),
       headers: {'Content-Type': 'application/json'}
@@ -138,7 +139,7 @@ describe("Faucet Web Server", () => {
     let error: Error = null as any;
     try {
       let testData = "0123456789".repeat(1024 * 1024);
-      await fetch("http://localhost:" + listenPort + "/api/testEndpoint", {
+      await FetchUtil.fetch("http://localhost:" + listenPort + "/api/testEndpoint", {
         method: 'POST',
         body: JSON.stringify({test: testData}),
         headers: {'Content-Type': 'application/json'}
@@ -159,7 +160,7 @@ describe("Faucet Web Server", () => {
       return new FaucetHttpResponse(500, "Test Error 4135");
     });
     let listenPort = webServer.getListenPort();
-    let testRsp = await fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
+    let testRsp = await FetchUtil.fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
     expect(testRsp.status).to.equal(500, "unexpected http response code");
     expect(testRsp.statusText).to.matches(/Test Error 4135/, "unexpected http response code");
   });
@@ -173,7 +174,7 @@ describe("Faucet Web Server", () => {
       return Promise.reject("Test Error 3672");
     });
     let listenPort = webServer.getListenPort();
-    let testRsp = await fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
+    let testRsp = await FetchUtil.fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
     let testRspText = await testRsp.text();
     expect(testRsp.status).to.equal(500, "unexpected http response code");
     expect(testRspText).to.matches(/Test Error 3672/, "unexpected http response code");
@@ -188,7 +189,7 @@ describe("Faucet Web Server", () => {
       throw new FaucetHttpResponse(500, "Test Error 4267");
     });
     let listenPort = webServer.getListenPort();
-    let testRsp = await fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
+    let testRsp = await FetchUtil.fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
     expect(testRsp.status).to.equal(500, "unexpected http response code");
     expect(testRsp.statusText).to.matches(/Test Error 4267/, "unexpected http response code");
   });
@@ -202,7 +203,7 @@ describe("Faucet Web Server", () => {
       throw "unexpected error";
     });
     let listenPort = webServer.getListenPort();
-    let testRsp = await fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
+    let testRsp = await FetchUtil.fetch("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"});
     expect(testRsp.status).to.equal(500, "unexpected http response code");
     expect(testRsp.statusText).to.matches(/Internal Server Error/, "unexpected http response code");
   });
@@ -258,7 +259,7 @@ describe("Faucet Web Server", () => {
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
     let listenPort = webServer.getListenPort();
-    let configOptionsRsp = await fetch(
+    let configOptionsRsp = await FetchUtil.fetch(
       "http://localhost:" + listenPort + "/api/getFaucetConfig", 
       {
         method: "OPTIONS",
@@ -270,7 +271,7 @@ describe("Faucet Web Server", () => {
     expect(configOptionsRsp.headers.get("access-control-allow-origin")).equals("https://example.com", "access-control-allow-origin mismatch");
     expect(configOptionsRsp.headers.get("access-control-allow-methods")).equals("GET, POST", "access-control-allow-methods mismatch");
 
-    let configRsp = await fetch(
+    let configRsp = await FetchUtil.fetch(
       "http://localhost:" + listenPort + "/api/getFaucetConfig", 
       {
         method: "GET",
@@ -294,7 +295,7 @@ describe("Faucet Web Server", () => {
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
     let listenPort = webServer.getListenPort();
-    let configOptionsRsp = await fetch(
+    let configOptionsRsp = await FetchUtil.fetch(
       "http://localhost:" + listenPort + "/api/getFaucetConfig", 
       {
         method: "OPTIONS",
@@ -336,7 +337,7 @@ describe("Faucet Web Server", () => {
       if(!fs.existsSync(resourcePath))
         fs.writeFileSync(resourcePath, "test");
 
-      let optionsRsp = await fetch(
+      let optionsRsp = await FetchUtil.fetch(
         "http://localhost:" + listenPort + resource, 
         {
           method: "OPTIONS",
@@ -348,7 +349,7 @@ describe("Faucet Web Server", () => {
       expect(optionsRsp.headers.get("access-control-allow-origin")).equals("https://example.com", "access-control-allow-origin mismatch");
       expect(optionsRsp.headers.get("access-control-allow-methods")).equals("GET, POST", "access-control-allow-methods mismatch");
 
-      let dataRsp = await fetch(
+      let dataRsp = await FetchUtil.fetch(
         "http://localhost:" + listenPort + resource, 
         {
           method: "GET",
