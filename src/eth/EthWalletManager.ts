@@ -3,7 +3,7 @@ import Web3, { ContractAbi, AbiFragment, TransactionReceipt, TransactionNotFound
 import net from 'net';
 import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
-import * as EthUtil from 'ethereumjs-util';
+import * as EthUtil from '@ethereumjs/util';
 import { Contract } from 'web3-eth-contract';
 import { ethRpcMethods } from 'web3-rpc-methods';
 import { faucetConfig } from '../config/FaucetConfig.js';
@@ -90,7 +90,7 @@ export class EthWalletManager {
     if(privkey.match(/^0x/))
       privkey = privkey.substring(2);
     this.walletKey = Buffer.from(privkey, "hex");
-    this.walletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(this.walletKey).toString("hex"));
+    this.walletAddr = EthUtil.toChecksumAddress(EthUtil.bytesToHex(EthUtil.privateToAddress(this.walletKey)));
 
     await this.loadWalletState();
 
@@ -404,9 +404,9 @@ export class EthWalletManager {
         nonce: nonce,
         gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
         gasPrice: gasPrice,
-        to: target,
-        value: "0x" + amount.toString(16),
-        data: data ? data : "0x"
+        to: target as EthUtil.PrefixedHexString,
+        value: "0x" + amount.toString(16) as EthUtil.PrefixedHexString,
+        data: (data ? data : "0x") as EthUtil.PrefixedHexString
       }, {
         common: this.chainCommon
       });
@@ -418,9 +418,9 @@ export class EthWalletManager {
         gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
         maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
         maxFeePerGas: faucetConfig.ethTxMaxFee,
-        to: target,
-        value: "0x" + amount.toString(16),
-        data: data ? data : "0x"
+        to: target as EthUtil.PrefixedHexString,
+        value: "0x" + amount.toString(16) as EthUtil.PrefixedHexString,
+        data: (data ? data : "0x") as EthUtil.PrefixedHexString
       }, {
         common: this.chainCommon
       });
