@@ -65,7 +65,6 @@
     "@ethereumjs/tx": "^5.2.1",
     "@types/node": "^22.1.0",
     "bignumber.js": "^9.1.2",
-    "ethereumjs-util": "^7.1.5",
     "hcaptcha": "^0.2.0",
     "html-entities": "^2.5.2",
     "json-bigint": "^1.0.0",
