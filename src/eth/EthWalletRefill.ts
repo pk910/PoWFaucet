@@ -10,6 +10,10 @@ export class EthWalletRefill {
   private lastWalletRefillTry: number;
   private walletRefillPromise: Promise<void>;
 
+  private now(): number {
+    return Math.floor(new Date().getTime() / 1000);
+  }
+
   public processWalletRefill(): Promise<void> {
     if(!this.walletRefillPromise) {
       this.walletRefillPromise = this.tryRefillWallet();
@@ -23,7 +27,7 @@ export class EthWalletRefill {
   private async tryRefillWallet() {
     if(!faucetConfig.ethRefillContract)
       return;
-    let now = Math.floor(new Date().getTime() / 1000);
+    let now = this.now();
     if(this.lastWalletRefillTry && now - this.lastWalletRefillTry < 60)
       return;
     if(this.lastWalletRefill && faucetConfig.ethRefillContract.cooldownTime && now - this.lastWalletRefill < faucetConfig.ethRefillContract.cooldownTime)
@@ -49,7 +53,7 @@ export class EthWalletRefill {
       else if(refillAction == "overflow")
         txResult = await this.overflowWallet(walletBalance - BigInt(faucetConfig.ethRefillContract.overflowBalance));
       
-      this.lastWalletRefill = Math.floor(new Date().getTime() / 1000);
+      this.lastWalletRefill = this.now();
 
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Sending " + refillAction + " transaction to vault contract: " + txResult.txHash);
 
@@ -67,6 +71,24 @@ export class EthWalletRefill {
     }
   }
 
+  private resolveCallArgs(args: string[], amount: string): string[] {
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    return args.map((arg) => {
+      switch(arg) {
+        case "{walletAddr}":
+          arg = ethWalletManager.getFaucetAddress();
+          break;
+        case "{amount}":
+          arg = amount;
+          break;
+        case "{token}":
+          arg = ethWalletManager.getTokenAddress();
+          break;
+      }
+      return arg;
+    })
+  }
+
   private async refillWallet(): Promise<TransactionResult> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let refillContractAbi = JSON.parse(faucetConfig.ethRefillContract.abi);
@@ -74,22 +96,7 @@ export class EthWalletRefill {
     let refillAmount = BigInt(faucetConfig.ethRefillContract.requestAmount) || 0n;
     let refillAllowance: bigint = null;
 
-    let getCallArgs = (args) => {
-      return args.map((arg) => {
-        switch(arg) {
-          case "{walletAddr}":
-            arg = ethWalletManager.getFaucetAddress();
-            break;
-          case "{amount}":
-            arg = refillAmount;
-            break;
-          case "{token}":
-            arg = ethWalletManager.getTokenAddress();
-            break;
-        }
-        return arg;
-      })
-    };
+    let getCallArgs = (args) => this.resolveCallArgs(args, refillAmount.toString());
 
     if(faucetConfig.ethRefillContract.allowanceFn) {
       // check allowance
@@ -125,22 +132,7 @@ export class EthWalletRefill {
     let refillContractAbi = JSON.parse(faucetConfig.ethRefillContract.abi);
     let refillContract = ethWalletManager.getContractInterface(faucetConfig.ethRefillContract.contract, refillContractAbi);
 
-    let getCallArgs = (args) => {
-      return args.map((arg) => {
-        switch(arg) {
-          case "{walletAddr}":
-            arg = ethWalletManager.getFaucetAddress();
-            break;
-          case "{amount}":
-            arg = amount;
-            break;
-          case "{token}":
-            arg = ethWalletManager.getTokenAddress();
-            break;
-        }
-        return arg;
-      })
-    };
+    let getCallArgs = (args) => this.resolveCallArgs(args, amount.toString());
 
     let callArgs = getCallArgs(faucetConfig.ethRefillContract.depositFnArgs || []);
     return await ethWalletManager.sendCustomTx(
@@ -152,7 +144,7 @@ export class EthWalletRefill {
   }
 
   public getFaucetRefillCooldown(): number {
-    let now = Math.floor(new Date().getTime() / 1000);
+    let now = this.now();
     if(!faucetConfig.ethRefillContract || !faucetConfig.ethRefillContract.cooldownTime)
       return 0;
     if(!this.lastWalletRefill)
