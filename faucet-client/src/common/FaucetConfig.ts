@@ -1,4 +1,3 @@
-
 export interface IFaucetConfig {
   faucetStatus: IFaucetStatus[];
   faucetCoinSymbol: string;
@@ -37,39 +36,41 @@ export interface IPoWModuleConfig {
 }
 
 export enum PoWHashAlgo {
-  SCRYPT      = "scrypt",
+  SCRYPT = "scrypt",
   CRYPTONIGHT = "cryptonight",
-  ARGON2      = "argon2",
+  ARGON2 = "argon2",
 }
 
-export type PoWParams = {
-  a: PoWHashAlgo.SCRYPT,
-  n: number; // cpu and memory cost
-  r: number; // block size
-  p: number; // parallelization
-  l: number; // key length
-} | {
-  a: PoWHashAlgo.CRYPTONIGHT,
-  c: number; // cn-algo
-  v: number; // variant
-  h: number; // height
-} | {
-  a: PoWHashAlgo.ARGON2;
-  t: number; // type
-  v: number; // version
-  i: number; // timeCost
-  m: number; // memoryCost
-  p: number; // parallelization,
-  l: number; // keyLength
-}
+export type PoWParams =
+  | {
+      a: PoWHashAlgo.SCRYPT;
+      n: number; // cpu and memory cost
+      r: number; // block size
+      p: number; // parallelization
+      l: number; // key length
+    }
+  | {
+      a: PoWHashAlgo.CRYPTONIGHT;
+      c: number; // cn-algo
+      v: number; // variant
+      h: number; // height
+    }
+  | {
+      a: PoWHashAlgo.ARGON2;
+      t: number; // type
+      v: number; // version
+      i: number; // timeCost
+      m: number; // memoryCost
+      p: number; // parallelization,
+      l: number; // keyLength
+    };
 
 export interface IPassportModuleConfig {
   refreshTimeout: number;
   manualVerification: boolean;
-  stampScoring: {[stamp: string]: number};
-  boostFactor: {[score: number]: number};
+  stampScoring: { [stamp: string]: number };
+  boostFactor: { [score: number]: number };
 }
-
 
 export interface IFaucetStatus {
   text: string;

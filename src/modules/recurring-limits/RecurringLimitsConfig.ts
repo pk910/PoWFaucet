@@ -19,4 +19,4 @@ export interface IRecurringLimitConfig {
 export const defaultConfig: IRecurringLimitsConfig = {
   enabled: false,
   limits: [],
-}
+};

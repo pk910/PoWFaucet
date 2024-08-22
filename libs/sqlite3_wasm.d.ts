@@ -53,11 +53,7 @@ export class Database {
   exec(sql: string): void;
   prepare(sql: string): Statement;
   run(sql: string, values?: BindValues): RunResult;
-  all(
-    sql: string,
-    values?: BindValues,
-    options?: QueryOptions
-  ): QueryResult[];
+  all(sql: string, values?: BindValues, options?: QueryOptions): QueryResult[];
   get(
     sql: string,
     values?: BindValues,

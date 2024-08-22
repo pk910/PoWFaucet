@@ -1,8 +1,14 @@
 import React, { PropsWithChildren } from "react";
-import {IFaucetConfig} from "../../common/FaucetConfig";
-import {FaucetApi} from "../../common/FaucetApi";
-import {ClaimNotificationClient, IClaimNotificationUpdateData} from "./ClaimNotificationClient";
-import {FaucetSession, IFaucetSessionStatus} from "../../common/FaucetSession";
+import { IFaucetConfig } from "../../common/FaucetConfig";
+import { FaucetApi } from "../../common/FaucetApi";
+import {
+  ClaimNotificationClient,
+  IClaimNotificationUpdateData,
+} from "./ClaimNotificationClient";
+import {
+  FaucetSession,
+  IFaucetSessionStatus,
+} from "../../common/FaucetSession";
 
 export interface IClaimContainerProps {
   faucetConfig: IFaucetConfig;

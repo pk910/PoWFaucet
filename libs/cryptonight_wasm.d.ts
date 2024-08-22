@@ -1,13 +1,17 @@
-
-export type CryptoNight = (input: string, algo: number, variant: number, height: number) => string;
+export type CryptoNight = (
+  input: string,
+  algo: number,
+  variant: number,
+  height: number
+) => string;
 
 /* algo
-* 0: cn
-* 1: cn-lite
-* 2: cn-pico
-* 3: cn-half
-* 4: cn-rwz
-*/
+ * 0: cn
+ * 1: cn-lite
+ * 2: cn-pico
+ * 3: cn-half
+ * 4: cn-rwz
+ */
 
 /*
 Supported algorithms

@@ -1,6 +1,11 @@
 import mysql, { ResultSetHeader } from "mysql2";
 import { FaucetDbDriver } from "../FaucetDatabase.js";
-import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver.js";
+import {
+  BaseDriver,
+  BindValues,
+  QueryResult,
+  RunResult,
+} from "./BaseDriver.js";
 
 export interface IMySQLOptions {
   driver: FaucetDbDriver.MYSQL;
@@ -33,28 +38,35 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
   public override async exec(sql: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this.pool.getConnection((err, connection) => {
-        if(err)
-          return reject("mysql exec() error: could not acquire connection: " + err.toString());
-        
+        if (err)
+          return reject(
+            "mysql exec() error: could not acquire connection: " +
+              err.toString()
+          );
+
         connection.query(sql, (error, results) => {
-          if(error)
+          if (error)
             reject("mysql exec() error [" + sql + "]: " + error.toString());
-          else
-            resolve();
+          else resolve();
           connection.release();
-        })
+        });
       });
     });
   }
 
-  public override async run(sql: string, values?: BindValues): Promise<RunResult> {
+  public override async run(
+    sql: string,
+    values?: BindValues
+  ): Promise<RunResult> {
     return new Promise((resolve, reject) => {
       this.pool.getConnection((err, connection) => {
-        if(err)
-          return reject("mysql run() error: could not acquire connection: " + err.toString());
-        
+        if (err)
+          return reject(
+            "mysql run() error: could not acquire connection: " + err.toString()
+          );
+
         connection.query(sql, values, (error, results) => {
-          if(error)
+          if (error)
             reject("mysql run() error [" + sql + "]: " + error.toString());
           else {
             resolve({
@@ -63,45 +75,54 @@ export class MySQLDriver extends BaseDriver<IMySQLOptions> {
             });
           }
           connection.release();
-        })
+        });
       });
     });
   }
-  
-  public override async all(sql: string, values?: BindValues): Promise<QueryResult[]> {
+
+  public override async all(
+    sql: string,
+    values?: BindValues
+  ): Promise<QueryResult[]> {
     return new Promise((resolve, reject) => {
       this.pool.getConnection((err, connection) => {
-        if(err)
-          return reject("mysql all() error: could not acquire connection: " + err.toString());
-        
+        if (err)
+          return reject(
+            "mysql all() error: could not acquire connection: " + err.toString()
+          );
+
         connection.query(sql, values, (error, results) => {
-          if(error)
+          if (error)
             reject("mysql all() error [" + sql + "]: " + error.toString());
           else {
             resolve(results as QueryResult[]);
           }
           connection.release();
-        })
+        });
       });
     });
   }
 
-  public override async get(sql: string, values?: BindValues): Promise<QueryResult | null> {
+  public override async get(
+    sql: string,
+    values?: BindValues
+  ): Promise<QueryResult | null> {
     return new Promise((resolve, reject) => {
       this.pool.getConnection((err, connection) => {
-        if(err)
-          return reject("mysql get() error: could not acquire connection: " + err.toString());
-        
+        if (err)
+          return reject(
+            "mysql get() error: could not acquire connection: " + err.toString()
+          );
+
         connection.query(sql, values, (error, results) => {
-          if(error)
+          if (error)
             reject("mysql get() error [" + sql + "]: " + error.toString());
           else {
             resolve((results as QueryResult[]).length > 0 ? results[0] : null);
           }
           connection.release();
-        })
+        });
       });
     });
   }
-
 }

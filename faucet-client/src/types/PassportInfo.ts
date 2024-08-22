@@ -1,4 +1,3 @@
-
 export interface IPassportScoreInfo {
   score: number;
   factor: number;

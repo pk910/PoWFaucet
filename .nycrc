@@ -1,10 +1,5 @@
 {
   "reporter": ["text", "lcov"],
-  "include": [
-    "src/**"
-  ],
-  "exclude": [
-    "libs/*.js",
-    "tests/**"
-  ]
+  "include": ["src/**"],
+  "exclude": ["libs/*.js", "tests/**"]
 }

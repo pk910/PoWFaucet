@@ -1,22 +1,24 @@
-
 import { encode } from "base32768";
 import fs from "fs";
- 
-const base32768WASM = encode(fs.readFileSync("scrypt-wasm/pkg/scrypt_wasm_bg.wasm"));
 
-const wasmWrappperJS = fs.readFileSync("scrypt-wasm/pkg/scrypt_wasm_bg.js", { encoding: "utf8" });
+const base32768WASM = encode(
+  fs.readFileSync("scrypt-wasm/pkg/scrypt_wasm_bg.wasm")
+);
+
+const wasmWrappperJS = fs.readFileSync("scrypt-wasm/pkg/scrypt_wasm_bg.js", {
+  encoding: "utf8",
+});
 let lines = wasmWrappperJS.split("\n");
 
 // filter out the first line "import * as wasm from './scrypt_wasm_bg.wasm';"
 // because we are using global namespace, not es6 modules
-lines = lines.filter(line => !line.includes("scrypt_wasm_bg.wasm"))
+lines = lines.filter((line) => !line.includes("scrypt_wasm_bg.wasm"));
 
 // replace export with global namespace for the same reason.
-lines = lines.map(line => {
-  if(line.startsWith("export function scrypt")) {
+lines = lines.map((line) => {
+  if (line.startsWith("export function scrypt")) {
     return line.replace("export function scrypt", "scrypt = function");
-  }
-  else if(line.startsWith("export function")) {
+  } else if (line.startsWith("export function")) {
     return line.replace("export function", "function");
   }
   return line;
@@ -43,9 +45,13 @@ module.exports = {
 
 `);
 
-// Now its time to load the wasm module. 
+// Now its time to load the wasm module.
 // first, load the base32768 module into a global variable called "base32768"
-console.log(fs.readFileSync("node_modules/base32768/src/index.js", { encoding: "utf8" }).replace(/^export .*$/m, ""))
+console.log(
+  fs
+    .readFileSync("node_modules/base32768/src/index.js", { encoding: "utf8" })
+    .replace(/^export .*$/m, "")
+);
 
 // now, decode the base32768 string into an ArrayBuffer and tell WebAssembly to load it
 console.log(`
@@ -55,9 +61,14 @@ const wasmBinary = decode(base32768WASM);
 scryptPromise = WebAssembly.instantiate(wasmBinary, {}).then(instantiatedModule => {
 `);
 
-// Output the WASM wrapper JS code that came from the Rust WASM compiler, 
+// Output the WASM wrapper JS code that came from the Rust WASM compiler,
 // slightly modified to use global namespace instead of es6 modules
-console.log(customWASMWrappperJS.split("\n").map(x => `  ${x}`).join("\n"));
+console.log(
+  customWASMWrappperJS
+    .split("\n")
+    .map((x) => `  ${x}`)
+    .join("\n")
+);
 
 console.log("__wbg_set_wasm(instantiatedModule.instance.exports);");
 // finish off by closing scryptPromise

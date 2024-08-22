@@ -1,17 +1,20 @@
-import 'mocha';
-import sinon from 'sinon';
-import { expect } from 'chai';
-import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig } from '../common.js';
-import { ServiceManager } from '../../src/common/ServiceManager.js';
-import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
-import { ModuleManager } from '../../src/modules/ModuleManager.js';
-import { SessionManager } from '../../src/session/SessionManager.js';
-import { faucetConfig } from '../../src/config/FaucetConfig.js';
-import { FaucetError } from '../../src/common/FaucetError.js';
-import { FakeProvider } from '../stubs/FakeProvider.js';
-import { IEthInfoConfig } from '../../src/modules/ethinfo/EthInfoConfig.js';
-import { EthWalletManager } from '../../src/eth/EthWalletManager.js';
-
+import "mocha";
+import sinon from "sinon";
+import { expect } from "chai";
+import {
+  bindTestStubs,
+  unbindTestStubs,
+  loadDefaultTestConfig,
+} from "../common.js";
+import { ServiceManager } from "../../src/common/ServiceManager.js";
+import { FaucetDatabase } from "../../src/db/FaucetDatabase.js";
+import { ModuleManager } from "../../src/modules/ModuleManager.js";
+import { SessionManager } from "../../src/session/SessionManager.js";
+import { faucetConfig } from "../../src/config/FaucetConfig.js";
+import { FaucetError } from "../../src/common/FaucetError.js";
+import { FakeProvider } from "../stubs/FakeProvider.js";
+import { IEthInfoConfig } from "../../src/modules/ethinfo/EthInfoConfig.js";
+import { EthWalletManager } from "../../src/eth/EthWalletManager.js";
 
 describe("Faucet module: ethinfo", () => {
   let globalStubs;
@@ -22,7 +25,8 @@ describe("Faucet module: ethinfo", () => {
     fakeProvider = new FakeProvider();
     loadDefaultTestConfig();
     faucetConfig.faucetStats = null;
-    faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
+    faucetConfig.ethWalletKey =
+      "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethRpcHost = fakeProvider;
     await ServiceManager.GetService(FaucetDatabase).initialize();
     fakeProvider.injectResponse("eth_chainId", 1337);
@@ -50,13 +54,22 @@ describe("Faucet module: ethinfo", () => {
     let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
       addr: "0x0000000000000000000000000000000000001337",
     });
-    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
+    expect(testSession.getSessionStatus()).to.equal(
+      "claimable",
+      "unexpected session status"
+    );
     let balanceReq = fakeProvider.getLastRequest("eth_getBalance");
     expect(balanceReq).to.not.equal(null, "no eth_getBalance request");
-    expect(balanceReq.params[0]).to.equal("0x0000000000000000000000000000000000001337", "unexpected target address in eth_getBalance request");
+    expect(balanceReq.params[0]).to.equal(
+      "0x0000000000000000000000000000000000001337",
+      "unexpected target address in eth_getBalance request"
+    );
     let codeReq = fakeProvider.getLastRequest("eth_getCode");
     expect(codeReq).to.not.equal(null, "no eth_getCode request");
-    expect(codeReq.params[0]).to.equal("0x0000000000000000000000000000000000001337", "unexpected target address in eth_getCode request");
+    expect(codeReq.params[0]).to.equal(
+      "0x0000000000000000000000000000000000001337",
+      "unexpected target address in eth_getCode request"
+    );
   });
 
   it("Start session with too high balance", async () => {
@@ -74,11 +87,14 @@ describe("Faucet module: ethinfo", () => {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
       });
-    } catch(ex) {
+    } catch (ex) {
       error = ex;
     }
     expect(error).to.not.equal(null, "no exception thrown");
-    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
+    expect(error instanceof FaucetError).to.equal(
+      true,
+      "unexpected error type"
+    );
     expect(error?.getCode()).to.equal("BALANCE_LIMIT", "unexpected error code");
   });
 
@@ -97,12 +113,14 @@ describe("Faucet module: ethinfo", () => {
       await sessionManager.createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
       });
-    } catch(ex) {
+    } catch (ex) {
       error = ex;
     }
     expect(error).to.not.equal(null, "no exception thrown");
-    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
+    expect(error instanceof FaucetError).to.equal(
+      true,
+      "unexpected error type"
+    );
     expect(error?.getCode()).to.equal("CONTRACT_ADDR", "unexpected error code");
   });
-
 });

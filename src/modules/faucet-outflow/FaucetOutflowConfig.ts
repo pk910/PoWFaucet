@@ -13,4 +13,4 @@ export const defaultConfig: IFaucetOutflowConfig = {
   duration: 86400,
   lowerLimit: 0,
   upperLimit: 0,
-}
+};

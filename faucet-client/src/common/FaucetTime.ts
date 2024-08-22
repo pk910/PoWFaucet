@@ -1,4 +1,3 @@
-
 export class FaucetTime {
   private offset: number;
 
@@ -7,7 +6,7 @@ export class FaucetTime {
   }
 
   public syncTimeOffset(remoteTime: number) {
-    let localTime = Math.floor((new Date()).getTime() / 1000);
+    let localTime = Math.floor(new Date().getTime() / 1000);
     this.offset = localTime - remoteTime;
   }
 
@@ -21,11 +20,10 @@ export class FaucetTime {
 
   public getSyncedDate(): Date {
     let localDate = new Date();
-    return new Date(localDate.getTime() - (this.offset * 1000));
+    return new Date(localDate.getTime() - this.offset * 1000);
   }
 
   public getSyncedTime(): number {
     return Math.floor(this.getSyncedDate().getTime() / 1000);
   }
-  
 }

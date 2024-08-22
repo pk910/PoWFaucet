@@ -4,11 +4,13 @@ export interface IBaseModuleConfig {
   enabled: boolean;
 }
 
-export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModuleConfig> {
+export abstract class BaseModule<
+  TModCfg extends IBaseModuleConfig = IBaseModuleConfig,
+> {
   protected abstract readonly moduleDefaultConfig: TModCfg;
   protected moduleManager: ModuleManager;
   protected moduleName: string;
-  protected moduleConfig: TModCfg
+  protected moduleConfig: TModCfg;
   protected enabled: boolean;
 
   public constructor(manager: ModuleManager, name: string) {
@@ -21,15 +23,19 @@ export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModule
   }
 
   public enableModule(): Promise<void> {
-    if(this.enabled)
-      return Promise.reject("cannot enable module '" + this.moduleName + "': already enabled");
+    if (this.enabled)
+      return Promise.reject(
+        "cannot enable module '" + this.moduleName + "': already enabled"
+      );
     this.enabled = true;
     return this.startModule();
   }
-  
+
   public disableModule(): Promise<void> {
-    if(!this.enabled)
-      return Promise.reject("cannot disable module '" + this.moduleName + "': not enabled");
+    if (!this.enabled)
+      return Promise.reject(
+        "cannot disable module '" + this.moduleName + "': not enabled"
+      );
     this.enabled = false;
     return this.stopModule();
   }
@@ -40,8 +46,7 @@ export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModule
 
   public setModuleConfig(config: TModCfg): void {
     this.moduleConfig = Object.assign({}, this.moduleDefaultConfig, config);
-    if(this.enabled)
-      this.onConfigReload();
+    if (this.enabled) this.onConfigReload();
   }
 
   public isEnabled(): boolean {
@@ -50,5 +55,5 @@ export abstract class BaseModule<TModCfg extends IBaseModuleConfig = IBaseModule
 
   protected abstract startModule(): Promise<void>;
   protected abstract stopModule(): Promise<void>;
-  protected onConfigReload(): void {};
+  protected onConfigReload(): void {}
 }

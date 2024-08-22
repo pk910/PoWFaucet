@@ -1,4 +1,9 @@
-import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver.js";
+import {
+  BaseDriver,
+  BindValues,
+  QueryResult,
+  RunResult,
+} from "./BaseDriver.js";
 import { Worker } from "worker_threads";
 import { PromiseDfd } from "../../utils/PromiseDfd.js";
 
@@ -8,7 +13,7 @@ export interface IWorkerOptions {
 
 export class WorkerDriver extends BaseDriver<IWorkerOptions> {
   private port: Worker;
-  private reqDict: {[idx: number]: PromiseDfd<any>} = {};
+  private reqDict: { [idx: number]: PromiseDfd<any> } = {};
   private reqIdx = 1;
   private readyDfd: PromiseDfd<void>;
 
@@ -22,7 +27,7 @@ export class WorkerDriver extends BaseDriver<IWorkerOptions> {
   private sendRequest<TRes>(cmd: string, args: any[]): Promise<TRes> {
     return this.readyDfd.promise.then(() => {
       let reqIdx = this.reqIdx++;
-      let resDfd = this.reqDict[reqIdx] = new PromiseDfd<TRes>();
+      let resDfd = (this.reqDict[reqIdx] = new PromiseDfd<TRes>());
       this.port.postMessage({
         req: reqIdx,
         cmd: cmd,
@@ -33,20 +38,16 @@ export class WorkerDriver extends BaseDriver<IWorkerOptions> {
   }
 
   private onWorkerMessage(msg: any) {
-    if(msg.cmd === "init") {
+    if (msg.cmd === "init") {
       this.readyDfd.resolve();
       return;
     }
-    if(!msg.req)
-      return;
+    if (!msg.req) return;
     let reqDfd = this.reqDict[msg.req];
-    if(!reqDfd)
-      return;
+    if (!reqDfd) return;
     delete this.reqDict[msg.req];
-    if(msg.hasOwnProperty("result"))
-      reqDfd.resolve(msg.result);
-    else
-      reqDfd.reject(msg.error);
+    if (msg.hasOwnProperty("result")) reqDfd.resolve(msg.result);
+    else reqDfd.reject(msg.error);
   }
 
   public override async open(options: IWorkerOptions): Promise<void> {
@@ -61,16 +62,24 @@ export class WorkerDriver extends BaseDriver<IWorkerOptions> {
     return this.sendRequest("exec", [sql]);
   }
 
-  public override async run(sql: string, values?: BindValues): Promise<RunResult> {
+  public override async run(
+    sql: string,
+    values?: BindValues
+  ): Promise<RunResult> {
     return this.sendRequest("run", [sql, values]);
   }
-  
-  public override async all(sql: string, values?: BindValues): Promise<QueryResult[]> {
+
+  public override async all(
+    sql: string,
+    values?: BindValues
+  ): Promise<QueryResult[]> {
     return this.sendRequest("all", [sql, values]);
   }
 
-  public override async get(sql: string, values?: BindValues): Promise<QueryResult | null> {
+  public override async get(
+    sql: string,
+    values?: BindValues
+  ): Promise<QueryResult | null> {
     return this.sendRequest("get", [sql, values]);
   }
-
 }

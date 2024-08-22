@@ -8,7 +8,7 @@ npm i
 
 cp .env.example .env
 
-npm run start # start backend 
+npm run start # start backend
 npm run start:inspect # start backend with debugging available
 ```
 

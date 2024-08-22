@@ -1,4 +1,4 @@
-import {FaucetApi} from "./FaucetApi";
+import { FaucetApi } from "./FaucetApi";
 
 export interface IFaucetSessionStatus {
   session: string;
@@ -35,7 +35,7 @@ export interface IFaucetSessionInfo {
   }[];
   balance: string;
   target: string;
-  modules?: {[module: string]: any};
+  modules?: { [module: string]: any };
   failedCode?: string;
   failedReason?: string;
 }
@@ -49,58 +49,60 @@ export interface IFaucetSessionRecoveryInfo {
 
 export class FaucetSession {
   public static persistSessionInfo(session: FaucetSession) {
-    if(!session) {
+    if (!session) {
       localStorage.removeItem("powSessionStatus");
-    }
-    else {
-      localStorage.setItem("powSessionStatus", JSON.stringify({
-        v: 2,
-        id: session.getSessionId(),
-        time: session.getStartTime(),
-        addr: session.getTargetAddr(),
-        value: session.getDropAmount().toString(),
-      }));
+    } else {
+      localStorage.setItem(
+        "powSessionStatus",
+        JSON.stringify({
+          v: 2,
+          id: session.getSessionId(),
+          time: session.getStartTime(),
+          addr: session.getTargetAddr(),
+          value: session.getDropAmount().toString(),
+        })
+      );
     }
   }
 
   public static recoverSessionInfo(): IFaucetSessionRecoveryInfo {
     const statusJson = localStorage.getItem("powSessionStatus");
-    if(!statusJson)
-      return null;
+    if (!statusJson) return null;
     const recoveryInfo = JSON.parse(statusJson);
-    if(!recoveryInfo || recoveryInfo.v !== 2)
-      return null;
+    if (!recoveryInfo || recoveryInfo.v !== 2) return null;
     return recoveryInfo;
   }
-
 
   private faucetApi: FaucetApi;
   private sessionId: string;
   private sessionInfo: IFaucetSessionInfo;
   private sessionInfoPromise: Promise<IFaucetSessionInfo>;
 
-  public constructor(faucetApi: FaucetApi, sessionId: string, sessionInfo?: IFaucetSessionInfo) {
+  public constructor(
+    faucetApi: FaucetApi,
+    sessionId: string,
+    sessionInfo?: IFaucetSessionInfo
+  ) {
     this.faucetApi = faucetApi;
     this.sessionId = sessionId;
     this.sessionInfo = sessionInfo;
   }
 
   public loadSessionInfo(): Promise<IFaucetSessionInfo> {
-    if(this.sessionInfo)
-      return Promise.resolve(this.sessionInfo);
+    if (this.sessionInfo) return Promise.resolve(this.sessionInfo);
     return this.refreshSessionInfo();
   }
 
   public refreshSessionInfo(): Promise<IFaucetSessionInfo> {
-    if(this.sessionInfoPromise)
-      return this.sessionInfoPromise;
-    return this.sessionInfoPromise = this.faucetApi.getSession(this.sessionId).then((sessionInfo) => {
-      if((sessionInfo as any).error)
-        throw sessionInfo;
-      this.sessionInfo = sessionInfo;
-      this.sessionInfoPromise = null;
-      return sessionInfo;
-    });
+    if (this.sessionInfoPromise) return this.sessionInfoPromise;
+    return (this.sessionInfoPromise = this.faucetApi
+      .getSession(this.sessionId)
+      .then((sessionInfo) => {
+        if ((sessionInfo as any).error) throw sessionInfo;
+        this.sessionInfo = sessionInfo;
+        this.sessionInfoPromise = null;
+        return sessionInfo;
+      }));
   }
 
   public setSessionInfo(sessionInfo: IFaucetSessionInfo) {
@@ -112,7 +114,9 @@ export class FaucetSession {
   }
 
   public getModuleState(module: string): any {
-    return this.sessionInfo?.modules ? this.sessionInfo?.modules[module] : undefined;
+    return this.sessionInfo?.modules
+      ? this.sessionInfo?.modules[module]
+      : undefined;
   }
 
   public setModuleState(module: string, state: any): any {
@@ -124,8 +128,7 @@ export class FaucetSession {
   }
 
   public setStatus(status: string): void {
-    if(!this.sessionInfo)
-      return;
+    if (!this.sessionInfo) return;
     this.sessionInfo.status = status;
   }
 
@@ -140,5 +143,4 @@ export class FaucetSession {
   public getStartTime(): number {
     return this.sessionInfo?.start;
   }
-
 }

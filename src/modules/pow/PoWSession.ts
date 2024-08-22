@@ -19,10 +19,8 @@ export class PoWSession {
 
   public set activeClient(value: PoWClient) {
     this.session.setSessionModuleRef("pow.client", value);
-    if(value)
-      this.session.setSessionData("pow.idleTime", null);
-    else
-      this.session.setSessionData("pow.idleTime", nowSeconds());
+    if (value) this.session.setSessionData("pow.idleTime", null);
+    else this.session.setSessionData("pow.idleTime", nowSeconds());
   }
 
   public get idleTime(): number {
@@ -96,6 +94,4 @@ export class PoWSession {
     this.getFaucetSession().setDropAmount(0n);
     this.getFaucetSession().setSessionFailed("SLASHED", reason);
   }
-
-
 }

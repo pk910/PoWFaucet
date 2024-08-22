@@ -1,10 +1,9 @@
-
-const groth16 = require('@zk-kit/groth16');
-const ffjavascript = require('ffjavascript');
+const groth16 = require("@zk-kit/groth16");
+const ffjavascript = require("ffjavascript");
 
 function init() {
-  if(!globalThis.curve_bn128) {
-    return ffjavascript.buildBn128(true).then(function(curve_bn128) {
+  if (!globalThis.curve_bn128) {
+    return ffjavascript.buildBn128(true).then(function (curve_bn128) {
       globalThis.curve_bn128 = curve_bn128;
     });
   }

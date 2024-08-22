@@ -13,38 +13,41 @@ export function getHashedIp(remoteAddr: string): string {
     hash.update("iphash\r\n");
     hash.update(input);
     let hashStr = hash.digest("hex");
-    if(len)
-      hashStr = hashStr.substring(0, len);
+    if (len) hashStr = hashStr.substring(0, len);
     return hashStr;
   };
 
   let hashBase = "";
-  if((ipMatch = /^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/.exec(remoteAddr))) {
+  if (
+    (ipMatch = /^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/.exec(
+      remoteAddr
+    ))
+  ) {
     // IPv4
     hashGlue = ".";
 
-    for(let i = 0; i < 4; i++) {
-      hashParts.push(getHash(hashBase + ipMatch[i+1], 3));
-      hashBase += (hashBase ? "." : "") + ipMatch[i+1];
+    for (let i = 0; i < 4; i++) {
+      hashParts.push(getHash(hashBase + ipMatch[i + 1], 3));
+      hashBase += (hashBase ? "." : "") + ipMatch[i + 1];
     }
-  }
-  else {
+  } else {
     // IPv6
     hashGlue = ":";
 
     const ipSplit = remoteAddr.split(":");
     const ipParts: string[] = [];
-    for(let i = 0; i < ipSplit.length; i++) {
-      if(ipSplit[i] === "") {
+    for (let i = 0; i < ipSplit.length; i++) {
+      if (ipSplit[i] === "") {
         const skipLen = 8 - ipSplit.length + 1;
-        for(let j = 0; j < skipLen; j++)
-          ipParts.push("0");
+        for (let j = 0; j < skipLen; j++) ipParts.push("0");
         break;
       }
       ipParts.push(ipSplit[i]);
     }
-    for(let i = 0; i < 8; i++) {
-      hashParts.push(ipParts[i] === "0" ? "0" : getHash(hashBase + ipParts[i], 3));
+    for (let i = 0; i < 8; i++) {
+      hashParts.push(
+        ipParts[i] === "0" ? "0" : getHash(hashBase + ipParts[i], 3)
+      );
       hashBase += (hashBase ? "." : "") + ipParts[i];
     }
   }
@@ -58,4 +61,3 @@ export function getHashedSessionId(sessionId: string, secret: string): string {
   sessionIdHash.update(sessionId);
   return sessionIdHash.digest("hex").substring(0, 20);
 }
-

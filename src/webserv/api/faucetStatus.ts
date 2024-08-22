@@ -28,7 +28,7 @@ export interface IClientSessionStatus {
   start: number;
   target: string;
   ip: string;
-  ipInfo: any,
+  ipInfo: any;
   balance: string;
   nonce: number;
   hashrate: number;
@@ -76,7 +76,6 @@ export interface IClientQueueStatus {
   claims: IClientClaimStatus[];
 }
 
-
 export async function buildFaucetStatus(): Promise<IClientFaucetStatus> {
   const moduleManager = ServiceManager.GetService(ModuleManager);
   const sessionManager = ServiceManager.GetService(SessionManager);
@@ -89,31 +88,48 @@ export async function buildFaucetStatus(): Promise<IClientFaucetStatus> {
       walletBalance: ethWalletManager.getFaucetBalance()?.toString(),
       unclaimedBalance: (await sessionManager.getUnclaimedBalance()).toString(),
       queuedBalance: ethClaimManager.getQueuedAmount().toString(),
-      balanceRestriction: moduleManager.getModule<FaucetBalanceModule>("faucet-balance")?.getBalanceRestriction() || 100,
+      balanceRestriction:
+        moduleManager
+          .getModule<FaucetBalanceModule>("faucet-balance")
+          ?.getBalanceRestriction() || 100,
     },
-    outflowRestriction: moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.getOutflowDebugState(),
-    refill: faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract ? {
-      balance: (await ethWalletManager.getWalletBalance(faucetConfig.ethRefillContract.contract)).toString(),
-      trigger: faucetConfig.ethRefillContract.triggerBalance.toString(),
-      amount: faucetConfig.ethRefillContract.requestAmount.toString(),
-      cooldown: ethWalletRefill.getFaucetRefillCooldown(),
-    } : null,
+    outflowRestriction: moduleManager
+      .getModule<FaucetOutflowModule>("faucet-outflow")
+      ?.getOutflowDebugState(),
+    refill:
+      faucetConfig.ethRefillContract && faucetConfig.ethRefillContract.contract
+        ? {
+            balance: (
+              await ethWalletManager.getWalletBalance(
+                faucetConfig.ethRefillContract.contract
+              )
+            ).toString(),
+            trigger: faucetConfig.ethRefillContract.triggerBalance.toString(),
+            amount: faucetConfig.ethRefillContract.requestAmount.toString(),
+            cooldown: ethWalletRefill.getFaucetRefillCooldown(),
+          }
+        : null,
   };
 
   return statusRsp;
 }
 
-export async function buildSessionStatus(unmasked?: boolean): Promise<IClientSessionsStatus> {
+export async function buildSessionStatus(
+  unmasked?: boolean
+): Promise<IClientSessionsStatus> {
   const sessionsRsp: IClientSessionsStatus = {
     sessions: null,
   };
 
-  const sessions = await ServiceManager.GetService(FaucetDatabase).getAllSessions(86400);
+  const sessions =
+    await ServiceManager.GetService(FaucetDatabase).getAllSessions(86400);
   const sessionManager = ServiceManager.GetService(SessionManager);
   sessionsRsp.sessions = sessions.map((session) => {
     const runningSession = sessionManager.getSession(session.sessionId);
     return {
-      id: unmasked ? session.sessionId : getHashedSessionId(session.sessionId, faucetConfig.faucetSecret),
+      id: unmasked
+        ? session.sessionId
+        : getHashedSessionId(session.sessionId, faucetConfig.faucetSecret),
       start: session.startTime,
       target: session.targetAddr,
       ip: unmasked ? session.remoteIP : getHashedIp(session.remoteIP),
@@ -125,21 +141,26 @@ export async function buildSessionStatus(unmasked?: boolean): Promise<IClientSes
       restr: session.data["ipinfo.restriction.data"],
       cliver: session.data["cliver"],
       boost: session.data["passport.score"],
-      connected: runningSession ? !!runningSession.getSessionModuleRef("pow.client") : null,
+      connected: runningSession
+        ? !!runningSession.getSessionModuleRef("pow.client")
+        : null,
       idle: session.data["pow.idleTime"],
       factors: session.data["reward.factors"],
-    }
+    };
   });
 
   return sessionsRsp;
 }
 
 export function buildQueueStatus(unmasked?: boolean): IClientQueueStatus {
-  const claims = ServiceManager.GetService(EthClaimManager).getTransactionQueue();
+  const claims =
+    ServiceManager.GetService(EthClaimManager).getTransactionQueue();
   const rspClaims = claims.map((claimTx) => {
     return {
       time: claimTx.claim.claimTime,
-      session: unmasked ? claimTx.session : getHashedSessionId(claimTx.session, faucetConfig.faucetSecret),
+      session: unmasked
+        ? claimTx.session
+        : getHashedSessionId(claimTx.session, faucetConfig.faucetSecret),
       target: claimTx.target,
       amount: claimTx.amount.toString(),
       status: claimTx.claim.claimStatus,
@@ -147,7 +168,7 @@ export function buildQueueStatus(unmasked?: boolean): IClientQueueStatus {
       nonce: claimTx.claim.txNonce || null,
       hash: claimTx.claim.txHash || null,
       txhex: claimTx.claim.txHex || null,
-    }
+    };
   });
 
   return {

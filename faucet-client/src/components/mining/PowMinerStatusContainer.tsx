@@ -1,11 +1,10 @@
 import React from "react";
-import {PoWClient} from "../../pow/PoWClient";
-import {IPoWMinerStats, PoWMiner} from "../../pow/PoWMiner";
-import {PoWSession} from "../../pow/PoWSession";
-import {FaucetTime} from "../../common/FaucetTime";
-import {IFaucetConfig} from "../../common/FaucetConfig";
-import {renderTimespan} from "../../utils/DateUtils";
-
+import { PoWClient } from "../../pow/PoWClient";
+import { IPoWMinerStats, PoWMiner } from "../../pow/PoWMiner";
+import { PoWSession } from "../../pow/PoWSession";
+import { FaucetTime } from "../../common/FaucetTime";
+import { IFaucetConfig } from "../../common/FaucetConfig";
+import { renderTimespan } from "../../utils/DateUtils";
 
 export interface IPoWMinerStatusProps {
   powClient: PoWClient;

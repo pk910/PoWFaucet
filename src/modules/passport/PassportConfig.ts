@@ -7,8 +7,8 @@ export interface IPassportConfig extends IBaseModuleConfig {
   trustedIssuers: string[];
   refreshCooldown: number;
   stampDeduplicationTime: number;
-  stampScoring: {[stamp: string]: number};
-  boostFactor: {[score: number]: number};
+  stampScoring: { [stamp: string]: number };
+  boostFactor: { [score: number]: number };
 }
 
 export const defaultConfig: IPassportConfig = {
@@ -16,9 +16,9 @@ export const defaultConfig: IPassportConfig = {
   scorerApiKey: null,
   cachePath: null,
   cacheTime: 86400,
-  trustedIssuers: [ "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" ],
+  trustedIssuers: ["did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC"],
   refreshCooldown: 300,
   stampDeduplicationTime: 86400 * 3,
   stampScoring: {},
   boostFactor: {},
-}
+};

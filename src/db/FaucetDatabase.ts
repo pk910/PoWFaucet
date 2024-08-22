@@ -56,9 +56,12 @@ export class FaucetDatabase {
     this.initialized = true;
 
     await this.initDatabase();
-    this.cleanupTimer = setInterval(() => {
-      this.cleanStore();
-    }, 1000 * 60 * 60 * 2);
+    this.cleanupTimer = setInterval(
+      () => {
+        this.cleanStore();
+      },
+      1000 * 60 * 60 * 2
+    );
   }
 
   public dispose() {
@@ -406,8 +409,7 @@ export class FaucetDatabase {
     whereArgs: any[]
   ): Promise<GitcoinClaimTableType[]> {
     return this.db.all(
-      "SELECT * FROM GitcoinClaims WHERE " +
-        whereSql,
+      "SELECT * FROM GitcoinClaims WHERE " + whereSql,
       whereArgs
     ) as Promise<GitcoinClaimTableType[]>;
   }
@@ -464,8 +466,8 @@ export class FaucetDatabase {
         claim: skipData
           ? undefined
           : row.ClaimData
-          ? JSON.parse(row.ClaimData)
-          : null,
+            ? JSON.parse(row.ClaimData)
+            : null,
       };
     });
   }
@@ -547,14 +549,12 @@ export class FaucetDatabase {
         nowSeconds(),
         nowSeconds(),
         faucetConfig.maxDropAmount,
-        remoteIP
+        remoteIP,
       ]
     );
 
     // Now get the created record by runResult.lastInsertRowid
-    await this.selectGitcoinClaims("Uuid = ?", [
-      id,
-    ]);
+    await this.selectGitcoinClaims("Uuid = ?", [id]);
     return id;
   }
 
@@ -574,7 +574,7 @@ export class FaucetDatabase {
     const lastClaim = finishedClaims[finishedClaims.length - 1];
     return lastClaim.DateClaimed;
   }
-  
+
   public async updateGitcoinClaimRecordTxHash(uuid: string, txHash: string) {
     const now = nowSeconds();
     return await this.db.run(
@@ -583,10 +583,9 @@ export class FaucetDatabase {
     );
   }
   public async deleteGitcoinClaimRecord(uuid: string) {
-    return await this.db.run(
-      "DELETE FROM GitcoinClaims WHERE Uuid = ?",
-      [uuid]
-    );
+    return await this.db.run("DELETE FROM GitcoinClaims WHERE Uuid = ?", [
+      uuid,
+    ]);
   }
 
   public async getLastFinishedSessionStartTime(
@@ -610,9 +609,7 @@ export class FaucetDatabase {
     return lastSession.startTime;
   }
 
-  public async getClaimableSessions(
-    userId: string,
-  ) {
+  public async getClaimableSessions(userId: string) {
     const claimableSessions = await this.selectSessions(
       "UserId = ? AND Status IN ('claimable')",
       [userId],

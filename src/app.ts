@@ -1,7 +1,11 @@
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 import { isMainThread } from "node:worker_threads";
-import { faucetConfig, loadFaucetConfig, setAppBasePath } from "./config/FaucetConfig.js";
+import {
+  faucetConfig,
+  loadFaucetConfig,
+  setAppBasePath,
+} from "./config/FaucetConfig.js";
 import { FaucetWorkers } from "./common/FaucetWorker.js";
 import { EthWalletManager } from "./eth/EthWalletManager.js";
 import { FaucetHttpServer } from "./webserv/FaucetHttpServer.js";
@@ -17,13 +21,12 @@ import { PromMetricsService } from "./services/PromMetrics.js";
 import { GitcoinClaimer } from "./modules/gitcoin-claimer/GitcoinClaimer.js";
 
 (async () => {
-  if(!isMainThread) {
+  if (!isMainThread) {
     FaucetWorkers.loadWorkerClass();
-  }
-  else {
+  } else {
     try {
       let srcfile: string;
-      if(typeof require !== "undefined") {
+      if (typeof require !== "undefined") {
         srcfile = require.main.filename;
       } else {
         srcfile = fileURLToPath(import.meta.url);
@@ -32,7 +35,16 @@ import { GitcoinClaimer } from "./modules/gitcoin-claimer/GitcoinClaimer.js";
 
       setAppBasePath(basepath);
       loadFaucetConfig();
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Initializing PoWFaucet v" + faucetConfig.faucetVersion + " (AppBasePath: " + faucetConfig.appBasePath + ", InternalBasePath: " + basepath + ")");
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.INFO,
+        "Initializing PoWFaucet v" +
+          faucetConfig.faucetVersion +
+          " (AppBasePath: " +
+          faucetConfig.appBasePath +
+          ", InternalBasePath: " +
+          basepath +
+          ")"
+      );
       ServiceManager.GetService(FaucetProcess).initialize();
       ServiceManager.GetService(FaucetWorkers).initialize(srcfile);
       ServiceManager.GetService(FaucetStatus).initialize();
@@ -46,13 +58,16 @@ import { GitcoinClaimer } from "./modules/gitcoin-claimer/GitcoinClaimer.js";
       ServiceManager.GetService(FaucetHttpServer).initialize();
       ServiceManager.GetService(PromMetricsService).initialize();
 
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
-    } catch(ex) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Faucet initialization failed: " + ex.toString() + " " + ex.stack);
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.INFO,
+        "Faucet initialization complete."
+      );
+    } catch (ex) {
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        "Faucet initialization failed: " + ex.toString() + " " + ex.stack
+      );
       process.exit(0);
     }
   }
 })();
-
-
-

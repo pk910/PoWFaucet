@@ -1,11 +1,11 @@
-import { WebSocket, RawData } from 'ws';
-import { PoWSession } from './PoWSession.js';
-import { ServiceManager } from '../../common/ServiceManager.js';
-import { PoWShareVerification } from './PoWShareVerification.js';
-import { FaucetProcess, FaucetLogLevel } from '../../common/FaucetProcess.js';
-import { FaucetStatsLog } from '../../services/FaucetStatsLog.js';
-import { FaucetSession } from '../../session/FaucetSession.js';
-import { PoWModule } from './PoWModule.js';
+import { WebSocket, RawData } from "ws";
+import { PoWSession } from "./PoWSession.js";
+import { ServiceManager } from "../../common/ServiceManager.js";
+import { PoWShareVerification } from "./PoWShareVerification.js";
+import { FaucetProcess, FaucetLogLevel } from "../../common/FaucetProcess.js";
+import { FaucetStatsLog } from "../../services/FaucetStatsLog.js";
+import { FaucetSession } from "../../session/FaucetSession.js";
+import { PoWModule } from "./PoWModule.js";
 
 export class PoWClient {
   private module: PoWModule;
@@ -14,7 +14,11 @@ export class PoWClient {
   private pingTimer: NodeJS.Timeout = null;
   private lastPingPong: Date;
 
-  public constructor(module: PoWModule, session: PoWSession, socket: WebSocket) {
+  public constructor(
+    module: PoWModule,
+    session: PoWSession,
+    socket: WebSocket
+  ) {
     this.module = module;
     this.session = session;
     this.socket = socket;
@@ -22,21 +26,24 @@ export class PoWClient {
 
     this.session.activeClient = this;
 
-    this.socket.on("message", (data, isBinary) => this.onClientMessage(data, isBinary));
+    this.socket.on("message", (data, isBinary) =>
+      this.onClientMessage(data, isBinary)
+    );
     this.socket.on("ping", (data) => {
       this.lastPingPong = new Date();
-      if(this.socket)
-        this.socket.pong(data)
+      if (this.socket) this.socket.pong(data);
     });
     this.socket.on("pong", (data) => {
       this.lastPingPong = new Date();
     });
     this.socket.on("error", (err) => {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "WebSocket error: " + err.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.WARNING,
+        "WebSocket error: " + err.toString()
+      );
       try {
-        if(this.socket)
-          this.socket.close();
-      } catch(ex) {}
+        if (this.socket) this.socket.close();
+      } catch (ex) {}
       this.dispose("client error");
     });
     this.socket.on("close", () => {
@@ -54,88 +61,102 @@ export class PoWClient {
   }
 
   private dispose(reason: string) {
-    if(!this.socket)
-      return;
+    if (!this.socket) return;
     this.socket = null;
 
-    if(this.session && this.session.activeClient === this)
+    if (this.session && this.session.activeClient === this)
       this.session.activeClient = null;
 
     this.module.disposePoWClient(this, reason);
 
-    if(this.pingTimer) {
+    if (this.pingTimer) {
       clearInterval(this.pingTimer);
       this.pingTimer = null;
     }
   }
 
   public killClient(reason?: string) {
-    if(!this.socket)
-      return;
+    if (!this.socket) return;
     try {
-      this.sendErrorResponse("CLIENT_KILLED", "Client killed: " + (reason || ""), null, FaucetLogLevel.HIDDEN);
+      this.sendErrorResponse(
+        "CLIENT_KILLED",
+        "Client killed: " + (reason || ""),
+        null,
+        FaucetLogLevel.HIDDEN
+      );
       this.socket.close();
-    } catch(ex) {}
+    } catch (ex) {}
     this.dispose(reason);
   }
 
   private pingClientLoop() {
     this.pingTimer = setInterval(() => {
-      if(!this.socket)
-        return;
-      
-      let pingpongTime = Math.floor(((new Date()).getTime() - this.lastPingPong.getTime()) / 1000);
-      if(pingpongTime > this.module.getModuleConfig().powPingTimeout) {
+      if (!this.socket) return;
+
+      let pingpongTime = Math.floor(
+        (new Date().getTime() - this.lastPingPong.getTime()) / 1000
+      );
+      if (pingpongTime > this.module.getModuleConfig().powPingTimeout) {
         this.killClient("ping timeout");
         return;
       }
-      
+
       this.socket.ping();
     }, this.module.getModuleConfig().powPingInterval * 1000);
   }
 
   public sendMessage(action: string, data?: any, rsp?: any) {
-    if(!this.socket)
-      return;
-    
+    if (!this.socket) return;
+
     let message: any = {
-      action: action
+      action: action,
     };
-    if(data !== undefined)
-      message.data = data;
-    if(rsp !== undefined)
-      message.rsp = rsp;
-    
+    if (data !== undefined) message.data = data;
+    if (rsp !== undefined) message.rsp = rsp;
+
     this.socket.send(JSON.stringify(message));
   }
 
-  private sendErrorResponse(errCode: string, errMessage: string, reqMsg?: any, logLevel?: FaucetLogLevel, data?: any) {
-    if(!logLevel)
-      logLevel = FaucetLogLevel.WARNING;
+  private sendErrorResponse(
+    errCode: string,
+    errMessage: string,
+    reqMsg?: any,
+    logLevel?: FaucetLogLevel,
+    data?: any
+  ) {
+    if (!logLevel) logLevel = FaucetLogLevel.WARNING;
     let logReqMsg = reqMsg && logLevel !== FaucetLogLevel.INFO;
-    ServiceManager.GetService(FaucetProcess).emitLog(logLevel, "Returned error to client: [" + errCode + "] " + errMessage + (logReqMsg ? "\n    Message: " + JSON.stringify(reqMsg) : ""));
-    
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      logLevel,
+      "Returned error to client: [" +
+        errCode +
+        "] " +
+        errMessage +
+        (logReqMsg ? "\n    Message: " + JSON.stringify(reqMsg) : "")
+    );
+
     let resObj: any = {
       code: errCode,
-      message: errMessage
+      message: errMessage,
     };
-    if(data)
-      resObj.data = data;
+    if (data) resObj.data = data;
     this.sendMessage("error", resObj, reqMsg ? reqMsg.id : undefined);
   }
 
-  private async onClientMessage(data: RawData, isBinary: boolean): Promise<void> {
+  private async onClientMessage(
+    data: RawData,
+    isBinary: boolean
+  ): Promise<void> {
     let message;
     try {
       message = JSON.parse(data.toString());
-    } catch(ex) {
+    } catch (ex) {
       this.killClient("invalid message: " + ex.toString());
       return;
     }
-    if(!message || typeof message !== "object")
-      return;
+    if (!message || typeof message !== "object") return;
 
-    switch(message.action) {
+    switch (message.action) {
       case "foundShare":
         await this.onCliFoundShare(message);
         break;
@@ -146,10 +167,14 @@ export class PoWClient {
         await this.onCliCloseSession(message);
         break;
       default:
-        this.sendMessage("error", {
-          code: "INVALID_ACTION",
-          message: "Unknown action"
-        }, message.id);
+        this.sendMessage(
+          "error",
+          {
+            code: "INVALID_ACTION",
+            message: "Unknown action",
+          },
+          message.id
+        );
         break;
     }
   }
@@ -157,9 +182,13 @@ export class PoWClient {
   private onCliFoundShare(message: any) {
     let reqId = message.id || undefined;
 
-    if(typeof message.data !== "object" || !message.data)
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid share data", message);
-    
+    if (typeof message.data !== "object" || !message.data)
+      return this.sendErrorResponse(
+        "INVALID_SHARE",
+        "Invalid share data",
+        message
+      );
+
     let moduleConfig = this.module.getModuleConfig();
     let shareData: {
       nonces: number[];
@@ -167,70 +196,116 @@ export class PoWClient {
       hashrate: number;
     } = message.data;
 
-    if(shareData.params !== this.module.getPoWParamsStr()) 
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", message);
-    if(shareData.nonces.length !== moduleConfig.powNonceCount)
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count", message);
-    
+    if (shareData.params !== this.module.getPoWParamsStr())
+      return this.sendErrorResponse(
+        "INVALID_SHARE",
+        "Invalid share params",
+        message
+      );
+    if (shareData.nonces.length !== moduleConfig.powNonceCount)
+      return this.sendErrorResponse(
+        "INVALID_SHARE",
+        "Invalid nonce count",
+        message
+      );
+
     let lastNonce = this.session.lastNonce;
-    for(let i = 0; i < shareData.nonces.length; i++) {
-      if(shareData.nonces[i] <= lastNonce)
-        return this.sendErrorResponse("INVALID_SHARE", "Nonce too low", `${JSON.stringify(message)}, session.lastNonce: ${lastNonce}, shareData.nonces[i]: ${shareData.nonces[i]}`);
+    for (let i = 0; i < shareData.nonces.length; i++) {
+      if (shareData.nonces[i] <= lastNonce)
+        return this.sendErrorResponse(
+          "INVALID_SHARE",
+          "Nonce too low",
+          `${JSON.stringify(message)}, session.lastNonce: ${lastNonce}, shareData.nonces[i]: ${shareData.nonces[i]}`
+        );
       lastNonce = shareData.nonces[i];
     }
     this.session.lastNonce = lastNonce;
-    if(shareData.hashrate) {
+    if (shareData.hashrate) {
       let reportedHashRates = this.session.reportedHashrate;
       reportedHashRates.push(shareData.hashrate);
-      if(reportedHashRates.length > 5)
-        reportedHashRates.splice(0, 1);
+      if (reportedHashRates.length > 5) reportedHashRates.splice(0, 1);
       this.session.reportedHashrate = reportedHashRates;
     }
-    
+
     this.session.missedVerifications = 0;
-    
-    if(moduleConfig.powHashrateHardLimit > 0) {
-      let sessionAge = Math.floor((new Date()).getTime() / 1000) - this.getFaucetSession().getStartTime();
+
+    if (moduleConfig.powHashrateHardLimit > 0) {
+      let sessionAge =
+        Math.floor(new Date().getTime() / 1000) -
+        this.getFaucetSession().getStartTime();
       let nonceLimit = (sessionAge + 30) * moduleConfig.powHashrateHardLimit;
-      if(lastNonce > nonceLimit)
-        return this.sendErrorResponse("HASHRATE_LIMIT", "Nonce too high (did you evade the hashrate limit?) " + sessionAge + "/" + nonceLimit, message);
+      if (lastNonce > nonceLimit)
+        return this.sendErrorResponse(
+          "HASHRATE_LIMIT",
+          "Nonce too high (did you evade the hashrate limit?) " +
+            sessionAge +
+            "/" +
+            nonceLimit,
+          message
+        );
     }
 
-    let shareVerification = new PoWShareVerification(this.module, this.session, shareData.nonces);
-    shareVerification.startVerification().then((result) => {
-      if(!result.isValid)
-        this.sendErrorResponse("WRONG_SHARE", "Share verification failed", message);
-      else {
-        if(reqId)
-          this.sendMessage("ok", null, reqId);
-        
-        this.session.shareCount++;
+    let shareVerification = new PoWShareVerification(
+      this.module,
+      this.session,
+      shareData.nonces
+    );
+    shareVerification.startVerification().then(
+      (result) => {
+        if (!result.isValid)
+          this.sendErrorResponse(
+            "WRONG_SHARE",
+            "Share verification failed",
+            message
+          );
+        else {
+          if (reqId) this.sendMessage("ok", null, reqId);
 
-        let faucetStats = ServiceManager.GetService(FaucetStatsLog);
-        faucetStats.statShareCount++;
-        faucetStats.statShareRewards += result.reward;
-        faucetStats.statVerifyCount += shareVerification.getMinerVerifyCount();
-        faucetStats.statVerifyMisses += shareVerification.getMinerVerifyMisses();
+          this.session.shareCount++;
+
+          let faucetStats = ServiceManager.GetService(FaucetStatsLog);
+          faucetStats.statShareCount++;
+          faucetStats.statShareRewards += result.reward;
+          faucetStats.statVerifyCount +=
+            shareVerification.getMinerVerifyCount();
+          faucetStats.statVerifyMisses +=
+            shareVerification.getMinerVerifyMisses();
+        }
+      },
+      (err) => {
+        if (this.session) {
+          this.sendErrorResponse(
+            "VERIFY_FAILED",
+            "Share verification error" + (err ? ": " + err.toString() : ""),
+            message
+          );
+        }
       }
-    }, (err) => {
-      if(this.session) {
-        this.sendErrorResponse("VERIFY_FAILED", "Share verification error" + (err ? ": " + err.toString() : ""), message);
-      }
-    });
+    );
   }
-  
+
   private async onCliVerifyResult(message: any) {
-    if(typeof message.data !== "object" || !message.data)
-      return this.sendErrorResponse("INVALID_VERIFYRESULT", "Invalid verification result data");
+    if (typeof message.data !== "object" || !message.data)
+      return this.sendErrorResponse(
+        "INVALID_VERIFYRESULT",
+        "Invalid verification result data"
+      );
 
     let verifyRes: {
       shareId: string;
       isValid: boolean;
     } = message.data;
 
-    let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.getFaucetSession().getSessionId(), verifyRes.isValid);
-    let verifyReward = BigInt(this.module.getModuleConfig().powShareReward) * BigInt(this.module.getModuleConfig().verifyMinerRewardPerc * 100) / 10000n;
-    if(verifyValid && verifyReward > 0n) {
+    let verifyValid = PoWShareVerification.processVerificationResult(
+      verifyRes.shareId,
+      this.getFaucetSession().getSessionId(),
+      verifyRes.isValid
+    );
+    let verifyReward =
+      (BigInt(this.module.getModuleConfig().powShareReward) *
+        BigInt(this.module.getModuleConfig().verifyMinerRewardPerc * 100)) /
+      10000n;
+    if (verifyValid && verifyReward > 0n) {
       let addedReward = await this.getFaucetSession().addReward(verifyReward);
 
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
@@ -238,7 +313,7 @@ export class PoWClient {
 
       this.sendMessage("updateBalance", {
         balance: this.getFaucetSession().getDropAmount().toString(),
-        reason: "valid verification"
+        reason: "valid verification",
       });
     }
   }
@@ -249,5 +324,4 @@ export class PoWClient {
     let sessionInfo = await this.session.getFaucetSession().getSessionInfo();
     this.sendMessage("ok", sessionInfo, reqId);
   }
-
 }

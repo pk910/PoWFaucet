@@ -25,15 +25,17 @@ export abstract class FaucetModuleDB {
   }
 
   protected now(): number {
-    return Math.floor((new Date()).getTime() / 1000);
+    return Math.floor(new Date().getTime() / 1000);
   }
 
   public async initSchema(): Promise<void> {
-    await this.faucetStore.upgradeIfNeeded(this.getModuleName(), this.latestSchemaVersion, (version) => this.upgradeSchema(version));
+    await this.faucetStore.upgradeIfNeeded(
+      this.getModuleName(),
+      this.latestSchemaVersion,
+      (version) => this.upgradeSchema(version)
+    );
   }
   protected abstract upgradeSchema(version: number): Promise<number>;
 
-  public async cleanStore(): Promise<void> {
-  }
-
+  public async cleanStore(): Promise<void> {}
 }
