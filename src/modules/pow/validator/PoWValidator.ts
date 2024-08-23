@@ -1,27 +1,29 @@
-import assert from 'node:assert';
-import { isMainThread, parentPort, Worker } from 'worker_threads';
-import { FaucetWorkers } from '../../../common/FaucetWorker.js';
-import { ServiceManager } from '../../../common/ServiceManager.js';
-import { PromiseDfd } from '../../../utils/PromiseDfd.js';
-import { PoWHashAlgo } from '../PoWConfig.js';
-import { PoWModule } from '../PoWModule.js';
-import { IPoWValidatorValidateRequest } from './IPoWValidator.js';
+import assert from "node:assert";
+import { isMainThread, parentPort, Worker } from "worker_threads";
+import { FaucetWorkers } from "../../../common/FaucetWorker.js";
+import { ServiceManager } from "../../../common/ServiceManager.js";
+import { PromiseDfd } from "../../../utils/PromiseDfd.js";
+import { PoWHashAlgo } from "../PoWConfig.js";
+import { PoWModule } from "../PoWModule.js";
+import { IPoWValidatorValidateRequest } from "./IPoWValidator.js";
 
 export class PoWValidator {
   private module: PoWModule;
   private worker: Worker;
   private readyDfd: PromiseDfd<void>;
-  private validateQueue: {[shareId: string]: PromiseDfd<boolean>} = {};
+  private validateQueue: { [shareId: string]: PromiseDfd<boolean> } = {};
 
   public constructor(module: PoWModule, worker?: Worker) {
     this.module = module;
     this.readyDfd = new PromiseDfd<void>();
-    this.worker = worker || ServiceManager.GetService(FaucetWorkers).createWorker("pow-validator");
-    this.worker.on("message", (msg) => this.onWorkerMessage(msg))
+    this.worker =
+      worker ||
+      ServiceManager.GetService(FaucetWorkers).createWorker("pow-validator");
+    this.worker.on("message", (msg) => this.onWorkerMessage(msg));
   }
 
   public dispose() {
-    if(this.worker) {
+    if (this.worker) {
       this.worker.terminate();
       this.worker = null;
     }
@@ -31,7 +33,11 @@ export class PoWValidator {
     return Object.keys(this.validateQueue).length;
   }
 
-  public validateShare(shareId: string, nonces: number[], preimg: string): Promise<boolean> {
+  public validateShare(
+    shareId: string,
+    nonces: number[],
+    preimg: string
+  ): Promise<boolean> {
     let resDfd = new PromiseDfd<boolean>();
     let config = this.module.getModuleConfig();
     let req: IPoWValidatorValidateRequest = {
@@ -40,12 +46,12 @@ export class PoWValidator {
       preimage: preimg,
       algo: config.powHashAlgo,
       params: (() => {
-        switch(config.powHashAlgo) {
-          case PoWHashAlgo.SCRYPT: 
+        switch (config.powHashAlgo) {
+          case PoWHashAlgo.SCRYPT:
             return config.powScryptParams;
-          case PoWHashAlgo.CRYPTONIGHT: 
+          case PoWHashAlgo.CRYPTONIGHT:
             return config.powCryptoNightParams;
-          case PoWHashAlgo.ARGON2: 
+          case PoWHashAlgo.ARGON2:
             return config.powArgon2Params;
         }
       })(),
@@ -55,7 +61,7 @@ export class PoWValidator {
     this.readyDfd.promise.then(() => {
       this.worker.postMessage({
         action: "validate",
-        data: req
+        data: req,
       });
     });
 
@@ -63,9 +69,9 @@ export class PoWValidator {
   }
 
   private onWorkerMessage(msg: any) {
-    assert.equal(msg && (typeof msg === "object"), true);
+    assert.equal(msg && typeof msg === "object", true);
 
-    switch(msg.action) {
+    switch (msg.action) {
       case "init":
         this.readyDfd.resolve();
         break;
@@ -77,12 +83,10 @@ export class PoWValidator {
 
   private onWorkerValidated(msg: any) {
     assert.equal(this.validateQueue.hasOwnProperty(msg.shareId), true);
-    
+
     let resDfd = this.validateQueue[msg.shareId];
     delete this.validateQueue[msg.shareId];
 
     resDfd.resolve(msg.isValid);
   }
-
 }
-

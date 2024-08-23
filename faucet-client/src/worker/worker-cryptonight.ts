@@ -1,6 +1,8 @@
-
 import { PoWWorker } from "./PoWWorker";
-import { getCryptoNight, getCryptoNightReadyPromise } from "../../../libs/cryptonight_wasm.cjs";
+import {
+  getCryptoNight,
+  getCryptoNightReadyPromise,
+} from "../../../libs/cryptonight_wasm.cjs";
 import { PoWHashAlgo } from "../common/FaucetConfig";
 
 (() => {
@@ -8,10 +10,9 @@ import { PoWHashAlgo } from "../common/FaucetConfig";
     let cryptonight = getCryptoNight();
     new PoWWorker({
       hashFn: (nonce, preimg, params) => {
-        if(params.a !== PoWHashAlgo.CRYPTONIGHT)
-          return null;
+        if (params.a !== PoWHashAlgo.CRYPTONIGHT) return null;
         return cryptonight(preimg + nonce, params.c, params.v, params.h);
-      }
+      },
     });
-  })
+  });
 })();

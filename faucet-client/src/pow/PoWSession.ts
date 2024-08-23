@@ -1,18 +1,18 @@
-import { TypedEmitter } from 'tiny-typed-emitter';
+import { TypedEmitter } from "tiny-typed-emitter";
 import { PoWClient } from "./PoWClient";
 import { IPoWMinerShare, IPoWMinerVerification, PoWMiner } from "./PoWMiner";
-import { FaucetTime } from '../common/FaucetTime';
-import { FaucetSession } from '../common/FaucetSession';
+import { FaucetTime } from "../common/FaucetTime";
+import { FaucetSession } from "../common/FaucetSession";
 
 export interface IPoWSessionOptions {
   session: FaucetSession;
   client: PoWClient;
   time: FaucetTime;
   showNotification: (
-      type: string,
-      message: string,
-      time?: number | boolean,
-      timeout?: number
+    type: string,
+    message: string,
+    time?: number | boolean,
+    timeout?: number
   ) => number;
 }
 
@@ -59,20 +59,20 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
       this.processVerifyQueue();
     });
     this.options.client.on("verify", (message) =>
-        this.processVerification(message.data)
+      this.processVerification(message.data)
     );
     this.options.client.on("updateBalance", (message) =>
-        this.updateBalance(message.data)
+      this.updateBalance(message.data)
     );
     this.options.client.on("error", (message) => {
       if (message.data.code === "CLIENT_KILLED") {
         this.options.client.stop();
       } else {
         this.options.showNotification(
-            "error",
-            "WS Error: [" + message.data.code + "] " + message.data.message,
-            true,
-            20 * 1000
+          "error",
+          "WS Error: [" + message.data.code + "] " + message.data.message,
+          true,
+          20 * 1000
         );
       }
       // this.emit("error", message);
@@ -172,10 +172,10 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   private _submitShare(share: IPoWMinerShare) {
     this.options.client.sendRequest("foundShare", share).catch((err) => {
       this.options.showNotification(
-          "error",
-          "Submission error: [" + err.code + "] " + err.message,
-          true,
-          20 * 1000
+        "error",
+        "Submission error: [" + err.code + "] " + err.message,
+        true,
+        20 * 1000
       );
     });
   }
@@ -186,17 +186,17 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   private processVerifyQueue() {
     this.verifyResultQueue?.forEach((result) =>
-        this._submitVerifyResult(result)
+      this._submitVerifyResult(result)
     );
   }
 
   private _submitVerifyResult(result: any) {
     this.options.client.sendRequest("verifyResult", result).catch((err) => {
       this.options.showNotification(
-          "error",
-          "Verification error: [" + err.code + "] " + err.message,
-          true,
-          20 * 1000
+        "error",
+        "Verification error: [" + err.code + "] " + err.message,
+        true,
+        20 * 1000
       );
     });
   }

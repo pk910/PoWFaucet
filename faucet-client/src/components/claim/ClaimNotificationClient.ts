@@ -69,7 +69,7 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
   private startClient() {
     this.clientStatus = ClaimNotificationClientStatus.CONNECTING;
     this.clientSocket = new WebSocket(
-        this.options.claimWsUrl + "?session=" + this.options.sessionId
+      this.options.claimWsUrl + "?session=" + this.options.sessionId
     );
     this.clientSocket.addEventListener("open", (_evt) => {
       this.clientStatus = ClaimNotificationClientStatus.READY;
@@ -82,7 +82,7 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
       this.onClientClose();
     });
     this.clientSocket.addEventListener("message", (evt) =>
-        this.onClientMessage(evt)
+      this.onClientMessage(evt)
     );
   }
 
@@ -90,14 +90,17 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
     if (this.reconnectTimer) {
       return;
     }
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      if (
+    this.reconnectTimer = setTimeout(
+      () => {
+        this.reconnectTimer = null;
+        if (
           this.clientStatus === ClaimNotificationClientStatus.CLOSED_RECONNECT
-      ) {
-        this.startClient();
-      }
-    }, 5 * 1000 + 1000 * 5 * Math.random());
+        ) {
+          this.startClient();
+        }
+      },
+      5 * 1000 + 1000 * 5 * Math.random()
+    );
   }
 
   private onClientClose() {
@@ -135,13 +138,16 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
       this.readyDfd = null;
     }
     if (!this.disconnectTimer) {
-      this.disconnectTimer = setTimeout(() => {
-        this.disconnectTimer = null;
-        // reconnect after 24h
-        if (this.clientSocket) {
-          this.clientSocket.close(1000, "24h reconnect");
-        }
-      }, 60 * 60 * 24 * 1000);
+      this.disconnectTimer = setTimeout(
+        () => {
+          this.disconnectTimer = null;
+          // reconnect after 24h
+          if (this.clientSocket) {
+            this.clientSocket.close(1000, "24h reconnect");
+          }
+        },
+        60 * 60 * 24 * 1000
+      );
     }
     this.emit("open");
   }

@@ -1,12 +1,11 @@
-
-import * as fs from 'fs';
-import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig.js';
-import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
-import { ServiceManager } from '../common/ServiceManager.js';
-import { EthWalletManager } from '../eth/EthWalletManager.js';
-import { FaucetSession } from '../session/FaucetSession.js';
-import { SessionManager } from '../session/SessionManager.js';
-import { EthClaimInfo } from '../eth/EthClaimManager.js';
+import * as fs from "fs";
+import { faucetConfig, resolveRelativePath } from "../config/FaucetConfig.js";
+import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess.js";
+import { ServiceManager } from "../common/ServiceManager.js";
+import { EthWalletManager } from "../eth/EthWalletManager.js";
+import { FaucetSession } from "../session/FaucetSession.js";
+import { SessionManager } from "../session/SessionManager.js";
+import { EthClaimInfo } from "../eth/EthClaimManager.js";
 
 export interface IFaucetStatsConfig {
   logfile: string;
@@ -29,15 +28,15 @@ export class FaucetStatsLog {
   private statsTimer: NodeJS.Timeout;
 
   public initialize() {
-    if(this.initialized)
-      return;
+    if (this.initialized) return;
     this.initialized = true;
 
-    if(faucetConfig.faucetStats) {
+    if (faucetConfig.faucetStats) {
       this.enabled = true;
-      this.statsFile = resolveRelativePath(faucetConfig.faucetStats.logfile || "faucet-stats.log");
-    }
-    else {
+      this.statsFile = resolveRelativePath(
+        faucetConfig.faucetStats.logfile || "faucet-stats.log"
+      );
+    } else {
       this.enabled = false;
     }
 
@@ -47,21 +46,20 @@ export class FaucetStatsLog {
   public dispose() {
     this.initialized = false;
     this.enabled = false;
-    if(this.statsTimer) {
+    if (this.statsTimer) {
       clearTimeout(this.statsTimer);
       this.statsTimer = null;
     }
   }
 
   private sheduleStatsLoop() {
-    let now = (new Date()).getTime();
+    let now = new Date().getTime();
     let loopInterval = faucetConfig.faucetLogStatsInterval * 1000;
     let loopIndex = Math.floor(now / loopInterval);
     let nextLoopTime = (loopIndex + 1) * loopInterval;
     let loopDelay = nextLoopTime - now + 10;
 
-    if(this.statsTimer)
-      clearTimeout(this.statsTimer);
+    if (this.statsTimer) clearTimeout(this.statsTimer);
     this.statsTimer = setTimeout(() => {
       this.statsTimer = null;
       this.processFaucetStats();
@@ -70,9 +68,8 @@ export class FaucetStatsLog {
   }
 
   private addStatsEntry(type: string, data: any) {
-    if(!this.enabled)
-      return;
-    let now = Math.floor((new Date()).getTime() / 1000);
+    if (!this.enabled) return;
+    let now = Math.floor(new Date().getTime() / 1000);
     let entry = type + " " + now + " " + JSON.stringify(data) + "\n";
     fs.appendFileSync(this.statsFile, entry);
   }
@@ -87,12 +84,14 @@ export class FaucetStatsLog {
       val: session.getDropAmount().toString(),
       hr: Math.round(session.getSessionData("pow.hashrate") || 0),
       no: session.getSessionData("pow.lastNonce") || 0,
-      loc: ipinfo ? {
-        c: ipinfo.countryCode,
-        r: ipinfo.regionCode,
-        h: ipinfo.hosting ? 1 : undefined,
-        p: ipinfo.proxy ? 1 : undefined,
-      } : null,
+      loc: ipinfo
+        ? {
+            c: ipinfo.countryCode,
+            r: ipinfo.regionCode,
+            h: ipinfo.hosting ? 1 : undefined,
+            p: ipinfo.proxy ? 1 : undefined,
+          }
+        : null,
       in: undefined,
       id: session.getSessionId(),
       ps: boostinfo ? boostinfo.score : 0,
@@ -111,8 +110,11 @@ export class FaucetStatsLog {
   }
 
   private processFaucetStats() {
-    let sessions = ServiceManager.GetService(SessionManager).getActiveSessions();
-    let idleSessCount = sessions.filter((s) => !s.getSessionModuleRef("pow.client")).length;
+    let sessions =
+      ServiceManager.GetService(SessionManager).getActiveSessions();
+    let idleSessCount = sessions.filter(
+      (s) => !s.getSessionModuleRef("pow.client")
+    ).length;
     let hashRate = 0;
     let cliCount = sessions.length - idleSessCount;
     sessions.forEach((s) => {
@@ -123,11 +125,44 @@ export class FaucetStatsLog {
     let statsLog = [];
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     statsLog.push("clients: " + cliCount);
-    statsLog.push("sessions: " + sessions.length + " (" + hashRate + " H/s, " + idleSessCount + " idle)");
-    statsLog.push("shares: " + this.statShareCount + " (" + ethWalletManager.readableAmount(this.statShareRewards) + ")");
-    statsLog.push("verify: " + (this.statVerifyCount -  this.statVerifyMisses) + " (reward: " + ethWalletManager.readableAmount(this.statVerifyReward) + ", missed: " + this.statVerifyMisses + " / -" + ethWalletManager.readableAmount(this.statVerifyPenalty) + ")");
-    statsLog.push("claims: " + this.statClaimCount + " (" + ethWalletManager.readableAmount(this.statClaimRewards) + ")");
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "# STATS # " + statsLog.join(", "));
+    statsLog.push(
+      "sessions: " +
+        sessions.length +
+        " (" +
+        hashRate +
+        " H/s, " +
+        idleSessCount +
+        " idle)"
+    );
+    statsLog.push(
+      "shares: " +
+        this.statShareCount +
+        " (" +
+        ethWalletManager.readableAmount(this.statShareRewards) +
+        ")"
+    );
+    statsLog.push(
+      "verify: " +
+        (this.statVerifyCount - this.statVerifyMisses) +
+        " (reward: " +
+        ethWalletManager.readableAmount(this.statVerifyReward) +
+        ", missed: " +
+        this.statVerifyMisses +
+        " / -" +
+        ethWalletManager.readableAmount(this.statVerifyPenalty) +
+        ")"
+    );
+    statsLog.push(
+      "claims: " +
+        this.statClaimCount +
+        " (" +
+        ethWalletManager.readableAmount(this.statClaimRewards) +
+        ")"
+    );
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO,
+      "# STATS # " + statsLog.join(", ")
+    );
 
     this.addStatsEntry("STATS", {
       cliCnt: cliCount,
@@ -155,5 +190,4 @@ export class FaucetStatsLog {
     this.statClaimRewards = 0n;
     this.statSlashCount = 0;
   }
-
 }

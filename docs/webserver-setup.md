@@ -14,6 +14,7 @@ I'd suggest mpm_event with high limits instead. There is not much traffic going 
 See [sitecfg-apache2.conf](https://github.com/pk910/PoWFaucet/blob/master/docs/sitecfg-apache2.conf) for example apache2 site config (used for kiln-faucet.pk910.de)
 
 required apache2 modules:
+
 - proxy
 - proxy_wstunnel
 - rewrite
@@ -28,7 +29,7 @@ See [sitecfg-nginx.conf](https://github.com/pk910/PoWFaucet/blob/master/docs/sit
 
 ## Common issue: Connection limits too low
 
-Keep in mind the connection limits of the webserver. 
+Keep in mind the connection limits of the webserver.
 
 Per default there is a OS-enforced limit of `1024` concurrent file descriptors in most linux distributions.
 

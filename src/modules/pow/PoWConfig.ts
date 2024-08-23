@@ -37,9 +37,9 @@ export interface IPoWConfig extends IBaseModuleConfig {
 }
 
 export enum PoWHashAlgo {
-  SCRYPT      = "scrypt",
+  SCRYPT = "scrypt",
   CRYPTONIGHT = "cryptonight",
-  ARGON2      = "argon2",
+  ARGON2 = "argon2",
 }
 
 export interface IPoWSCryptParams {
@@ -64,7 +64,10 @@ export interface IPoWArgon2Params {
   keyLength: number; // how many bytes to generate as output, e.g. 16 bytes (128 bits)
 }
 
-export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params;
+export type PoWCryptoParams =
+  | IPoWSCryptParams
+  | IPoWCryptoNightParams
+  | IPoWArgon2Params;
 
 export const defaultConfig: IPoWConfig = {
   enabled: false,
@@ -108,4 +111,4 @@ export const defaultConfig: IPoWConfig = {
   verifyMinerTimeout: 30,
   verifyMinerRewardPerc: 15,
   verifyMinerMissPenaltyPerc: 10,
-}
+};

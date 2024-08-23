@@ -1,14 +1,15 @@
-
 import { encode } from "base32768";
 import fs from "fs";
 
-const base32768Module = fs.readFileSync("node_modules/base32768/src/index.js", { encoding: "utf8" }).replace(/^export .*$/m, "");
+const base32768Module = fs
+  .readFileSync("node_modules/base32768/src/index.js", { encoding: "utf8" })
+  .replace(/^export .*$/m, "");
 const base32768WASM = encode(fs.readFileSync("hash_a2.wasm"));
 
 const wasmWrappperJS = fs.readFileSync("hash_a2.js", { encoding: "utf8" });
 let lines = wasmWrappperJS.replace(/import\.meta/g, "wasmMeta").split("\n");
 // filter out the "export default Module" line
-lines = lines.filter(line => !line.startsWith("export default Module"));
+lines = lines.filter((line) => !line.startsWith("export default Module"));
 const customWASMWrappperJS = lines.join("\n");
 
 // --------------------------------------------------------------------------

@@ -39,4 +39,4 @@ export const defaultConfig: IGithubConfig = {
   cacheTime: 86400,
   checks: [],
   restrictions: [],
-}
+};

@@ -498,7 +498,11 @@ export class FaucetWebApi {
     }
 
     try {
-      const { txHash, targetAddress } = await gitcoinClaimer.claimGitcoin(body, userId, remoteIP);
+      const { txHash, targetAddress } = await gitcoinClaimer.claimGitcoin(
+        body,
+        userId,
+        remoteIP
+      );
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.INFO,
         `[GITCOIN_CLAIM_SUCCESS]: User: ${userId}; Address: ${targetAddress};`
@@ -609,9 +613,10 @@ export class FaucetWebApi {
     let sessionData: FaucetSessionStoreData;
     if (
       !sessionId ||
-      !(sessionData = await ServiceManager.GetService(
-        SessionManager
-      ).getSessionData(sessionId))
+      !(sessionData =
+        await ServiceManager.GetService(SessionManager).getSessionData(
+          sessionId
+        ))
     )
       return new FaucetHttpResponse(404, "Session not found");
 
@@ -685,9 +690,10 @@ export class FaucetWebApi {
       return new FaucetHttpResponse(403, "Access denied");
     }
 
-    const metrics = await ServiceManager.GetService(
-      PromMetricsService
-    ).getWalletBalanceMetric();
+    const metrics =
+      await ServiceManager.GetService(
+        PromMetricsService
+      ).getWalletBalanceMetric();
     const contentType =
       ServiceManager.GetService(PromMetricsService).getContentType();
 

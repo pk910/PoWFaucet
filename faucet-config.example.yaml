@@ -51,10 +51,10 @@ ethTxGasLimit: 21000
 
 # max transaction gas fee (in wei)
 # used as limit for legacy transactions (faucet won't build transactions with higher gas price)
-ethTxMaxFee: 100000000000  # 100 gwei
+ethTxMaxFee: 100000000000 # 100 gwei
 
 # max transaction priority fee (in wei)
-ethTxPrioFee: 2000000000  # 2 gwei
+ethTxPrioFee: 2000000000 # 2 gwei
 
 # max number of unconfirmed transactions to create simultaneously
 ethMaxPending: 12
@@ -65,14 +65,13 @@ ethQueueNoFunds: true
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 ethTxExplorerLink: "https://holesky.etherscan.io/tx/{txid}"
 
-
 # min/max drop amount (max is the default if no module lowers it)
 maxDropAmount: 1000000000000000000 # 1 ETH
 minDropAmount: 10000000000000000 # 0.01 ETH
 
 # maximum session time (from start till payout)
 # only relevant if one of the enabled protection mechanisms introduces a session delay (eg. mining)
-sessionTimeout: 43200  # 12h
+sessionTimeout: 43200 # 12h
 
 # session cleanup time
 # session data will be removed from the faucet DB after that time
@@ -81,7 +80,6 @@ sessionCleanup: 2592000 # 30 days
 # session save time
 # how often session updates will be written to DB
 sessionSaveTime: 120
-
 
 ### Protection mechanisms
 modules:
@@ -127,7 +125,6 @@ modules:
     # deny sessions for contract addresses
     denyContract: true
 
-
   ## Faucet Balance module
   faucet-balance:
     # enable / disable faucet balance protection
@@ -136,7 +133,7 @@ modules:
     # reward restriction based on faucet wallet balance. lowest value applies
     fixedRestriction:
       1000000000000000000000: 90 # 90% if lower than 1000 ETH
-      100000000000000000000: 10  # 10% if lower than 100 ETH
+      100000000000000000000: 10 # 10% if lower than 100 ETH
 
     # dynamic reward restriction based on faucet balance
     # alternative to fixedRestriction, if both are set, the lower factor gets applied
@@ -208,7 +205,7 @@ modules:
     rpcHost: "https://rpc.flashbots.net/"
 
     # require minimum balance on mainnet wallet
-    minBalance: 10000000000000000  # 0.01 ETH
+    minBalance: 10000000000000000 # 0.01 ETH
 
     # require minimum number of transactions from mainnet wallet (nonce count)
     minTxCount: 5
@@ -248,19 +245,19 @@ modules:
 
     # reward amount per eligible hash (in wei)
     #powShareReward: 12500000000000000  # 0.0125
-    powShareReward:   2000000000000000  # 0.002 ETH
+    powShareReward: 2000000000000000 # 0.002 ETH
 
     # penalty for not responding to a verification request (percent of powShareReward)
     # shouldn't be too high as this can happen regularly in case of connection loss or so
-    verifyMinerMissPenaltyPerc: 10  # 10% of powShareReward
+    verifyMinerMissPenaltyPerc: 10 # 10% of powShareReward
 
     # reward for responding to a verification request in time (percent of powShareReward)
     # some extra reward for slow miners
     # comment out to disable rewards for verification requests
-    verifyMinerRewardPerc:   15  # 15% of powShareReward
+    verifyMinerRewardPerc: 15 # 15% of powShareReward
 
     # maximum mining session time (in seconds)
-    powSessionTimeout: 18000   # 5h
+    powSessionTimeout: 18000 # 5h
 
     # maximum number of seconds a session can idle until it gets closed
     powIdleTimeout: 1800 # 30min
@@ -273,7 +270,7 @@ modules:
     powDifficulty: 11
 
     # mining algorithm to use
-    powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
+    powHashAlgo: "argon2" # scrypt / cryptonight / argon2
 
     # pow module settings have been trimmed for readability.
     # you can find all available settings on https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki#module-pow
@@ -364,13 +361,13 @@ modules:
 ### Fund Management
 
 # minimum balance to keep in the faucet wallet (in wei)
-spareFundsAmount: 100000000000000000  # 0.1 ETH
+spareFundsAmount: 100000000000000000 # 0.1 ETH
 
 # minimum balance to show the empty faucet error message
-noFundsBalance:   1000000000000000000  # 1 ETH
+noFundsBalance: 1000000000000000000 # 1 ETH
 
 # minimum balance to show the low funds warning
-lowFundsBalance: 10000000000000000000  # 10 ETH
+lowFundsBalance: 10000000000000000000 # 10 ETH
 
 # low faucet balance warning message / false to disable the warning
 lowFundsWarning: "The faucet is running out of funds! Faucet Balance: {1}"
@@ -384,13 +381,11 @@ rpcConnectionError: "The Faucet is currently not working properly (RPC error)"
 # prevent creation of new sessions (used for maintenance)
 #denyNewSessions: "Sorry, the faucet is currently in maintenance mode. Please try again later."
 
-
 # Gitcoin claimer settings
 gitcoinClaimerEnabled: false
 gitcoinApiToken: "example.value"
 gitcoinScorerId: 7833
 gitcoinMinimumScore: 3
-
 
 ### Automatic wallet refill
 
@@ -409,7 +404,6 @@ ethRefillContract:
   #triggerBalance: 1100000000000000000000  # 1100 ETH
   #cooldownTime: 5430 # 1.5h + 30sec
   #requestAmount: 125000000000000000000 # 125 ETH
-
 
 ### Other Settings
 

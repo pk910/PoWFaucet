@@ -1,4 +1,3 @@
-
 export interface IClientClaimStatus {
   time: number;
   session: string;
@@ -16,7 +15,7 @@ export interface IClientSessionStatus {
   start: number;
   target: string;
   ip: string;
-  ipInfo: IClientSessionIPInfo,
+  ipInfo: IClientSessionIPInfo;
   balance: string;
   nonce: number;
   hashrate: number;
@@ -67,7 +66,6 @@ export interface IFaucetStatusOutflowStatus {
   upperLimit: number;
 }
 
-
 export interface IClientSessionIPInfo {
   status: string;
   country?: string;
@@ -90,9 +88,9 @@ export interface IClientSessionRestrictionStatus {
   reward: number;
   messages: {
     text: string;
-    notify: boolean|string;
+    notify: boolean | string;
   }[];
-  blocked: false|"close"|"kill";
+  blocked: false | "close" | "kill";
 }
 
 export interface ISessionRewardFactor {

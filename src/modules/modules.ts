@@ -12,14 +12,14 @@ import { WhitelistModule } from "./whitelist/WhitelistModule.js";
 
 export const MODULE_CLASSES = {
   "concurrency-limit": ConcurrencyLimitModule,
-  "ethinfo": EthInfoModule,
+  ethinfo: EthInfoModule,
   "faucet-balance": FaucetBalanceModule,
   "faucet-outflow": FaucetOutflowModule,
-  "github": GithubModule,
-  "ipinfo": IPInfoModule,
+  github: GithubModule,
+  ipinfo: IPInfoModule,
   "mainnet-wallet": MainnetWalletModule,
-  "passport": PassportModule,
-  "pow": PoWModule,
+  passport: PassportModule,
+  pow: PoWModule,
   "recurring-limits": RecurringLimitsModule,
-  "whitelist": WhitelistModule,
-}
+  whitelist: WhitelistModule,
+};

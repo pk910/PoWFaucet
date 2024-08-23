@@ -1,19 +1,19 @@
-const webpack = require('webpack');
-const TerserPlugin = require('terser-webpack-plugin');
+const webpack = require("webpack");
+const TerserPlugin = require("terser-webpack-plugin");
 
 module.exports = [
   {
-    entry: './lib.js',
-    target: 'node',
-    mode: 'production',
+    entry: "./lib.js",
+    target: "node",
+    mode: "production",
     resolve: {
-      extensions: ['.js'],
+      extensions: [".js"],
     },
     output: {
-      filename: 'groth16.cjs',
-      path: __dirname + '/dist',
-      library: 'libpack',
-      libraryTarget:'umd'
+      filename: "groth16.cjs",
+      path: __dirname + "/dist",
+      library: "libpack",
+      libraryTarget: "umd",
     },
     plugins: [
       new webpack.optimize.LimitChunkCountPlugin({
@@ -33,5 +33,5 @@ module.exports = [
         }),
       ],
     },
-  }
+  },
 ];

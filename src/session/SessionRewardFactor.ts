@@ -1,4 +1,3 @@
-
 export interface ISessionRewardFactor {
   factor: number;
   module: string;

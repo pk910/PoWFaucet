@@ -1,5 +1,10 @@
 import { FaucetDbDriver } from "../FaucetDatabase.js";
-import { BaseDriver, BindValues, QueryResult, RunResult } from "./BaseDriver.js";
+import {
+  BaseDriver,
+  BindValues,
+  QueryResult,
+  RunResult,
+} from "./BaseDriver.js";
 
 export interface ISQLiteOptions {
   driver: FaucetDbDriver.SQLITE;
@@ -11,7 +16,7 @@ export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
   private static sqlite: Promise<any>;
 
   private static loadSQLite(): Promise<any> {
-    if(!this.sqlite) {
+    if (!this.sqlite) {
       this.sqlite = import("../../../libs/sqlite3_wasm.cjs");
     }
     return this.sqlite;
@@ -30,33 +35,49 @@ export class SQLiteDriver extends BaseDriver<ISQLiteOptions> {
   public override async exec(sql: string): Promise<void> {
     try {
       this.db.exec(sql);
-    } catch(ex) {
-      return Promise.reject("sqlite exec() error: " + sql + " [] " + ex.toString());
+    } catch (ex) {
+      return Promise.reject(
+        "sqlite exec() error: " + sql + " [] " + ex.toString()
+      );
     }
   }
 
-  public override async run(sql: string, values?: BindValues): Promise<RunResult> {
+  public override async run(
+    sql: string,
+    values?: BindValues
+  ): Promise<RunResult> {
     try {
       return this.db.run(sql, values);
-    } catch(ex) {
-      return Promise.reject("sqlite run() error: " + sql + " [] " + ex.toString());
+    } catch (ex) {
+      return Promise.reject(
+        "sqlite run() error: " + sql + " [] " + ex.toString()
+      );
     }
   }
-  
-  public override async all(sql: string, values?: BindValues): Promise<QueryResult[]> {
+
+  public override async all(
+    sql: string,
+    values?: BindValues
+  ): Promise<QueryResult[]> {
     try {
       return this.db.all(sql, values);
-    } catch(ex) {
-      return Promise.reject("sqlite all() error: " + sql + " [] " + ex.toString());
+    } catch (ex) {
+      return Promise.reject(
+        "sqlite all() error: " + sql + " [] " + ex.toString()
+      );
     }
   }
 
-  public override async get(sql: string, values?: BindValues): Promise<QueryResult | null> {
+  public override async get(
+    sql: string,
+    values?: BindValues
+  ): Promise<QueryResult | null> {
     try {
       return this.db.get(sql, values);
-    } catch(ex) {
-      return Promise.reject("sqlite get() error: " + sql + " [] " + ex.toString());
+    } catch (ex) {
+      return Promise.reject(
+        "sqlite get() error: " + sql + " [] " + ex.toString()
+      );
     }
   }
-
 }

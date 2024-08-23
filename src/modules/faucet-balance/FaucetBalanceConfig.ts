@@ -6,11 +6,11 @@ export interface IFaucetBalanceConfig extends IBaseModuleConfig {
   };
   dynamicRestriction?: {
     targetBalance: number;
-  }
+  };
 }
 
 export const defaultConfig: IFaucetBalanceConfig = {
   enabled: false,
   fixedRestriction: null,
   dynamicRestriction: null,
-}
+};

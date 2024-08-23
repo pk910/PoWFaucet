@@ -11,4 +11,4 @@ export const defaultConfig: IMainnetWalletConfig = {
   rpcHost: null,
   minTxCount: 0,
   minBalance: 0,
-}
+};

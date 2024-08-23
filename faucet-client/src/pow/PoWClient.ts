@@ -1,7 +1,6 @@
-import { TypedEmitter } from 'tiny-typed-emitter';
+import { TypedEmitter } from "tiny-typed-emitter";
 import { PromiseDfd } from "../utils/PromiseDfd";
-import { IFaucetConfig, IFaucetStatus } from '../common/FaucetConfig';
-
+import { IFaucetConfig, IFaucetStatus } from "../common/FaucetConfig";
 
 export interface IPoWClientOptions {
   powApiUrl: string;
@@ -9,8 +8,8 @@ export interface IPoWClientOptions {
 }
 
 interface PoWClientEvents {
-  'open': () => void;
-  'close': () => void;
+  open: () => void;
+  close: () => void;
   [command: string]: (message: any) => void;
 }
 
@@ -29,7 +28,7 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   private requestCounter: number = 1;
   private reconnectTimer: NodeJS.Timeout;
   private disconnectTimer: NodeJS.Timeout;
-  private requestQueue: {[id: number]: PromiseDfd<any>} = {};
+  private requestQueue: { [id: number]: PromiseDfd<any> } = {};
 
   public constructor(options: IPoWClientOptions) {
     super();
@@ -38,16 +37,16 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   }
 
   public start() {
-    this.clientStatus =PoWClientStatus.CLOSED_RECONNECT;
+    this.clientStatus = PoWClientStatus.CLOSED_RECONNECT;
     this.startClient();
   }
 
   public stop() {
-    if(this.clientSocket) {
+    if (this.clientSocket) {
       this.clientSocket.close();
       this.clientSocket = null;
     }
-    this.clientStatus =PoWClientStatus.CLOSED_IDLE;
+    this.clientStatus = PoWClientStatus.CLOSED_IDLE;
   }
 
   public isReady(): boolean {
@@ -55,16 +54,16 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   }
 
   public getReadyPromise(): Promise<void> {
-    if(this.clientStatus === PoWClientStatus.READY)
-      return Promise.resolve();
-    if(!this.readyDfd)
-      this.readyDfd = new PromiseDfd<void>();
+    if (this.clientStatus === PoWClientStatus.READY) return Promise.resolve();
+    if (!this.readyDfd) this.readyDfd = new PromiseDfd<void>();
     return this.readyDfd.promise;
   }
 
   private startClient() {
     this.clientStatus = PoWClientStatus.CONNECTING;
-    this.clientSocket = new WebSocket(this.options.powApiUrl + "?session=" + this.options.sessionId);
+    this.clientSocket = new WebSocket(
+      this.options.powApiUrl + "?session=" + this.options.sessionId
+    );
     this.clientSocket.addEventListener("open", (evt) => {
       console.log("[PoWClient] faucet websocket opened");
       this.clientStatus = PoWClientStatus.READY;
@@ -78,56 +77,62 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
       console.log("[PoWClient] faucet websocket error", evt);
       this.onClientClose();
     });
-    this.clientSocket.addEventListener("message", (evt) => this.onClientMessage(evt));
+    this.clientSocket.addEventListener("message", (evt) =>
+      this.onClientMessage(evt)
+    );
   }
 
   private reconnectClient() {
-    if(this.reconnectTimer)
-      return;
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      if(this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
-        this.startClient();
-    }, (5 * 1000) + (1000 * 5 * Math.random()));
+    if (this.reconnectTimer) return;
+    this.reconnectTimer = setTimeout(
+      () => {
+        this.reconnectTimer = null;
+        if (this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
+          this.startClient();
+      },
+      5 * 1000 + 1000 * 5 * Math.random()
+    );
   }
 
   private onClientClose() {
     this.clientSocket = null;
-    if(this.clientStatus !== PoWClientStatus.CLOSED_IDLE)
+    if (this.clientStatus !== PoWClientStatus.CLOSED_IDLE)
       this.clientStatus = PoWClientStatus.CLOSED_RECONNECT;
-    if(this.disconnectTimer) {
+    if (this.disconnectTimer) {
       clearTimeout(this.disconnectTimer);
       this.disconnectTimer = null;
     }
     this.emit("close");
-    if(this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
+    if (this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
       this.reconnectClient();
   }
 
   public sendRequest<T = any>(action: string, data?: any): Promise<T> {
-    if(this.clientStatus === PoWClientStatus.CLOSED_IDLE)
-      return Promise.reject("Internal Error (sendRequest called without active client). Please report this issue on github.");
-    if(this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
-      return Promise.reject("Not connected to faucet server. Please check your internet connection and try again in a few seconds.");
+    if (this.clientStatus === PoWClientStatus.CLOSED_IDLE)
+      return Promise.reject(
+        "Internal Error (sendRequest called without active client). Please report this issue on github."
+      );
+    if (this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
+      return Promise.reject(
+        "Not connected to faucet server. Please check your internet connection and try again in a few seconds."
+      );
 
-    let readyPromise: Promise<void>; 
-    if(this.clientStatus !== PoWClientStatus.READY)
+    let readyPromise: Promise<void>;
+    if (this.clientStatus !== PoWClientStatus.READY)
       readyPromise = this.getReadyPromise();
-    else
-      readyPromise = Promise.resolve();
+    else readyPromise = Promise.resolve();
 
     return readyPromise.then(() => this._sendRequest(action, data));
   }
 
   private _sendRequest<T = any>(action: string, data?: any): Promise<T> {
     var requestId = this.requestCounter++;
-    var reqDfd = this.requestQueue[requestId] = new PromiseDfd<T>();
+    var reqDfd = (this.requestQueue[requestId] = new PromiseDfd<T>());
     var message: any = {
       id: requestId,
-      action: action
+      action: action,
     };
-    if(data !== undefined)
-      message.data = data;
+    if (data !== undefined) message.data = data;
 
     this.clientSocket.send(JSON.stringify(message));
 
@@ -136,10 +141,9 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
 
   public sendMessage(action: string, data?: object) {
     var message: any = {
-      action: action
+      action: action,
     };
-    if(data !== undefined)
-      message.data = data;
+    if (data !== undefined) message.data = data;
 
     this.clientSocket.send(JSON.stringify(message));
   }
@@ -148,44 +152,44 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
     var message;
     try {
       message = JSON.parse(evt.data);
-    } catch(ex) {
+    } catch (ex) {
       console.error(ex);
       return;
     }
 
-    if(message.hasOwnProperty("rsp")) {
+    if (message.hasOwnProperty("rsp")) {
       var rspId = message.rsp;
-      var isOk = (message.action !== "error");
-      if(this.requestQueue.hasOwnProperty(rspId)) {
-        if(isOk)
-          this.requestQueue[rspId].resolve(message.data);
-        else
-          this.requestQueue[rspId].reject(message.data);
+      var isOk = message.action !== "error";
+      if (this.requestQueue.hasOwnProperty(rspId)) {
+        if (isOk) this.requestQueue[rspId].resolve(message.data);
+        else this.requestQueue[rspId].reject(message.data);
         delete this.requestQueue[rspId];
       }
       return;
     }
 
-    if(message.action) {
+    if (message.action) {
       this.emit(message.action, message);
     }
   }
 
   private onClientReady() {
-    if(this.readyDfd) {
+    if (this.readyDfd) {
       this.readyDfd.resolve();
       this.readyDfd = null;
     }
-    if(!this.disconnectTimer) {
-      this.disconnectTimer = setTimeout(() => {
-        this.disconnectTimer = null;
-        // reconnect after 24h
-        if(this.clientSocket) {
-          this.clientSocket.close(1000, "24h reconnect");
-        }
-      }, 60 * 60 * 24 * 1000);
+    if (!this.disconnectTimer) {
+      this.disconnectTimer = setTimeout(
+        () => {
+          this.disconnectTimer = null;
+          // reconnect after 24h
+          if (this.clientSocket) {
+            this.clientSocket.close(1000, "24h reconnect");
+          }
+        },
+        60 * 60 * 24 * 1000
+      );
     }
     this.emit("open");
   }
-
 }

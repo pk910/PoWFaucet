@@ -1,5 +1,5 @@
 import { MessagePort } from "worker_threads";
-import assert from 'node:assert';
+import assert from "node:assert";
 import { BaseDriver } from "./driver/BaseDriver.js";
 import { FaucetDatabaseOptions } from "./FaucetDatabase.js";
 import { SQLiteDriver } from "./driver/SQLiteDriver.js";
@@ -16,15 +16,15 @@ export class DatabaseWorker {
   }
 
   private async onControlMessage(msg: any) {
-    assert.equal(msg && (typeof msg === "object"), true);
+    assert.equal(msg && typeof msg === "object", true);
 
     //console.log(evt);
-    
+
     let result: any = {
       req: msg.req,
     };
     try {
-      switch(msg.cmd) {
+      switch (msg.cmd) {
         case "open":
           result.result = await this.onCtrlOpen(msg.args);
           break;
@@ -43,10 +43,8 @@ export class DatabaseWorker {
         case "get":
           result.result = await this.driver.get(msg.args[0], msg.args[1]);
           break;
-        
       }
-    }
-    catch(ex) {
+    } catch (ex) {
       result.error = ex;
     }
     this.port.postMessage(result);
@@ -54,7 +52,7 @@ export class DatabaseWorker {
 
   private async onCtrlOpen(args: any[]) {
     let driverOpts: FaucetDatabaseOptions = args[0];
-    switch(driverOpts.driver) {
+    switch (driverOpts.driver) {
       case "sqlite":
         this.driver = new SQLiteDriver();
         await this.driver.open(driverOpts);
@@ -67,5 +65,4 @@ export class DatabaseWorker {
         throw "unknown database driver: " + (driverOpts as any).driver;
     }
   }
-
 }

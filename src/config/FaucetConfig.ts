@@ -1,53 +1,44 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import YAML from 'yaml'
-import randomBytes from 'randombytes'
+import * as fs from "fs";
+import * as path from "path";
+import YAML from "yaml";
+import randomBytes from "randombytes";
 
-import { ServiceManager } from '../common/ServiceManager.js';
-import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
-import { IConfigSchema } from './ConfigSchema.js';
-import { getDefaultConfig } from './DefaultConfig.js';
+import { ServiceManager } from "../common/ServiceManager.js";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { IConfigSchema } from "./ConfigSchema.js";
+import { getDefaultConfig } from "./DefaultConfig.js";
 
-import 'dotenv/config';
+import "dotenv/config";
 import * as EthUtil from "ethereumjs-util";
 
-let cliArgs = (function() {
+let cliArgs = (function () {
   let args = {};
   let arg, key;
-  for(let i = 0; i < process.argv.length; i++) {
-      if((arg = /^--([^=]+)(?:=(.+))?$/.exec(process.argv[i]))) {
-          key = arg[1];
-          args[arg[1]] = arg[2] || true;
-      }
-      else if(key) {
-          args[key] = process.argv[i];
-          key = null;
-      }
+  for (let i = 0; i < process.argv.length; i++) {
+    if ((arg = /^--([^=]+)(?:=(.+))?$/.exec(process.argv[i]))) {
+      key = arg[1];
+      args[arg[1]] = arg[2] || true;
+    } else if (key) {
+      args[key] = process.argv[i];
+      key = null;
+    }
   }
   return args;
 })();
 
-
 let internalBasePath = path.join(".");
 let basePath: string;
-if(cliArgs['datadir']) {
-  basePath = cliArgs['datadir'];
-  if(!path.isAbsolute(basePath))
+if (cliArgs["datadir"]) {
+  basePath = cliArgs["datadir"];
+  if (!path.isAbsolute(basePath))
     basePath = resolveRelativePath(basePath, process.cwd());
-}
-else
-  basePath = process.cwd();
-
+} else basePath = process.cwd();
 
 export let faucetConfigFile: string;
-if(cliArgs['config']) {
-  if(path.isAbsolute(cliArgs['config']))
-    faucetConfigFile = cliArgs['config'];
-  else
-    faucetConfigFile = path.join(basePath, cliArgs['config']);
-}
-else
-  faucetConfigFile = path.join(basePath, "faucet-config.yaml");
+if (cliArgs["config"]) {
+  if (path.isAbsolute(cliArgs["config"])) faucetConfigFile = cliArgs["config"];
+  else faucetConfigFile = path.join(basePath, cliArgs["config"]);
+} else faucetConfigFile = path.join(basePath, "faucet-config.yaml");
 
 export let faucetConfig: IConfigSchema = null;
 
@@ -60,82 +51,101 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   let configFile = faucetConfigFile;
 
   let faucetVersion: string;
-  if(typeof POWFAUCET_VERSION !== "undefined") {
+  if (typeof POWFAUCET_VERSION !== "undefined") {
     faucetVersion = POWFAUCET_VERSION;
   } else {
-    let packageJson = JSON.parse(fs.readFileSync(path.join(internalBasePath, "package.json"), 'utf8'));
+    let packageJson = JSON.parse(
+      fs.readFileSync(path.join(internalBasePath, "package.json"), "utf8")
+    );
     faucetVersion = packageJson.version;
   }
 
-  if(!fs.existsSync(configFile) && !loadDefaultsOnly) {
+  if (!fs.existsSync(configFile) && !loadDefaultsOnly) {
     // create copy of faucet-config.example.yml
-    let exampleConfigFile = resolveRelativePath("~app/faucet-config.example.yaml");
-    if(!fs.existsSync(exampleConfigFile))
+    let exampleConfigFile = resolveRelativePath(
+      "~app/faucet-config.example.yaml"
+    );
+    if (!fs.existsSync(exampleConfigFile))
       throw exampleConfigFile + " not found";
 
     let exampleYamlSrc = fs.readFileSync(exampleConfigFile, "utf8");
-    exampleYamlSrc = exampleYamlSrc.replace(/^ethWalletKey:.*$/m, 'ethWalletKey: "' + randomBytes(32).toString("hex") + '"');
-    exampleYamlSrc = exampleYamlSrc.replace(/^faucetSecret:.*$/m, 'faucetSecret: "' + randomBytes(40).toString("hex") + '"');
+    exampleYamlSrc = exampleYamlSrc.replace(
+      /^ethWalletKey:.*$/m,
+      'ethWalletKey: "' + randomBytes(32).toString("hex") + '"'
+    );
+    exampleYamlSrc = exampleYamlSrc.replace(
+      /^faucetSecret:.*$/m,
+      'faucetSecret: "' + randomBytes(40).toString("hex") + '"'
+    );
 
     fs.writeFileSync(configFile, exampleYamlSrc);
     console.log("Created default config at " + configFile);
   }
-  if(cliArgs['create-config']) {
+  if (cliArgs["create-config"]) {
     process.exit(0);
   }
 
-  if(!loadDefaultsOnly) {
+  if (!loadDefaultsOnly) {
     let yamlSrc = fs.readFileSync(configFile, "utf8");
     let yamlObj = YAML.parse(yamlSrc);
 
-    if(!yamlObj.version || yamlObj.version == 1) {
-      throw "V1 configuration is incompatible with V2."
-    }
-    else {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Loaded faucet config from yaml file: " + configFile);
+    if (!yamlObj.version || yamlObj.version == 1) {
+      throw "V1 configuration is incompatible with V2.";
+    } else {
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.INFO,
+        "Loaded faucet config from yaml file: " + configFile
+      );
       config = yamlObj;
     }
   }
 
-  if(config) {
+  if (config) {
     config.faucetSecret = process.env.FAUCET_SECRET;
     config.ethWalletKey = process.env.ETH_WALLET_KEY;
 
     let privkey = config.ethWalletKey;
-    if (privkey.match(/^0x/))
-      privkey = privkey.substring(2);
+    if (privkey.match(/^0x/)) privkey = privkey.substring(2);
     const walletKey = Buffer.from(privkey, "hex");
-    config.ethWalletAddr = EthUtil.toChecksumAddress("0x"+EthUtil.privateToAddress(walletKey).toString("hex"));
+    config.ethWalletAddr = EthUtil.toChecksumAddress(
+      "0x" + EthUtil.privateToAddress(walletKey).toString("hex")
+    );
 
     // @ts-ignore
     config.database.file = process.env.DB_FILE_PATH;
 
-    if(config.staticPath) config.staticPath = resolveRelativePath(config.staticPath);
-    if(config.faucetPidFile) config.faucetPidFile = resolveRelativePath(config.faucetPidFile);
-    if(config.faucetLogFile) config.faucetLogFile = resolveRelativePath(config.faucetLogFile);
-    if(config.faucetStats?.logfile) config.faucetStats.logfile = resolveRelativePath(config.faucetStats.logfile);
-  }
-  else {
+    if (config.staticPath)
+      config.staticPath = resolveRelativePath(config.staticPath);
+    if (config.faucetPidFile)
+      config.faucetPidFile = resolveRelativePath(config.faucetPidFile);
+    if (config.faucetLogFile)
+      config.faucetLogFile = resolveRelativePath(config.faucetLogFile);
+    if (config.faucetStats?.logfile)
+      config.faucetStats.logfile = resolveRelativePath(
+        config.faucetStats.logfile
+      );
+  } else {
     config = {} as any;
   }
 
-  if(!faucetConfig)
-    faucetConfig = {} as any;
+  if (!faucetConfig) faucetConfig = {} as any;
   Object.assign(faucetConfig, getDefaultConfig(), config, {
     appBasePath: basePath,
     faucetVersion: faucetVersion,
   } as any);
 }
 
-export function resolveRelativePath(inputPath: string, customBasePath?: string): string {
-  if(!inputPath || typeof inputPath !== "string" || inputPath === ":memory:")
+export function resolveRelativePath(
+  inputPath: string,
+  customBasePath?: string
+): string {
+  if (!inputPath || typeof inputPath !== "string" || inputPath === ":memory:")
     return inputPath;
   let outputPath: string = inputPath;
-  if(!customBasePath)
-    customBasePath = basePath;
-  if(inputPath.match(/^~app\//))
+  if (!customBasePath) customBasePath = basePath;
+  if (inputPath.match(/^~app\//))
     outputPath = path.join(internalBasePath, inputPath.replace(/^~app\//, ""));
-  else if(!path.isAbsolute(inputPath))
+  else if (!path.isAbsolute(inputPath))
     outputPath = path.join(customBasePath, inputPath);
   return outputPath;
 }

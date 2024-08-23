@@ -412,9 +412,10 @@ export class GitcoinClaimer {
     }
 
     // Any claimable sessions at that moment?
-    const claimableSessions = await ServiceManager.GetService(
-      FaucetDatabase
-    ).getClaimableSessions(userId);
+    const claimableSessions =
+      await ServiceManager.GetService(FaucetDatabase).getClaimableSessions(
+        userId
+      );
     if (claimableSessions.length > 0) {
       return {
         can: false,
@@ -514,9 +515,8 @@ export class GitcoinClaimer {
     // Send transaction
     let transactionResult: TransactionResult;
     try {
-      transactionResult = await this._ethWallet.sendGitcoinClaimTx(
-        targetAddress
-      );
+      transactionResult =
+        await this._ethWallet.sendGitcoinClaimTx(targetAddress);
     } catch (ex) {
       clearClaiming();
       // If the transaction fails, delete the claim record

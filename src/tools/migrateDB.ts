@@ -3,13 +3,13 @@ import { SQLiteDriver } from "../db/driver/SQLiteDriver.js";
 import { FaucetDbDriver } from "../db/FaucetDatabase.js";
 import { SQL } from "../db/SQL.js";
 
-(async function() {
+(async function () {
   // migration config
   let sourceDB = new SQLiteDriver();
   let sourceDrv = FaucetDbDriver.SQLITE;
   await sourceDB.open({
     driver: sourceDrv,
-    file: "./faucet-store.db"
+    file: "./faucet-store.db",
   });
 
   let targetDB = new MySQLDriver();
@@ -30,29 +30,43 @@ import { SQL } from "../db/SQL.js";
     passportStamps: true,
   };
 
-
   // migration script
-  if(migrations.keyValueStore) {
-    let data = await sourceDB.all("SELECT " + SQL.field("Key", sourceDrv) + ",Value FROM KeyValueStore");
-    for(let i = 0; i < data.length; i++) {
+  if (migrations.keyValueStore) {
+    let data = await sourceDB.all(
+      "SELECT " + SQL.field("Key", sourceDrv) + ",Value FROM KeyValueStore"
+    );
+    for (let i = 0; i < data.length; i++) {
       await targetDB.run(
-        SQL.driverSql({
-          [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO KeyValueStore (Key,Value) VALUES (?,?)",
-          [FaucetDbDriver.MYSQL]: "REPLACE INTO KeyValueStore (`Key`,Value) VALUES (?,?)",
-        }, targetDrv),
-        [ data[i].Key as any, data[i].Value as any ]
+        SQL.driverSql(
+          {
+            [FaucetDbDriver.SQLITE]:
+              "INSERT OR REPLACE INTO KeyValueStore (Key,Value) VALUES (?,?)",
+            [FaucetDbDriver.MYSQL]:
+              "REPLACE INTO KeyValueStore (`Key`,Value) VALUES (?,?)",
+          },
+          targetDrv
+        ),
+        [data[i].Key as any, data[i].Value as any]
       );
     }
   }
 
-  async function migrateTable(table: string, fields: string[], batchSize?: number) {
-    if(!batchSize)
-      batchSize = 10;
-    console.log("migrating table " + table)
+  async function migrateTable(
+    table: string,
+    fields: string[],
+    batchSize?: number
+  ) {
+    if (!batchSize) batchSize = 10;
+    console.log("migrating table " + table);
     await targetDB.run("DELETE FROM " + table);
-    let data = await sourceDB.all("SELECT " + fields.map((f) => SQL.field(f, sourceDrv)).join(",") + " FROM " + table);
+    let data = await sourceDB.all(
+      "SELECT " +
+        fields.map((f) => SQL.field(f, sourceDrv)).join(",") +
+        " FROM " +
+        table
+    );
     let dataIdx = 0;
-    while(dataIdx < data.length) {
+    while (dataIdx < data.length) {
       let batchLen = Math.min(data.length - dataIdx, batchSize);
       let dataBatch = data.slice(dataIdx, dataIdx + batchLen);
       console.log("  migrate batch " + dataIdx + " - " + (dataIdx + batchLen));
@@ -62,28 +76,44 @@ import { SQL } from "../db/SQL.js";
         "INSERT INTO " + table,
         " (" + fields.map((f) => SQL.field(f, sourceDrv)).join(",") + ") ",
         "VALUES ",
-        dataBatch.map(b => {
-          return "(" + fields.map((f) => {
-            args.push(b[f]);
-            return "?";
-          }).join(",") + ")"
-        }).join(",")
+        dataBatch
+          .map((b) => {
+            return (
+              "(" +
+              fields
+                .map((f) => {
+                  args.push(b[f]);
+                  return "?";
+                })
+                .join(",") +
+              ")"
+            );
+          })
+          .join(","),
       ].join("");
       await targetDB.run(sql, args);
     }
   }
 
-  if(migrations.sessions)
-    await migrateTable("Sessions", ["SessionId", "Status", "StartTime", "TargetAddr", "DropAmount", "RemoteIP", "Tasks", "Data", "ClaimData"]);
-  if(migrations.ipInfoCache)
+  if (migrations.sessions)
+    await migrateTable("Sessions", [
+      "SessionId",
+      "Status",
+      "StartTime",
+      "TargetAddr",
+      "DropAmount",
+      "RemoteIP",
+      "Tasks",
+      "Data",
+      "ClaimData",
+    ]);
+  if (migrations.ipInfoCache)
     await migrateTable("IPInfoCache", ["IP", "Json", "Timeout"]);
-  if(migrations.passportCache)
+  if (migrations.passportCache)
     await migrateTable("PassportCache", ["Address", "Json", "Timeout"]);
-  if(migrations.passportStamps)
+  if (migrations.passportStamps)
     await migrateTable("PassportStamps", ["StampHash", "Address", "Timeout"]);
-  
+
   console.log("migration complete!");
   process.exit(0);
-
 })();
-

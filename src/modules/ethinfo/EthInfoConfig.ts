@@ -9,4 +9,4 @@ export const defaultConfig: IEthInfoConfig = {
   enabled: false,
   maxBalance: 0,
   denyContract: false,
-}
+};

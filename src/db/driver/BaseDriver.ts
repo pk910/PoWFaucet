@@ -1,4 +1,3 @@
-
 export interface RunResult {
   changes: number;
   lastInsertRowid: number | bigint;
@@ -20,5 +19,8 @@ export abstract class BaseDriver<TDriverOpts = {}> {
   public abstract exec(sql: string): Promise<void>;
   public abstract run(sql: string, values?: BindValues): Promise<RunResult>;
   public abstract all(sql: string, values?: BindValues): Promise<QueryResult[]>;
-  public abstract get(sql: string, values?: BindValues): Promise<QueryResult | null>;
+  public abstract get(
+    sql: string,
+    values?: BindValues
+  ): Promise<QueryResult | null>;
 }

@@ -148,7 +148,10 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
     }
   }
 
-  public async getTimeToNewSessionStart(userId: string, remoteIP: string): Promise<number> {
+  public async getTimeToNewSessionStart(
+    userId: string,
+    remoteIP: string
+  ): Promise<number> {
     const limit = this.moduleConfig.limits[0];
     if (!limit) {
       throw new FaucetError("RECURRING_LIMIT", "Limit is not set");
@@ -157,7 +160,7 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
     const lastSessionStartTime = await ServiceManager.GetService(
       FaucetDatabase
     ).getLastFinishedSessionStartTime(userId, limit.duration);
-    
+
     // Then check Gitcoin claims
     const lastGitcoinClaimTime = await ServiceManager.GetService(
       FaucetDatabase
