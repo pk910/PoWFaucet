@@ -1,6 +1,7 @@
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
 import { faucetConfig } from "../config/FaucetConfig.js";
+import { FaucetSession } from "../session/FaucetSession.js";
 import { BaseModule } from "./BaseModule.js";
 import { MODULE_CLASSES } from "./modules.js";
 
@@ -129,6 +130,7 @@ export class ModuleManager {
 
   public async processActionHooks(localfns: {prio: number, hook: Function}[], action: ModuleHookAction, args: any[]): Promise<void> {
     let hooks = this.getActionHooks(action);
+    let debugOutput = action == ModuleHookAction.SessionStart;
     let localIdx = 0;
     let hookIdx = 0;
     do {
@@ -142,11 +144,55 @@ export class ModuleManager {
 
       let promises: Promise<void>[] = [];
       while(localfns.length > localIdx && localfns[localIdx].prio == loopPrio) {
-        promises.push(localfns[localIdx].hook.apply(this, args));
+        if(debugOutput) {
+          let session: FaucetSession = args[0];
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "sessionStart " + session.getSessionId() + "  start: local " + localIdx);
+        }
+
+        let promise = localfns[localIdx].hook.apply(this, args);
+        if (promise instanceof Promise) {
+          ((localIdx) => {
+            promise.then(() => {
+              if(debugOutput) {
+                let session: FaucetSession = args[0];
+                ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "sessionStart " + session.getSessionId() + "  end: local " + localIdx);
+              }
+            })
+          })(localIdx);
+        } else {
+          if(debugOutput) {
+            let session: FaucetSession = args[0];
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "sessionStart " + session.getSessionId() + "  nop: local " + localIdx);
+          }
+        }
+
+        promises.push(promise);
         localIdx++;
       }
       while(hooks.length > hookIdx && hooks[hookIdx].prio == loopPrio) {
-        promises.push(hooks[hookIdx].hook.apply(this, args));
+        if(debugOutput) {
+          let session: FaucetSession = args[0];
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "sessionStart " + session.getSessionId() + "  start: module " + (hooks[hookIdx].module?.getModuleName() || "*.") + hooks[hookIdx].name);
+        }
+
+        let promise = hooks[hookIdx].hook.apply(this, args);
+        if (promise instanceof Promise) {
+          ((hookIdx) => {
+            promise.then(() => {
+              if(debugOutput) {
+                let session: FaucetSession = args[0];
+                ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "sessionStart " + session.getSessionId() + "  end: module " + (hooks[hookIdx].module?.getModuleName() || "*.") + hooks[hookIdx].name);
+              }
+            })
+          })(hookIdx);
+        } else {
+          if(debugOutput) {
+            let session: FaucetSession = args[0];
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "sessionStart " + session.getSessionId() + "  nop: module " + (hooks[hookIdx].module?.getModuleName() || "*.") + hooks[hookIdx].name);
+          }
+        }
+
+        promises.push(promise);
         hookIdx++;
       }
 
