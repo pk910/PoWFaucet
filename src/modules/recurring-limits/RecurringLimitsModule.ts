@@ -54,26 +54,54 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
     )
       return;
     await Promise.all(
-      this.moduleConfig.limits.map((limit) => this.checkLimit(session, limit))
+      this.moduleConfig.limits.map((limit) =>
+        this.checkSessionLimit(session, limit)
+      )
     );
   }
 
-  private async checkLimit(
+  private async checkSessionLimit(
     session: FaucetSession,
     config: IRecurringLimitConfig
   ): Promise<void> {
-    let remoteIP = session.getRemoteIP();
+    const remoteIP = session.getRemoteIP();
     const targetAddr = session.getTargetAddr();
     const userId = session.getUserId();
-    const {
-      ip4Subnet,
-      duration,
-      limitCount,
-      limitAmount,
-      action,
-      message,
-      rewards,
-    } = config;
+    const { rewards } = config;
+
+    const limitApplies = await this.checkLimit(
+      {
+        remoteIP,
+        targetAddr,
+        userId,
+      },
+      config,
+      config.action
+    );
+
+    if (limitApplies && typeof rewards !== "undefined") {
+      const cfactor = session.getSessionData("recurring-limits.factor");
+      if (typeof cfactor === "undefined" || rewards < cfactor)
+        session.setSessionData("recurring-limits.factor", rewards);
+    }
+  }
+
+  private async checkLimit(
+    {
+      targetAddr,
+      remoteIP: _remoteIP,
+      userId,
+    }: {
+      targetAddr?: string;
+      remoteIP: string;
+      userId: string;
+    },
+    config: IRecurringLimitConfig,
+    action: string
+  ): Promise<boolean> {
+    const { ip4Subnet, duration, limitCount, limitAmount, message } = config;
+
+    let remoteIP = _remoteIP;
 
     const noActionOrBlock = !action || action === "block";
 
@@ -141,11 +169,7 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
       }
     }
 
-    if (limitApplies && typeof rewards !== "undefined") {
-      const cfactor = session.getSessionData("recurring-limits.factor");
-      if (typeof cfactor === "undefined" || rewards < cfactor)
-        session.setSessionData("recurring-limits.factor", rewards);
-    }
+    return limitApplies;
   }
 
   public async getTimeToNewSessionStart(
@@ -156,6 +180,25 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
     if (!limit) {
       throw new FaucetError("RECURRING_LIMIT", "Limit is not set");
     }
+
+    const limitPromises = await Promise.all(
+      this.moduleConfig.limits.map((limit) =>
+        this.checkLimit(
+          {
+            userId,
+            remoteIP,
+          },
+          limit,
+          "none"
+        )
+      )
+    );
+    const limitApplies = limitPromises.some((res) => res);
+
+    if (!limitApplies) {
+      return 0;
+    }
+
     // Check PoW sessions
     const lastSessionStartTime = await ServiceManager.GetService(
       FaucetDatabase
