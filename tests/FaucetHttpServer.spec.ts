@@ -2,9 +2,8 @@ import 'mocha';
 import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
-import fetch from 'node-fetch';
 import { WebSocket } from 'ws';
-import { bindTestStubs, loadDefaultTestConfig, unbindTestStubs } from './common.js';
+import { bindTestStubs, loadDefaultTestConfig, returnDelayedPromise, unbindTestStubs } from './common.js';
 import { ServiceManager } from '../src/common/ServiceManager.js';
 import { FaucetWebApi } from '../src/webserv/FaucetWebApi.js';
 import { IncomingHttpHeaders, IncomingMessage } from 'http';
@@ -361,6 +360,49 @@ describe("Faucet Web Server", () => {
       expect(dataRsp.headers.get("access-control-allow-origin")).equals("https://example2.com", "access-control-allow-origin mismatch 2");
       expect(dataRsp.headers.get("access-control-allow-methods")).equals("GET, POST", "access-control-allow-methods mismatch 2");
     }
+  });
+
+  it("FetchUtil: request", async () => {
+    faucetConfig.buildSeoIndex = false;
+    faucetConfig.serverPort = 0;
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    ServiceManager.GetService(FaucetWebApi).registerApiEndpoint("testEndpoint", async (req, url, body) => {
+      return "test";
+    });
+    let listenPort = webServer.getListenPort();
+    let res = await FetchUtil.fetchWithTimeout("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"}, 100).then((rsp) => rsp.json());
+    expect(res).to.equals("test", "unexpected response");
+  });
+
+  it("FetchUtil: timeout", async () => {
+    faucetConfig.buildSeoIndex = false;
+    faucetConfig.serverPort = 0;
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    ServiceManager.GetService(FaucetWebApi).registerApiEndpoint("testEndpoint", async (req, url, body) => {
+      return returnDelayedPromise(true, "test", 200);
+    });
+    let listenPort = webServer.getListenPort();
+    let err;
+    try {
+      await FetchUtil.fetchWithTimeout("http://localhost:" + listenPort + "/api/testEndpoint", {method: "GET"}, 100);
+    } catch(ex) {
+      err = ex;
+    }
+    expect(!!err).to.equals(true, "no error thrown");
+    expect(err.toString()).to.matches(/Request timed out/, "unexpected error message");
+  });
+
+  it("FetchUtil: http error", async () => {
+    let err;
+    try {
+      await FetchUtil.fetchWithTimeout("http://127.0.0.1:62353/api/testEndpoint", {method: "GET", }, 5000);
+    } catch(ex) {
+      err = ex;
+    }
+    expect(!!err).to.equals(true, "no error thrown");
+    expect(err.toString()).to.matches(/failed/, "unexpected error message");
   });
 
 });

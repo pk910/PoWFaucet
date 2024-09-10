@@ -52,7 +52,7 @@ export class IPInfoResolver {
       return await this.ipInfoCache[ipAddr][1];
 
     let ipApiUrl = this.ipInfoApi.replace(/{ip}/, ipAddr);
-    let promise = FetchUtil.fetch(ipApiUrl)
+    let promise = FetchUtil.fetchWithTimeout(ipApiUrl, null, 20000)
     .then((rsp) => rsp.json())
     .then((rsp: any) => {
       if(!rsp || !rsp.status)

@@ -63,11 +63,11 @@ export class GithubResolver {
       tokenReqData.append("client_id", this.module.getModuleConfig().appClientId);
       tokenReqData.append("client_secret", this.module.getModuleConfig().appSecret);
       tokenReqData.append("code", authCode);
-      let tokenRsp = await FetchUtil.fetch("https://github.com/login/oauth/access_token", {
+      let tokenRsp = await FetchUtil.fetchWithTimeout("https://github.com/login/oauth/access_token", {
         method: 'POST',
         body: tokenReqData,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-      }).then((rsp) => rsp.text());
+      }, 10000).then((rsp) => rsp.text());
       
       let tokenRspData = new URLSearchParams(tokenRsp);
       if(tokenRspData.has("access_token"))
@@ -114,10 +114,10 @@ export class GithubResolver {
   }
 
   private async fetchProfileInfo(accessToken: string): Promise<IGithubUserInfo> {
-    let userData = await FetchUtil.fetch("https://api.github.com/user", {
+    let userData = await FetchUtil.fetchWithTimeout("https://api.github.com/user", {
       method: 'GET',
       headers: {'Authorization': 'token ' + accessToken}
-    }).then((rsp) => rsp.json()) as any;
+    }, 10000).then((rsp) => rsp.json()) as any;
     return {
       uid: userData.id,
       user: userData.name,
@@ -191,7 +191,7 @@ export class GithubResolver {
         }
       }
     }`;
-    let graphData = await FetchUtil.fetch("https://api.github.com/graphql", {
+    let graphData = await FetchUtil.fetchWithTimeout("https://api.github.com/graphql", {
       method: 'POST',
       body: JSON.stringify({
         query: graphQuery,
@@ -200,7 +200,7 @@ export class GithubResolver {
         'Authorization': 'token ' + accessToken,
         'Content-Type': 'application/x-www-form-urlencoded',
       }
-    }).then((rsp) => rsp.json()) as any;
+    }, 15000).then((rsp) => rsp.json()) as any;
 
     githubInfo.info.ownRepoCount = 0;
     githubInfo.info.ownRepoStars = 0;

@@ -163,11 +163,11 @@ export class PassportResolver {
     }
     try {
       if(!passport) {
-        // load passport from api
-        let passportRsp = await FetchUtil.fetch("https://api.scorer.gitcoin.co/registry/stamps/" + addr, {
+        // load passport from api (20 sec timeout)
+        let passportRsp = await FetchUtil.fetchWithTimeout("https://api.scorer.gitcoin.co/registry/stamps/" + addr, {
           method: 'GET',
           headers: {'X-API-KEY': this.module.getModuleConfig().scorerApiKey}
-        }).then((rsp) => rsp.json() as any, (ex) => {
+        }, 20000).then((rsp) => rsp.json() as any, (ex) => {
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "API Error while fetching passport: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
         });
         let gotPassport = passportRsp && passportRsp.items && passportRsp.items.length > 0;

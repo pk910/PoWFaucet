@@ -97,11 +97,11 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
     verifyData.append("response", token);
     verifyData.append("remoteip", remoteIp);
 
-    let verifyRsp = await FetchUtil.fetch("https://www.google.com/recaptcha/api/siteverify", {
+    let verifyRsp = await FetchUtil.fetchWithTimeout("https://www.google.com/recaptcha/api/siteverify", {
       method: 'POST',
       body: verifyData,
       headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-    }).then((rsp) => rsp.json()) as any;
+    }, 10000).then((rsp) => rsp.json()) as any;
 
     if(!verifyRsp || !verifyRsp.success)
       return false;
@@ -114,11 +114,11 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
     verifyData.append("response", token);
     verifyData.append("remoteip", remoteIp);
 
-    let verifyRsp = await FetchUtil.fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    let verifyRsp = await FetchUtil.fetchWithTimeout("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: 'POST',
       body: verifyData,
       headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-    }).then((rsp) => rsp.json()) as any;
+    }, 10000).then((rsp) => rsp.json()) as any;
 
     if(!verifyRsp || !verifyRsp.success)
       return false;
@@ -131,11 +131,11 @@ export class CaptchaModule extends BaseModule<ICaptchaConfig> {
     verifyData.append("remoteip", remoteIp);
     verifyData.append("variant", variant);
 
-    let verifyRsp = await FetchUtil.fetch(this.moduleConfig.secret, {
+    let verifyRsp = await FetchUtil.fetchWithTimeout(this.moduleConfig.secret, {
       method: 'POST',
       body: verifyData,
       headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-    }).then((rsp) => rsp.json()) as any;
+    }, 20000).then((rsp) => rsp.json()) as any;
 
     if(!verifyRsp || !verifyRsp.success) {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Captcha verification failed: " + (verifyRsp?.info || ""));
