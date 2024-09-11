@@ -283,38 +283,91 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
   }
 
   private renderPassportRefreshForm(): React.ReactElement {
+    let files = this.state.passportJson ? [this.state.passportJson] : [];
+
     return (
       <div className="passport-manual-refresh container">
-        <div className="row form-header">
+        <div className="row">
+          <div className="col">
+            You can find the Passport JSON by visiting the <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Dashboard</a> and clicking on "Passport Details".<br />
+            (<a href="https://support.passport.xyz/passport-knowledge-base/common-questions/how-can-i-access-my-passport-json" target='_blank'>See FAQ for more details</a>)
+          </div>
+        </div>
+        <div className="row form-header mt-2">
           <div className="col">
             Upload Gitcoin Passport JSON for verification:
           </div>
         </div>
         <div className="row">
           <div className="col">
-            <textarea 
-              className="passport-json"
-              value={this.state.passportJson} 
-              placeholder="Please paste your Gitcoin Passport JSON here"
-              onChange={(evt) => this.setState({ passportJson: evt.target.value })} 
-              disabled={this.state.manualRefreshRunning}
+            <div
+              onDrop={(event) => this.handleDrop(event)}
+              onDragOver={(event) => event.preventDefault()}
             >
-            </textarea>
+              <textarea 
+                className="passport-json"
+                value={this.state.passportJson} 
+                placeholder="Please paste your Gitcoin Passport JSON here"
+                onChange={(evt) => this.setState({ passportJson: evt.target.value })} 
+                disabled={this.state.manualRefreshRunning}
+              >
+              </textarea>
+            </div>
           </div>
         </div>
         <div className="row">
-          <div className="col">
+          <div className="col-6">
+            <span className="mx-2">or</span>
+            <button 
+              className="btn btn-secondary" 
+              onClick={(evt) => document.getElementById("passport-json-file").click()} 
+              >
+                Load from JSON File
+            </button>
+          </div>
+          <div className="col-1">
+            <input type="file" className="form-control passport-upload-input" id="passport-json-file" accept=".json" onChange={(evt) => {
+              let file = evt.target.files[0];
+              if(file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  this.setState({
+                    passportJson: event.target.result.toString(),
+                  });
+                };
+                reader.readAsText(file);
+              }
+            }} />
+          </div>
+          <div className="col-5 text-end">
             <button 
               className="btn btn-primary passport-json-submit" 
               onClick={(evt) => this.onUploadPassportJsonClick()} 
               disabled={this.state.manualRefreshRunning || this.state.passportJson.length < 100}
               >
-                Upload &amp; Verify passport JSON
+                Verify passport JSON
             </button>
           </div>
         </div>
       </div>
     )
+  }
+
+  private handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const droppedFiles = event.dataTransfer.files;
+    if (droppedFiles.length > 0) {
+      let files = Array.from(droppedFiles);
+      files.filter((file) => file.type === "application/json").forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          this.setState({
+            passportJson: event.target.result.toString(),
+          });
+        };
+        reader.readAsText(file);
+      });
+    }
   }
 
   private setPassportRefreshCooldown(cooldownTime?: number) {

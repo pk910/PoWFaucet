@@ -64,6 +64,10 @@
   margin-top: 16px;
 }
 
+.pow-boost-info .passport-manual-refresh .passport-upload-input {
+  visibility: hidden;
+}
+
 .pow-boost-info .passport-manual-refresh .form-header {
   font-weight: bold;
 }
