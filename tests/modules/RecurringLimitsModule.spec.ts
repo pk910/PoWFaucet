@@ -124,5 +124,56 @@ describe("Faucet module: recurring-limits", () => {
     expect(error?.getCode()).to.equal("RECURRING_LIMIT", "unexpected error code");
   });
 
+  it("Exceed limit by ip subnet (session count)", async () => {
+    faucetConfig.maxDropAmount = 100;
+    faucetConfig.minDropAmount = 10;
+    faucetConfig.modules["recurring-limits"] = {
+      enabled: true,
+      limits: [
+        {
+          duration: 30,
+          ip4Subnet: 24,
+          limitCount: 2,
+        }
+      ]
+    } as IRecurringLimitsConfig;
+    let moduleManager = ServiceManager.GetService(ModuleManager);
+    await moduleManager.initialize();
+    expect(await runTestSession()).to.equal(100n, "unexpected drop amount: session 1");
+    expect(await runTestSession()).to.equal(100n, "unexpected drop amount: session 2");
+    let error: FaucetError | null = null;
+    try {
+      await ServiceManager.GetService(SessionManager).createSession("8.8.8.4", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error).to.not.equal(null, "no exception thrown");
+    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
+    expect(error?.getCode()).to.equal("RECURRING_LIMIT", "unexpected error code");
+  });
+
+  it("Check reward reduction when exceeding limit", async () => {
+    faucetConfig.maxDropAmount = 100;
+    faucetConfig.minDropAmount = 10;
+    faucetConfig.modules["recurring-limits"] = {
+      enabled: true,
+      limits: [
+        {
+          duration: 30,
+          limitCount: 2,
+          action: "none",
+          rewards: 10,
+        }
+      ]
+    } as IRecurringLimitsConfig;
+    let moduleManager = ServiceManager.GetService(ModuleManager);
+    await moduleManager.initialize();
+    expect(await runTestSession()).to.equal(100n, "unexpected drop amount: session 1");
+    expect(await runTestSession()).to.equal(100n, "unexpected drop amount: session 2");
+    expect(await runTestSession()).to.equal(10n, "unexpected drop amount: session 3");
+  });
+
 
 });
