@@ -45,18 +45,6 @@ emconfigure ./configure \
   CFLAGS="-fdata-sections -ffunction-sections -O2" \
   LDFLAGS="-Wl,--gc-sections"
 
-# make sha256 external
-if [[ $EXTERNALIZE_SHA256 -ne 0 ]]; then
-  sed -i.bak 's/static \(void secp256k1_sha256_\(initialize\|write\|finalize\)\)/\1/' src/hash_impl.h 
-  sed -i.bak 's/static \(void secp256k1_sha256_\(initialize\|write\|finalize\)\)/extern \1/' src/hash.h
-else
-  # undo any previous changes
-  find src -type f -name "*.bak" | while read -r sr_bak; do
-    sr_original="${sr_bak%.bak}"
-    mv "$sr_bak" "$sr_original"
-  done
-fi
-
 # make
 emmake make FORMAT=wasm
 emmake make src/precompute_ecmult-precompute_ecmult FORMAT=wasm

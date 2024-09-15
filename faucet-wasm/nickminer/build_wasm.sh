@@ -9,19 +9,12 @@ if [ ! -d secp256k1 ]; then
   git clone https://github.com/bitcoin-core/secp256k1.git secp256k1
 fi
 
-emcc_is_installed="$(which emcc | wc -l)"
+docker_is_installed="$(which docker | wc -l)"
 
-if [ "$emcc_is_installed" == "0" ]; then
-  if [ ! -d ./emsdk ]; then
-    git clone https://github.com/emscripten-core/emsdk.git
-  fi
-  cd emsdk
-  ./emsdk install latest
-  ./emsdk activate latest
-  source ./emsdk_env.sh
-  cd ..
+if [ "$docker_is_installed" == "0" ] ; then
+  printf "docker is required for the next step. Please install it manually 😇"
+  exit 1
 fi
-
 
 printf "compiling nickminer wasm... \n"
 
