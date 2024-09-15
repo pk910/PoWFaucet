@@ -93,6 +93,17 @@ export class PoWModule extends BaseModule<IPoWConfig> {
           l: this.moduleConfig.powArgon2Params.keyLength,
         };
         break;
+      case PoWHashAlgo.NICKMINER:
+        powParams = {
+          a: PoWHashAlgo.NICKMINER,
+          i: this.moduleConfig.powNickMinerParams.hash,
+          r: this.moduleConfig.powNickMinerParams.sigR,
+          v: this.moduleConfig.powNickMinerParams.sigV,
+          c: this.moduleConfig.powNickMinerParams.count,
+          s: this.moduleConfig.powNickMinerParams.suffix,
+          p: this.moduleConfig.powNickMinerParams.prefix,
+        };
+        break;
     }
 
     clientConfig[this.moduleName] = {
@@ -100,7 +111,6 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       powIdleTimeout: this.moduleConfig.powIdleTimeout,
       powParams: powParams,
       powDifficulty: this.moduleConfig.powDifficulty,
-      powNonceCount: this.moduleConfig.powNonceCount,
       powHashrateLimit: this.moduleConfig.powHashrateSoftLimit,
     };
   }
@@ -265,6 +275,15 @@ export class PoWModule extends BaseModule<IPoWConfig> {
         "|" + this.moduleConfig.powArgon2Params.memoryCost +
         "|" + this.moduleConfig.powArgon2Params.parallelization +
         "|" + this.moduleConfig.powArgon2Params.keyLength +
+        "|" + this.moduleConfig.powDifficulty;
+      case PoWHashAlgo.NICKMINER:
+        return PoWHashAlgo.NICKMINER.toString() +
+        "|" + this.moduleConfig.powNickMinerParams.hash +
+        "|" + this.moduleConfig.powNickMinerParams.sigR +
+        "|" + this.moduleConfig.powNickMinerParams.sigV +
+        "|" + this.moduleConfig.powNickMinerParams.count +
+        "|" + this.moduleConfig.powNickMinerParams.suffix +
+        "|" + this.moduleConfig.powNickMinerParams.prefix +
         "|" + this.moduleConfig.powDifficulty;
     }
   }

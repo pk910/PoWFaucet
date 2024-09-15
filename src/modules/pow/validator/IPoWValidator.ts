@@ -2,7 +2,8 @@ import { PoWCryptoParams, PoWHashAlgo } from "../PoWConfig.js";
 
 export interface IPoWValidatorValidateRequest {
   shareId: string;
-  nonces: number[];
+  nonce: number;
+  data: string;
   preimage: string;
   algo: PoWHashAlgo;
   params: PoWCryptoParams;

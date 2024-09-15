@@ -31,12 +31,13 @@ export class PoWValidator {
     return Object.keys(this.validateQueue).length;
   }
 
-  public validateShare(shareId: string, nonces: number[], preimg: string): Promise<boolean> {
+  public validateShare(shareId: string, nonce: number, preimg: string, data: string): Promise<boolean> {
     let resDfd = new PromiseDfd<boolean>();
     let config = this.module.getModuleConfig();
     let req: IPoWValidatorValidateRequest = {
       shareId: shareId,
-      nonces: nonces,
+      nonce: nonce,
+      data: data,
       preimage: preimg,
       algo: config.powHashAlgo,
       params: (() => {
@@ -47,6 +48,8 @@ export class PoWValidator {
             return config.powCryptoNightParams;
           case PoWHashAlgo.ARGON2: 
             return config.powArgon2Params;
+          case PoWHashAlgo.NICKMINER: 
+            return config.powNickMinerParams;
         }
       })(),
       difficulty: config.powDifficulty,

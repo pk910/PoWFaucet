@@ -56,7 +56,13 @@ var webpackModuleConfigs = [
       path: path.join(__dirname, '/dist'),
       filename: 'powfaucet-worker-a2.js',
     },
-
+  },
+  {
+    entry: './src/worker/worker-nickminer',
+    output: {
+      path: path.join(__dirname, '/dist'),
+      filename: 'powfaucet-worker-nm.js',
+    },
   },
 ];
 
