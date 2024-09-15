@@ -42,7 +42,6 @@ describe("Faucet module: pow", () => {
         keyLength: 16,
       },
       powDifficulty: 11,
-      powNonceCount: 2,
       powHashrateSoftLimit: 1337,
     } as IPoWConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
@@ -56,7 +55,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.p).to.equal(1, "client config mismatch: powParams.p");
     expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
-    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config mismatch: powNonceCount");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
     let powModule = moduleManager.getModule<PoWModule>("pow");
     expect(powModule.getPoWParamsStr()).to.equal("scrypt|4096|8|1|16|11", "invalid powParams string");
@@ -74,7 +72,6 @@ describe("Faucet module: pow", () => {
         height: 10,
       },
       powDifficulty: 11,
-      powNonceCount: 2,
       powHashrateSoftLimit: 1337,
     } as IPoWConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
@@ -87,7 +84,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.v).to.equal(1, "client config mismatch: powParams.v");
     expect(clientConfig.modules['pow'].powParams.h).to.equal(10, "client config mismatch: powParams.h");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
-    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config mismatch: powNonceCount");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
     let powModule = moduleManager.getModule<PoWModule>("pow");
     expect(powModule.getPoWParamsStr()).to.equal("cryptonight|0|1|10|11", "invalid powParams string");
@@ -108,7 +104,6 @@ describe("Faucet module: pow", () => {
         keyLength: 16,
       },
       powDifficulty: 11,
-      powNonceCount: 2,
       powHashrateSoftLimit: 1337,
     } as IPoWConfig;
     let moduleManager = ServiceManager.GetService(ModuleManager);
@@ -124,7 +119,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.p).to.equal(1, "client config mismatch: powParams.p");
     expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
-    expect(clientConfig.modules['pow'].powNonceCount).to.equal(2, "client config mismatch: powNonceCount");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
     let powModule = moduleManager.getModule<PoWModule>("pow");
     expect(powModule.getPoWParamsStr()).to.equal("argon2|0|13|4|4096|1|16|11", "invalid powParams string");
@@ -312,7 +306,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 2,
       } as IPoWConfig;
       let moduleManager = ServiceManager.GetService(ModuleManager);
       await moduleManager.initialize();
@@ -325,7 +318,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1337 ],
+          nonce: 1337,
           params: "invalid_params_str",
           hashrate: 12,
         }
@@ -336,43 +329,6 @@ describe("Faucet module: pow", () => {
       expect(errorMsg[0].rsp).to.equal(42, "invalid response id");
       expect(errorMsg[0].data.code).to.equal("INVALID_SHARE", "unexpected error code");
       expect(errorMsg[0].data.message).to.equal("Invalid share params", "unexpected error message");
-    });
-
-    it("check action 'foundShare': invalid nonce count", async () => {
-      faucetConfig.modules["pow"] = {
-        enabled: true,
-        powHashAlgo: PoWHashAlgo.SCRYPT,
-        powScryptParams: {
-          cpuAndMemory: 4096,
-          blockSize: 8,
-          parallelization: 1,
-          keyLength: 16,
-        },
-        powDifficulty: 11,
-        powNonceCount: 2,
-      } as IPoWConfig;
-      let moduleManager = ServiceManager.GetService(ModuleManager);
-      await moduleManager.initialize();
-      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
-        addr: "0x0000000000000000000000000000000000001337",
-      });
-      expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
-      fakeSocket.emit("message", JSON.stringify({
-        id: 42,
-        action: "foundShare",
-        data: {
-          nonces: [ 1337 ],
-          params: "scrypt|4096|8|1|16|11",
-          hashrate: 12,
-        }
-      }))
-      expect(fakeSocket.isReady).to.equal(true, "client is not ready");
-      let errorMsg = fakeSocket.getSentMessage("error");
-      expect(errorMsg.length).to.equal(1, "no error message sent");
-      expect(errorMsg[0].rsp).to.equal(42, "invalid response id");
-      expect(errorMsg[0].data.code).to.equal("INVALID_SHARE", "unexpected error code");
-      expect(errorMsg[0].data.message).to.matches(/Invalid nonce count/i, "unexpected error message");
     });
 
     it("check action 'foundShare': nonce too low", async () => {
@@ -386,7 +342,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
       } as IPoWConfig;
       let moduleManager = ServiceManager.GetService(ModuleManager);
       await moduleManager.initialize();
@@ -400,7 +355,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1337 ],
+          nonce: 1337,
           params: "scrypt|4096|8|1|16|11",
           hashrate: 12,
         }
@@ -424,7 +379,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
       } as IPoWConfig;
       let moduleManager = ServiceManager.GetService(ModuleManager);
@@ -438,7 +392,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 133700 ],
+          nonce: 133700,
           params: "scrypt|4096|8|1|16|11",
           hashrate: 12,
         }
@@ -463,7 +417,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyLocalLowPeerPercent: 100,
       } as IPoWConfig;
@@ -479,7 +432,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1524 ],
+          nonce: 1524,
           params: "scrypt|4096|8|1|16|11",
           hashrate: 12,
         }
@@ -507,7 +460,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyLocalLowPeerPercent: 100,
       } as IPoWConfig;
@@ -523,7 +475,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1526 ],
+          nonce: 1526,
           params: "scrypt|4096|8|1|16|11",
           hashrate: 12,
         }
@@ -551,7 +503,6 @@ describe("Faucet module: pow", () => {
           height: 0,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyLocalLowPeerPercent: 100,
       } as IPoWConfig;
@@ -567,7 +518,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1944 ],
+          nonce: 1944,
           params: "cryptonight|0|0|0|11",
           hashrate: 12,
         }
@@ -594,7 +545,6 @@ describe("Faucet module: pow", () => {
           height: 0,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyLocalLowPeerPercent: 100,
       } as IPoWConfig;
@@ -610,7 +560,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1526 ],
+          nonce: 1526,
           params: "cryptonight|0|0|0|11",
           hashrate: 12,
         }
@@ -641,7 +591,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyLocalLowPeerPercent: 100,
       } as IPoWConfig;
@@ -657,7 +606,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 2034 ],
+          nonce: 2034,
           params: "argon2|0|13|4|4096|1|16|11",
           hashrate: 12,
         }
@@ -687,7 +636,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyLocalLowPeerPercent: 100,
       } as IPoWConfig;
@@ -703,7 +651,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1526 ],
+          nonce: 1526,
           params: "argon2|0|13|4|4096|1|16|11",
           hashrate: 12,
         }
@@ -732,7 +680,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyMinerIndividuals: 1,
         verifyMinerPeerCount: 1,
@@ -758,7 +705,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1524 ],
+          nonce: 1524,
           params: "scrypt|4096|8|1|16|11",
           hashrate: 12,
         }
@@ -768,7 +715,7 @@ describe("Faucet module: pow", () => {
       let verifyMsg = fakeSocket2.getSentMessage("verify");
       expect(verifyMsg.length).to.equal(1, "unexpected number of verify messages sent");
       expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage mismatch");
-      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces mismatch");
+      expect(verifyMsg[0].data.nonce).to.equal(1524, "invalid verify message: nonce mismatch");
       // send verify result
       fakeSocket2.emit("message", JSON.stringify({
         id: 43,
@@ -801,7 +748,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyMinerIndividuals: 1,
         verifyMinerPeerCount: 1,
@@ -827,7 +773,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1524 ],
+          nonce: 1524,
           params: "scrypt|4096|8|1|16|11",
           hashrate: 12,
         }
@@ -837,7 +783,7 @@ describe("Faucet module: pow", () => {
       let verifyMsg = fakeSocket2.getSentMessage("verify");
       expect(verifyMsg.length).to.equal(1, "unexpected number of verify messages sent");
       expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage mismatch");
-      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces mismatch");
+      expect(verifyMsg[0].data.nonce).to.equal(1524, "invalid verify message: nonce mismatch");
       // send verify result
       fakeSocket2.emit("message", JSON.stringify({
         id: 43,
@@ -870,7 +816,6 @@ describe("Faucet module: pow", () => {
           keyLength: 16,
         },
         powDifficulty: 11,
-        powNonceCount: 1,
         powHashrateHardLimit: 100,
         verifyMinerIndividuals: 1,
         verifyMinerPeerCount: 1,
@@ -897,7 +842,7 @@ describe("Faucet module: pow", () => {
         id: 42,
         action: "foundShare",
         data: {
-          nonces: [ 1524 ],
+          nonce: 1524,
           params: "scrypt|4096|8|1|16|11",
           hashrate: 12,
         }
@@ -907,7 +852,7 @@ describe("Faucet module: pow", () => {
       let verifyMsg = fakeSocket2.getSentMessage("verify");
       expect(verifyMsg.length).to.equal(1, "unexpected number of verify messages sent");
       expect(verifyMsg[0].data.preimage).to.equal("oXwNMIuRUOc=", "invalid verify message: preimage mismatch");
-      expect(verifyMsg[0].data.nonces[0]).to.equal(1524, "invalid verify message: nonces mismatch");
+      expect(verifyMsg[0].data.nonce).to.equal(1524, "invalid verify message: nonce mismatch");
       await awaitSleepPromise(1500, () => fakeSocket1.getSentMessage("ok").length > 0);
       let okMsg2 = fakeSocket1.getSentMessage("ok");
       expect(okMsg2.length).to.equal(1, "no ok message sent");
