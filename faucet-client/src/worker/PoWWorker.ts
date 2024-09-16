@@ -1,11 +1,13 @@
 import { getPoWParamsStr } from "../utils/PoWParamsHelper";
 import { PoWParams } from "../common/FaucetConfig";
 import { base64ToHex } from "../utils/ConvertHelpers";
+import { PoWHashAlgo } from "../types/PoWMinerSrc";
 
 export type PoWWorkerHashFn = (nonceHex: string, preimgHex: string, params: PoWParams) => string;
 
 export interface IPoWWorkerOptions {
   hashFn: PoWWorkerHashFn;
+  configFn?: (preimg: string, params: PoWParams) => void;
 }
 
 interface IPoWWorkerParams {
@@ -74,6 +76,10 @@ export class PoWWorker {
     }];
     this.workNonce = data.nonceStart;
 
+    if(this.options.configFn) {
+      this.options.configFn(this.powPreImage, this.powParams.params);
+    }
+
     this.startWorkLoop();
   }
 
@@ -89,17 +95,27 @@ export class PoWWorker {
 
   private onCtrlSetParams(data: any) {
     this.powParams = this.getWorkerParams(data.params, data.difficulty);
+    if(this.options.configFn) {
+      this.options.configFn(this.powPreImage, this.powParams.params);
+    }
   }
 
   private onCtrlVerify(share: any) {
     let preimg = base64ToHex(share.preimage);
 
-    let isValid = (share.nonces.length > 0);
-    for(var i = 0; i < share.nonces.length && isValid; i++) {
-      if(!this.checkHash(share.nonces[i], preimg)) {
-        isValid = false;
-        break;
-      }
+    let isValid = true;
+    if(this.options.configFn) {
+      this.options.configFn(preimg, this.powParams.params);
+    }
+    let hash = this.checkHash(share.nonce, preimg);
+    if(!hash) {
+      isValid = false;
+    } else if(this.powParams.params.a === PoWHashAlgo.NICKMINER && hash !== share.data) {
+      isValid = false;
+    }
+
+    if(this.options.configFn) {
+      this.options.configFn(this.powPreImage, this.powParams.params);
     }
 
     postMessage({
@@ -200,6 +216,7 @@ export class PoWWorker {
         action: "nonce",
         data: {
           nonce: nonce,
+          data: this.powParams.params.a === PoWHashAlgo.NICKMINER ? hash : null,
           params: this.powParams.pstr,
         }
       });
@@ -216,8 +233,18 @@ export class PoWWorker {
     this.statsCount++;
     let hashHex = this.options.hashFn(nonceHex, preimg, this.powParams.params);
 
-    let startOfHash = hashHex.substring(0, this.powParams.dmask.length);
-    return (startOfHash <= this.powParams.dmask) ? hashHex : null;
+    if (this.powParams.params.a === PoWHashAlgo.NICKMINER) {
+      if(hashHex.substring(0, 2) != "0x") {
+        console.error("NickMiner error:", hashHex);
+        return null;
+      }
+
+      let difficulty = parseInt(hashHex.substring(2, 4), 16);
+      return (difficulty >= this.powParams.difficulty) ? hashHex : null;
+    } else {
+      let startOfHash = hashHex.substring(0, this.powParams.dmask.length);
+      return (startOfHash <= this.powParams.dmask) ? hashHex : null;
+    }
   }
 
 }

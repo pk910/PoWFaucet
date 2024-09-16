@@ -71,7 +71,6 @@ export interface IPoWModuleConfig {
   powIdleTimeout: number;
   powParams: PoWParams;
   powDifficulty: number;
-  powNonceCount: number;
   powHashrateLimit: number;
 }
 
@@ -94,6 +93,14 @@ export type PoWParams = {
   m: number; // memoryCost
   p: number; // parallelization,
   l: number; // keyLength
+} | {
+  a: PoWHashAlgo.NICKMINER;
+  i: string; // input hash
+  r: string; // sigR
+  v: number; // sigV
+  c: number; // count
+  s: string; // suffix
+  p: string; // prefix
 }
 
 export interface IPassportModuleConfig {

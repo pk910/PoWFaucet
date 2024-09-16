@@ -1,3 +1,5 @@
+import fs from "fs";
+
 import { ServiceManager } from "../../common/ServiceManager.js";
 import { getNewGuid } from "../../utils/GuidUtils.js";
 import { PromiseDfd } from "../../utils/PromiseDfd.js";
@@ -7,6 +9,9 @@ import { SessionManager } from "../../session/SessionManager.js";
 import { FaucetSessionStatus } from "../../session/FaucetSession.js";
 import { PoWClient } from "./PoWClient.js";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
+import { PoWHashAlgo } from "./PoWConfig.js";
+import { resolveRelativePath } from "../../config/FaucetConfig.js";
+import { base64ToHex } from "../../utils/ConvertHelpers.js";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -25,7 +30,8 @@ export class PoWShareVerification {
   private shareId: string;
   private module: PoWModule;
   private session: PoWSession;
-  private nonces: number[];
+  private nonce: number;
+  private data: string;
   private verifyLocal = false;
   private verifyMinerCount = 0;
   private verifyMinerSessions: string[] = [];
@@ -34,11 +40,12 @@ export class PoWShareVerification {
   private isInvalid = false;
   private resultDfd: PromiseDfd<IPoWShareVerificationResult>;
 
-  public constructor(module: PoWModule, session: PoWSession, nonces: number[]) {
+  public constructor(module: PoWModule, session: PoWSession, nonce: number, data: string) {
     this.shareId = getNewGuid();
     this.module = module;
     this.session = session;
-    this.nonces = nonces;
+    this.nonce = nonce;
+    this.data = data;
     PoWShareVerification.verifyingShares[this.shareId] = this;
   }
 
@@ -68,7 +75,7 @@ export class PoWShareVerification {
 
     if(this.verifyLocal) {
       // verify locally
-      this.module.getValidator().validateShare(this.shareId, this.nonces, this.session.preImage).then((isValid) => {
+      this.module.getValidator().validateShare(this.shareId, this.nonce, this.session.preImage, this.data).then((isValid) => {
         if(!isValid)
           this.isInvalid = true;
         this.completeVerification();
@@ -87,7 +94,8 @@ export class PoWShareVerification {
         validatorSession.activeClient.sendMessage("verify", {
           shareId: this.shareId,
           preimage: this.session.preImage,
-          nonces: this.nonces,
+          nonce: this.nonce,
+          data: this.data,
         });
       }
       this.verifyMinerTimer = setTimeout(() => {
@@ -147,7 +155,7 @@ export class PoWShareVerification {
     if(this.isInvalid && !this.verifyLocal) {
       // always verify invalid shares locally
       this.verifyLocal = true;
-      this.module.getValidator().validateShare(this.shareId, this.nonces, this.session.preImage).then((isValid) => {
+      this.module.getValidator().validateShare(this.shareId, this.nonce, this.session.preImage, this.data).then((isValid) => {
         if(isValid)
           this.isInvalid = false;
         this.completeVerification();
@@ -201,6 +209,33 @@ export class PoWShareVerification {
     else {
       // valid share - add rewards
       shareReward = this.session.getFaucetSession().addReward(BigInt(powConfig.powShareReward));
+    }
+
+    if(powConfig.powHashAlgo === PoWHashAlgo.NICKMINER && powConfig.powNickMinerParams.relevantFile) {
+      // check for relevant results
+      let difficulty = parseInt(this.data.substring(2, 4), 16);
+      if(difficulty >= powConfig.powNickMinerParams.suffix.length * 4) {
+        // check for valid prefix
+        for(let i = 0; i < powConfig.powNickMinerParams.prefix.length; i++) {
+          let addrByte = parseInt(this.data.substring(4 + i * 2, 6 + i * 2), 16);
+          let prefixByte = parseInt(powConfig.powNickMinerParams.prefix.substring(i*2, (i*2)+2), 16);
+
+          let diffByte = addrByte ^ prefixByte;
+          if(diffByte & 0x80) break; difficulty++;
+          if(diffByte & 0x40) break; difficulty++;
+          if(diffByte & 0x20) break; difficulty++;
+          if(diffByte & 0x10) break; difficulty++;
+          if(diffByte & 0x08) break; difficulty++;
+          if(diffByte & 0x04) break; difficulty++;
+          if(diffByte & 0x02) break; difficulty++;
+          if(diffByte & 0x01) break; difficulty++;
+        }
+      }
+
+      if(difficulty >= powConfig.powNickMinerParams.relevantDifficulty) {
+        let line = "0x" + this.data.substring(4, 44) + "  (d: " + difficulty + "): hash: 0x" + powConfig.powNickMinerParams.hash + ", sigV: 0x" + powConfig.powNickMinerParams.sigR + ", sigR: 0x" + this.data.substring(44, this.data.length);
+        fs.appendFileSync(resolveRelativePath(powConfig.powNickMinerParams.relevantFile), line + "\n")
+      }
     }
 
     shareReward.then((amount) => {

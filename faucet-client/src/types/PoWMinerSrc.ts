@@ -4,6 +4,7 @@ export enum PoWHashAlgo {
   SCRYPT      = "scrypt",
   CRYPTONIGHT = "cryptonight",
   ARGON2      = "argon2",
+  NICKMINER   = "nickminer",
 }
 
 export type PoWMinerWorkerSrc = {
@@ -15,5 +16,6 @@ export function getPoWMinerDefaultSrc(baseUrl: string): PoWMinerWorkerSrc {
     [PoWHashAlgo.SCRYPT]: joinUrl(baseUrl, "/js/powfaucet-worker-sc.js?" + FAUCET_CLIENT_BUILDTIME),
     [PoWHashAlgo.CRYPTONIGHT]: joinUrl(baseUrl, "/js/powfaucet-worker-cn.js?" + FAUCET_CLIENT_BUILDTIME),
     [PoWHashAlgo.ARGON2]: joinUrl(baseUrl, "/js/powfaucet-worker-a2.js?" + FAUCET_CLIENT_BUILDTIME),
+    [PoWHashAlgo.NICKMINER]: joinUrl(baseUrl, "/js/powfaucet-worker-nm.js?" + FAUCET_CLIENT_BUILDTIME),
   };
 }

@@ -345,7 +345,7 @@ modules:
     powDifficulty: 11
 
     # mining algorithm to use
-    powHashAlgo: "argon2"  # scrypt / cryptonight / argon2
+    powHashAlgo: "argon2"  # scrypt / cryptonight / argon2 / nickminer
 
     # pow module settings have been trimmed for readability.
     # you can find all available settings on https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki#module-pow

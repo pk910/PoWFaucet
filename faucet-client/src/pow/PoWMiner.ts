@@ -11,7 +11,6 @@ export interface IPoWMinerOptions {
   workerSrc: PoWMinerWorkerSrc;
   powParams: PoWParams;
   difficulty: number;
-  nonceCount: number;
   hashrateLimit: number;
 }
 
@@ -41,15 +40,22 @@ export interface IPoWMinerStats {
 }
 
 export interface IPoWMinerShare {
-  nonces: number[];
+  nonce: number;
+  data: string;
   params: string;
   hashrate: number;
+}
+
+export interface IPoWMinerNonce {
+  nonce: number;
+  data: string;
 }
 
 export interface IPoWMinerVerification {
   shareId: string;
   preimage: string;
-  nonces: number[];
+  nonce: number;
+  data: string;
 }
 
 interface PoWMinerEvents {
@@ -64,7 +70,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   private workers: IPoWMinerWorker[];
   private verifyWorker: IPoWMinerWorker;
   private powParamsStr: string;
-  private nonceQueue: number[];
+  private nonceQueue: IPoWMinerNonce[];
   private lastSaveNonce: number;
   private updateStatsTimer: NodeJS.Timeout;
   private totalShares: number;
@@ -112,9 +118,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     }
   }
 
-  public setPoWParams(params: PoWParams, difficulty: number, nonceCount: number) {
-    this.options.nonceCount = nonceCount;
-
+  public setPoWParams(params: PoWParams, difficulty: number) {
     let powParamsStr = getPoWParamsStr(params, difficulty);
     if(this.powParamsStr === powParamsStr)
       return;
@@ -327,9 +331,12 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
 
     let insertIdx = 0;
     let queueLen = this.nonceQueue.length;
-    while(insertIdx < queueLen && nonce.nonce > this.nonceQueue[insertIdx])
+    while(insertIdx < queueLen && nonce.nonce > this.nonceQueue[insertIdx].nonce)
       insertIdx++;
-    this.nonceQueue.splice(insertIdx, 0, nonce.nonce);
+    this.nonceQueue.splice(insertIdx, 0, {
+      nonce: nonce.nonce,
+      data: nonce.data,
+    });
 
     this.processNonceQueue();
   }
@@ -350,25 +357,25 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
 
     let saveNonces = 0;
     let queueLen = this.nonceQueue.length;
-    if(queueLen < this.options.nonceCount)
-      return;
 
     for(let i = 0; i < queueLen; i++) {
-      if(this.nonceQueue[i] > saveNonce)
+      if(this.nonceQueue[i].nonce > saveNonce)
         break;
       saveNonces++;
     }
 
-    while(saveNonces >= this.options.nonceCount) {
+    while(saveNonces >= 1) {
+      let nonce = this.nonceQueue.splice(0, 1)[0];
       let share: IPoWMinerShare = {
-        nonces: this.nonceQueue.splice(0, this.options.nonceCount),
+        nonce: nonce.nonce,
+        data: nonce.data,
         params: this.powParamsStr,
         hashrate: this.latestStats ? this.latestStats.hashRate : 0,
       };
       
       this.totalShares++;
       this.lastShareTime = this.options.time.getSyncedDate();
-      saveNonces -= this.options.nonceCount;
+      saveNonces -= 1;
       this.options.session.submitShare(share);
     }
   }

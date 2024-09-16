@@ -11,8 +11,8 @@ export interface IPoWConfig extends IBaseModuleConfig {
   powScryptParams: IPoWSCryptParams; // scrypt parameters
   powCryptoNightParams: IPoWCryptoNightParams; // cryptonight parameters
   powArgon2Params: IPoWArgon2Params; // argon2 parameters
+  powNickMinerParams: IPoWNickMinerParams; // nickminer parameters
   powDifficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
-  powNonceCount: number; // number of scrypt hashes to pack into a share (should be low as that just increases verification load on server side)
   powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
   powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceed the limit)
 
@@ -40,6 +40,7 @@ export enum PoWHashAlgo {
   SCRYPT      = "scrypt",
   CRYPTONIGHT = "cryptonight",
   ARGON2      = "argon2",
+  NICKMINER   = "nickminer",
 }
 
 export interface IPoWSCryptParams {
@@ -64,7 +65,19 @@ export interface IPoWArgon2Params {
   keyLength: number; // how many bytes to generate as output, e.g. 16 bytes (128 bits)
 }
 
-export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params;
+export interface IPoWNickMinerParams {
+  hash: string; // input hash
+  sigR: string; // sigR
+  sigV: number; // sigV
+  count: number; // number of hashed per hash call
+  suffix: string; // suffix to check for in the hash (client side)
+  prefix: string; // additional prefix to check for on server side for interesting nonces
+
+  relevantDifficulty: number; // min difficulty to thread a hash as relevant
+  relevantFile: string; // filename to store relevant data
+}
+
+export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params | IPoWNickMinerParams;
 
 export const defaultConfig: IPoWConfig = {
   enabled: false,
@@ -93,8 +106,17 @@ export const defaultConfig: IPoWConfig = {
     parallelization: 1,
     keyLength: 16,
   },
+  powNickMinerParams: {
+    hash: "1234567890123456",
+    sigR: "0539",
+    sigV: 27,
+    count: 60,
+    suffix: "beac02",
+    prefix: "0000",
+    relevantDifficulty: 0,
+    relevantFile: null,
+  },
   powDifficulty: 11,
-  powNonceCount: 1,
   powHashrateSoftLimit: 0,
   powHashrateHardLimit: 0,
   verifyLocalPercent: 10,

@@ -162,22 +162,19 @@ export class PoWClient {
     
     let moduleConfig = this.module.getModuleConfig();
     let shareData: {
-      nonces: number[];
+      nonce: number;
+      data: string;
       params: string;
       hashrate: number;
     } = message.data;
 
     if(shareData.params !== this.module.getPoWParamsStr()) 
       return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", message);
-    if(shareData.nonces.length !== moduleConfig.powNonceCount)
-      return this.sendErrorResponse("INVALID_SHARE", "Invalid nonce count", message);
     
     let lastNonce = this.session.lastNonce;
-    for(let i = 0; i < shareData.nonces.length; i++) {
-      if(shareData.nonces[i] <= lastNonce)
-        return this.sendErrorResponse("INVALID_SHARE", "Nonce too low", message);
-      lastNonce = shareData.nonces[i];
-    }
+    if(shareData.nonce <= lastNonce)
+      return this.sendErrorResponse("INVALID_SHARE", "Nonce too low", message);
+    lastNonce = shareData.nonce;
     this.session.lastNonce = lastNonce;
     if(shareData.hashrate) {
       let reportedHashRates = this.session.reportedHashrate;
@@ -196,7 +193,7 @@ export class PoWClient {
         return this.sendErrorResponse("HASHRATE_LIMIT", "Nonce too high (did you evade the hashrate limit?) " + sessionAge + "/" + nonceLimit, message);
     }
 
-    let shareVerification = new PoWShareVerification(this.module, this.session, shareData.nonces);
+    let shareVerification = new PoWShareVerification(this.module, this.session, shareData.nonce, shareData.data);
     shareVerification.startVerification().then((result) => {
       if(!result.isValid)
         this.sendErrorResponse("WRONG_SHARE", "Share verification failed", message);
