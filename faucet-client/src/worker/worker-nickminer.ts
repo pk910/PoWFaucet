@@ -7,8 +7,6 @@ import { PoWHashAlgo } from "../types/PoWMinerSrc";
   getNickMinerReadyPromise().then(() => {
     let nickMiner = getNickMiner();
     nickMiner.miner_init();
-
-    (globalThis as any).nickMiner = nickMiner;
     
     new PoWWorker({
       hashFn: (nonce, preimg, params) => {
