@@ -68,6 +68,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
   private configRefreshInterval: NodeJS.Timer;
   private faucetContainerElement: HTMLElement;
   private lastConfigRefresh = 0;
+  private lastConfigRefreshStart = 0;
   private statusAlertIdCounter = 0;
   private notificationIdCounter = 0;
   private dialogIdCounter = 0;
@@ -98,6 +99,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       showDialog: (dialogProps: IFaucetDialogProps) => this.showDialog(dialogProps),
       hideDialog: (dialogId: number) => this.hideDialog(dialogId),
       getContainer: () => this.faucetContainerElement,
+      refreshConfig: () => this.loadFaucetConfig(),
     };
 
     this.state = {
@@ -138,6 +140,11 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
   }
 
   private loadFaucetConfig() {
+    let now = (new Date()).getTime();
+    if(now - this.lastConfigRefreshStart < 10000)
+      return;
+    this.lastConfigRefreshStart = now;
+
     this.pageContext.faucetApi.getFaucetConfig().then((faucetConfig) => {
       this.lastConfigRefresh = (new Date()).getTime();
       this.setState({

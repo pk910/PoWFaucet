@@ -50,7 +50,10 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       "clientOpen": {
         emmiter: this.powClient,
         event: "open",
-        listener: () => this.updateConnectionState(true),
+        listener: () => {
+          this.props.pageContext.refreshConfig();
+          this.updateConnectionState(true);
+        },
       },
       "clientClose": {
         emmiter: this.powClient,

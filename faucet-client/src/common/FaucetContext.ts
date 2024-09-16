@@ -26,4 +26,6 @@ export interface IFaucetContext {
   hideDialog(dialogId: number): void;
   getContainer(): HTMLElement;
 
+  refreshConfig(): void;
+
 }
