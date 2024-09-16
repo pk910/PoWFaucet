@@ -233,7 +233,7 @@ export class PoWShareVerification {
       }
 
       if(difficulty >= powConfig.powNickMinerParams.relevantDifficulty) {
-        let line = "0x" + this.data.substring(4, 44) + "  (d: " + difficulty + "): hash: 0x" + powConfig.powNickMinerParams.hash + ", sigV: 0x" + powConfig.powNickMinerParams.sigR + ", sigR: 0x" + this.data.substring(44, this.data.length);
+        let line = "0x" + this.data.substring(4, 44) + "  (d: " + difficulty + "): hash: 0x" + powConfig.powNickMinerParams.hash + ", sigR: 0x" + powConfig.powNickMinerParams.sigR + ", sigS: 0x" + this.data.substring(44, this.data.length);
         fs.appendFileSync(resolveRelativePath(powConfig.powNickMinerParams.relevantFile), line + "\n")
       }
     }
