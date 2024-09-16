@@ -11,6 +11,7 @@ import { PoWClient } from "./PoWClient.js";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 import { PoWHashAlgo } from "./PoWConfig.js";
 import { resolveRelativePath } from "../../config/FaucetConfig.js";
+import { base64ToHex } from "../../utils/ConvertHelpers.js";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -232,7 +233,7 @@ export class PoWShareVerification {
       }
 
       if(difficulty >= powConfig.powNickMinerParams.relevantDifficulty) {
-        let line = "0x" + this.data.substring(4, 44) + "  (d: " + difficulty + "): sigR: 0x" + this.data.substring(44);
+        let line = "0x" + this.data.substring(4, 44) + "  (d: " + difficulty + "): hash: 0x" + powConfig.powNickMinerParams.hash + ", sigV: 0x" + powConfig.powNickMinerParams.sigR + ", sigR: 0x" + this.data.substring(44, this.data.length) + ", preimg: " + base64ToHex(this.session.preImage) + ", nonce: " + this.nonce;
         fs.appendFileSync(resolveRelativePath(powConfig.powNickMinerParams.relevantFile), line + "\n")
       }
     }
