@@ -58,6 +58,12 @@ export interface IPoWMinerVerification {
   data: string;
 }
 
+export interface IPoWMinerVerificationResult {
+  shareId: string;
+  params: string;
+  isValid: boolean;
+}
+
 interface PoWMinerEvents {
   'stats': (stats: IPoWMinerStats) => void;
 }
@@ -480,7 +486,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     });
   }
 
-  private onWorkerVerifyResult(worker: IPoWMinerWorker, result: any) {
+  private onWorkerVerifyResult(worker: IPoWMinerWorker, result: IPoWMinerVerificationResult) {
     this.options.session.submitVerifyResult(result);
   }
 

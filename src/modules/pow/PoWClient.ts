@@ -222,8 +222,12 @@ export class PoWClient {
 
     let verifyRes: {
       shareId: string;
+      params?: string;
       isValid: boolean;
     } = message.data;
+
+    if(verifyRes.params && verifyRes.params !== this.module.getPoWParamsStr()) 
+      return this.sendErrorResponse("INVALID_VERIFYRESULT", "Invalid share params", message);
 
     let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.getFaucetSession().getSessionId(), verifyRes.isValid);
     let verifyReward = BigInt(this.module.getModuleConfig().powShareReward) * BigInt(this.module.getModuleConfig().verifyMinerRewardPerc * 100) / 10000n;

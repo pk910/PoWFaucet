@@ -27,7 +27,6 @@ export class PoWWorker {
   private options: IPoWWorkerOptions;
   private workerId: number;
   private powParams: IPoWWorkerParams;
-  private powDifficulty: number;
   private powPreImage: string;
   private working = false;
   private workNonce: number;
@@ -122,6 +121,7 @@ export class PoWWorker {
       action: "verifyResult",
       data: {
         shareId: share.shareId,
+        params: this.powParams.pstr,
         isValid: isValid
       }
     });
