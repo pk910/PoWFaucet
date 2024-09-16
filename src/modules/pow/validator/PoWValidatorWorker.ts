@@ -107,7 +107,7 @@ export class PoWValidatorWorker {
       dmask = this.difficultyMasks[req.difficulty] = this.getDifficultyMask(req.difficulty);
 
     let isValid = true;
-    let nonceHex = req.nonce.toString(16);
+    let nonceHex = req.nonce?.toString(16) || "";
     if(nonceHex.length < 16) {
       nonceHex = "0000000000000000".substring(0, 16 - nonceHex.length) + nonceHex;
     }
