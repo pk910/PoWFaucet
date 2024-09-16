@@ -5,7 +5,10 @@ export class FetchUtil {
         url: RequestInfo,
         init?: RequestInit,
     ): Promise<Response> {
-        return nodeFetch(url, init);
+        if(init)
+            return nodeFetch(url, init);
+        else
+            return nodeFetch(url);
     }
 
     public static fetchWithTimeout(
