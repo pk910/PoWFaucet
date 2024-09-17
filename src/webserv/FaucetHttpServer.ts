@@ -67,6 +67,12 @@ export class FaucetHttpServer {
     this.httpServer.on("upgrade", (req, sock, head) =>
       this.onHttpUpgrade(req, sock, head)
     );
+    this.httpServer.on("error", (err) => {
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        "FaucetHttpServer error: " + err.toString()
+      );
+    });
     this.httpServer.listen(faucetConfig.serverPort);
 
     this.wssServer = new WebSocketServer({
