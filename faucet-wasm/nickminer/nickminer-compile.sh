@@ -1,5 +1,11 @@
 #!/bin/bash
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+if [ "$SCRIPT_DIR" != "/app" ]; then
+  echo "This script should be run from within the build container! run ./build_wasm.sh to build the wasm"
+  exit 1
+fi
+
 # method for joining a multiline string list using a delimiter
 join() {
   s_list=$1; s_delim=$2
