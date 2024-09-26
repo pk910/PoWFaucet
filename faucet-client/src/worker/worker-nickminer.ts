@@ -17,7 +17,7 @@ import { PoWHashAlgo } from "../types/PoWMinerSrc";
       configFn: (preimg, params) => {
         if(params.a !== PoWHashAlgo.NICKMINER)
           return null;
-        nickMiner.miner_set_config(params.i, params.r, params.v, params.s, params.c, preimg);
+        nickMiner.miner_set_config(params.i, params.r, params.v, params.s, params.p, params.c, preimg);
       }
     });
     

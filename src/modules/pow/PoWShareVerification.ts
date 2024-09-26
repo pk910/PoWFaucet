@@ -214,24 +214,6 @@ export class PoWShareVerification {
     if(powConfig.powHashAlgo === PoWHashAlgo.NICKMINER && powConfig.powNickMinerParams.relevantFile) {
       // check for relevant results
       let difficulty = parseInt(this.data.substring(2, 4), 16);
-      if(difficulty >= powConfig.powNickMinerParams.suffix.length * 4) {
-        // check for valid prefix
-        for(let i = 0; i < powConfig.powNickMinerParams.prefix.length; i++) {
-          let addrByte = parseInt(this.data.substring(4 + i * 2, 6 + i * 2), 16);
-          let prefixByte = parseInt(powConfig.powNickMinerParams.prefix.substring(i*2, (i*2)+2), 16);
-
-          let diffByte = addrByte ^ prefixByte;
-          if(diffByte & 0x80) break; difficulty++;
-          if(diffByte & 0x40) break; difficulty++;
-          if(diffByte & 0x20) break; difficulty++;
-          if(diffByte & 0x10) break; difficulty++;
-          if(diffByte & 0x08) break; difficulty++;
-          if(diffByte & 0x04) break; difficulty++;
-          if(diffByte & 0x02) break; difficulty++;
-          if(diffByte & 0x01) break; difficulty++;
-        }
-      }
-
       if(difficulty >= powConfig.powNickMinerParams.relevantDifficulty) {
         let line = "0x" + this.data.substring(4, 44) + "  (d: " + difficulty + "): hash: 0x" + powConfig.powNickMinerParams.hash + ", sigR: 0x" + powConfig.powNickMinerParams.sigR + ", sigS: 0x" + this.data.substring(44, this.data.length);
         fs.appendFileSync(resolveRelativePath(powConfig.powNickMinerParams.relevantFile), line + "\n")

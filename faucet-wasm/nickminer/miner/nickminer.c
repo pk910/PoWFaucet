@@ -16,7 +16,9 @@ unsigned char inputSigR[32];
 unsigned char inputSigV;
 unsigned char preimageHash[32];
 unsigned char outputSuffix[20];
+unsigned char outputPrefix[20];
 int outputSuffixLen;
+int outputPrefixLen;
 int maxRounds;
 
 void miner_init() {
@@ -54,7 +56,7 @@ static void get_create_addr(unsigned char *deployer, unsigned char *addrBuf) {
     memcpy(addrBuf, hashout+12, 20);
 }
 
-void miner_set_config(unsigned char *input_hex, unsigned char *input_sigr, int input_sig_v, unsigned char *output_suffix, int max_rounds, unsigned char *preimageHex) {
+void miner_set_config(unsigned char *input_hex, unsigned char *input_sigr, int input_sig_v, unsigned char *output_suffix, unsigned char *output_prefix, int max_rounds, unsigned char *preimageHex) {
     unsigned char *pos;
     size_t i;
 
@@ -66,6 +68,11 @@ void miner_set_config(unsigned char *input_hex, unsigned char *input_sigr, int i
     pos = output_suffix;
     for(i = 0; i < output_len; i++) { sscanf(pos, "%2hhx", &outputSuffix[i]); pos += 2; }
     outputSuffixLen = output_len;
+
+    output_len = strlen(output_prefix) / 2;
+    pos = output_prefix;
+    for(i = 0; i < output_len; i++) { sscanf(pos, "%2hhx", &outputPrefix[i]); pos += 2; }
+    outputPrefixLen = output_len;
 
     maxRounds = max_rounds;
 
@@ -196,6 +203,21 @@ unsigned char* miner_run(unsigned char *nonceHex) {
             if(diff & 0x20) { break; } else { score++; }
             if(diff & 0x40) { break; } else { score++; }
             if(diff & 0x80) { break; } else { score++; }
+        }
+
+        if (score == outputSuffixLen * 8) {
+            // suffix matches completely, check prefix
+            for (j = 0; j < outputPrefixLen; j++) {
+                diff = addr[j] ^ outputPrefix[j];
+                if(diff & 0x80) { break; } else { score++; }
+                if(diff & 0x40) { break; } else { score++; }
+                if(diff & 0x20) { break; } else { score++; }
+                if(diff & 0x10) { break; } else { score++; }
+                if(diff & 0x08) { break; } else { score++; }
+                if(diff & 0x04) { break; } else { score++; }
+                if(diff & 0x02) { break; } else { score++; }
+                if(diff & 0x01) { break; } else { score++; }
+            }
         }
 
         if (score > bestScore) {

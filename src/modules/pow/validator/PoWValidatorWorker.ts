@@ -64,7 +64,7 @@ export class PoWValidatorWorker {
           await module.default.getNickMinerReadyPromise();
           let nickMiner = module.default.getNickMiner();
           return (nonce, preimg, params: IPoWNickMinerParams) => {
-            nickMiner.miner_set_config(params.hash, params.sigR, params.sigV, params.suffix, params.count, preimg);
+            nickMiner.miner_set_config(params.hash, params.sigR, params.sigV, params.suffix, params.prefix, params.count, preimg);
             return nickMiner.miner_run(nonce);
           };
         })();
