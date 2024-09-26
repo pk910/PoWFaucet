@@ -11,6 +11,7 @@ export interface IPoWSessionOptions {
   client: PoWClient;
   time: FaucetTime;
   showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => number;
+  refreshConfig: () => void;
 }
 
 export interface IPoWSessionBalanceUpdate {
@@ -108,8 +109,11 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   private _submitShare(share: IPoWMinerShare) {
     this.options.client.sendRequest("foundShare", share).catch((err) => {
-      if(err.code === "INVALID_SHARE" && err.data && err.data.message === "Invalid share params")
+      if(err.code === "INVALID_SHARE" && err.message === "Invalid share params") {
+        this.shareQueue = this.shareQueue.filter((s) => s.params !== share.params);
+        this.options.refreshConfig();
         return; // Ignore invalid params
+      }
 
       this.options.showNotification("error", "Submission error: [" + err.code + "] " + err.message, true, 20 * 1000);
     });
@@ -132,8 +136,11 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   private _submitVerifyResult(result: IPoWMinerVerificationResult) {
     this.options.client.sendRequest("verifyResult", result).catch((err) => {
-      if(err.code === "INVALID_VERIFYRESULT" && err.data && err.data.message === "Invalid share params")
+      if(err.code === "INVALID_VERIFYRESULT" && err.message === "Invalid share params") {
+        this.verifyResultQueue = this.verifyResultQueue.filter((s) => s.params !== result.params);
+        this.options.refreshConfig();
         return; // Ignore invalid params
+      }
 
       this.options.showNotification("error", "Verification error: [" + err.code + "] " + err.message, true, 20 * 1000);
     });

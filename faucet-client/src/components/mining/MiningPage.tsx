@@ -123,7 +123,8 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       time: this.props.pageContext.faucetApi.getFaucetTime(),
       showNotification: (type: string, message: string, time?: number|boolean, timeout?: number) => {
         return this.props.pageContext.showNotification(type, message, time, timeout);
-      }
+      },
+      refreshConfig: () => this.props.pageContext.refreshConfig(),
     });
 
     this.powMiner = new PoWMiner({
