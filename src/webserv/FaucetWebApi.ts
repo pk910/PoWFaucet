@@ -16,7 +16,7 @@ import {
   FaucetSessionStatus,
   FaucetSessionStoreData,
   FaucetSessionTask,
-  IClientSessionInfo,
+  IClientSessionInfo
 } from "../session/FaucetSession.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { sha256 } from "../utils/CryptoUtils.js";
@@ -24,7 +24,7 @@ import { nowSeconds } from "../utils/DateUtils.js";
 import {
   buildFaucetStatus,
   buildQueueStatus,
-  buildSessionStatus,
+  buildSessionStatus
 } from "./api/faucetStatus.js";
 import { FaucetHttpResponse } from "./FaucetHttpServer.js";
 
@@ -302,10 +302,13 @@ export class FaucetWebApi {
     return faucetConfig.maxDropAmount;
   }
 
-  public onGetFaucetConfig(
+  public async onGetFaucetConfig(
     clientVersion?: string,
     sessionId?: string
-  ): IClientFaucetConfig {
+  ): Promise<IClientFaucetConfig> {
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    await ethWalletManager.updateFaucetStatus();
+
     let faucetSession = sessionId
       ? ServiceManager.GetService(SessionManager).getSession(sessionId, [
           FaucetSessionStatus.RUNNING,
@@ -316,7 +319,6 @@ export class FaucetWebApi {
       clientVersion,
       faucetSession
     );
-    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
 
     let moduleConfig = {};
     ServiceManager.GetService(ModuleManager).processActionHooks(

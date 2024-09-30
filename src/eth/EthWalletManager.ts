@@ -99,7 +99,15 @@ export class EthWalletManager {
     this.walletKey = Buffer.from(privkey, "hex");
     this.walletAddr = faucetConfig.ethWalletAddr;
 
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO,
+      "Initializing loadWalletState..."
+    );
     await this.loadWalletState();
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO,
+      "Initialized loadWalletState successfully"
+    );
 
     // reload handler
     ServiceManager.GetService(FaucetProcess).addListener("reload", () => {
@@ -258,7 +266,7 @@ export class EthWalletManager {
       });
   }
 
-  private async updateFaucetStatus() {
+  public async updateFaucetStatus() {
     let statusMessage: string = null;
     let statusLevel: FaucetStatusLevel = null;
     const lowFundsBalance =
