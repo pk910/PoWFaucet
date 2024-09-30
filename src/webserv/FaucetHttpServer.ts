@@ -148,6 +148,11 @@ export class FaucetHttpServer {
               }
             })
             .catch((err) => {
+              ServiceManager.GetService(FaucetProcess).emitLog(
+                FaucetLogLevel.ERROR,
+                JSON.stringify(err)
+              );
+
               if (
                 err &&
                 typeof err === "object" &&
