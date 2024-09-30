@@ -1,10 +1,16 @@
 import { IncomingMessage } from "http";
-import { faucetConfig } from "../config/FaucetConfig.js";
+
+import { FaucetError } from "../common/FaucetError.js";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { EthClaimManager } from "../eth/EthClaimManager.js";
 import { EthWalletManager } from "../eth/EthWalletManager.js";
+import { GitcoinClaimer } from "../modules/gitcoin-claimer/GitcoinClaimer.js";
+import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
+import { RecurringLimitsModule } from "../modules/recurring-limits/RecurringLimitsModule";
 import { FaucetStatus, IFaucetStatus } from "../services/FaucetStatus.js";
-import { FaucetHttpResponse } from "./FaucetHttpServer.js";
-import { SessionManager } from "../session/SessionManager.js";
+import { PromMetricsService } from "../services/PromMetrics.js";
 import {
   FaucetSession,
   FaucetSessionStatus,
@@ -12,20 +18,15 @@ import {
   FaucetSessionTask,
   IClientSessionInfo,
 } from "../session/FaucetSession.js";
-import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
-import { FaucetError } from "../common/FaucetError.js";
-import { EthClaimManager } from "../eth/EthClaimManager.js";
+import { SessionManager } from "../session/SessionManager.js";
+import { sha256 } from "../utils/CryptoUtils.js";
+import { nowSeconds } from "../utils/DateUtils.js";
 import {
   buildFaucetStatus,
   buildQueueStatus,
   buildSessionStatus,
 } from "./api/faucetStatus.js";
-import { sha256 } from "../utils/CryptoUtils.js";
-import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
-import { RecurringLimitsModule } from "../modules/recurring-limits/RecurringLimitsModule";
-import { PromMetricsService } from "../services/PromMetrics.js";
-import { GitcoinClaimer } from "../modules/gitcoin-claimer/GitcoinClaimer.js";
-import { nowSeconds } from "../utils/DateUtils.js";
+import { FaucetHttpResponse } from "./FaucetHttpServer.js";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -120,7 +121,9 @@ export class FaucetWebApi {
       return new FaucetHttpResponse(403, "Access denied");
     }
 
-    if (req.headers["api-key"] !== apiKey) {
+    const requestApiKey = req.headers["api-key"];
+
+    if (requestApiKey !== apiKey) {
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.WARNING,
         `Unauthorized request to "${endpoint}"`
@@ -613,10 +616,9 @@ export class FaucetWebApi {
     let sessionData: FaucetSessionStoreData;
     if (
       !sessionId ||
-      !(sessionData =
-        await ServiceManager.GetService(SessionManager).getSessionData(
-          sessionId
-        ))
+      !(sessionData = await ServiceManager.GetService(
+        SessionManager
+      ).getSessionData(sessionId))
     )
       return new FaucetHttpResponse(404, "Session not found");
 
@@ -690,10 +692,9 @@ export class FaucetWebApi {
       return new FaucetHttpResponse(403, "Access denied");
     }
 
-    const metrics =
-      await ServiceManager.GetService(
-        PromMetricsService
-      ).getWalletBalanceMetric();
+    const metrics = await ServiceManager.GetService(
+      PromMetricsService
+    ).getWalletBalanceMetric();
     const contentType =
       ServiceManager.GetService(PromMetricsService).getContentType();
 
