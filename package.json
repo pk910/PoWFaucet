@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
-    "@types/chai": "^4.3.17",
+    "@types/chai": "^5.0.0",
     "@types/json-bigint": "^1.0.4",
     "@types/mocha": "^10.0.7",
     "@types/mysql": "^2.15.26",
