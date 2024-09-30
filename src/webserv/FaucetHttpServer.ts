@@ -150,7 +150,7 @@ export class FaucetHttpServer {
             .catch((err) => {
               ServiceManager.GetService(FaucetProcess).emitLog(
                 FaucetLogLevel.ERROR,
-                JSON.stringify(err)
+                `API request error for ${req.url}: ${JSON.stringify(err)}`
               );
 
               if (

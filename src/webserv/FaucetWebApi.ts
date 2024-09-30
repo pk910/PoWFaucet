@@ -311,7 +311,7 @@ export class FaucetWebApi {
     sessionId?: string
   ): Promise<IClientFaucetConfig> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    await ethWalletManager.updateFaucetStatus();
+    // await ethWalletManager.updateFaucetStatus();
 
     let faucetSession = sessionId
       ? ServiceManager.GetService(SessionManager).getSession(sessionId, [
