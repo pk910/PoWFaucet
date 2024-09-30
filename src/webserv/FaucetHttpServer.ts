@@ -1,20 +1,22 @@
 import * as fs from "fs";
-import * as path from "path";
-import * as stream from "node:stream";
+import { encode } from "html-entities";
 import {
   createServer,
   IncomingMessage,
   Server as HttpServer,
-  ServerResponse,
+  ServerResponse
 } from "http";
-import { Server as StaticServer } from "@brettz9/node-static";
-import { WebSocket, WebSocketServer } from "ws";
-import { faucetConfig } from "../config/FaucetConfig.js";
-import { encode } from "html-entities";
 import { OutgoingHttpHeaders } from "http2";
-import { FaucetWebApi } from "./FaucetWebApi.js";
+import * as stream from "node:stream";
+import * as path from "path";
+import { WebSocket, WebSocketServer } from "ws";
+
+import { Server as StaticServer } from "@brettz9/node-static";
+
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
-import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess.js";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { FaucetWebApi } from "./FaucetWebApi.js";
 
 export class FaucetHttpResponse {
   public readonly code: number;

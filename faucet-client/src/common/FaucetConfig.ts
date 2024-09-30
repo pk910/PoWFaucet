@@ -4,7 +4,7 @@ export interface IFaucetConfig {
   faucetCoinType: string;
   faucetCoinContract: string;
   faucetCoinDecimals: number;
-  faucetCoinBalance: bigint | null;
+  faucetCoinBalance: string | null;
   noFundsBalance: number;
   lowFundsBalance: number;
   minClaim: number;

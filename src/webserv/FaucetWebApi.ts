@@ -40,7 +40,7 @@ export interface IClientFaucetConfig {
   faucetCoinType: string;
   faucetCoinContract: string;
   faucetCoinDecimals: number;
-  faucetCoinBalance: bigint | null;
+  faucetCoinBalance: string | null;
   noFundsBalance: number;
   lowFundsBalance: number;
   minClaim: number;
@@ -310,6 +310,9 @@ export class FaucetWebApi {
     clientVersion?: string,
     sessionId?: string
   ): Promise<IClientFaucetConfig> {
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    await ethWalletManager.updateFaucetStatus();
+
     let faucetSession = sessionId
       ? ServiceManager.GetService(SessionManager).getSession(sessionId, [
           FaucetSessionStatus.RUNNING,
@@ -327,16 +330,15 @@ export class FaucetWebApi {
       ModuleHookAction.ClientConfig,
       [moduleConfig, sessionId]
     );
-    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
 
-    return {
+    const config: IClientFaucetConfig = {
       faucetStatus: faucetStatus.status,
       faucetStatusHash: faucetStatus.hash,
       faucetCoinSymbol: faucetConfig.faucetCoinSymbol,
       faucetCoinType: faucetConfig.faucetCoinType,
       faucetCoinContract: faucetConfig.faucetCoinContract,
       faucetCoinDecimals: ethWalletManager.getFaucetDecimals(),
-      faucetCoinBalance: ethWalletManager.walletState.balance,
+      faucetCoinBalance: String(ethWalletManager.walletState.balance),
       noFundsBalance: faucetConfig.noFundsBalance,
       lowFundsBalance: faucetConfig.lowFundsBalance,
       minClaim: faucetConfig.minDropAmount,
@@ -349,6 +351,8 @@ export class FaucetWebApi {
       time: nowSeconds(),
       modules: moduleConfig,
     };
+
+    return config;
   }
 
   public async onStartSession(
