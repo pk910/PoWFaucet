@@ -1,28 +1,29 @@
-import { WebSocket } from "ws";
-import { faucetConfig } from "../config/FaucetConfig.js";
-import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
-import { ServiceManager } from "../common/ServiceManager.js";
-import { EthWalletManager } from "./EthWalletManager.js";
-import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
-import { FaucetDatabase } from "../db/FaucetDatabase.js";
-import { EthWalletRefill } from "./EthWalletRefill.js";
-import {
-  FaucetSessionStatus,
-  FaucetSessionStoreData,
-} from "../session/FaucetSession.js";
-import { FaucetError } from "../common/FaucetError.js";
-import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
-import { FaucetHttpServer } from "../webserv/FaucetHttpServer.js";
 import { IncomingMessage } from "http";
-import {
-  EthClaimNotificationClient,
-  IEthClaimNotificationData,
-} from "./EthClaimNotificationClient.js";
-import { FaucetOutflowModule } from "../modules/faucet-outflow/FaucetOutflowModule.js";
 import { clearInterval } from "timers";
 import { TransactionReceipt } from "web3";
-import { nowSeconds } from "../utils/DateUtils.js";
+import { WebSocket } from "ws";
+
+import { FaucetError } from "../common/FaucetError.js";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { ServiceManager } from "../common/ServiceManager.js";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { FaucetDatabase } from "../db/FaucetDatabase.js";
+import { FaucetOutflowModule } from "../modules/faucet-outflow/FaucetOutflowModule.js";
 import { GitcoinClaimStatus } from "../modules/gitcoin-claimer/GitcoinClaimerTypes.js";
+import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
+import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
+import {
+  FaucetSessionStatus,
+  FaucetSessionStoreData
+} from "../session/FaucetSession.js";
+import { nowSeconds } from "../utils/DateUtils.js";
+import { FaucetHttpServer } from "../webserv/FaucetHttpServer.js";
+import {
+  EthClaimNotificationClient,
+  IEthClaimNotificationData
+} from "./EthClaimNotificationClient.js";
+import { EthWalletManager } from "./EthWalletManager.js";
+import { EthWalletRefill } from "./EthWalletRefill.js";
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -158,8 +159,9 @@ export class EthClaimManager {
       let sessionInfo: FaucetSessionStoreData;
       if (
         !sessionId ||
-        !(sessionInfo =
-          await ServiceManager.GetService(FaucetDatabase).getSession(sessionId))
+        !(sessionInfo = await ServiceManager.GetService(
+          FaucetDatabase
+        ).getSession(sessionId))
       )
         throw new Error("session not found");
 
@@ -350,9 +352,9 @@ export class EthClaimManager {
       }
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.ERROR,
-        "Exception in transaction queue processing: " +
-          ex.toString() +
-          `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : stack}`
+        "Exception in transaction queue processing: " + ex.toString()
+        // TODO: Uncomment the following line
+        // `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : stack}`
       );
     }
     this.queueProcessing = false;
@@ -449,12 +451,9 @@ export class EthClaimManager {
       })
       .then(() => {
         this.historyTxDict[claimTx.claim.txNonce] = claimTx;
-        setTimeout(
-          () => {
-            delete this.historyTxDict[claimTx.claim.txNonce];
-          },
-          30 * 60 * 1000
-        );
+        setTimeout(() => {
+          delete this.historyTxDict[claimTx.claim.txNonce];
+        }, 30 * 60 * 1000);
       });
   }
 }

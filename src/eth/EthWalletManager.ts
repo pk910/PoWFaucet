@@ -267,6 +267,11 @@ export class EthWalletManager {
   }
 
   public async updateFaucetStatus() {
+    ServiceManager.GetService(FaucetProcess).emitLog(
+      FaucetLogLevel.INFO,
+      `Updating faucet status for ${this.walletAddr}...`
+    );
+
     let statusMessage: string = null;
     let statusLevel: FaucetStatusLevel = null;
     const lowFundsBalance =

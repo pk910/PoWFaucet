@@ -40,6 +40,9 @@ export interface IClientFaucetConfig {
   faucetCoinType: string;
   faucetCoinContract: string;
   faucetCoinDecimals: number;
+  faucetCoinBalance: bigint | null;
+  noFundsBalance: number;
+  lowFundsBalance: number;
   minClaim: number;
   maxClaim: number;
   sessionTimeout: number;
@@ -332,6 +335,9 @@ export class FaucetWebApi {
       faucetCoinType: faucetConfig.faucetCoinType,
       faucetCoinContract: faucetConfig.faucetCoinContract,
       faucetCoinDecimals: ethWalletManager.getFaucetDecimals(),
+      faucetCoinBalance: ethWalletManager.getFaucetBalance(),
+      noFundsBalance: faucetConfig.noFundsBalance,
+      lowFundsBalance: faucetConfig.lowFundsBalance,
       minClaim: faucetConfig.minDropAmount,
       maxClaim: faucetConfig.maxDropAmount,
       sessionTimeout: faucetConfig.sessionTimeout,
