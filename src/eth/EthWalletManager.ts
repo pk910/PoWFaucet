@@ -68,10 +68,10 @@ export class EthWalletManager {
   private chainCommon: EthCom.Common;
   private walletKey: Buffer;
   private walletAddr: string;
-  private walletState: WalletState;
   private tokenState: FaucetTokenState;
   private lastWalletRefresh: number;
   private txReceiptPollInterval = 12000;
+  public walletState: WalletState;
 
   public async initialize(): Promise<void> {
     if (this.initialized) {

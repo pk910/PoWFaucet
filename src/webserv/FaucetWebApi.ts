@@ -139,11 +139,12 @@ export class FaucetWebApi {
         return this.onGetVersion();
       case "getMaxReward".toLowerCase():
         return this.onGetMaxReward();
-      case "getFaucetConfig".toLowerCase():
+      case "getFaucetConfig".toLowerCase(): {
         return this.onGetFaucetConfig(
           apiUrl.query["cliver"] as string,
           apiUrl.query["session"] as string
         );
+      }
       case "startSession".toLowerCase():
         return this.onStartSession(req, body);
       case "getSession".toLowerCase():
@@ -335,7 +336,7 @@ export class FaucetWebApi {
       faucetCoinType: faucetConfig.faucetCoinType,
       faucetCoinContract: faucetConfig.faucetCoinContract,
       faucetCoinDecimals: ethWalletManager.getFaucetDecimals(),
-      faucetCoinBalance: ethWalletManager.getFaucetBalance(),
+      faucetCoinBalance: ethWalletManager.walletState.balance,
       noFundsBalance: faucetConfig.noFundsBalance,
       lowFundsBalance: faucetConfig.lowFundsBalance,
       minClaim: faucetConfig.minDropAmount,
