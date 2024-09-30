@@ -1,24 +1,26 @@
+import * as EthUtil from "ethereumjs-util";
 import Web3, {
-  ContractAbi,
   AbiFragment,
-  TransactionReceipt,
+  ContractAbi,
   TransactionNotFound,
+  TransactionReceipt,
 } from "web3";
+import { Contract } from "web3-eth-contract";
+import IpcProvider from "web3-providers-ipc";
+import { ethRpcMethods } from "web3-rpc-methods";
+
 import * as EthCom from "@ethereumjs/common";
 import * as EthTx from "@ethereumjs/tx";
-import * as EthUtil from "ethereumjs-util";
-import { Contract } from "web3-eth-contract";
-import { ethRpcMethods } from "web3-rpc-methods";
-import { faucetConfig } from "../config/FaucetConfig.js";
-import { ServiceManager } from "../common/ServiceManager.js";
-import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess.js";
-import { FaucetStatus, FaucetStatusLevel } from "../services/FaucetStatus.js";
-import { strFormatPlaceholder } from "../utils/StringUtils.js";
-import { sleepPromise } from "../utils/PromiseUtils.js";
-import { EthClaimInfo } from "./EthClaimManager.js";
+
 import { Erc20Abi } from "../abi/ERC20.js";
-import IpcProvider from "web3-providers-ipc";
+import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { ServiceManager } from "../common/ServiceManager.js";
+import { faucetConfig } from "../config/FaucetConfig.js";
+import { FaucetStatus, FaucetStatusLevel } from "../services/FaucetStatus.js";
 import { nowSeconds } from "../utils/DateUtils.js";
+import { sleepPromise } from "../utils/PromiseUtils.js";
+import { strFormatPlaceholder } from "../utils/StringUtils.js";
+import { EthClaimInfo } from "./EthClaimManager.js";
 
 export interface WalletState {
   ready: boolean;
@@ -259,6 +261,10 @@ export class EthWalletManager {
   private async updateFaucetStatus() {
     let statusMessage: string = null;
     let statusLevel: FaucetStatusLevel = null;
+    const lowFundsBalance =
+      this.walletState.balance + BigInt(faucetConfig.lowFundsBalance);
+    const noFundsBalance = BigInt(faucetConfig.noFundsBalance);
+
     if (this.walletState) {
       if (!this.walletState.ready) {
         if (typeof faucetConfig.rpcConnectionError === "string")
@@ -279,7 +285,7 @@ export class EthWalletManager {
 
       if (
         !statusLevel &&
-        (this.walletState.balance <= faucetConfig.noFundsBalance ||
+        (this.walletState.balance <= noFundsBalance ||
           this.walletState.nativeBalance <=
             BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee))
       ) {
@@ -292,24 +298,23 @@ export class EthWalletManager {
           statusLevel = FaucetStatusLevel.ERROR;
         }
       }
-      if (
-        !statusLevel &&
-        this.walletState.balance <= faucetConfig.lowFundsBalance
-      ) {
-        if (typeof faucetConfig.lowFundsWarning === "string")
-          statusMessage = faucetConfig.lowFundsWarning;
-        else if (faucetConfig.lowFundsWarning)
-          statusMessage =
-            "The faucet is running out of funds! Faucet Balance: {1}";
-        if (statusMessage) {
-          statusMessage = strFormatPlaceholder(
-            statusMessage,
-            this.readableAmount(this.walletState.balance)
-          );
-          statusLevel = FaucetStatusLevel.WARNING;
-        }
+    }
+
+    if (!statusLevel && this.walletState.balance <= lowFundsBalance) {
+      if (typeof faucetConfig.lowFundsWarning === "string")
+        statusMessage = faucetConfig.lowFundsWarning;
+      else if (faucetConfig.lowFundsWarning)
+        statusMessage =
+          "The faucet is running out of funds! Faucet Balance: {1}";
+      if (statusMessage) {
+        statusMessage = strFormatPlaceholder(
+          statusMessage,
+          this.readableAmount(this.walletState.balance)
+        );
+        statusLevel = FaucetStatusLevel.WARNING;
       }
     }
+
     ServiceManager.GetService(FaucetStatus).setFaucetStatus(
       "wallet",
       statusMessage,

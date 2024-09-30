@@ -1,15 +1,15 @@
+import "dotenv/config";
+
+import * as EthUtil from "ethereumjs-util";
 import * as fs from "fs";
 import * as path from "path";
-import YAML from "yaml";
 import randomBytes from "randombytes";
+import YAML from "yaml";
 
-import { ServiceManager } from "../common/ServiceManager.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { ServiceManager } from "../common/ServiceManager.js";
 import { IConfigSchema } from "./ConfigSchema.js";
 import { getDefaultConfig } from "./DefaultConfig.js";
-
-import "dotenv/config";
-import * as EthUtil from "ethereumjs-util";
 
 let cliArgs = (function () {
   let args = {};
