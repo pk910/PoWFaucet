@@ -274,8 +274,8 @@ export class EthWalletManager {
 
     let statusMessage: string = null;
     let statusLevel: FaucetStatusLevel = null;
-    const lowFundsBalance =
-      this.walletState.balance + BigInt(faucetConfig.lowFundsBalance);
+
+    const lowFundsBalance = BigInt(faucetConfig.lowFundsBalance);
     const noFundsBalance = BigInt(faucetConfig.noFundsBalance);
 
     if (this.walletState) {
@@ -299,13 +299,14 @@ export class EthWalletManager {
       // Log warning if the faucet is running out of funds
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.INFO,
-        `Wallet balance: ${this.walletState.balance}, No funds balance: ${noFundsBalance}`
-      );
-      ServiceManager.GetService(FaucetProcess).emitLog(
-        FaucetLogLevel.INFO,
-        `Should notify no funds: ${this.walletState.balance <= noFundsBalance}`
+        `No funds status: ${
+          this.walletState.balance <= noFundsBalance
+        }; No funds balance: ${noFundsBalance}; Wallet balance: ${
+          this.walletState.balance
+        }`
       );
 
+      // Log warning if the faucet is out of funds
       if (
         !statusLevel &&
         (this.walletState.balance <= noFundsBalance ||
@@ -323,6 +324,7 @@ export class EthWalletManager {
       }
     }
 
+    // Log warning if the faucet is running low on funds
     if (!statusLevel && this.walletState.balance <= lowFundsBalance) {
       if (typeof faucetConfig.lowFundsWarning === "string")
         statusMessage = faucetConfig.lowFundsWarning;
