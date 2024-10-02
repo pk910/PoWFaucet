@@ -11,7 +11,6 @@
 
 secp256k1_context *ctx;
 unsigned char output[(258 * 2) + 1];
-unsigned char createAddrInBuf[23], createAddrOutBuf[32];
 unsigned char inputHash[32];
 unsigned char inputSigR[32];
 unsigned char inputSigV;
@@ -24,9 +23,6 @@ int maxRounds;
 
 void miner_init() {
     ctx = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY);
-    createAddrInBuf[0] = 0xd6;
-    createAddrInBuf[1] = 0x94;
-    createAddrInBuf[22] = 0x80;
 }
 
 static void hash_keccak256(const char *data, uint16_t length, char *result) {
@@ -48,38 +44,43 @@ static void parse_hex_bigendian(unsigned char *hex, unsigned char *buf, size_t l
     for(i = 0; i < hex_len; i++) { sscanf(pos, "%2hhx", &buf[i+offset]); pos += 2; }
 }
 
-static unsigned char* get_create_addr(unsigned char *deployer) {
-    memcpy(createAddrInBuf+2, deployer, 20);
-    hash_keccak256(createAddrInBuf, 23, createAddrOutBuf);
-    return createAddrOutBuf+12;
+static void get_create_addr(unsigned char *deployer, unsigned char *addrBuf) {
+    unsigned char hashout[32];
+    unsigned char hashbuf[23];
+    hashbuf[0] = 0xd6;
+    hashbuf[1] =  0x94;
+    memcpy(hashbuf+2, deployer, 20);
+    hashbuf[22] = 0x80;
+
+    hash_keccak256(hashbuf, 23, hashout);
+    memcpy(addrBuf, hashout+12, 20);
 }
 
 void miner_set_config(unsigned char *input_hex, unsigned char *input_sigr, int input_sig_v, unsigned char *output_suffix, unsigned char *output_prefix, int max_rounds, unsigned char *preimageHex) {
     unsigned char *pos;
     size_t i;
-    int len;
 
     parse_hex_bigendian(input_hex, inputHash, 32);
     parse_hex_bigendian(input_sigr, inputSigR, 32);
     inputSigV = input_sig_v;
     
-    len = strlen(output_suffix) / 2;
+    int output_len = strlen(output_suffix) / 2;
     pos = output_suffix;
-    for(i = 0; i < len; i++) { sscanf(pos, "%2hhx", &outputSuffix[i]); pos += 2; }
-    outputSuffixLen = len;
+    for(i = 0; i < output_len; i++) { sscanf(pos, "%2hhx", &outputSuffix[i]); pos += 2; }
+    outputSuffixLen = output_len;
 
-    len = strlen(output_prefix) / 2;
+    output_len = strlen(output_prefix) / 2;
     pos = output_prefix;
-    for(i = 0; i < len; i++) { sscanf(pos, "%2hhx", &outputPrefix[i]); pos += 2; }
-    outputPrefixLen = len;
+    for(i = 0; i < output_len; i++) { sscanf(pos, "%2hhx", &outputPrefix[i]); pos += 2; }
+    outputPrefixLen = output_len;
 
     maxRounds = max_rounds;
 
-    len = strlen(preimageHex) / 2;
-    unsigned char preimage_bytes[len];
+    int preimage_len = strlen(preimageHex) / 2;
+    unsigned char preimage_bytes[preimage_len];
     pos = preimageHex;
-    for(i = 0; i < len; i++) { sscanf(pos, "%2hhx", &preimage_bytes[i]); pos += 2; }
-    hash_keccak256(preimage_bytes, len, preimageHash);
+    for(i = 0; i < preimage_len; i++) { sscanf(pos, "%2hhx", &preimage_bytes[i]); pos += 2; }
+    hash_keccak256(preimage_bytes, preimage_len, preimageHash);
 }
 
 unsigned char* miner_get_input() {
@@ -133,27 +134,35 @@ unsigned char* miner_run(unsigned char *nonceHex) {
     memcpy(sigBytes, inputSigR, 32);
     sigBytes[64] = inputSigV - 27;
 
-    /*
-    sigBytes:
-        0-31: sigR
-        32-63: sigS
-            32-47: input nonce
-            48-61: preimage
-            62-63: run nonce
-        64: sigV
-    */
-    parse_hex_bigendian(nonceHex, sigBytes+32, 16);
-    memcpy(sigBytes + 48, preimageHash, 16);
-
     size_t i, j, outputlen, addrpos;
-    unsigned char diff, *pos, *addr, bestAddr[20], bestNonce[32], pubkey_out[65], pubkey_hash[32];
-    int score, highValue, lowValue, bestScore = 0;
+
+
+    unsigned char nonce[32];
+    /*
+        0-15: input nonce
+        16-29: preimage
+        30-31: run nonce
+    */
+    parse_hex_bigendian(nonceHex, nonce, 16);
+    memcpy(nonce + 16, preimageHash, 16);
+
+    unsigned char bestAddr[20];
+    unsigned char bestNonce[32];
+    int bestScore = 0;
+
     secp256k1_ecdsa_recoverable_signature sig;
     secp256k1_pubkey pubkey;
+    unsigned char pubkey_out[65];
+    unsigned char pubkey_hash[32];
+    unsigned char addr[20];
+    int score, highValue, lowValue;
+    unsigned char diff;
 
     for (i = 0; i < maxRounds; i++) {
-        sigBytes[62] = (i >> 8) & 0xff;
-        sigBytes[63] = i & 0xff;
+        nonce[30] = (i >> 8) & 0xff;
+        nonce[31] = i & 0xff;
+        
+        memcpy(sigBytes+32, nonce, 32);
 
         if (!secp256k1_ecdsa_recoverable_signature_parse_compact(ctx, &sig, sigBytes, (int)sigBytes[64])) {
             printf("failed to parse sig\n");
@@ -177,7 +186,7 @@ unsigned char* miner_run(unsigned char *nonceHex) {
         }
 
         hash_keccak256(pubkey_out+1, 64, pubkey_hash);
-        addr = get_create_addr(pubkey_hash+12);
+        get_create_addr(pubkey_hash+12, addr);
 
         score = 0;
         for (j = 0; j < outputSuffixLen; j++) {
@@ -214,11 +223,11 @@ unsigned char* miner_run(unsigned char *nonceHex) {
         if (score > bestScore) {
             bestScore = score;
             memcpy(bestAddr, addr, 20);
-            memcpy(bestNonce, sigBytes+32, 32);
+            memcpy(bestNonce, nonce, 32);
         }
     }
 
-    pos = output;
+    unsigned char *pos = output;
     pos += sprintf(pos, "0x%02x", bestScore);
     for (i = 0; i < 20; i++) {
         pos += sprintf(pos, "%02x", bestAddr[i]);
