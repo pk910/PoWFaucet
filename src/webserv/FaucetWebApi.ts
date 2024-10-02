@@ -81,7 +81,7 @@ export class FaucetWebApi {
       case "getFaucetConfig".toLowerCase():
         return this.onGetFaucetConfig(apiUrl.query['cliver'] as string, apiUrl.query['session'] as string);
       case "startSession".toLowerCase():
-        return this.onStartSession(req, body);
+        return this.onStartSession(req, body, apiUrl.query['cliver'] as string);
       case "getSession".toLowerCase():
         return this.onGetSession(apiUrl.query['session'] as string);
       case "claimReward".toLowerCase():
@@ -184,7 +184,7 @@ export class FaucetWebApi {
     };
   }
 
-  public async onStartSession(req: IncomingMessage, body: Buffer): Promise<any> {
+  public async onStartSession(req: IncomingMessage, body: Buffer, clientVersion: string): Promise<any> {
     if(req.method !== "POST")
       return new FaucetHttpResponse(405, "Method Not Allowed");
     
@@ -203,6 +203,9 @@ export class FaucetWebApi {
           target: session.getTargetAddr(),
         }
       }
+
+      if(clientVersion)
+        session.setSessionData("cliver", clientVersion);
 
       sessionInfo = await session.getSessionInfo();
     } catch(ex) {

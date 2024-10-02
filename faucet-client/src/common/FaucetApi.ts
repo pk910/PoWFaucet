@@ -104,7 +104,9 @@ export class FaucetApi {
   }
 
   public startSession(inputData: any): Promise<IFaucetSessionInfo> {
-    return this.apiPost("/startSession", {}, inputData);
+    return this.apiPost("/startSession", {
+      cliver: FAUCET_CLIENT_VERSION,
+    }, inputData);
   }
 
   public claimReward(inputData: any): Promise<IFaucetSessionStatus> {

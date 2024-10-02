@@ -64,7 +64,7 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
 
   private startClient() {
     this.clientStatus = PoWClientStatus.CONNECTING;
-    this.clientSocket = new WebSocket(this.options.powApiUrl + "?session=" + this.options.sessionId);
+    this.clientSocket = new WebSocket(this.options.powApiUrl + "?session=" + this.options.sessionId + "&cliver=" + FAUCET_CLIENT_VERSION);
     this.clientSocket.addEventListener("open", (evt) => {
       console.log("[PoWClient] faucet websocket opened");
       this.clientStatus = PoWClientStatus.READY;
