@@ -1,9 +1,13 @@
+import { FaucetError } from "../../common/FaucetError.js";
 import { ServiceManager } from "../../common/ServiceManager.js";
+import { FaucetDatabase } from "../../db/FaucetDatabase.js";
 import { EthWalletManager } from "../../eth/EthWalletManager.js";
 import {
   FaucetSession,
   ISessionStartUserInput,
 } from "../../session/FaucetSession.js";
+import { ISessionRewardFactor } from "../../session/SessionRewardFactor.js";
+import { renderTimespan } from "../../utils/DateUtils.js";
 import { BaseModule } from "../BaseModule.js";
 import { ModuleHookAction } from "../ModuleManager.js";
 import {
@@ -11,10 +15,6 @@ import {
   IRecurringLimitConfig,
   IRecurringLimitsConfig,
 } from "./RecurringLimitsConfig.js";
-import { FaucetError } from "../../common/FaucetError.js";
-import { FaucetDatabase } from "../../db/FaucetDatabase.js";
-import { renderTimespan } from "../../utils/DateUtils.js";
-import { ISessionRewardFactor } from "../../session/SessionRewardFactor.js";
 
 export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -182,34 +182,31 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
     }
 
     const limitPromises = await Promise.all(
-      this.moduleConfig.limits.map((limit) =>
-        this.checkLimit(
+      this.moduleConfig.limits.map((limit) => {
+        return this.checkLimit(
           {
             userId,
             remoteIP,
           },
           limit,
           "none"
-        )
-      )
+        );
+      })
     );
     const limitApplies = limitPromises.some((res) => res);
 
-    if (!limitApplies) {
-      return 0;
-    }
-
     // Check PoW sessions
-    const lastSessionStartTime = await ServiceManager.GetService(
+    const lastSessionStartTime: number | null = await ServiceManager.GetService(
       FaucetDatabase
     ).getLastFinishedSessionStartTime(userId, limit.duration);
 
     // Then check Gitcoin claims
-    const lastGitcoinClaimTime = await ServiceManager.GetService(
+    const lastGitcoinClaimTime: number | null = await ServiceManager.GetService(
       FaucetDatabase
     ).getLastGitcoinClaimTime(userId, limit.duration);
 
-    if (!lastGitcoinClaimTime && !lastSessionStartTime) {
+    // If no session and Gitcoin claim was found, return 0
+    if (!lastGitcoinClaimTime && !lastSessionStartTime && !limitApplies) {
       return 0;
     }
 

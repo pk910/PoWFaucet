@@ -16,7 +16,7 @@ import {
   FaucetSessionStatus,
   FaucetSessionStoreData,
   FaucetSessionTask,
-  IClientSessionInfo
+  IClientSessionInfo,
 } from "../session/FaucetSession.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { sha256 } from "../utils/CryptoUtils.js";
@@ -24,7 +24,7 @@ import { nowSeconds } from "../utils/DateUtils.js";
 import {
   buildFaucetStatus,
   buildQueueStatus,
-  buildSessionStatus
+  buildSessionStatus,
 } from "./api/faucetStatus.js";
 import { FaucetHttpResponse } from "./FaucetHttpServer.js";
 
@@ -508,7 +508,7 @@ export class FaucetWebApi {
     );
     // If user can't claim, throw an error
     if (!canClaim.can) {
-      throw new FaucetError("GITCOIN_CLAIM_ERROR", canClaim.reason);
+      return new FaucetHttpResponse(403, canClaim.reason);
     }
 
     try {
