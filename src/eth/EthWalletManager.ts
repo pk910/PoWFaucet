@@ -526,7 +526,7 @@ export class EthWalletManager {
   }
 
   public async sendGitcoinClaimTx(target: string): Promise<TransactionResult> {
-    const amount = faucetConfig.maxDropAmount;
+    const amount = faucetConfig.minDropAmount;
     let txPromise: Promise<TransactionReceipt>;
     let retryCount = 0;
     let txError: Error;
