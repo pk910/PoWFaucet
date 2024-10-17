@@ -21,6 +21,8 @@ import { ModuleManager } from "../ModuleManager.js";
 import { RecurringLimitsModule } from "../recurring-limits/RecurringLimitsModule.js";
 import { isValidAddress } from "ethereumjs-util";
 import { FaucetError } from "../../common/FaucetError.js";
+import { checkEnabled } from "./checkEnabled.decorator.js";
+import { makeGitcoinClaimerError } from "./makeGitcoinClaimerError.js";
 
 type Address = string;
 
@@ -233,28 +235,12 @@ class GitcoinAPI {
   }
 }
 
-function makeGitcoinClaimerError(
-  reason: "disabled" | "noScorerId" | "noApiToken"
-) {
-  let code = "GITCOIN_CLAIM_INIT";
-  let reasonText = "";
-  //
-  switch (reason) {
-    case "disabled": {
-      reasonText = "Gitcoin claimer is disabled";
-      break;
-    }
-    case "noScorerId": {
-      reasonText = "Gitcoin API scorer ID is required (gitcoinScorerId)";
-      break;
-    }
-    case "noApiToken": {
-      reasonText = "Gitcoin API access token is required (gitcoinApiToken)";
-      break;
-    }
-  }
-
-  return new FaucetError(code, reasonText);
+function getValidatedAddressSchema(body: Buffer) {
+  const schema = zodSchemaBodyValidation(
+    body,
+    z.object({ address: z.string() })
+  );
+  return schema.address;
 }
 
 export class GitcoinClaimer {
@@ -285,39 +271,25 @@ export class GitcoinClaimer {
     this._moduleManager = ServiceManager.GetService(ModuleManager);
   }
 
-  public isEnabled(): boolean {
-    return this._isEnabled;
-  }
-
-  // TODO: Implement decorator/HoF for guarding methods
-  private guard() {
-    if (!this._isEnabled) {
-      throw makeGitcoinClaimerError("disabled");
-    }
-  }
-
+  @checkEnabled
   public async getAddressScore(body: Buffer): Promise<{
     value: number;
     needToSubmit: boolean;
   }> {
-    this.guard();
-    const validated = zodSchemaBodyValidation(
-      body,
-      z.object({ address: z.string() })
-    );
-    const result = await this._gitcoinApi.getScore(validated.address);
+    const address = getValidatedAddressSchema(body);
+    const result = await this._gitcoinApi.getScore(address);
     return result;
   }
 
+  @checkEnabled
   public async getSingingMessage(): Promise<GitcoinSigningMessage> {
-    this.guard();
     return this._gitcoinApi.getSigningMessage();
   }
 
+  @checkEnabled
   public async checkPassportSubmitCache(body: Buffer): Promise<{
     canSubmitAgainAt: number;
   }> {
-    this.guard();
     const validated = zodSchemaBodyValidation(
       body,
       zodPassportSubmitData
@@ -337,10 +309,10 @@ export class GitcoinClaimer {
     };
   }
 
+  @checkEnabled
   public async submitPassport(body: Buffer): Promise<{
     canSubmitAgainAt: number;
   }> {
-    this.guard();
     const validated = zodSchemaBodyValidation(
       body,
       zodPassportSubmitData
@@ -376,17 +348,17 @@ export class GitcoinClaimer {
       };
     }
 
-    const result = await this._gitcoinApi.submitPassport(validated);
+    await this._gitcoinApi.submitPassport(validated);
     return {
       canSubmitAgainAt: Date.now() + 1000 * 60 * 5, // 5 minutes from now
     };
   }
 
+  @checkEnabled
   public async checkIfUserCanClaimGitcoin(
     userId: string,
     remoteIP: string
   ): Promise<{ can: boolean; reason: string }> {
-    this.guard();
     const activeSessions = this._sessionManager
       .getActiveSessions()
       .filter((activeSession) => {
@@ -412,10 +384,9 @@ export class GitcoinClaimer {
     }
 
     // Any claimable sessions at that moment?
-    const claimableSessions =
-      await ServiceManager.GetService(FaucetDatabase).getClaimableSessions(
-        userId
-      );
+    const claimableSessions = await ServiceManager.GetService(
+      FaucetDatabase
+    ).getClaimableSessions(userId);
     if (claimableSessions.length > 0) {
       return {
         can: false,
@@ -426,14 +397,15 @@ export class GitcoinClaimer {
     return { can: true, reason: "No limiting conditions" };
   }
 
+  @checkEnabled
   public async claimGitcoin(
     body: Buffer,
     userId: string,
     remoteIP: string
   ): Promise<{ txHash: string; targetAddress: string }> {
-    this.guard();
+    const address = getValidatedAddressSchema(body);
     // Check address score
-    const { value: score } = await this.getAddressScore(body);
+    const { value: score } = await this._gitcoinApi.getScore(address);
 
     // Check if the score is enough
     if (score < faucetConfig.gitcoinMinimumScore) {
@@ -451,18 +423,8 @@ export class GitcoinClaimer {
       throw new FaucetError("GITCOIN_CLAIM_ERROR", reason);
     }
 
-    // Extract target address
-    let targetAddress: string;
-    const validatedTargetAddress = zodSchemaBodyValidation(
-      body,
-      z.object({ address: z.string() })
-    );
-
     // Validate more
-    if (
-      !validatedTargetAddress.address ||
-      !isValidAddress(validatedTargetAddress.address)
-    ) {
+    if (!address || !isValidAddress(address)) {
       const message = `GITCOIN_CLAIM_ERROR: Invalid target address by user ${userId}`;
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.ERROR,
@@ -470,7 +432,6 @@ export class GitcoinClaimer {
       );
       throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
     }
-    targetAddress = validatedTargetAddress.address;
 
     // Check if the user is already claiming
     if (this._hasClaimingByUser(userId)) {
@@ -489,7 +450,7 @@ export class GitcoinClaimer {
     try {
       claimRecordId = await this._db.createGitcoinClaim(
         userId,
-        targetAddress,
+        address,
         remoteIP
       );
     } catch (ex) {
@@ -515,8 +476,7 @@ export class GitcoinClaimer {
     // Send transaction
     let transactionResult: TransactionResult;
     try {
-      transactionResult =
-        await this._ethWallet.sendGitcoinClaimTx(targetAddress);
+      transactionResult = await this._ethWallet.sendGitcoinClaimTx(address);
     } catch (ex) {
       clearClaiming();
       // If the transaction fails, delete the claim record
@@ -550,7 +510,7 @@ export class GitcoinClaimer {
     }
 
     clearClaiming();
-    return { txHash, targetAddress };
+    return { txHash, targetAddress: address };
   }
 
   private _addClaimingByUser(userId: string) {
