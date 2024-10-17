@@ -26,7 +26,7 @@ import {
   buildQueueStatus,
   buildSessionStatus,
 } from "./api/faucetStatus.js";
-import { FaucetHttpResponse } from "./FaucetHttpServer.js";
+import { FaucetHttpResponse } from "./FaucetHttpResponse.js";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -95,13 +95,11 @@ export class FaucetWebApi {
 
   public async onApiRequest(req: IncomingMessage, body?: Buffer): Promise<any> {
     const apiUrl = this.parseApiUrl(req.url);
-    if (!apiUrl || apiUrl.path.length === 0)
-      return new FaucetHttpResponse(404, "Not Found");
+    if (!apiUrl || apiUrl.path.length === 0) return new FaucetHttpResponse(404);
 
     // k8s health check
     if (apiUrl.path[0].toLowerCase() === "health") {
-      if (req.method !== "GET")
-        return new FaucetHttpResponse(405, "Method Not Allowed");
+      if (req.method !== "GET") return new FaucetHttpResponse(405);
 
       switch (apiUrl.path[1].toLowerCase()) {
         case "readyz":
@@ -109,7 +107,7 @@ export class FaucetWebApi {
         case "livez":
           return this.onLivenessCheck();
         default:
-          return new FaucetHttpResponse(404, "Not Found");
+          return new FaucetHttpResponse(404);
       }
     }
 
@@ -121,7 +119,7 @@ export class FaucetWebApi {
         FaucetLogLevel.ERROR,
         `CLIENT_API_KEY is missing`
       );
-      return new FaucetHttpResponse(403, "Access denied");
+      return new FaucetHttpResponse(401);
     }
 
     const requestApiKey = req.headers["api-key"];
@@ -131,7 +129,7 @@ export class FaucetWebApi {
         FaucetLogLevel.WARNING,
         `Unauthorized request to "${endpoint}"`
       );
-      return new FaucetHttpResponse(403, "Access denied");
+      return new FaucetHttpResponse(401);
     }
 
     switch (endpoint.toLowerCase()) {
@@ -185,7 +183,7 @@ export class FaucetWebApi {
         if ((handler = this.apiEndpoints[apiUrl.path[0].toLowerCase()]))
           return handler(req, apiUrl, body);
     }
-    return new FaucetHttpResponse(404, "Not Found");
+    return new FaucetHttpResponse(404);
   }
 
   private async onPassportSubmitData(
@@ -197,8 +195,7 @@ export class FaucetWebApi {
       }
     | FaucetHttpResponse
   > {
-    if (req.method !== "POST")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
 
     const GitcoinClaimerService = ServiceManager.GetService(GitcoinClaimer);
     return GitcoinClaimerService.submitPassport(body);
@@ -213,8 +210,7 @@ export class FaucetWebApi {
       }
     | FaucetHttpResponse
   > {
-    if (req.method !== "POST")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
 
     const GitcoinClaimerService = ServiceManager.GetService(GitcoinClaimer);
     return GitcoinClaimerService.checkPassportSubmitCache(body);
@@ -224,8 +220,7 @@ export class FaucetWebApi {
     req: IncomingMessage,
     body: Buffer
   ): Promise<any> {
-    if (req.method !== "POST")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
 
     const GitcoinClaimerService = ServiceManager.GetService(GitcoinClaimer);
     return GitcoinClaimerService.getSingingMessage();
@@ -241,8 +236,7 @@ export class FaucetWebApi {
         needToSubmit: boolean;
       }
   > {
-    if (req.method !== "POST")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
 
     const GitcoinClaimerService = ServiceManager.GetService(GitcoinClaimer);
     return GitcoinClaimerService.getAddressScore(body);
@@ -359,12 +353,14 @@ export class FaucetWebApi {
     req: IncomingMessage,
     body: Buffer
   ): Promise<any> {
-    if (req.method !== "POST")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
 
     const userInput = JSON.parse(body.toString("utf8"));
     if (!userInput.userId) {
-      return new FaucetHttpResponse(500, "userId is missing");
+      return new FaucetHttpResponse(
+        400,
+        JSON.stringify({ error: "userId is missing" })
+      );
     }
     let sessionInfo: IClientSessionInfo;
     let session: FaucetSession;
@@ -419,11 +415,13 @@ export class FaucetWebApi {
     req: IncomingMessage,
     userId: string
   ): Promise<any> {
-    if (req.method !== "GET")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "GET") return new FaucetHttpResponse(405);
 
     if (!userId) {
-      return new FaucetHttpResponse(500, "userId is missing");
+      return new FaucetHttpResponse(
+        400,
+        JSON.stringify({ error: "userId is missing" })
+      );
     }
 
     const remoteIP = this.getRemoteAddr(req);
@@ -497,8 +495,7 @@ export class FaucetWebApi {
       }
     | FaucetHttpResponse
   > {
-    if (req.method !== "POST")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
 
     const remoteIP = this.getRemoteAddr(req);
     const gitcoinClaimer = ServiceManager.GetService(GitcoinClaimer);
@@ -508,7 +505,10 @@ export class FaucetWebApi {
     );
     // If user can't claim, throw an error
     if (!canClaim.can) {
-      return new FaucetHttpResponse(403, canClaim.reason);
+      return new FaucetHttpResponse(
+        403,
+        JSON.stringify({ error: canClaim.reason })
+      );
     }
 
     try {
@@ -525,16 +525,15 @@ export class FaucetWebApi {
     } catch (ex) {
       let failedReason = ex.toString();
       ServiceManager.GetService(FaucetProcess).emitLog(
-        FaucetLogLevel.INFO,
-        `[FaucetWebApi.onClaimRewardByGitcoin]: Error. UserId: ${userId}; Reason: ${failedReason};`
+        FaucetLogLevel.ERROR,
+        `[FaucetWebApi.onClaimRewardByGitcoin]: UserId: ${userId}; Reason: ${failedReason}`
       );
       throw ex;
     }
   }
 
   public async onClaimReward(req: IncomingMessage, body: Buffer): Promise<any> {
-    if (req.method !== "POST")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
 
     let userInput = JSON.parse(body.toString("utf8"));
     let sessionData: FaucetSessionStoreData;
@@ -631,7 +630,7 @@ export class FaucetWebApi {
         SessionManager
       ).getSessionData(sessionId))
     )
-      return new FaucetHttpResponse(404, "Session not found");
+      return new FaucetHttpResponse(404);
 
     return this.getSessionStatus(sessionData, details);
   }
@@ -655,7 +654,7 @@ export class FaucetWebApi {
   public async onGetFaucetStatus(key: string): Promise<any> {
     if (key) {
       if (key !== sha256(faucetConfig.faucetSecret + "-unmasked"))
-        return new FaucetHttpResponse(403, "Access denied");
+        return new FaucetHttpResponse(403);
       return Object.assign(
         await buildFaucetStatus(),
         buildQueueStatus(true),
@@ -683,13 +682,12 @@ export class FaucetWebApi {
   }
 
   public async onMetricsRequest(req: IncomingMessage): Promise<any> {
-    if (req.method !== "GET")
-      return new FaucetHttpResponse(405, "Method Not Allowed");
+    if (req.method !== "GET") return new FaucetHttpResponse(405);
 
     const auth = req.headers.authorization;
 
     if (!auth) {
-      return new FaucetHttpResponse(403, "Access denied");
+      return new FaucetHttpResponse(401);
     }
 
     const [type, token] = auth.split(" ");
@@ -700,7 +698,7 @@ export class FaucetWebApi {
       token === "" ||
       token !== process.env.PROMETHEUS_AUTH_TOKEN
     ) {
-      return new FaucetHttpResponse(403, "Access denied");
+      return new FaucetHttpResponse(401);
     }
 
     const metrics = await ServiceManager.GetService(
@@ -714,7 +712,10 @@ export class FaucetWebApi {
 
   private async onReadinessCheck(): Promise<any> {
     if (!faucetConfig) {
-      return new FaucetHttpResponse(500, "Not ready yet");
+      return new FaucetHttpResponse(
+        500,
+        JSON.stringify({ error: "Not ready yet" })
+      );
     }
 
     return new FaucetHttpResponse(200, "OK");

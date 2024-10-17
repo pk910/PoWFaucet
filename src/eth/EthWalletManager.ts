@@ -3,7 +3,7 @@ import Web3, {
   AbiFragment,
   ContractAbi,
   TransactionNotFound,
-  TransactionReceipt
+  TransactionReceipt,
 } from "web3";
 import { Contract } from "web3-eth-contract";
 import IpcProvider from "web3-providers-ipc";
@@ -295,16 +295,6 @@ export class EthWalletManager {
         target: this.walletAddr,
         amount: BigInt(faucetConfig.maxDropAmount),
       });
-
-      // Log warning if the faucet is running out of funds
-      ServiceManager.GetService(FaucetProcess).emitLog(
-        FaucetLogLevel.INFO,
-        `No funds status: ${
-          this.walletState.balance <= noFundsBalance
-        }; No funds balance: ${noFundsBalance}; Wallet balance: ${
-          this.walletState.balance
-        }`
-      );
 
       // Log warning if the faucet is out of funds
       if (

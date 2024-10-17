@@ -1,14 +1,10 @@
-import * as fs from "fs";
-import { encode } from "html-entities";
 import {
   createServer,
   IncomingMessage,
   Server as HttpServer,
-  ServerResponse
+  ServerResponse,
 } from "http";
-import { OutgoingHttpHeaders } from "http2";
 import * as stream from "node:stream";
-import * as path from "path";
 import { WebSocket, WebSocketServer } from "ws";
 
 import { Server as StaticServer } from "@brettz9/node-static";
@@ -17,25 +13,7 @@ import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetWebApi } from "./FaucetWebApi.js";
-
-export class FaucetHttpResponse {
-  public readonly code: number;
-  public readonly reason: string;
-  public readonly body: string;
-  public readonly headers: OutgoingHttpHeaders;
-
-  public constructor(
-    code: number,
-    reason: string,
-    body?: string,
-    headers?: OutgoingHttpHeaders
-  ) {
-    this.code = code;
-    this.reason = reason;
-    this.body = body;
-    this.headers = headers;
-  }
-}
+import { FaucetHttpResponse } from "./FaucetHttpResponse.js";
 
 export interface FaucetWssEndpoint {
   pattern: RegExp;

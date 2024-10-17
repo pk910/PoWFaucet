@@ -14,7 +14,7 @@ import { renderTimespan } from "../../utils/DateUtils.js";
 import { FaucetWebApi, IFaucetApiUrl } from "../../webserv/FaucetWebApi.js";
 import { IncomingMessage } from "http";
 import { faucetConfig } from "../../config/FaucetConfig.js";
-import { FaucetHttpResponse } from "../../webserv/FaucetHttpServer.js";
+import { FaucetHttpResponse } from "../../webserv/FaucetHttpResponse.js";
 import {
   GithubResolver,
   IGithubInfo,
@@ -227,7 +227,7 @@ export class GithubModule extends BaseModule<IGithubConfig> {
     }
 
     let pageHtml = this.buildCallbackPage(authResult);
-    return new FaucetHttpResponse(200, "OK", pageHtml, {
+    return new FaucetHttpResponse(200, pageHtml, {
       "Content-Type": "text/html; charset=utf-8",
     });
   }
