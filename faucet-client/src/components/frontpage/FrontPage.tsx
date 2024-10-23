@@ -116,7 +116,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
         let requiredScore = 0;
         let ipflags: string[] = [];
 
-        if(sessionInfo.failedCode == "IPINFO_RESTRICTION" && this.props.faucetConfig.modules["passport"] && this.props.faucetConfig.modules["passport"].guestRefresh !== false && sessionInfo.failedData["ipflags"]) {
+        if(sessionInfo.failedCode == "IPINFO_RESTRICTION" && this.props.faucetConfig.modules["passport"] && this.props.faucetConfig.modules["passport"].guestRefresh !== false && sessionInfo.failedData && sessionInfo.failedData["ipflags"]) {
           canStartWithScore = true;
           if(sessionInfo.failedData["ipflags"][0] && this.props.faucetConfig.modules["passport"].overrideScores[0] > 0) {
             canStartWithScore = true;
