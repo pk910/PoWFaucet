@@ -135,6 +135,11 @@ class GitcoinAPI {
     }
 
     const score = (await response.json()) as ScoreResponse;
+    // Delete error property if it's null
+    // Since it's being recognized by Grafana as error log
+    if (score.error == null) {
+      delete score.error;
+    }
 
     ServiceManager.GetService(FaucetProcess).emitLog(
       FaucetLogLevel.INFO,
