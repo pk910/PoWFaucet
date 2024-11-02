@@ -198,7 +198,7 @@ class GitcoinAPI {
 
   public async submitPassport(
     passport: Omit<PassportSubmitData, "scorer_id">
-  ): Promise<{ result: "success" }> {
+  ): Promise<{ result: "success" | "error" }> {
     const url = `${this.baseUrl}/registry/submit-passport`;
 
     const response = await FetchUtil.fetch(url, {
@@ -217,7 +217,7 @@ class GitcoinAPI {
         FaucetLogLevel.ERROR,
         errorMessage
       );
-      throw new FaucetError("GITCOIN_API_ERROR", errorMessage);
+      return { result: "error" };
     }
 
     try {
@@ -226,7 +226,13 @@ class GitcoinAPI {
         FaucetLogLevel.INFO,
         JSON.stringify(respBody)
       );
-    } catch (error) {}
+    } catch (error) {
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        'Something went wrong while parsing response from "submit-passport" endpoint'
+      );
+      return { result: "error" };
+    }
 
     // Cache the submission
     GitcoinPassportSubmissions.set(passport.address, {
@@ -353,8 +359,9 @@ export class GitcoinClaimer {
       };
     }
 
-    await this._gitcoinApi.submitPassport(validated);
+    const response = await this._gitcoinApi.submitPassport(validated);
     return {
+      ...response,
       canSubmitAgainAt: Date.now() + 1000 * 60 * 5, // 5 minutes from now
     };
   }
