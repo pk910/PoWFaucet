@@ -438,19 +438,22 @@ export class EthWalletManager {
       } catch (ex) {
         if (!txError) txError = ex;
         ServiceManager.GetService(FaucetProcess).emitLog(
-          FaucetLogLevel.ERROR,
-          "Sending TX for " +
-            claimInfo.target +
-            " failed [try: " +
-            retryCount +
-            "]: " +
-            ex.toString()
+          FaucetLogLevel.WARNING,
+          `[sendClaimTx] Sending TX for ${
+            claimInfo.target
+          } failed [try: ${retryCount}]: ${ex.toString()}`
         );
         await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
         await this.loadWalletState();
       }
     } while (!txPromise && retryCount++ < 3);
-    if (!txPromise) throw txError;
+    if (!txPromise) {
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        txError.message
+      );
+      throw txError;
+    }
 
     return {
       txHash: claimInfo.claim.txHash,
@@ -531,19 +534,20 @@ export class EthWalletManager {
       } catch (ex) {
         if (!txError) txError = ex;
         ServiceManager.GetService(FaucetProcess).emitLog(
-          FaucetLogLevel.ERROR,
-          "[sendGitcoinClaimTx]: Sending TX for " +
-            target +
-            " failed [try: " +
-            retryCount +
-            "]: " +
-            ex.toString()
+          FaucetLogLevel.WARNING,
+          `[sendGitcoinClaimTx] Sending TX for ${target} failed [try: ${retryCount}]: ${ex.toString()}`
         );
         await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
         await this.loadWalletState();
       }
     } while (!txPromise && retryCount++ < 3);
-    if (!txPromise) throw txError;
+    if (!txPromise) {
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.ERROR,
+        txError.message
+      );
+      throw txError;
+    }
 
     return {
       txHash,
