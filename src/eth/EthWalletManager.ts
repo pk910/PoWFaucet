@@ -280,7 +280,7 @@ export class EthWalletManager {
   }
 
   public checkIsContract(addr: string): Promise<boolean> {
-    return this.web3.eth.getCode(addr).then((res) => res && !!res.match(/^0x[0-9a-f]{2,}$/));
+    return this.web3.eth.getCode(addr).then((res) => res && !!res.match(/^0x[0-9a-f]{2,}$/) && !res.match(/^0xef0100/));
   }
 
   public getFaucetBalance(native?: boolean): bigint | null {
