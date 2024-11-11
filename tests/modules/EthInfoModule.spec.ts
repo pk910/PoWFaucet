@@ -105,4 +105,26 @@ describe("Faucet module: ethinfo", () => {
     expect(error?.getCode()).to.equal("CONTRACT_ADDR", "unexpected error code");
   });
 
+  it("Start session for wallet with eip7702 delegation", async () => {
+    faucetConfig.modules["ethinfo"] = {
+      enabled: true,
+      maxBalance: 1000,
+      denyContract: true,
+    } as IEthInfoConfig;
+    fakeProvider.injectResponse("eth_getBalance", "1000");
+    fakeProvider.injectResponse("eth_getCode", "0xef010012345678");
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
+    let balanceReq = fakeProvider.getLastRequest("eth_getBalance");
+    expect(balanceReq).to.not.equal(null, "no eth_getBalance request");
+    expect(balanceReq.params[0]).to.equal("0x0000000000000000000000000000000000001337", "unexpected target address in eth_getBalance request");
+    let codeReq = fakeProvider.getLastRequest("eth_getCode");
+    expect(codeReq).to.not.equal(null, "no eth_getCode request");
+    expect(codeReq.params[0]).to.equal("0x0000000000000000000000000000000000001337", "unexpected target address in eth_getCode request");
+  });
+
 });
