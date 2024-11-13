@@ -38,6 +38,12 @@ jobs:
     - run: npm install
     - run: npm run bundle
 
+    # build client project
+    - run: |
+        cd faucet-client
+        npm install
+        node ./build-client.js 
+
     - run: pkg --compress Brotli .
 
     - name: Upload powfaucet.js artifact

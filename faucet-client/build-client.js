@@ -29,6 +29,13 @@ function copyIfFoundOrRemove(filename, dstpath, dstname) {
   }
 }
 
+function checkFileExists(filename, dstpath) {
+  let dstfile = path.join(dstpath, filename);
+  if(!fs.existsSync(dstfile)) {
+    throw "file not found: " + dstfile;
+  }
+}
+
 (new Promise((resolve, reject) => {
   console.log("Building pow-faucet-client...");
   let compiler = webpack(webpackConfig);
@@ -73,5 +80,16 @@ function copyIfFoundOrRemove(filename, dstpath, dstname) {
   copyIfFoundOrRemove("powfaucet-worker-nm.js.map", path.join(staticPath, "js"));
 
   console.log("finished");
+}).then(() => {
+  let staticPath = path.join(__dirname, "..", "static");
+  checkFileExists("powfaucet.css", path.join(staticPath, "css"));
+  checkFileExists("powfaucet.js", path.join(staticPath, "js"));
+  checkFileExists("powfaucet-worker-sc.js", path.join(staticPath, "js"));
+  checkFileExists("powfaucet-worker-cn.js", path.join(staticPath, "js"));
+  checkFileExists("powfaucet-worker-a2.js", path.join(staticPath, "js"));
+  checkFileExists("powfaucet-worker-nm.js", path.join(staticPath, "js"));
+}).catch((err) => {
+  console.log("build failed: ", err);
+  process.exit(1);
 });
 
