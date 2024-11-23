@@ -1,6 +1,5 @@
 import { TypedEmitter } from "tiny-typed-emitter";
 import { PromiseDfd } from "../utils/PromiseDfd";
-import { IFaucetConfig, IFaucetStatus } from "../common/FaucetConfig";
 
 export interface IPoWClientOptions {
   powApiUrl: string;
@@ -84,14 +83,11 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
 
   private reconnectClient() {
     if (this.reconnectTimer) return;
-    this.reconnectTimer = setTimeout(
-      () => {
-        this.reconnectTimer = null;
-        if (this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
-          this.startClient();
-      },
-      5 * 1000 + 1000 * 5 * Math.random()
-    );
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
+        this.startClient();
+    }, 5 * 1000 + 1000 * 5 * Math.random());
   }
 
   private onClientClose() {
@@ -110,7 +106,7 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   public sendRequest<T = any>(action: string, data?: any): Promise<T> {
     if (this.clientStatus === PoWClientStatus.CLOSED_IDLE)
       return Promise.reject(
-        "Internal Error (sendRequest called without active client). Please report this issue on github."
+        `Internal Error (sendRequest called "${action}" action without active client). Please report this issue on github.`
       );
     if (this.clientStatus === PoWClientStatus.CLOSED_RECONNECT)
       return Promise.reject(
@@ -179,16 +175,13 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
       this.readyDfd = null;
     }
     if (!this.disconnectTimer) {
-      this.disconnectTimer = setTimeout(
-        () => {
-          this.disconnectTimer = null;
-          // reconnect after 24h
-          if (this.clientSocket) {
-            this.clientSocket.close(1000, "24h reconnect");
-          }
-        },
-        60 * 60 * 24 * 1000
-      );
+      this.disconnectTimer = setTimeout(() => {
+        this.disconnectTimer = null;
+        // reconnect after 24h
+        if (this.clientSocket) {
+          this.clientSocket.close(1000, "24h reconnect");
+        }
+      }, 60 * 60 * 24 * 1000);
     }
     this.emit("open");
   }
