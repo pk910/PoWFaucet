@@ -540,7 +540,7 @@ export class EthWalletManager {
         await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
         await this.loadWalletState();
       }
-    } while (!txPromise && retryCount++ < 3);
+    } while (!txPromise && retryCount++ < 5);
     if (!txPromise) {
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.ERROR,
