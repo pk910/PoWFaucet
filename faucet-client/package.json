@@ -1,6 +1,6 @@
 {
   "name": "@drpcorg/pow-client",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "PoW Faucet Client",
   "scripts": {
     "bundle": "webpack",
