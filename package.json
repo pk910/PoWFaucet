@@ -6,11 +6,11 @@
   "bin": "bundle/powfaucet.cjs",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/instrument.js dist/instrument.js",
     "build-client": "cd faucet-client && node build-client.js",
-    "start": "tsc && node dist/app.js",
-    "start:inspect": "tsc && node --inspect=127.0.0.1:9999 dist/app.js",
-    "bundle": "tsc && webpack --mode production",
+    "start": "npm run build && node dist/app.js",
+    "start:inspect": "npm run build && node --inspect=127.0.0.1:9999 dist/app.js",
+    "bundle": "npm run build && webpack --mode production",
     "test": "mocha --exit --trace-warnings 'tests/**/*.ts'",
     "prepare": "husky"
   },
@@ -65,6 +65,7 @@
     "@brettz9/node-static": "^0.1.1",
     "@ethereumjs/common": "^4.1.0",
     "@ethereumjs/tx": "^5.2.1",
+    "@sentry/node": "^8.42.0",
     "@types/node": "^20.11.24",
     "bignumber.js": "^9.1.2",
     "dotenv": "^16.4.5",

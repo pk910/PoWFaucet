@@ -1,3 +1,5 @@
+import "./instrument.js";
+
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 import { isMainThread } from "node:worker_threads";
