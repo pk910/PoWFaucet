@@ -24,4 +24,4 @@ COPY --from=build-client-env /build/static ./static
 COPY ./faucet-config.example.yaml .
 
 EXPOSE 8080
-ENTRYPOINT [ "node", "--no-deprecation", "bundle/powfaucet.cjs" ]
+ENTRYPOINT [ "node", "--no-deprecation", "bundle/app.cjs" ]

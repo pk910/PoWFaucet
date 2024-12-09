@@ -11,13 +11,16 @@ let packageJson = JSON.parse(
 );
 
 export default {
-  entry: "./dist/app.js",
+  entry: {
+    app: "./dist/app.js",
+    PoWValidatorWorker: "./dist/modules/pow/validator/PoWValidatorWorker.js",
+  },
   target: "node",
   resolve: {
     extensions: [".ts", ".js"],
   },
   output: {
-    filename: "powfaucet.cjs",
+    filename: "[name].cjs",
     path: path.resolve(basedir, "bundle"),
   },
   plugins: [

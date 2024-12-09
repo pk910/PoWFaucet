@@ -6,9 +6,9 @@
   "bin": "bundle/powfaucet.cjs",
   "type": "module",
   "scripts": {
-    "build": "tsc && cp src/instrument.js dist/instrument.js",
+    "build": "tsc",
     "build-client": "cd faucet-client && node build-client.js",
-    "start": "npm run build && node dist/app.js",
+    "start": "npm run bundle && node --no-deprecation --env-file .env bundle/app.cjs",
     "start:inspect": "npm run build && node --inspect=127.0.0.1:9999 dist/app.js",
     "bundle": "npm run build && webpack --mode production",
     "test": "mocha --exit --trace-warnings 'tests/**/*.ts'",

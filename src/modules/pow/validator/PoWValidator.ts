@@ -1,11 +1,10 @@
 import assert from "node:assert";
-import { isMainThread, parentPort, Worker } from "worker_threads";
-import { FaucetWorkers } from "../../../common/FaucetWorker.js";
-import { ServiceManager } from "../../../common/ServiceManager.js";
+import { Worker } from "node:worker_threads";
 import { PromiseDfd } from "../../../utils/PromiseDfd.js";
 import { PoWHashAlgo } from "../PoWConfig.js";
 import { PoWModule } from "../PoWModule.js";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator.js";
+import path from "path";
 
 export class PoWValidator {
   private module: PoWModule;
@@ -17,8 +16,7 @@ export class PoWValidator {
     this.module = module;
     this.readyDfd = new PromiseDfd<void>();
     this.worker =
-      worker ||
-      ServiceManager.GetService(FaucetWorkers).createWorker("pow-validator");
+      worker || new Worker(path.resolve(__dirname, "PoWValidatorWorker.cjs"));
     this.worker.on("message", (msg) => this.onWorkerMessage(msg));
   }
 
