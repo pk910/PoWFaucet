@@ -10,6 +10,7 @@ import {
 } from "../config/FaucetConfig.js";
 import { ServiceManager } from "./ServiceManager.js";
 import { SessionManager } from "../session/SessionManager.js";
+import * as Sentry from "@sentry/node";
 
 interface FaucetProcessEvents {
   event: () => void;
@@ -35,6 +36,7 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
           `  Exception origin: ${origin}\r\n` +
           `  Stack Trace: ${err.stack}\r\n`
       );
+      Sentry.captureException(err, { extra: { origin, stack: err.stack } });
       this.shutdown(1);
     },
     unhandledRejection: (reason: any, promise) => {
@@ -44,11 +46,15 @@ export class FaucetProcess extends TypedEmitter<FaucetProcessEvents> {
       } catch (ex) {
         stack = ex.stack;
       }
+      const stackTrace = reason && reason.stack ? reason.stack : stack;
       this.emitLog(
         FaucetLogLevel.ERROR,
         `### Caught unhandled rejection: ${reason}\r\n` +
-          `  Stack Trace: ${reason && reason.stack ? reason.stack : stack}\r\n`
+          `  Stack Trace: ${stackTrace}\r\n`
       );
+      Sentry.captureMessage("Caught unhandled rejection", {
+        extra: { reason, stack: stackTrace },
+      });
     },
     SIGUSR1: () => {
       this.emitLog(

@@ -3,6 +3,7 @@ import { ServiceManager } from "../common/ServiceManager.js";
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { BaseModule } from "./BaseModule.js";
 import { MODULE_CLASSES } from "./modules.js";
+import * as Sentry from "@sentry/node";
 
 export enum ModuleHookAction {
   ClientConfig,
@@ -66,10 +67,12 @@ export class ModuleManager {
       if (!module) {
         let ModuleClass = MODULE_CLASSES[modName];
         if (!ModuleClass) {
+          const msg = "Cannot load module '" + modName + "': unknown module";
           ServiceManager.GetService(FaucetProcess).emitLog(
             FaucetLogLevel.ERROR,
-            "Cannot load module '" + modName + "': unknown module"
+            msg
           );
+          Sentry.captureMessage(msg);
           continue;
         }
         module = this.loadedModules[modName] = new ModuleClass(this, modName);

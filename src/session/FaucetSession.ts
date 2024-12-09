@@ -10,7 +10,7 @@ import { ISessionRewardFactor } from "./SessionRewardFactor.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { nowSeconds } from "../utils/DateUtils.js";
-
+import * as Sentry from "@sentry/node";
 export enum FaucetSessionStatus {
   UNKNOWN = "unknown",
   STARTING = "starting",
@@ -92,10 +92,14 @@ export class FaucetSession {
     userInput: ISessionStartUserInput
   ): Promise<void> {
     if (this.status !== FaucetSessionStatus.UNKNOWN) {
+      const msg = `Cannot start session: session already in ${this.status} state`;
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.ERROR,
-        `[INVALID_STATE]: Cannot start session: session already in ${this.status} state; IP: ${remoteIP}; UserId: ${userInput.userId}`
+        `[INVALID_STATE]: ${msg}; IP: ${remoteIP}; UserId: ${userInput.userId}`
       );
+      Sentry.captureMessage(msg, {
+        extra: { remoteIP, userId: userInput.userId },
+      });
       throw new FaucetError(
         "INVALID_STATE",
         "cannot start session: session already in '" + this.status + "' state"
@@ -125,6 +129,9 @@ export class FaucetSession {
                   FaucetLogLevel.ERROR,
                   `[FAUCET_DISABLED]: ${denyMessage}; IP: ${remoteIP}; UserId: ${userInput.userId}`
                 );
+                Sentry.captureMessage(denyMessage, {
+                  extra: { remoteIP, userId: userInput.userId },
+                });
                 throw new FaucetError("FAUCET_DISABLED", denyMessage);
               }
             },
@@ -135,10 +142,14 @@ export class FaucetSession {
               // prio 5: get target address from userInput if not set provided by a module
               const targetAddr = this.targetAddr || userInput.addr;
               if (typeof targetAddr !== "string") {
+                const msg = `[INVALID_ADDR]: Missing target address`;
                 ServiceManager.GetService(FaucetProcess).emitLog(
                   FaucetLogLevel.ERROR,
-                  `[INVALID_ADDR]: Missing target address; IP: ${remoteIP}; UserId: ${userInput.userId}`
+                  `${msg}; IP: ${remoteIP}; UserId: ${userInput.userId}`
                 );
+                Sentry.captureMessage(msg, {
+                  extra: { remoteIP, userId: userInput.userId },
+                });
                 throw new FaucetError(
                   "INVALID_ADDR",
                   "Missing target address."
@@ -148,10 +159,14 @@ export class FaucetSession {
                 !targetAddr.match(/^0x[0-9a-fA-F]{40}$/) ||
                 targetAddr.match(/^0x0{40}$/i)
               ) {
+                const msg = `[INVALID_ADDR]: Invalid target address: ${targetAddr}`;
                 ServiceManager.GetService(FaucetProcess).emitLog(
                   FaucetLogLevel.ERROR,
-                  `[INVALID_ADDR]: Invalid target address: ${targetAddr}; IP: ${remoteIP}; UserId: ${userInput.userId}`
+                  `${msg}; IP: ${remoteIP}; UserId: ${userInput.userId}`
                 );
+                Sentry.captureMessage(msg, {
+                  extra: { remoteIP, userId: userInput.userId },
+                });
                 throw new FaucetError(
                   "INVALID_ADDR",
                   "Invalid target address: " + targetAddr
@@ -173,14 +188,27 @@ export class FaucetSession {
             FaucetLogLevel.ERROR,
             `[SessionStart]: FaucetError. Exception code: ${code}; UserId: ${userInput.userId}`
           );
+          Sentry.captureException(ex, {
+            extra: {
+              remoteIP,
+              userId: userInput.userId,
+              code,
+              origin: "SessionStart_FaucetError",
+            },
+          });
         }
 
         await this.setSessionFailed(code, ex.message);
       } else {
         ServiceManager.GetService(FaucetProcess).emitLog(
           FaucetLogLevel.ERROR,
-          `[SessionStart]: FaucetError ${ex.toString()}. Exception code: INTERNAL_ERROR; UserId: ${userInput.userId}`
+          `[SessionStart]: FaucetError ${ex.toString()}. Exception code: INTERNAL_ERROR; UserId: ${
+            userInput.userId
+          }`
         );
+        Sentry.captureException(ex, {
+          extra: { remoteIP, userId: userInput.userId, origin: "SessionStart" },
+        });
         await this.setSessionFailed(
           "INTERNAL_ERROR",
           "sessionStart failed: " + ex.toString()

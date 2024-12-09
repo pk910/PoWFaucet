@@ -1,3 +1,4 @@
+// IMPORTANT: Make sure to import `instrument.js` at the top of your file.
 import "./instrument.js";
 
 import path, { dirname } from "path";
@@ -21,6 +22,8 @@ import { SessionManager } from "./session/SessionManager.js";
 import { FaucetStatus } from "./services/FaucetStatus.js";
 import { PromMetricsService } from "./services/PromMetrics.js";
 import { GitcoinClaimer } from "./modules/gitcoin-claimer/GitcoinClaimer.js";
+
+import * as Sentry from "@sentry/node";
 
 (async () => {
   if (!isMainThread) {
@@ -65,10 +68,14 @@ import { GitcoinClaimer } from "./modules/gitcoin-claimer/GitcoinClaimer.js";
         "Faucet initialization complete."
       );
     } catch (ex) {
+      const msg = "Faucet initialization failed";
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.ERROR,
-        "Faucet initialization failed: " + ex.toString() + " " + ex.stack
+        `${msg}: ${ex.toString()} ${ex.stack}`
       );
+      Sentry.captureException(ex, {
+        extra: { origin: msg },
+      });
       process.exit(0);
     }
   }

@@ -7,6 +7,7 @@ import { SessionManager } from "../../session/SessionManager.js";
 import { FaucetSessionStatus } from "../../session/FaucetSession.js";
 import { PoWClient } from "./PoWClient.js";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
+import * as Sentry from "@sentry/node";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -132,11 +133,14 @@ export class PoWShareVerification {
       .map((client) => client.getPoWSession())
       .filter((session, index) => {
         if (!session.activeClient) {
+          const msg =
+            "PoWModule.getActiveClients returned a inactive client: " +
+            session.getFaucetSession().getSessionId();
           ServiceManager.GetService(FaucetProcess).emitLog(
             FaucetLogLevel.ERROR,
-            "PoWModule.getActiveClients returned a inactive client: " +
-              session.getFaucetSession().getSessionId()
+            msg
           );
+          Sentry.captureException(msg);
           return false;
         }
         return (

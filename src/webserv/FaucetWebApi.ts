@@ -27,6 +27,7 @@ import {
   buildSessionStatus,
 } from "./api/faucetStatus.js";
 import { FaucetHttpResponse } from "./FaucetHttpResponse.js";
+import * as Sentry from "@sentry/node";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -115,10 +116,12 @@ export class FaucetWebApi {
     const apiKey = process.env.CLIENT_API_KEY;
 
     if (!apiKey) {
+      const msg = `CLIENT_API_KEY is missing`;
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.ERROR,
-        `CLIENT_API_KEY is missing`
+        msg
       );
+      Sentry.captureMessage(msg);
       return new FaucetHttpResponse(401);
     }
 
@@ -528,6 +531,12 @@ export class FaucetWebApi {
         FaucetLogLevel.ERROR,
         `[FaucetWebApi.onClaimRewardByGitcoin]: UserId: ${userId}; Reason: ${failedReason}`
       );
+      Sentry.captureException(ex, {
+        extra: {
+          origin: "FaucetWebApi.onClaimRewardByGitcoin",
+          userId,
+        },
+      });
       throw ex;
     }
   }

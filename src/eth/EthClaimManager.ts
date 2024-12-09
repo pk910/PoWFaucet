@@ -14,17 +14,17 @@ import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import {
   FaucetSessionStatus,
-  FaucetSessionStoreData
+  FaucetSessionStoreData,
 } from "../session/FaucetSession.js";
 import { nowSeconds } from "../utils/DateUtils.js";
 import { FaucetHttpServer } from "../webserv/FaucetHttpServer.js";
 import {
   EthClaimNotificationClient,
-  IEthClaimNotificationData
+  IEthClaimNotificationData,
 } from "./EthClaimNotificationClient.js";
 import { EthWalletManager } from "./EthWalletManager.js";
 import { EthWalletRefill } from "./EthWalletRefill.js";
-
+import * as Sentry from "@sentry/node";
 export enum ClaimTxStatus {
   QUEUE = "queue",
   PROCESSING = "processing",
@@ -110,14 +110,18 @@ export class EthClaimManager {
             ServiceManager.GetService(EthWalletManager).watchClaimTx(claimInfo)
           );
           break;
-        default:
+        default: {
+          const msg =
+            "Cannot restore claimTx: unexpected claim status '" +
+            claimInfo.claim.claimStatus +
+            "'";
           ServiceManager.GetService(FaucetProcess).emitLog(
             FaucetLogLevel.ERROR,
-            "Cannot restore claimTx: unexpected claim status '" +
-              claimInfo.claim.claimStatus +
-              "'"
+            msg
           );
+          Sentry.captureMessage(msg, { extra: { claimInfo } });
           return;
+        }
       }
       if (claimInfo.claim.claimIdx > maxQueueIdx)
         maxQueueIdx = claimInfo.claim.claimIdx;
@@ -350,12 +354,14 @@ export class EthClaimManager {
       } catch (ex) {
         stack = ex.stack;
       }
+      const stackTrace = ex && ex.stack ? ex.stack : stack;
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.ERROR,
-        "Exception in transaction queue processing: " + ex.toString()
-        // TODO: Uncomment the following line
-        // `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : stack}`
+        "Exception in transaction queue processing: " +
+          ex.toString() +
+          `\r\n   Stack Trace: ${stackTrace}`
       );
+      Sentry.captureException(ex, { extra: { stackTrace } });
     }
     this.queueProcessing = false;
   }

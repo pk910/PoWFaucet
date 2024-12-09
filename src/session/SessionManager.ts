@@ -7,7 +7,7 @@ import {
   FaucetSessionStatus,
   FaucetSessionStoreData,
 } from "./FaucetSession.js";
-
+import * as Sentry from "@sentry/node";
 export class SessionManager {
   private initialized: boolean;
   private faucetSessions: { [sessionId: string]: FaucetSession } = {};
@@ -35,10 +35,14 @@ export class SessionManager {
 
     this.cleanupTimer = setInterval(() => {
       this.processSessionTimeouts().catch((err) => {
+        const msg = "Error while processing session timeouts";
         ServiceManager.GetService(FaucetProcess).emitLog(
           FaucetLogLevel.ERROR,
-          "Error while processing session timeouts: " + err.toString()
+          `${msg}: ${err.toString()}`
         );
+        Sentry.captureException(err, {
+          extra: { origin: msg },
+        });
       });
     }, 120 * 1000);
   }
@@ -93,8 +97,9 @@ export class SessionManager {
       if (session.getSessionStatus() !== FaucetSessionStatus.CLAIMING)
         totalBalance += session.getDropAmount();
     });
-    totalBalance +=
-      await ServiceManager.GetService(FaucetDatabase).getClaimableAmount();
+    totalBalance += await ServiceManager.GetService(
+      FaucetDatabase
+    ).getClaimableAmount();
     return totalBalance;
   }
 
@@ -106,7 +111,9 @@ export class SessionManager {
     }
   ): Promise<FaucetSession> {
     let info = (action: string, additional?: string) =>
-      `${action} new session for IP: ${remoteIP}; UserId: ${userInput.userId}; ${additional ? `${additional}` : ""}`;
+      `${action} new session for IP: ${remoteIP}; UserId: ${
+        userInput.userId
+      }; ${additional ? `${additional}` : ""}`;
     ServiceManager.GetService(FaucetProcess).emitLog(
       FaucetLogLevel.INFO,
       info("Creating")
