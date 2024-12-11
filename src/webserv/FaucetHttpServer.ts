@@ -3,6 +3,7 @@ import {
   IncomingMessage,
   Server as HttpServer,
   ServerResponse,
+  request,
 } from "http";
 import * as stream from "node:stream";
 import { WebSocket, WebSocketServer } from "ws";
@@ -14,6 +15,7 @@ import { ServiceManager } from "../common/ServiceManager.js";
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetWebApi } from "./FaucetWebApi.js";
 import { FaucetHttpResponse } from "./FaucetHttpResponse.js";
+import * as Sentry from "@sentry/node";
 
 export interface FaucetWssEndpoint {
   pattern: RegExp;
@@ -48,10 +50,14 @@ export class FaucetHttpServer {
       this.onHttpUpgrade(req, sock, head)
     );
     this.httpServer.on("error", (err) => {
+      const msg = "FaucetHttpServer error";
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.ERROR,
-        "FaucetHttpServer error: " + err.toString()
+        `${msg}: ${err.toString()}`
       );
+      Sentry.captureException(err, {
+        extra: { origin: msg },
+      });
     });
     this.httpServer.listen(faucetConfig.serverPort);
 
@@ -126,10 +132,14 @@ export class FaucetHttpServer {
               }
             })
             .catch((err) => {
+              const msg = `API request error`;
               ServiceManager.GetService(FaucetProcess).emitLog(
                 FaucetLogLevel.ERROR,
-                `API request error for ${req.url}: ${JSON.stringify(err)}`
+                `${msg} for ${req.url}: ${JSON.stringify(err)}`
               );
+              Sentry.captureException(err, {
+                extra: { origin: msg, requestUrl: req.url },
+              });
 
               if (
                 err &&

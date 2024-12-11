@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { MessagePort } from "worker_threads";
+import { parentPort, isMainThread, MessagePort } from "node:worker_threads";
 import { base64ToHex } from "../../../utils/ConvertHelpers.js";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator.js";
 import {
@@ -21,7 +21,11 @@ export class PoWValidatorWorker {
   private port: MessagePort;
   private difficultyMasks: { [difficulty: number]: string } = {};
 
-  public constructor(port: MessagePort) {
+  public constructor(port: MessagePort | null) {
+    if (!port) {
+      throw new Error("Parent port is missing");
+    }
+
     this.port = port;
     this.port.on("message", (evt) => this.onControlMessage(evt));
     this.port.postMessage({ action: "init" });
@@ -94,8 +98,6 @@ export class PoWValidatorWorker {
   private onControlMessage(msg: any) {
     assert.equal(msg && typeof msg === "object", true);
 
-    //console.log(evt);
-
     switch (msg.action) {
       case "validate":
         this.onCtrlValidate(msg.data);
@@ -150,3 +152,9 @@ export class PoWValidatorWorker {
     });
   }
 }
+
+if (isMainThread) {
+  throw new Error("This script should only be run as a worker thread");
+}
+
+new PoWValidatorWorker(parentPort);

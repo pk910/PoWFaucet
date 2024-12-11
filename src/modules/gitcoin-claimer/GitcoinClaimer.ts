@@ -23,7 +23,7 @@ import { isValidAddress } from "ethereumjs-util";
 import { FaucetError } from "../../common/FaucetError.js";
 import { checkEnabled } from "./checkEnabled.decorator.js";
 import { makeGitcoinClaimerError } from "./makeGitcoinClaimerError.js";
-
+import * as Sentry from "@sentry/node";
 type Address = string;
 
 type ScoreResponse = {
@@ -168,6 +168,7 @@ class GitcoinAPI {
         FaucetLogLevel.ERROR,
         errorMessage
       );
+      Sentry.captureMessage(errorMessage);
       throw new FaucetError("GITCOIN_API_ERROR", errorMessage);
     }
 
@@ -217,6 +218,7 @@ class GitcoinAPI {
         FaucetLogLevel.ERROR,
         errorMessage
       );
+      Sentry.captureMessage(errorMessage);
       return { result: "error" };
     }
 
@@ -231,6 +233,7 @@ class GitcoinAPI {
         FaucetLogLevel.ERROR,
         'Something went wrong while parsing response from "submit-passport" endpoint'
       );
+      Sentry.captureException(error, { extra: { origin: "submitPassport" } });
       return { result: "error" };
     }
 
@@ -442,6 +445,7 @@ export class GitcoinClaimer {
         FaucetLogLevel.ERROR,
         message
       );
+      Sentry.captureMessage(message);
       throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
     }
 
@@ -473,6 +477,7 @@ export class GitcoinClaimer {
         FaucetLogLevel.ERROR,
         message
       );
+      Sentry.captureException(ex, { extra: { origin: "createGitcoinClaim" } });
       clearClaiming();
       throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
     }
@@ -501,6 +506,9 @@ export class GitcoinClaimer {
         FaucetLogLevel.ERROR,
         message
       );
+      Sentry.captureException(ex, {
+        extra: { origin: "deleteGitcoinClaimRecord" },
+      });
       throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
     }
 
@@ -517,6 +525,9 @@ export class GitcoinClaimer {
         FaucetLogLevel.ERROR,
         message
       );
+      Sentry.captureException(ex, {
+        extra: { origin: "updateGitcoinClaimRecordTxHash" },
+      });
       clearClaiming();
       throw new FaucetError("GITCOIN_CLAIM_ERROR", message);
     }

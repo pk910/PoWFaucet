@@ -21,6 +21,7 @@ import { nowSeconds } from "../utils/DateUtils.js";
 import { sleepPromise } from "../utils/PromiseUtils.js";
 import { strFormatPlaceholder } from "../utils/StringUtils.js";
 import { EthClaimInfo } from "./EthClaimManager.js";
+import * as Sentry from "@sentry/node";
 
 export interface WalletState {
   ready: boolean;
@@ -142,6 +143,9 @@ export class EthWalletManager {
           FaucetLogLevel.ERROR,
           "Web3 provider error: " + e.toString()
         );
+        Sentry.captureException(e, {
+          extra: { origin: "Web3 provider error" },
+        });
       });
       provider.on("end", () => {
         ServiceManager.GetService(FaucetProcess).emitLog(
@@ -185,12 +189,15 @@ export class EthWalletManager {
             this.tokenState.decimals = Number(res);
           });
         break;
-      default:
+      default: {
+        const msg = "Unknown coin type: " + faucetConfig.faucetCoinType;
         ServiceManager.GetService(FaucetProcess).emitLog(
           FaucetLogLevel.ERROR,
-          "Unknown coin type: " + faucetConfig.faucetCoinType
+          msg
         );
+        Sentry.captureMessage(msg);
         return;
+      }
     }
   }
 
@@ -252,13 +259,14 @@ export class EthWalletManager {
             nativeBalance: 0n,
             nonce: 0,
           });
+          const msg = "Error loading wallet state for " + this.walletAddr;
           ServiceManager.GetService(FaucetProcess).emitLog(
             FaucetLogLevel.ERROR,
-            "Error loading wallet state for " +
-              this.walletAddr +
-              ": " +
-              err.toString()
+            msg + ": " + err.toString()
           );
+          Sentry.captureException(err, {
+            extra: { origin: msg },
+          });
         }
       )
       .then(() => {
@@ -452,6 +460,9 @@ export class EthWalletManager {
         FaucetLogLevel.ERROR,
         txError.message
       );
+      Sentry.captureException(txError, {
+        extra: { origin: "sendClaimTx" },
+      });
       throw txError;
     }
 
@@ -546,6 +557,9 @@ export class EthWalletManager {
         FaucetLogLevel.ERROR,
         txError.message
       );
+      Sentry.captureException(txError, {
+        extra: { origin: "sendGitcoinClaimTx" },
+      });
       throw txError;
     }
 
@@ -703,14 +717,14 @@ export class EthWalletManager {
         ) {
           // just retry when RPC connection issue
         } else {
+          const msg = "Error while polling transaction receipt for " + txhash;
           ServiceManager.GetService(FaucetProcess).emitLog(
             FaucetLogLevel.ERROR,
-            "Error while polling transaction receipt for " +
-              txhash +
-              ": " +
-              ex.toString()
+            msg + ": " + ex.toString()
           );
-          console.log("err ", ex);
+          Sentry.captureException(ex, {
+            extra: { origin: msg },
+          });
           throw ex;
         }
       }
