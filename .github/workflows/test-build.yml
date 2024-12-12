@@ -47,17 +47,17 @@ jobs:
     - run: pkg --compress Brotli .
 
     - name: Upload powfaucet.js artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         path: ./bundle/powfaucet.cjs
         name: powfaucet.js
     - name: Upload linux binary artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         path: ./bin/pow-faucet-server-linux
         name: powfaucet-server-linux
     - name: Upload windows binary artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         path: ./bin/pow-faucet-server-win.exe
         name: powfaucet-server-win.exe
