@@ -286,55 +286,62 @@ export class EthWalletManager {
     const lowFundsBalance = BigInt(faucetConfig.lowFundsBalance);
     const noFundsBalance = BigInt(faucetConfig.noFundsBalance);
 
-    if (this.walletState) {
-      if (!this.walletState.ready) {
-        if (typeof faucetConfig.rpcConnectionError === "string")
-          statusMessage = faucetConfig.rpcConnectionError;
-        else if (faucetConfig.rpcConnectionError)
-          statusMessage = "The faucet could not connect to the network RPC";
-        if (statusMessage) {
-          statusMessage = strFormatPlaceholder(statusMessage);
-          statusLevel = FaucetStatusLevel.ERROR;
-        }
+    const setError = (configMessage: any, defaultMessage: string) => {
+      if (typeof configMessage === "string") {
+        statusMessage = configMessage;
+      } else if (configMessage) {
+        statusMessage = defaultMessage;
       }
 
-      const gasLimit = await this.getGasLimitForClaimTx({
-        nonce: this.walletState.nonce,
-        target: this.walletAddr,
-        amount: BigInt(faucetConfig.maxDropAmount),
-      });
+      if (statusMessage) {
+        statusMessage = strFormatPlaceholder(statusMessage);
+        statusLevel = FaucetStatusLevel.ERROR;
+      }
+    };
+
+    if (this.walletState) {
+      if (!this.walletState.ready) {
+        setError(
+          faucetConfig.rpcConnectionError,
+          "The faucet could not connect to the network RPC"
+        );
+      }
 
       // Log warning if the faucet is out of funds
-      if (
-        !statusLevel &&
-        (this.walletState.balance <= noFundsBalance ||
+      if (!statusLevel && this.walletState.balance <= noFundsBalance) {
+        setError(faucetConfig.noFundsError, "The faucet is out of funds!");
+      }
+
+      // Log warning if there's not enough funds to cover the gas limit
+      if (!statusLevel) {
+        // It's important to check for gas limit only after checking for no funds, otherwise the gas limit check will fail
+        const gasLimit = await this.getGasLimitForClaimTx({
+          nonce: this.walletState.nonce,
+          target: this.walletAddr,
+          amount: BigInt(faucetConfig.maxDropAmount),
+        });
+
+        if (
           this.walletState.nativeBalance <=
-            BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee))
-      ) {
-        if (typeof faucetConfig.noFundsError === "string")
-          statusMessage = faucetConfig.noFundsError;
-        else if (faucetConfig.noFundsError)
-          statusMessage = "The faucet is out of funds!";
-        if (statusMessage) {
-          statusMessage = strFormatPlaceholder(statusMessage);
-          statusLevel = FaucetStatusLevel.ERROR;
+          BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee)
+        ) {
+          setError(faucetConfig.noFundsError, "The faucet is out of funds!");
         }
       }
     }
 
     // Log warning if the faucet is running low on funds
     if (!statusLevel && this.walletState.balance <= lowFundsBalance) {
-      if (typeof faucetConfig.lowFundsWarning === "string")
-        statusMessage = faucetConfig.lowFundsWarning;
-      else if (faucetConfig.lowFundsWarning)
-        statusMessage =
-          "The faucet is running out of funds! Faucet Balance: {1}";
+      setError(
+        faucetConfig.lowFundsWarning,
+        "The faucet is running out of funds! Faucet Balance: {1}"
+      );
+
       if (statusMessage) {
         statusMessage = strFormatPlaceholder(
           statusMessage,
           this.readableAmount(this.walletState.balance)
         );
-        statusLevel = FaucetStatusLevel.WARNING;
       }
     }
 
