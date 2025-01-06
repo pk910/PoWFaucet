@@ -106,6 +106,7 @@ export class FaucetStatsLog {
       to: claim.target,
       val: claim.amount.toString(),
       sess: claim.session,
+      user: claim.userId,
     });
   }
 

@@ -13,3 +13,11 @@ export function zodSchemaBodyValidation<Schema extends z.ZodObject<any, any>>(
     throw new Error("Invalid request body");
   }
 }
+
+export function getValidatedAddressSchema(body: Buffer) {
+  const schema = zodSchemaBodyValidation(
+    body,
+    z.object({ address: z.string() })
+  );
+  return schema;
+}

@@ -48,7 +48,9 @@ export interface IQueuedClaimTx {
 }
 
 export interface EthClaimInfo {
-  session: string;
+  session?: string; // for PoW
+  userId?: string; // for Gitcoin
+  gitcoinClaimRecordId?: string; // for Gitcoin
   target: string;
   amount: string;
   claim: EthClaimData;
@@ -220,15 +222,16 @@ export class EthClaimManager {
         ?.updateState(null, BigInt(claimInfo.claim.txFee));
       ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimInfo);
     }
-    ServiceManager.GetService(FaucetDatabase).updateClaimData(
-      claimInfo.session,
-      claimInfo.claim
-    );
+    if (claimInfo.session) {
+      ServiceManager.GetService(FaucetDatabase).updateClaimData(
+        claimInfo.session,
+        claimInfo.claim
+      );
+    }
   }
 
   public async createSessionClaim(
-    sessionData: FaucetSessionStoreData,
-    userInput: any
+    sessionData: FaucetSessionStoreData
   ): Promise<EthClaimInfo> {
     if (sessionData.status !== FaucetSessionStatus.CLAIMABLE)
       throw new FaucetError(
@@ -254,11 +257,12 @@ export class EthClaimManager {
       claim: sessionData.claim,
     };
 
+    // This 'try' actually does nothing as there're no modules that add hooks for this action
     try {
       await ServiceManager.GetService(ModuleManager).processActionHooks(
         [],
         ModuleHookAction.SessionClaim,
-        [claimInfo, userInput]
+        [claimInfo]
       );
     } catch (ex) {
       if (ex instanceof FaucetError) throw ex;
@@ -398,8 +402,11 @@ export class EthClaimManager {
 
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.INFO,
-        "Submitted claim transaction " +
-          claimTx.session +
+        `Submitted claim transaction ${
+          claimTx.session
+            ? `, session ${claimTx.session}`
+            : `user ${claimTx.userId}`
+        }` +
           " [" +
           ethWalletManager.readableAmount(BigInt(claimTx.amount)) +
           "] to: " +
@@ -436,7 +443,8 @@ export class EthClaimManager {
         }
 
         delete this.pendingTxQueue[claimTx.claim.txHash];
-        delete this.claimTxDict[claimTx.session];
+        const dictKey = claimTx.session || "user-" + claimTx.userId;
+        delete this.claimTxDict[dictKey];
         claimTx.claim.txBlock = txData.block;
 
         this.lastConfirmedClaimTxIdx = claimTx.claim.claimIdx;
@@ -450,7 +458,8 @@ export class EthClaimManager {
           "Transaction for " + claimTx.target + " failed: " + error.toString()
         );
         delete this.pendingTxQueue[claimTx.claim.txHash];
-        delete this.claimTxDict[claimTx.session];
+        const dictKey = claimTx.session || "user-" + claimTx.userId;
+        delete this.claimTxDict[dictKey];
         claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
         claimTx.claim.txError = "Transaction Error: " + error.toString();
         this.updateClaimStatus(claimTx);

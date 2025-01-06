@@ -38,6 +38,7 @@ export interface FaucetSessionStoreData {
   data: any;
   claim: EthClaimData | null;
   userId: string;
+  mode: "pow" | "gitcoin";
 }
 
 export interface IClientSessionInfo {
@@ -72,6 +73,7 @@ export class FaucetSession {
   private dropAmount: bigint;
   private remoteIP: string;
   private userId: string;
+  private mode: "pow" | "gitcoin";
   private blockingTasks: FaucetSessionTask[] = [];
   private sessionDataDict: { [key: string]: any } = {};
   private sessionModuleRefs: { [key: string]: any } = {};
@@ -89,7 +91,8 @@ export class FaucetSession {
 
   public async startSession(
     remoteIP: string,
-    userInput: ISessionStartUserInput
+    userInput: ISessionStartUserInput,
+    mode: "pow" | "gitcoin"
   ): Promise<void> {
     if (this.status !== FaucetSessionStatus.UNKNOWN) {
       const msg = `Cannot start session: session already in ${this.status} state`;
@@ -112,6 +115,7 @@ export class FaucetSession {
     this.remoteIP = remoteIP;
     this.userId = userInput.userId;
     this.dropAmount = -1n;
+    this.mode = mode;
 
     try {
       await ServiceManager.GetService(ModuleManager).processActionHooks(
@@ -264,6 +268,7 @@ export class FaucetSession {
       data: this.sessionDataDict,
       userId: this.userId,
       claim: null,
+      mode: this.mode,
     };
   }
 
@@ -509,7 +514,7 @@ export class FaucetSession {
     return this.dropAmount < 0n ? 0n : this.dropAmount;
   }
 
-  public setDropAmount(amount: bigint) {
+  public async setDropAmount(amount: bigint) {
     if (this.dropAmount !== -1n) return;
     if (
       this.getSessionStatus() === FaucetSessionStatus.CLAIMING ||
@@ -518,7 +523,7 @@ export class FaucetSession {
     )
       return 0n;
     this.dropAmount = 0n;
-    if (amount > 0n) this.addReward(amount);
+    if (amount > 0n) await this.addReward(amount);
     else this.lazySaveSession();
   }
 
@@ -596,10 +601,17 @@ export class FaucetSession {
       target: this.getTargetAddr(),
       modules: moduleData,
     };
+
     if (this.status === FaucetSessionStatus.FAILED) {
-      sessionInfo.failedCode = this.getSessionData("failed.code");
+      const failedCode = this.getSessionData("failed.code");
+
+      sessionInfo.failedCode = failedCode;
       sessionInfo.failedReason = this.getSessionData("failed.reason");
     }
     return sessionInfo;
+  }
+
+  public getMode() {
+    return this.mode;
   }
 }

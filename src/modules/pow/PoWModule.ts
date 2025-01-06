@@ -154,17 +154,19 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     )
       return;
 
-    session.addBlockingTask(
-      this.moduleName,
-      "mining",
-      this.moduleConfig.powSessionTimeout
-    ); // this prevents the session from progressing to claimable before this module allows it
-    session.setDropAmount(0n);
+    if (session.getMode() === "pow") {
+      session.addBlockingTask(
+        this.moduleName,
+        "mining",
+        this.moduleConfig.powSessionTimeout
+      ); // this prevents the session from progressing to claimable before this module allows it
+      session.setDropAmount(0n);
 
-    // start mining session
-    let powSession = this.getPoWSession(session);
-    powSession.preImage = crypto.randomBytes(8).toString("base64");
-    this.resetSessionIdleTimer(powSession);
+      // start mining session
+      let powSession = this.getPoWSession(session);
+      powSession.preImage = crypto.randomBytes(8).toString("base64");
+      this.resetSessionIdleTimer(powSession);
+    }
   }
 
   private async processSessionRestore(session: FaucetSession): Promise<void> {
