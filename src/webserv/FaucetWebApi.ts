@@ -482,11 +482,6 @@ export class FaucetWebApi {
       remoteIP
     );
 
-    ServiceManager.GetService(FaucetProcess).emitLog(
-      FaucetLogLevel.INFO,
-      `[FaucetWebApi.onCheckUserLimits]: time: ${time}`
-    );
-
     return time
       ? {
           allowed: false,

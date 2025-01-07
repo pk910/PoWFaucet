@@ -524,7 +524,7 @@ export class FaucetDatabase {
     whereArgs.push(now - timeout);
     return this.selectSessions(
       "(" +
-        whereSql.join(" OR ") + // TODO: check if this is correct
+        whereSql.join(" OR ") +
         ") AND StartTime > ? AND ((Status IN ('claiming','finished') AND Mode = 'gitcoin') OR (Status IN ('claimable','claiming','finished') AND Mode = 'pow'))",
       whereArgs,
       skipData
@@ -547,21 +547,9 @@ export class FaucetDatabase {
     );
 
     if (!finishedSessions || !finishedSessions.length) {
-      ServiceManager.GetService(FaucetProcess).emitLog(
-        FaucetLogLevel.INFO,
-        "no finished sessions"
-      );
       return null;
     }
     const lastSession = finishedSessions[finishedSessions.length - 1];
-    ServiceManager.GetService(FaucetProcess).emitLog(
-      FaucetLogLevel.INFO,
-      "lastSessionId: " + lastSession.sessionId
-    );
-    ServiceManager.GetService(FaucetProcess).emitLog(
-      FaucetLogLevel.INFO,
-      "lastSession startTime: " + lastSession.startTime
-    );
     return lastSession.startTime;
   }
 
