@@ -1,5 +1,4 @@
 import { Worker } from "node:worker_threads";
-import { v4 } from "uuid";
 import { faucetConfig, resolveRelativePath } from "../config/FaucetConfig.js";
 import { FaucetProcess, FaucetLogLevel } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
@@ -10,7 +9,7 @@ import {
 import { BaseModule } from "../modules/BaseModule.js";
 import { ClaimTxStatus, EthClaimData } from "../eth/EthClaimManager.js";
 import { FaucetModuleDB } from "./FaucetModuleDB.js";
-import { BaseDriver, RunResult } from "./driver/BaseDriver.js";
+import { BaseDriver } from "./driver/BaseDriver.js";
 import { ISQLiteOptions } from "./driver/SQLiteDriver.js";
 import { WorkerDriver } from "./driver/WorkerDriver.js";
 import { FaucetWorkers } from "../common/FaucetWorker.js";
@@ -18,11 +17,6 @@ import { IMySQLOptions, MySQLDriver } from "./driver/MySQLDriver.js";
 import { SQL } from "./SQL.js";
 import { getHashedIp } from "../utils/HashedInfo.js";
 import { nowSeconds } from "../utils/DateUtils.js";
-import {
-  GitcoinClaimStatus,
-  GitcoinClaimTableType,
-} from "../modules/gitcoin-claimer/GitcoinClaimerTypes.js";
-import { GitcoinClaimsColumns } from "../modules/gitcoin-claimer/GitcoinClaimerData.js";
 
 export type FaucetDatabaseOptions = ISQLiteOptions | IMySQLOptions;
 
@@ -40,6 +34,7 @@ const TableSessionsColumns = [
   "RemoteIP",
   "Tasks",
   "UserId",
+  "Mode",
 ];
 
 const TableSessionsColumnsFull = [...TableSessionsColumns, "Data", "ClaimData"];
@@ -56,12 +51,9 @@ export class FaucetDatabase {
     this.initialized = true;
 
     await this.initDatabase();
-    this.cleanupTimer = setInterval(
-      () => {
-        this.cleanStore();
-      },
-      1000 * 60 * 60 * 2
-    );
+    this.cleanupTimer = setInterval(() => {
+      this.cleanStore();
+    }, 1000 * 60 * 60 * 2);
   }
 
   public dispose() {
@@ -326,6 +318,21 @@ export class FaucetDatabase {
           })
         );
       }
+      case 4: {
+        // upgrade to version 5
+        schemaVersion = 5;
+        await this.db.exec(
+          SQL.driverSql({
+            [FaucetDbDriver.SQLITE]: `
+              ALTER TABLE Sessions ADD COLUMN Mode TEXT;
+              UPDATE Sessions SET Mode = 'pow';
+            `,
+            [FaucetDbDriver.MYSQL]: `
+              ALTER TABLE Sessions ADD COLUMN Mode ENUM('pow', 'gitcoin') DEFAULT 'pow';
+            `,
+          })
+        );
+      }
     }
     if (schemaVersion !== oldVersion) {
       ServiceManager.GetService(FaucetProcess).emitLog(
@@ -404,16 +411,6 @@ export class FaucetDatabase {
     );
   }
 
-  private selectGitcoinClaims(
-    whereSql: string,
-    whereArgs: any[]
-  ): Promise<GitcoinClaimTableType[]> {
-    return this.db.all(
-      "SELECT * FROM GitcoinClaims WHERE " + whereSql,
-      whereArgs
-    ) as Promise<GitcoinClaimTableType[]>;
-  }
-
   private selectSessions(
     whereSql: string,
     whereArgs: any[],
@@ -448,6 +445,7 @@ export class FaucetDatabase {
       UserId: string;
       Data: string;
       ClaimData: string;
+      Mode: "pow" | "gitcoin";
     }[];
 
     if (rows.length === 0) return [];
@@ -466,8 +464,9 @@ export class FaucetDatabase {
         claim: skipData
           ? undefined
           : row.ClaimData
-            ? JSON.parse(row.ClaimData)
-            : null,
+          ? JSON.parse(row.ClaimData)
+          : null,
+        mode: row.Mode,
       };
     });
   }
@@ -526,66 +525,10 @@ export class FaucetDatabase {
     return this.selectSessions(
       "(" +
         whereSql.join(" OR ") +
-        ") AND StartTime > ? AND Status IN ('claimable','claiming','finished')",
+        ") AND StartTime > ? AND ((Status IN ('claiming','finished') AND Mode = 'gitcoin') OR (Status IN ('claimable','claiming','finished') AND Mode = 'pow'))",
       whereArgs,
       skipData
     );
-  }
-
-  // *** GitcoinClaim related functions ***
-  public async createGitcoinClaim(
-    userId: string,
-    targetAddress: string,
-    remoteIP: string
-  ): Promise<string> {
-    const id = v4();
-    const runResult = await this.db.run(
-      "INSERT INTO GitcoinClaims (Uuid,UserId,TargetAddress,Status,DateCreated,DateUpdated,DropAmount,RemoteIP) VALUES (?,?,?,?,?,?,?,?)",
-      [
-        id,
-        userId,
-        targetAddress,
-        GitcoinClaimStatus.PROCESSING,
-        nowSeconds(),
-        nowSeconds(),
-        faucetConfig.maxDropAmount,
-        remoteIP,
-      ]
-    );
-
-    // Now get the created record by runResult.lastInsertRowid
-    await this.selectGitcoinClaims("Uuid = ?", [id]);
-    return id;
-  }
-
-  public async getLastGitcoinClaimTime(
-    userId: string,
-    timeout: number
-  ): Promise<number> {
-    const timeDelta = nowSeconds() - timeout;
-
-    const finishedClaims = await this.selectGitcoinClaims(
-      "UserId = ? AND DateClaimed > ? ",
-      [userId, timeDelta]
-    );
-    if (!finishedClaims || !finishedClaims.length) {
-      return null;
-    }
-    const lastClaim = finishedClaims[finishedClaims.length - 1];
-    return lastClaim.DateClaimed;
-  }
-
-  public async updateGitcoinClaimRecordTxHash(uuid: string, txHash: string) {
-    const now = nowSeconds();
-    return await this.db.run(
-      "UPDATE GitcoinClaims SET TxHash = ?, Status = ?, DateClaimed = ? WHERE Uuid = ?",
-      [txHash, "DONE", now, uuid]
-    );
-  }
-  public async deleteGitcoinClaimRecord(uuid: string) {
-    return await this.db.run("DELETE FROM GitcoinClaims WHERE Uuid = ?", [
-      uuid,
-    ]);
   }
 
   public async getLastFinishedSessionStartTime(
@@ -598,10 +541,11 @@ export class FaucetDatabase {
     const finishedSessions = await this.selectSessions(
       "(" +
         whereSql.join(" OR ") +
-        ") AND StartTime > ? AND Status IN ('claiming','finished')",
+        ") AND StartTime > ? AND ((Status IN ('claiming','finished') AND Mode = 'gitcoin') OR (Status IN ('claimable','claiming','finished') AND Mode = 'pow'))",
       whereArgs,
       true
     );
+
     if (!finishedSessions || !finishedSessions.length) {
       return null;
     }
@@ -620,7 +564,7 @@ export class FaucetDatabase {
 
   public async getSession(sessionId: string): Promise<FaucetSessionStoreData> {
     const row = (await this.db.get(
-      "SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData,UserId FROM Sessions WHERE SessionId = ?",
+      "SELECT SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData,UserId,Mode FROM Sessions WHERE SessionId = ?",
       [sessionId]
     )) as {
       SessionId: string;
@@ -633,6 +577,7 @@ export class FaucetDatabase {
       Data: string;
       ClaimData: string;
       UserId: string;
+      Mode: "pow" | "gitcoin";
     };
 
     if (!row) return null;
@@ -648,6 +593,7 @@ export class FaucetDatabase {
       data: JSON.parse(row.Data),
       claim: row.ClaimData ? JSON.parse(row.ClaimData) : null,
       userId: row.UserId,
+      mode: row.Mode as "pow" | "gitcoin",
     };
   }
 
@@ -658,9 +604,9 @@ export class FaucetDatabase {
     await this.db.run(
       SQL.driverSql({
         [FaucetDbDriver.SQLITE]:
-          "INSERT OR REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData,UserId) VALUES (?,?,?,?,?,?,?,?,?,?)",
+          "INSERT OR REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData,UserId,Mode) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         [FaucetDbDriver.MYSQL]:
-          "REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData,UserId) VALUES (?,?,?,?,?,?,?,?,?,?)",
+          "REPLACE INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData,UserId,Mode) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
       }),
       [
         sessionData.sessionId,
@@ -673,6 +619,7 @@ export class FaucetDatabase {
         JSON.stringify(sessionData.data),
         sessionData.claim ? JSON.stringify(sessionData.claim) : null,
         sessionData.userId,
+        sessionData.mode,
       ]
     );
   }

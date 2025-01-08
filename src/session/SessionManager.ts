@@ -108,12 +108,13 @@ export class SessionManager {
     userInput: {
       addr: string;
       userId: string;
-    }
+    },
+    mode: "pow" | "gitcoin"
   ): Promise<FaucetSession> {
     let info = (action: string, additional?: string) =>
       `${action} new session for IP: ${remoteIP}; UserId: ${
         userInput.userId
-      }; ${additional ? `${additional}` : ""}`;
+      }; Mode: ${mode}, ${additional ? `${additional}` : ""}`;
     ServiceManager.GetService(FaucetProcess).emitLog(
       FaucetLogLevel.INFO,
       info("Creating")
@@ -123,7 +124,7 @@ export class SessionManager {
       FaucetLogLevel.INFO,
       info("Starting")
     );
-    await session.startSession(remoteIP, userInput);
+    await session.startSession(remoteIP, userInput, mode);
     ServiceManager.GetService(FaucetProcess).emitLog(
       FaucetLogLevel.INFO,
       info(

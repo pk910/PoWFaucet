@@ -28,6 +28,7 @@ import {
 } from "./api/faucetStatus.js";
 import { FaucetHttpResponse } from "./FaucetHttpResponse.js";
 import * as Sentry from "@sentry/node";
+import { getValidatedAddressSchema } from "../utils/zodSchemaBodyValidation.js";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -171,12 +172,8 @@ export class FaucetWebApi {
         return this.onPassportSubmitData(req, body);
       case "checkPassportSubmitCache".toLowerCase():
         return this.onCheckPassportSubmitCache(req, body);
-      case "claimRewardByGitcoin".toLowerCase():
-        return this.onClaimRewardByGitcoin(
-          req,
-          body,
-          apiUrl.query["userId"] as string
-        );
+      case "startSessionViaGitcoin".toLowerCase():
+        return this.onStartSessionViaGitcoin(req, body);
       default:
         let handler: (
           req: IncomingMessage,
@@ -241,8 +238,10 @@ export class FaucetWebApi {
   > {
     if (req.method !== "POST") return new FaucetHttpResponse(405);
 
-    const GitcoinClaimerService = ServiceManager.GetService(GitcoinClaimer);
-    return GitcoinClaimerService.getAddressScore(body);
+    const schema = getValidatedAddressSchema(body);
+    return ServiceManager.GetService(GitcoinClaimer).getAddressScore(
+      schema.address
+    );
   }
 
   public registerApiEndpoint(
@@ -352,43 +351,25 @@ export class FaucetWebApi {
     return config;
   }
 
-  public async onStartSession(
+  private async startSession(
     req: IncomingMessage,
-    body: Buffer
-  ): Promise<any> {
-    if (req.method !== "POST") return new FaucetHttpResponse(405);
-
-    const userInput = JSON.parse(body.toString("utf8"));
-    if (!userInput.userId) {
-      return new FaucetHttpResponse(
-        400,
-        JSON.stringify({ error: "userId is missing" })
-      );
-    }
-    let sessionInfo: IClientSessionInfo;
+    userInput: { userId: string; addr: string },
+    mode: "pow" | "gitcoin"
+  ) {
     let session: FaucetSession;
     try {
       session = await ServiceManager.GetService(SessionManager).createSession(
         this.getRemoteAddr(req),
-        userInput
+        userInput,
+        mode
       );
       if (session.getSessionStatus() === FaucetSessionStatus.FAILED) {
-        let failedCode = session.getSessionData("failed.code");
+        const sessionInfo = await session.getSessionInfo();
         ServiceManager.GetService(FaucetProcess).emitLog(
           FaucetLogLevel.INFO,
-          `[FaucetWebApi.onStartSession]: Session status failed: ${failedCode}; UserId: ${userInput.userId}`
+          `[FaucetWebApi.onStartSession]: Session status failed: ${sessionInfo.failedCode}; UserId: ${userInput.userId}`
         );
-
-        return {
-          status: FaucetSessionStatus.FAILED,
-          failedCode,
-          failedReason: session.getSessionData("failed.reason"),
-          balance: session.getDropAmount().toString(),
-          target: session.getTargetAddr(),
-        };
       }
-
-      sessionInfo = await session.getSessionInfo();
     } catch (ex) {
       if (ex instanceof FaucetError) {
         let failedCode = ex.getCode();
@@ -411,7 +392,72 @@ export class FaucetWebApi {
       }
     }
 
-    return sessionInfo;
+    return session;
+  }
+
+  public async onStartSession(
+    req: IncomingMessage,
+    body: Buffer
+  ): Promise<any> {
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
+
+    const userInput = JSON.parse(body.toString("utf8"));
+    if (!userInput.userId) {
+      return new FaucetHttpResponse(
+        400,
+        JSON.stringify({ error: "userId is missing" })
+      );
+    }
+
+    const session = await this.startSession(req, userInput, "pow");
+    if ("failedCode" in session) {
+      return session;
+    }
+    return session.getSessionInfo();
+  }
+
+  public async onStartSessionViaGitcoin(
+    req: IncomingMessage,
+    body: Buffer
+  ): Promise<any> {
+    if (req.method !== "POST") return new FaucetHttpResponse(405);
+
+    const userInput = JSON.parse(body.toString("utf8"));
+
+    if (!userInput.userId) {
+      return new FaucetHttpResponse(
+        400,
+        JSON.stringify({ error: "userId is missing" })
+      );
+    }
+
+    if (!userInput.addr) {
+      return new FaucetHttpResponse(
+        400,
+        JSON.stringify({ error: "addr is missing" })
+      );
+    }
+
+    const score = await ServiceManager.GetService(
+      GitcoinClaimer
+    ).getAddressScore(userInput.addr);
+
+    if (score.value < faucetConfig.gitcoinMinimumScore) {
+      throw new FaucetError(
+        "GITCOIN_CLAIM_ERROR",
+        `Gitcoin score is too low: ${score} (minimum required: ${faucetConfig.gitcoinMinimumScore})`
+      );
+    }
+
+    const session = await this.startSession(req, userInput, "gitcoin");
+
+    if ("failedCode" in session) {
+      return session;
+    }
+    await session.setDropAmount(BigInt(faucetConfig.maxDropAmount));
+    await session.completeSession();
+
+    return session.getSessionInfo();
   }
 
   public async onCheckUserLimits(
@@ -488,59 +534,6 @@ export class FaucetWebApi {
     return sessionInfo;
   }
 
-  private async onClaimRewardByGitcoin(
-    req: IncomingMessage,
-    body: Buffer,
-    userId: string
-  ): Promise<
-    | {
-        txHash: string;
-      }
-    | FaucetHttpResponse
-  > {
-    if (req.method !== "POST") return new FaucetHttpResponse(405);
-
-    const remoteIP = this.getRemoteAddr(req);
-    const gitcoinClaimer = ServiceManager.GetService(GitcoinClaimer);
-    const canClaim = await gitcoinClaimer.checkIfUserCanClaimGitcoin(
-      userId,
-      remoteIP
-    );
-    // If user can't claim, throw an error
-    if (!canClaim.can) {
-      return new FaucetHttpResponse(
-        403,
-        JSON.stringify({ error: canClaim.reason })
-      );
-    }
-
-    try {
-      const { txHash, targetAddress } = await gitcoinClaimer.claimGitcoin(
-        body,
-        userId,
-        remoteIP
-      );
-      ServiceManager.GetService(FaucetProcess).emitLog(
-        FaucetLogLevel.INFO,
-        `[GITCOIN_CLAIM_SUCCESS]: User: ${userId}; Address: ${targetAddress};`
-      );
-      return { txHash };
-    } catch (ex) {
-      let failedReason = ex.toString();
-      ServiceManager.GetService(FaucetProcess).emitLog(
-        FaucetLogLevel.ERROR,
-        `[FaucetWebApi.onClaimRewardByGitcoin]: UserId: ${userId}; Reason: ${failedReason}`
-      );
-      Sentry.captureException(ex, {
-        extra: {
-          origin: "FaucetWebApi.onClaimRewardByGitcoin",
-          userId,
-        },
-      });
-      throw ex;
-    }
-  }
-
   public async onClaimReward(req: IncomingMessage, body: Buffer): Promise<any> {
     if (req.method !== "POST") return new FaucetHttpResponse(405);
 
@@ -559,11 +552,9 @@ export class FaucetWebApi {
         failedReason: "Session not found.",
       };
     }
-
     try {
       await ServiceManager.GetService(EthClaimManager).createSessionClaim(
-        sessionData,
-        userInput
+        sessionData
       );
     } catch (ex) {
       if (ex instanceof FaucetError) {
@@ -579,7 +570,12 @@ export class FaucetWebApi {
           failedReason: ex.message,
         };
       } else {
-        console.error(ex, ex.stack);
+        ServiceManager.GetService(FaucetProcess).emitLog(
+          FaucetLogLevel.ERROR,
+          `[FaucetWebApi.onClaimReward] Internal error: ${ex.message}`
+        );
+        Sentry.captureException(ex, { extra: { method: "onClaimReward" } });
+
         return {
           status: FaucetSessionStatus.FAILED,
           failedCode: "INTERNAL_ERROR",

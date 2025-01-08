@@ -1,4 +1,5 @@
 import { FaucetError } from "../../common/FaucetError.js";
+import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 import { ServiceManager } from "../../common/ServiceManager.js";
 import { FaucetDatabase } from "../../db/FaucetDatabase.js";
 import { EthWalletManager } from "../../eth/EthWalletManager.js";
@@ -200,20 +201,13 @@ export class RecurringLimitsModule extends BaseModule<IRecurringLimitsConfig> {
       FaucetDatabase
     ).getLastFinishedSessionStartTime(userId, limit.duration);
 
-    // Then check Gitcoin claims
-    const lastGitcoinClaimTime: number | null = await ServiceManager.GetService(
-      FaucetDatabase
-    ).getLastGitcoinClaimTime(userId, limit.duration);
-
-    // If no session and Gitcoin claim was found, return 0
-    if (!lastGitcoinClaimTime && !lastSessionStartTime && !limitApplies) {
+    // If no session was found, return 0
+    if (!lastSessionStartTime && !limitApplies) {
       return 0;
     }
 
-    // Get the latest start time
-    const lastStartTime = Math.max(lastSessionStartTime, lastGitcoinClaimTime);
     // From seconds to milliseconds
-    return lastStartTime * 1000 + limit.duration * 1000;
+    return lastSessionStartTime * 1000 + limit.duration * 1000;
   }
 
   private async processSessionRewardFactor(

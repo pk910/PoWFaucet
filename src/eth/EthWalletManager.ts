@@ -536,52 +536,6 @@ export class EthWalletManager {
     });
   }
 
-  public async sendGitcoinClaimTx(target: string): Promise<TransactionResult> {
-    const amount = faucetConfig.minDropAmount;
-    let txPromise: Promise<TransactionReceipt>;
-    let retryCount = 0;
-    let txError: Error;
-    let txHash: string;
-
-    do {
-      try {
-        const { txHex, nonce } = await this.buildTx(target, amount);
-        const txResult = await this.sendTransaction(txHex, nonce);
-        txHash = txResult[0];
-        txPromise = txResult[1];
-      } catch (ex) {
-        if (!txError) txError = ex;
-        ServiceManager.GetService(FaucetProcess).emitLog(
-          FaucetLogLevel.WARNING,
-          `[sendGitcoinClaimTx] Sending TX for ${target} failed [try: ${retryCount}]: ${ex.toString()}`
-        );
-        await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
-        await this.loadWalletState();
-      }
-    } while (!txPromise && retryCount++ < 5);
-    if (!txPromise) {
-      ServiceManager.GetService(FaucetProcess).emitLog(
-        FaucetLogLevel.ERROR,
-        txError.message
-      );
-      Sentry.captureException(txError, {
-        extra: { origin: "sendGitcoinClaimTx" },
-      });
-      throw txError;
-    }
-
-    return {
-      txHash,
-      txPromise: this.postProcessTxResult(
-        {
-          amount,
-          txPromise,
-        },
-        true
-      ),
-    };
-  }
-
   public async sendCustomTx(params: {
     target: string;
     amount: bigint;
