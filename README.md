@@ -7,7 +7,7 @@
 
 Modularized faucet for EVM chains with different protection methods (Captcha, Mining, IP, Mainnet Balance, Gitcoin Passport and more)
 
-# Why
+# ❔ Why
 
 Faucets for ETH Testnets are spammed by bots. This faucet tries to reduce the efficiency of these automated requests by various protection methods.
 
@@ -19,7 +19,7 @@ If you want to run your own instance you need to transfer the funds you want to 
 
 For a more detailed description, take a look into the [Project Wiki](https://github.com/pk910/PoWFaucet/wiki)
 
-# Instances
+# 👀 Instances
 
 <table>
   <thead>
@@ -60,17 +60,17 @@ For a more detailed description, take a look into the [Project Wiki](https://git
   </tbody>
 </table>
 
-# Run Yourself
+# 🎛️ Run Yourself
 
 Read the [Faucet Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki) to see the installation and configuration instructions.
 
 You can also find some demo instances with different module combinations here: [Demo Instances](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/README.md)
 
-# Bugs & Features
+# 🐞 Bugs & Features
 
 Please feel free to report bugs and add new features via PRs if you like.
 
-# Thanks To
+# 🫡 Thanks To
 
 This faucet contains parts of code from the following projects:
 
@@ -78,6 +78,6 @@ This faucet contains parts of code from the following projects:
 
 [FaucETH](https://github.com/komputing/FaucETH) - faucet page design
 
-# License
+# 📄 License
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
