@@ -1,5 +1,3 @@
-
-
 name: Build docker image for latest release
 
 on:
@@ -12,13 +10,11 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+      - uses: actions/checkout@v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -26,12 +22,11 @@ jobs:
         run: |
           echo "server_version=$(cat package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
           echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
-        id: version
-      - name: Build version specific docker image
-        run: docker build . --file Dockerfile --tag pk910/powfaucet:v${{ steps.version.outputs.server_version }}
-      - name: Push version specific docker image
-        run: docker push pk910/powfaucet:v${{ steps.version.outputs.server_version }}
-      - name: Build v2-stable docker image
-        run: docker build . --file Dockerfile --tag pk910/powfaucet:v2-stable
-      - name: Push v2-stable docker image
-        run: docker push pk910/powfaucet:v2-stable
+      - name: Build and push multi-arch images
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file Dockerfile \
+            --tag pk910/powfaucet:v${{ env.server_version }} \
+            --tag pk910/powfaucet:v2-stable \
+            --push .
