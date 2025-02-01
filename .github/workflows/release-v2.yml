@@ -16,7 +16,7 @@ jobs:
       uses: docker/setup-buildx-action@v2
     - uses: actions/setup-node@v3
       with:
-        node-version: 21
+        node-version: 22
 
     - run: npm install
     - run: npm run test
@@ -31,7 +31,7 @@ jobs:
     # setup global dependencies
     - uses: actions/setup-node@v3
       with:
-        node-version: 21
+        node-version: 22
         registry-url: "https://registry.npmjs.org"
     - run: npm install -g pkg
 

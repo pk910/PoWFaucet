@@ -1,5 +1,5 @@
 # build-server env
-FROM --platform=$BUILDPLATFORM node:21-slim AS build-server-env
+FROM --platform=$BUILDPLATFORM node:22-slim AS build-server-env
 WORKDIR /build
 COPY package*.json ./
 RUN npm install
@@ -10,7 +10,7 @@ COPY ./src src
 RUN npm run bundle
 
 # build-client env
-FROM --platform=$BUILDPLATFORM node:21-slim AS build-client-env
+FROM --platform=$BUILDPLATFORM node:22-slim AS build-client-env
 WORKDIR /build
 COPY faucet-client/package*.json ./faucet-client/
 COPY ./libs libs
@@ -20,7 +20,7 @@ COPY ./faucet-client faucet-client
 RUN cd faucet-client && node ./build-client.js
 
 # final stage
-FROM node:18-slim
+FROM node:22-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN update-ca-certificates
