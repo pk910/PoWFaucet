@@ -19,6 +19,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Get project versions
+        id: version
         run: |
           echo "server_version=$(cat package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
           echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
@@ -27,6 +28,6 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --file Dockerfile \
-            --tag pk910/powfaucet:v${{ env.server_version }} \
+            --tag pk910/powfaucet:v${{ steps.version.outputs.server_version }} \
             --tag pk910/powfaucet:v2-stable \
             --push .
