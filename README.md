@@ -40,6 +40,15 @@ For a more detailed description, take a look into the [Project Wiki](https://git
       </td>
     </tr>
     <tr>
+      <td><a href="https://github.com/eth-clients/hoodi">Hoodi Testnet</a></td>
+      <td><a href="https://hoodi-faucet.pk910.de">https://hoodi-faucet.pk910.de</a></td>
+      <td>
+        <a href="#"><img alt="Faucet Version" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ffaucets.pk910.de%2Fbadges%2Fversion.php%3Ffaucet%3Dhoodi-faucet" /></a>
+        <a href="https://stats.uptimerobot.com/lW1jltO2k0/798768812"><img alt="Uptime Robot ratio (30 days)" src="https://img.shields.io/uptimerobot/ratio/m798768812-b78b2e9493487dc45fb42731" /></a>
+        <a href="https://hoodi.etherscan.io/address/0x6Cc9397c3B38739daCbfaA68EaD5F5D77Ba5F455"><img alt="Faucet Balance" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ffaucets.pk910.de%2Fbadges%2Fbalance.php%3Ffaucet%3Dhoodi-faucet" /></a>
+      </td>
+    </tr>
+    <tr>
       <td><a href="https://github.com/eth-clients/holesky">Holešovice Testnet</a></td>
       <td><a href="https://holesky-faucet.pk910.de">https://holesky-faucet.pk910.de</a></td>
       <td>
