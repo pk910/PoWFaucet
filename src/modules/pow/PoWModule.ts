@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import * as stream from 'node:stream';
 import { ServiceManager } from "../../common/ServiceManager.js";
 import { FaucetSession, FaucetSessionStatus } from "../../session/FaucetSession.js";
 import { BaseModule } from "../BaseModule.js";
@@ -13,18 +14,17 @@ import { PoWClient } from "./PoWClient.js";
 import { PoWSession } from "./PoWSession.js";
 import { FaucetError } from "../../common/FaucetError.js";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
+import { PoWServer } from "./PoWServer.js";
+import { Socket } from "node:net";
 
 export class PoWModule extends BaseModule<IPoWConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
-  private validator: PoWValidator;
-  private powClients: {[sessionId: string]: PoWClient} = {};
+ 
+  private powServers: {[serverId: string]: PoWServer} = {};
 
   protected override startModule(): Promise<void> {
     // register websocket endpoint (/pow)
-    ServiceManager.GetService(FaucetHttpServer).addWssEndpoint("pow", /^\/ws\/pow($|\?)/, (req, ws, ip) => this.processPoWClientWebSocket(req, ws, ip));
-
-    // start validator
-    this.validator = new PoWValidator(this);
+    ServiceManager.GetService(FaucetHttpServer).addRawEndpoint("pow", /^\/ws\/pow($|\?)/, (req, socket, head, ip) => this.processPoWClientWebSocket(req, socket, head, ip));
 
     // register faucet action hooks
     this.moduleManager.addActionHook(
@@ -53,13 +53,22 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   protected override stopModule(): Promise<void> {
     ServiceManager.GetService(FaucetHttpServer).removeWssEndpoint("pow");
 
-    this.validator.dispose();
-    this.validator = null;
-    return Promise.resolve();
+    let shutdownPromises: Promise<void>[] = [];
+    for(let serverId in this.powServers) {
+      let powServer = this.powServers[serverId];
+      shutdownPromises.push(powServer.shutdown());
+    }
+
+    return Promise.all(shutdownPromises).catch((err) => {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "error shutting down PoW servers: " + err.toString());
+    }).then();
   }
 
   protected override onConfigReload(): void {
-    
+    for(let serverId in this.powServers) {
+      let powServer = this.powServers[serverId];
+      powServer.updateConfig(this.moduleConfig);
+    }
   }
 
   private processClientConfig(clientConfig: any) {
@@ -120,11 +129,11 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       return;
     if(session.getSessionStatus() !== FaucetSessionStatus.RUNNING)
       return;
-    let powSession = this.getPoWSession(session);
+
     moduleState[this.moduleName] = {
-      lastNonce: powSession.lastNonce,
-      preImage: powSession.preImage,
-      shareCount: powSession.shareCount,
+      lastNonce: session.getSessionData("pow.lastNonce", 0),
+      preImage: session.getSessionData("pow.preimage"),
+      shareCount: session.getSessionData("pow.shareCount", 0),
     }
   }
 
@@ -136,27 +145,26 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     session.setDropAmount(0n);
 
     // start mining session
-    let powSession = this.getPoWSession(session);
-    powSession.preImage = crypto.randomBytes(8).toString('base64');
-    this.resetSessionIdleTimer(powSession);
+    session.setSessionData("pow.preimage", crypto.randomBytes(8).toString('base64'));
+
+    // create session on server
+    await this.getPoWServerForSession(session, true);
   }
 
   private async processSessionRestore(session: FaucetSession): Promise<void> {
     if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
       return;
-    let powSession = this.getPoWSession(session);
-    this.resetSessionIdleTimer(powSession);
+    await this.getPoWServerForSession(session, true);
   }
 
   private async processSessionComplete(session: FaucetSession): Promise<void> {
     if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
       return;
     setTimeout(() => {
-      let powSession = this.getPoWSession(session);
-      if(session.getSessionStatus() === FaucetSessionStatus.FAILED)
-        powSession.activeClient?.killClient("session failed: [" + session.getSessionData("failed.code") + "] " + session.getSessionData("failed.reason"));
-      else
-        powSession.activeClient?.killClient("session closed");
+      let powServer = session.getSessionModuleRef("pow.server");
+      if(powServer) {
+        powServer.destroySession(session.getSessionId());
+      }
     }, 100);
   }
 
@@ -165,7 +173,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     await session.tryProceedSession();
   }
 
-  private async processPoWClientWebSocket(req: IncomingMessage, ws: WebSocket, remoteIp: string): Promise<void> {
+  private async processPoWClientWebSocket(req: IncomingMessage, socket: Socket, head: Buffer, remoteIp: string): Promise<void> {
     let sessionId: string;
     let clientVersion: string;
     try {
@@ -176,26 +184,15 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       }
       clientVersion = url.get("cliver");
     } catch(ex) {
-      ws.send(JSON.stringify({
-        action: "error",
-        data: {
-          code: "INVALID_SESSION",
-          message: "session id missing"
-        }
-      }));
-      ws.close();
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n{"code": "INVALID_SESSION", "message": "session id missing"}');
+      socket.destroy();
       return;
     }
+
     let session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]);
     if(!session) {
-      ws.send(JSON.stringify({
-        action: "error",
-        data: {
-          code: "INVALID_SESSION",
-          message: "session not found"
-        }
-      }));
-      ws.close();
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n{"code": "INVALID_SESSION", "message": "session not found"}');
+      socket.destroy();
       return;
     }
 
@@ -203,16 +200,17 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       await session.updateRemoteIP(remoteIp);
     } catch(ex) {
       let errData = ex instanceof FaucetError ? {code: ex.getCode(), message: ex.message} : {code: "INTERNAL_ERROR", message: "Could not update session IP: " + ex.toString()};
-      ws.send(JSON.stringify({
-        action: "error",
-        data: errData
-      }));
-      ws.close();
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n' + JSON.stringify(errData));
+      socket.destroy();
       return;
     }
 
     session.setSessionData("cliver", clientVersion);
 
+    let powServer = await this.getPoWServerForSession(session, true);
+    powServer.connect(session.getSessionId(), req, socket, head);
+
+    /*
     let powSession = this.getPoWSession(session);
     let powClient: PoWClient;
     if((powClient = powSession.activeClient)) {
@@ -225,91 +223,50 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "connected PoWClient: " + session.getSessionId());
     
     this.resetSessionIdleTimer(powSession);
+    */
   }
 
-  public disposePoWClient(client: PoWClient, reason: string) {
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "closed PoWClient: " + client.getFaucetSession().getSessionId() + " (" + reason + ")");
-    this.resetSessionIdleTimer(client.getPoWSession());
+  private async getPoWServerForSession(session: FaucetSession, create: boolean = false): Promise<PoWServer> {
+    let serverPromise = session.getSessionModuleRef("pow.serverPromise");
+    if(serverPromise) {
+      let powServer = await serverPromise;
+      if(powServer)
+        return powServer;
+    }
 
-    if(this.powClients[client.getFaucetSession().getSessionId()] === client) {
-      delete this.powClients[client.getFaucetSession().getSessionId()];
+    if(!create)
+      return null;
+
+    let server: PoWServer;
+    let suitableServers: {server: PoWServer, sessions: number}[] = [];
+    for(let serverId in this.powServers) {
+      let powServer = this.powServers[serverId];
+      let sessionCount = powServer.getSessionCount();
+      if(sessionCount < this.moduleConfig.powSessionsPerServer || this.moduleConfig.powSessionsPerServer === 0) {
+        suitableServers.push({server: powServer, sessions: sessionCount});
+      }
+    }
+    
+    if(suitableServers.length > 0) {
+      // use the server with the least sessions
+      suitableServers.sort((a, b) => a.sessions - b.sessions);
+      server = suitableServers[0].server;
     }
     else {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "disposePoWClient: client not in active clients list: " + client.getFaucetSession().getSessionId());
+      server = new PoWServer(this, crypto.randomBytes(16).toString('base64'));
+      this.powServers[server.getServerId()] = server;
     }
-  }
 
-  public getActiveClients(): PoWClient[] {
-    return Object.values(this.powClients);
-  }
+    let registrationPromise = new Promise<PoWServer>(async (resolve, reject) => {
+      await server.getReadyPromise();
+      server.registerSession(session);
 
-  public getPoWSession(session: FaucetSession): PoWSession {
-    let powSession: PoWSession;
-    if(!(powSession = session.getSessionModuleRef("pow.session"))) {
-      powSession = new PoWSession(session);
-      session.setSessionModuleRef("pow.session", powSession);
-    }
-    return powSession;
-  }
+      resolve(server);
+    });
 
-  public getValidator(): PoWValidator {
-    return this.validator;
-  }
-
-  public getPoWParamsStr(): string {
-    switch(this.moduleConfig.powHashAlgo) {
-      case PoWHashAlgo.SCRYPT:
-        return PoWHashAlgo.SCRYPT.toString() +
-        "|" + this.moduleConfig.powScryptParams.cpuAndMemory +
-        "|" + this.moduleConfig.powScryptParams.blockSize +
-        "|" + this.moduleConfig.powScryptParams.parallelization +
-        "|" + this.moduleConfig.powScryptParams.keyLength +
-        "|" + this.moduleConfig.powDifficulty;
-      case PoWHashAlgo.CRYPTONIGHT:
-        return PoWHashAlgo.CRYPTONIGHT.toString() +
-        "|" + this.moduleConfig.powCryptoNightParams.algo +
-        "|" + this.moduleConfig.powCryptoNightParams.variant +
-        "|" + this.moduleConfig.powCryptoNightParams.height +
-        "|" + this.moduleConfig.powDifficulty;
-      case PoWHashAlgo.ARGON2:
-        return PoWHashAlgo.ARGON2.toString() +
-        "|" + this.moduleConfig.powArgon2Params.type +
-        "|" + this.moduleConfig.powArgon2Params.version +
-        "|" + this.moduleConfig.powArgon2Params.timeCost +
-        "|" + this.moduleConfig.powArgon2Params.memoryCost +
-        "|" + this.moduleConfig.powArgon2Params.parallelization +
-        "|" + this.moduleConfig.powArgon2Params.keyLength +
-        "|" + this.moduleConfig.powDifficulty;
-      case PoWHashAlgo.NICKMINER:
-        return PoWHashAlgo.NICKMINER.toString() +
-        "|" + this.moduleConfig.powNickMinerParams.hash +
-        "|" + this.moduleConfig.powNickMinerParams.sigR +
-        "|" + this.moduleConfig.powNickMinerParams.sigV +
-        "|" + this.moduleConfig.powNickMinerParams.count +
-        "|" + this.moduleConfig.powNickMinerParams.suffix +
-        "|" + this.moduleConfig.powNickMinerParams.prefix +
-        "|" + this.moduleConfig.powDifficulty;
-    }
-  }
-
-  private resetSessionIdleTimer(session: PoWSession) {
-    let hasActiveClient = !!session.activeClient;
-    let idleTimer = session.idleTimer;
-
-    if(hasActiveClient && idleTimer) {
-      clearTimeout(idleTimer);
-      session.idleTimer = null;
-    }
-    else if(!hasActiveClient && !idleTimer && session.idleTime && this.moduleConfig.powIdleTimeout) {
-      let now = Math.floor(new Date().getTime() / 1000);
-      let timeout = session.idleTime + this.moduleConfig.powIdleTimeout - now;
-      if(timeout < 0)
-        timeout = 0;
-      session.idleTimer = setTimeout(() => {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session idle timeout: " + session.getFaucetSession().getSessionId());
-        this.processPoWSessionClose(session.getFaucetSession());
-      }, timeout * 1000);
-    }
+    session.setSessionModuleRef("pow.serverPromise", registrationPromise);
+    let powServer = await registrationPromise;
+    return powServer;
   }
   
 }

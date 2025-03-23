@@ -387,16 +387,17 @@ export class FaucetSession {
     return rewardAmount;
   }
 
-  public async subPenalty(amount: bigint) {
+  public async subPenalty(amount: bigint): Promise<bigint> {
     if(this.status === FaucetSessionStatus.CLAIMING || this.status === FaucetSessionStatus.FINISHED || this.status === FaucetSessionStatus.FAILED)
       return;
     
     if(this.dropAmount === -1n)
       this.dropAmount = 0n;
+    if(amount > this.dropAmount)
+      amount = this.dropAmount;
     this.dropAmount -= amount;
-    if(this.dropAmount < 0n)
-      this.dropAmount = 0n;
     this.lazySaveSession();
+    return amount;
   }
 
   public async getSessionInfo(): Promise<IClientSessionInfo> {

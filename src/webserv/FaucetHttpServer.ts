@@ -10,6 +10,7 @@ import { OutgoingHttpHeaders } from 'http2';
 import { FaucetWebApi } from './FaucetWebApi.js';
 import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
+import { Socket } from 'node:net';
 
 export class FaucetHttpResponse {
   public readonly code: number;
@@ -27,7 +28,8 @@ export class FaucetHttpResponse {
 
 export interface FaucetWssEndpoint {
   pattern: RegExp;
-  handler: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => void;
+  wssHandler?: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => void;
+  rawHandler?: (req: IncomingMessage, socket: stream.Duplex, head: Buffer, remoteIp: string) => void;
 }
 
 const MAX_BODY_SIZE = 1024 * 1024 * 10; // 10MB
@@ -47,7 +49,7 @@ export class FaucetHttpServer {
 
     this.httpServer = createServer();
     this.httpServer.on("request", (req, rsp) => this.onHttpRequest(req, rsp));
-    this.httpServer.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock, head));
+    this.httpServer.on("upgrade", (req, sock, head) => this.onHttpUpgrade(req, sock as Socket, head));
     this.httpServer.listen(faucetConfig.serverPort);
 
     this.wssServer = new WebSocketServer({
@@ -74,10 +76,17 @@ export class FaucetHttpServer {
       return faucetConfig.serverPort;
   }
 
-  public addWssEndpoint(key: string, pattern: RegExp, handler: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => void) {
+  public addWssEndpoint(key: string, pattern: RegExp, wssHandler: (req: IncomingMessage, ws: WebSocket, remoteIp: string) => void) {
     this.wssEndpoints[key] = {
       pattern: pattern,
-      handler: handler,
+      wssHandler: wssHandler,
+    };
+  }
+
+  public addRawEndpoint(key: string, pattern: RegExp, rawHandler: (req: IncomingMessage, socket: Socket, head: Buffer, remoteIp: string) => void) {
+    this.wssEndpoints[key] = {
+      pattern: pattern,
+      rawHandler: rawHandler
     };
   }
 
@@ -169,7 +178,7 @@ export class FaucetHttpServer {
     return headers;
   }
 
-  private onHttpUpgrade(req: IncomingMessage, socket: stream.Duplex, head: Buffer) {
+  private onHttpUpgrade(req: IncomingMessage, socket: Socket, head: Buffer) {
     let wssEndpoint: FaucetWssEndpoint;
     let allEndpoints = Object.values(this.wssEndpoints);
     for(let i = 0; i < allEndpoints.length; i++) {
@@ -183,11 +192,18 @@ export class FaucetHttpServer {
       socket.destroy();
       return;
     }
-    
-    this.wssServer.handleUpgrade(req, socket, head, (ws) => {
-      let remoteAddr = ServiceManager.GetService(FaucetWebApi).getRemoteAddr(req);
-      wssEndpoint.handler(req, ws, remoteAddr);
-    });
+
+    let remoteAddr = ServiceManager.GetService(FaucetWebApi).getRemoteAddr(req);
+    if(wssEndpoint.wssHandler) {
+      this.wssServer.handleUpgrade(req, socket, head, (ws) => {
+        wssEndpoint.wssHandler(req, ws, remoteAddr);
+      });
+    } else if(wssEndpoint.rawHandler) {
+      wssEndpoint.rawHandler(req, socket, head, remoteAddr);
+    } else {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+    }
   }
 
   private buildSeoIndex() {

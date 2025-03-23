@@ -16,6 +16,8 @@ export interface IPoWConfig extends IBaseModuleConfig {
   powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
   powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceed the limit)
 
+  powSessionsPerServer: number; // maximum number of sessions per server sub-process (0 = unlimited)
+
   /* PoW-share verification
   Proof of Work shares need to be verified to prevent malicious users from just sending in random numbers.
   As that can lead to a huge verification work load on the server, this faucet can redistribute shares back to other miners for verification.
@@ -119,6 +121,7 @@ export const defaultConfig: IPoWConfig = {
   powDifficulty: 11,
   powHashrateSoftLimit: 0,
   powHashrateHardLimit: 0,
+  powSessionsPerServer: 0,
   verifyLocalPercent: 10,
   verifyLocalMaxQueue: 100,
   verifyMinerPeerCount: 4,
