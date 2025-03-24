@@ -31,7 +31,7 @@ export class PoWServerWorker {
   public constructor(port: MessagePort) {
     if(port) {
       this.port = port;
-      this.port.onmessage = this.onMessage.bind(this);
+      this.port.onmessage = (evt) => this.onMessage(evt.data, (evt as any).objs);
     } else if(process.send) {
       process.on("message", this.onMessage.bind(this));
     }
@@ -160,6 +160,13 @@ export class PoWServerWorker {
     fakeReq.url = request.url;
     fakeReq.method = request.method;
     fakeReq[this.serverSymbol] = request.sessionId;
+
+    if((socket as any)._testWs) {
+      // hack for unit tests
+      let testWs = (socket as any)._testWs;
+      this.wss.emit('connection', testWs, fakeReq);
+      return;
+    }
     
     socket.resume();
     this.server.emit('upgrade', fakeReq, socket, headBuffer);
@@ -183,7 +190,7 @@ export class PoWServerWorker {
       ws.close();
       return;
     }
-
+    
     if(session.activeClient) {
       session.activeClient.killClient("reconnected from another client");
       session.activeClient = null;

@@ -1,7 +1,6 @@
 import path, { dirname, basename } from "path";
 import { fileURLToPath } from "url";
 import { isMainThread, workerData } from "node:worker_threads";
-import child_process from "node:child_process";
 import { faucetConfig, loadFaucetConfig, setAppBasePath } from "./config/FaucetConfig.js";
 import { FaucetWorkers } from "./common/FaucetWorker.js";
 import { EthWalletManager } from "./eth/EthWalletManager.js";

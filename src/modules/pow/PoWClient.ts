@@ -120,8 +120,6 @@ export class PoWClient {
   }
 
   private async onClientMessage(data: RawData, isBinary: boolean, socket: WebSocket): Promise<void> {
-    //console.log("dbg: onClientMessage [" + socket.bufferedAmount + "] " + data.toString());
-
     let message;
     try {
       message = JSON.parse(data.toString());

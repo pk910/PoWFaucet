@@ -166,7 +166,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       if(powServer) {
         powServer.destroySession(session.getSessionId());
 
-        if (powServer.getSessionCount() === 0) {
+        if (powServer.getSessionCount() === 0 && Object.keys(this.powServers).length > 1) {
           this.stopServer(powServer);
         }
       }
@@ -189,15 +189,15 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       }
       clientVersion = url.get("cliver");
     } catch(ex) {
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n{"code": "INVALID_SESSION", "message": "session id missing"}');
-      socket.destroy();
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n{"action": "error", "data": {"code": "INVALID_SESSION", "message": "session id missing"}}');
+      socket.end();
       return;
     }
 
     let session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]);
     if(!session) {
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n{"code": "INVALID_SESSION", "message": "session not found"}');
-      socket.destroy();
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n{"action": "error", "data": {"code": "INVALID_SESSION", "message": "session not found"}}');
+      socket.end();
       return;
     }
 
@@ -205,8 +205,8 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       await session.updateRemoteIP(remoteIp);
     } catch(ex) {
       let errData = ex instanceof FaucetError ? {code: ex.getCode(), message: ex.message} : {code: "INTERNAL_ERROR", message: "Could not update session IP: " + ex.toString()};
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n' + JSON.stringify(errData));
-      socket.destroy();
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n{"action": "error", "data": ' + JSON.stringify(errData) + '}');
+      socket.end();
       return;
     }
 

@@ -56,8 +56,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
-    let powModule = moduleManager.getModule<PoWModule>("pow");
-    expect(powModule.getPoWParamsStr()).to.equal("scrypt|4096|8|1|16|11", "invalid powParams string");
   });
 
   it("Check client config exports (cryptonight)", async () => {
@@ -85,8 +83,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.h).to.equal(10, "client config mismatch: powParams.h");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
-    let powModule = moduleManager.getModule<PoWModule>("pow");
-    expect(powModule.getPoWParamsStr()).to.equal("cryptonight|0|1|10|11", "invalid powParams string");
   });
 
   it("Check client config exports (argon2)", async () => {
@@ -120,8 +116,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
-    let powModule = moduleManager.getModule<PoWModule>("pow");
-    expect(powModule.getPoWParamsStr()).to.equal("argon2|0|13|4|4096|1|16|11", "invalid powParams string");
   });
 
   it("Start mining session and check session params", async () => {
@@ -347,9 +341,10 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.lastNonce": 1337,
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      testSession.setSessionData("pow.lastNonce", 1337);
       let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,

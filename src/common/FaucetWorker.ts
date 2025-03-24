@@ -37,7 +37,7 @@ export class FaucetWorkers {
 
   public static loadWorkerClass(workerClassKey?: string, workerPort?: MessagePort|ChildProcess) {
     let workerClass = WORKER_CLASSES[workerClassKey || workerData?.classKey];
-    new workerClass(workerPort || parentPort);
+    return new workerClass(workerPort || parentPort);
   }
 
   private initialized: boolean;
