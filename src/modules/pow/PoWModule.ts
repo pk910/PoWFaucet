@@ -16,6 +16,7 @@ import { FaucetError } from "../../common/FaucetError.js";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 import { PoWServer } from "./PoWServer.js";
 import { Socket } from "node:net";
+import { getNewGuid } from "../../utils/GuidUtils.js";
 
 export class PoWModule extends BaseModule<IPoWConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -160,10 +161,14 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   private async processSessionComplete(session: FaucetSession): Promise<void> {
     if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
       return;
-    setTimeout(() => {
-      let powServer = session.getSessionModuleRef("pow.server");
+    setTimeout(async () => {
+      let powServer = await session.getSessionModuleRef("pow.serverPromise");
       if(powServer) {
         powServer.destroySession(session.getSessionId());
+
+        if (powServer.getSessionCount() === 0) {
+          this.stopServer(powServer);
+        }
       }
     }, 100);
   }
@@ -209,21 +214,6 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
     let powServer = await this.getPoWServerForSession(session, true);
     powServer.connect(session.getSessionId(), req, socket, head);
-
-    /*
-    let powSession = this.getPoWSession(session);
-    let powClient: PoWClient;
-    if((powClient = powSession.activeClient)) {
-      // kill other client
-      powClient.killClient("reconnected from another client");
-    }
-
-    powClient = new PoWClient(this, powSession, ws);
-    this.powClients[session.getSessionId()] = powClient;
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "connected PoWClient: " + session.getSessionId());
-    
-    this.resetSessionIdleTimer(powSession);
-    */
   }
 
   private async getPoWServerForSession(session: FaucetSession, create: boolean = false): Promise<PoWServer> {
@@ -248,12 +238,12 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     }
     
     if(suitableServers.length > 0) {
-      // use the server with the least sessions
-      suitableServers.sort((a, b) => a.sessions - b.sessions);
+      // use the server with the most sessions
+      suitableServers.sort((a, b) => b.sessions - a.sessions);
       server = suitableServers[0].server;
     }
     else {
-      server = new PoWServer(this, crypto.randomBytes(16).toString('base64'));
+      server = new PoWServer(this, getNewGuid());
       this.powServers[server.getServerId()] = server;
     }
 
@@ -267,6 +257,11 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     session.setSessionModuleRef("pow.serverPromise", registrationPromise);
     let powServer = await registrationPromise;
     return powServer;
+  }
+
+  private stopServer(server: PoWServer) {
+    server.shutdown();
+    delete this.powServers[server.getServerId()];
   }
   
 }

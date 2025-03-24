@@ -58,8 +58,6 @@ export class PoWClient {
     if(this.session && this.session.activeClient === this)
       this.session.activeClient = null;
 
-    //this.module.disposePoWClient(this, reason);
-
     if(this.pingTimer) {
       clearInterval(this.pingTimer);
       this.pingTimer = null;

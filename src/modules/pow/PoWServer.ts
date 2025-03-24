@@ -7,6 +7,9 @@ import { FaucetSession } from '../../session/FaucetSession.js';
 import { IPoWConfig } from './PoWConfig.js';
 import { PoWModule } from './PoWModule.js';
 import { FaucetLogLevel, FaucetProcess } from '../../common/FaucetProcess.js';
+import { EthClaimManager } from '../../eth/EthClaimManager.js';
+import { EthWalletManager } from '../../eth/EthWalletManager.js';
+import { ProcessLoadTracker } from '../../utils/ProcessLoadTracker.js';
 
 export class PoWServer {
   private module: PoWModule;
@@ -42,12 +45,19 @@ export class PoWServer {
           config: this.module.getModuleConfig(),
         });
         this.readyDfd.resolve();
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Started PoW worker process [" + this.serverId + "]");
         break;
       case "pow-session-abort":
         this.onSessionAbort(message.sessionId, message.type, message.reason, message.dirtyProps);
         break;
       case "pow-session-reward":
         this.onSessionReward(message.sessionId, message.reqId, BigInt(message.amount), message.dirtyProps);
+        break;
+      case "pow-session-flush":
+        this.onSessionFlush(message.sessionId, message.dirtyProps);
+        break;
+      case "pow-sysload":
+        this.onSysLoad(message.cpu, message.memory, message.eventLoopLag, message.clients);
         break;
     }
   }
@@ -61,14 +71,18 @@ export class PoWServer {
       session.setSessionData(key, dirtyProps[key]);
     }
 
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     switch(type) {
       case "slashed":
         session.setDropAmount(0n);
         session.setSessionFailed("SLASHED", reason);
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session slashed: " + session.getSessionId());
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session slashed: " + session.getSessionId() + " (" + reason + ") " + ethWalletManager.readableAmount(session.getDropAmount()));
         break;
       case "timeout":
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session idle timeout: " + session.getSessionId());
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session idle timeout: " + session.getSessionId() + " (" + reason + ") " + ethWalletManager.readableAmount(session.getDropAmount()));
+        break;
+      case "closed":
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session client closed: " + session.getSessionId() + " (" + reason + ") " + ethWalletManager.readableAmount(session.getDropAmount()));
         break;
     }
 
@@ -111,6 +125,16 @@ export class PoWServer {
     });
   }
 
+  private onSessionFlush(sessionId: string, dirtyProps: {[key: string]: any}) {
+    let session = this.sessions[sessionId];
+    if(!session)
+      return;
+
+    for(let key in dirtyProps) {
+      session.setSessionData(key, dirtyProps[key]);
+    }
+  }
+
   public getSessionCount(): number {
     return Object.keys(this.sessions).length;
   }
@@ -125,11 +149,13 @@ export class PoWServer {
     });
 
     let shutdownTimeout = setTimeout(() => {
-      this.worker.controller.abort();
+      this.worker.childProcess.kill();
     }, 5000);
 
     await this.shutdownDfd.promise;
     clearTimeout(shutdownTimeout);
+
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Stopped PoW worker process [" + this.serverId + "]");
   }
 
   public updateConfig(config: IPoWConfig) {
@@ -189,6 +215,16 @@ export class PoWServer {
     });
 
     socket.destroy();
+  }
+
+  private onSysLoad(cpu: number, memory: {heapUsed: number, heapTotal: number}, eventLoopLag: number, clients: number) {
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, 
+      ProcessLoadTracker.formatLoadStats(
+        `PoW server [${this.serverId}]`,
+        { timestamp: Math.floor(Date.now() / 1000), cpu, eventLoopLag, memory },
+        { Sessions: `${clients}/${this.getSessionCount()}` }
+      )
+    );
   }
 }
 

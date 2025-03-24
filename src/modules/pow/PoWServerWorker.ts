@@ -2,10 +2,12 @@ import { WebSocketServer, WebSocket, RawData } from 'ws';
 import { Socket } from "node:net";
 import http from "node:http";
 import stream from "node:stream";
+import os from "node:os";
 import { PoWSession } from "./PoWSession.js";
 import { IPoWConfig, PoWHashAlgo } from "./PoWConfig.js";
 import { PoWValidator } from "./validator/PoWValidator.js";
 import { PoWClient } from "./PoWClient.js";
+import { ProcessLoadTracker } from "../../utils/ProcessLoadTracker.js";
 
 interface IPoWConnectRequest {
   action: "pow-connect";
@@ -24,7 +26,7 @@ export class PoWServerWorker {
   private moduleConfig: IPoWConfig;
   private validator: PoWValidator;
   private sessions: {[sessionId: string]: PoWSession} = {};
-
+  private loadTracker: ProcessLoadTracker;
 
   public constructor(port: MessagePort) {
     if(port) {
@@ -42,6 +44,17 @@ export class PoWServerWorker {
 
     // start validator
     this.validator = new PoWValidator(this);
+
+    // Initialize load tracking
+    this.loadTracker = new ProcessLoadTracker((stats) => {
+      setTimeout(() => {
+        this.sendMessage({
+          action: "pow-sysload",
+          ...stats,
+          clients: this.getActiveClients().length
+        });
+      }, 50);
+    });
 
     this.sendMessage({ action: "init" });
   }
@@ -83,10 +96,11 @@ export class PoWServerWorker {
     });
   }
 
-  public sendSessionInfoRequest(sessionId: string) {
+  public sendSessionFlush(sessionId: string, dirtyProps: {[key: string]: any}) {
     this.sendMessage({
-      action: "pow-session-info",
+      action: "pow-session-flush",
       sessionId: sessionId,
+      dirtyProps: dirtyProps,
     });
   }
 
@@ -94,6 +108,9 @@ export class PoWServerWorker {
     //console.log("recv", message);
 
     switch(message.action) {
+      case "pow-shutdown":
+        this.onPoWShutdown();
+        break;
       case "pow-update-config":
         this.moduleConfig = message.config;
         break;
@@ -117,6 +134,7 @@ export class PoWServerWorker {
 
   private onPoWRegisterSession(sessionId: string, data: any) {
     let session = new PoWSession(sessionId, this);
+    data["pow.idleTime"] = Math.floor(new Date().getTime() / 1000);
     session.loadSessionData(data);
     this.sessions[sessionId] = session;
     this.resetSessionIdleTimer(session);
@@ -189,6 +207,33 @@ export class PoWServerWorker {
     }
   }
 
+  private onPoWShutdown() {
+    // flush all sessions
+    for(let sessionId in this.sessions) {
+      let session = this.sessions[sessionId];
+      let dirtyProps = session.getDirtyProps(true);
+      if (Object.keys(dirtyProps).length > 0) {
+        this.sendSessionFlush(sessionId, dirtyProps);
+      }
+
+      if(session.activeClient) {
+        session.activeClient.killClient("server shutdown");
+        session.activeClient = null;
+      }
+    }
+
+    if (this.loadTracker) {
+      this.loadTracker.stop();
+    }
+
+    this.wss.close();
+    this.server.close();
+
+    setTimeout(() => {
+      process.exit(0);
+    }, 100);
+  }
+
   public getPoWParamsStr(): string {
     switch(this.moduleConfig.powHashAlgo) {
       case PoWHashAlgo.SCRYPT:
@@ -258,6 +303,5 @@ export class PoWServerWorker {
       }, timeout * 1000);
     }
   }
-  
 }
   

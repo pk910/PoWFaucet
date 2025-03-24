@@ -244,7 +244,6 @@ export class FaucetSession {
     }
 
     if(this.dropAmount < BigInt(faucetConfig.minDropAmount)) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session amount too low: [" + this.dropAmount + "] " + JSON.stringify(this.sessionDataDict));
       return await this.setSessionFailed("AMOUNT_TOO_LOW", "drop amount lower than minimum");
     }
     
@@ -360,6 +359,9 @@ export class FaucetSession {
   public async addReward(amount: bigint): Promise<bigint> {
     if(this.getSessionStatus() === FaucetSessionStatus.CLAIMING || this.getSessionStatus() === FaucetSessionStatus.FINISHED || this.getSessionStatus() === FaucetSessionStatus.FAILED)
       return 0n;
+
+    if (typeof amount !== "bigint" || Number.isNaN(amount))
+      amount = BigInt(0);
     
     let rewardFactors: ISessionRewardFactor[] = [];
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewardFactor, [this, rewardFactors]);
