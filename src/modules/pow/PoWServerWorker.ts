@@ -118,7 +118,7 @@ export class PoWServerWorker {
         this.onPoWRegisterSession(message.sessionId, message.data);
         break;
       case "pow-destroy-session":
-        this.onPoWDestroySession(message.sessionId);
+        this.onPoWDestroySession(message.sessionId, message.failed);
         break;
       case "pow-connect":
         this.onPoWConnect(message, handle);
@@ -140,11 +140,11 @@ export class PoWServerWorker {
     this.resetSessionIdleTimer(session);
   }
 
-  private onPoWDestroySession(sessionId: string) {
+  private onPoWDestroySession(sessionId: string, failed: boolean) {
     let session = this.sessions[sessionId];
     if(session) {
       if(session.activeClient) {
-        session.activeClient.killClient("session closed");
+        session.activeClient.killClient(failed ? "session failed" : "session closed");
         session.activeClient = null;
       }
 

@@ -62,7 +62,7 @@ export class PoWSession {
   }
 
   public async subPenalty(amount: bigint) {
-    this.addReward(amount * -1n)
+    return this.addReward(amount * -1n);
   }
 
   public async addReward(amount: bigint) {

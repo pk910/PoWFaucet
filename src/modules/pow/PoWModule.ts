@@ -146,7 +146,11 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     session.setDropAmount(0n);
 
     // start mining session
-    session.setSessionData("pow.preimage", crypto.randomBytes(8).toString('base64'));
+    let preimage = session.getSessionData("pow.preimage");
+    if(!preimage) {
+      preimage = crypto.randomBytes(8).toString('base64');
+      session.setSessionData("pow.preimage", preimage);
+    }
 
     // create session on server
     await this.getPoWServerForSession(session, true);
@@ -161,16 +165,15 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   private async processSessionComplete(session: FaucetSession): Promise<void> {
     if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
       return;
-    setTimeout(async () => {
-      let powServer = await session.getSessionModuleRef("pow.serverPromise");
-      if(powServer) {
-        powServer.destroySession(session.getSessionId());
 
-        if (powServer.getSessionCount() === 0 && Object.keys(this.powServers).length > 1) {
-          this.stopServer(powServer);
-        }
+    let powServer: PoWServer = await session.getSessionModuleRef("pow.serverPromise");
+    if(powServer) {
+      powServer.destroySession(session.getSessionId(), session.getSessionStatus() === FaucetSessionStatus.FAILED);
+
+      if (powServer.getSessionCount() === 0 && Object.keys(this.powServers).length > 1) {
+        this.stopServer(powServer);
       }
-    }, 100);
+    }
   }
 
   public async processPoWSessionClose(session: FaucetSession): Promise<void> {

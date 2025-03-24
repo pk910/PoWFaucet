@@ -123,7 +123,7 @@ export class PoWShareVerification {
       }
       return (
         session !== this.session && 
-        session.getDropAmount() > minBalance &&
+        session.getDropAmount() >= minBalance &&
         session.missedVerifications < powConfig.verifyMinerMaxMissed &&
         session.pendingVerifications < powConfig.verifyMinerMaxPending
       );

@@ -397,7 +397,7 @@ export class FaucetSession {
 
   public async subPenalty(amount: bigint): Promise<bigint> {
     if(this.status === FaucetSessionStatus.CLAIMING || this.status === FaucetSessionStatus.FINISHED || this.status === FaucetSessionStatus.FAILED)
-      return;
+      return 0n;
     
     if(this.dropAmount === -1n)
       this.dropAmount = 0n;

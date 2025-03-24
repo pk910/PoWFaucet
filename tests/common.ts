@@ -85,7 +85,6 @@ export function bindTestStubs(stubs?) {
       let timerIdx = stateDict.interval.indexOf(ti as NodeJS.Timeout);
       if(timerIdx !== -1) stateDict.interval.splice(timerIdx, 1);
     }),
-    "process.exit": sinon.stub(process, "exit").callsFake(((code?: any) => {}) as any),
     ...stubs,
   };
   return allStubs;

@@ -86,7 +86,6 @@ export class PoWServer {
         break;
     }
 
-    delete this.sessions[sessionId];
     this.module.processPoWSessionClose(session);
 
     let sessionInfo = await session.getSessionInfo();
@@ -108,7 +107,9 @@ export class PoWServer {
 
     let rewardPromise: Promise<bigint>;
     if(amount < 0n) {
-      rewardPromise = session.subPenalty(amount);
+      rewardPromise = session.subPenalty(amount * -1n).then((amount) => {
+        return amount * -1n;
+      });
     } else {
       rewardPromise = session.addReward(amount);
     }
@@ -184,7 +185,7 @@ export class PoWServer {
     });
   }
 
-  public destroySession(sessionId: string) {
+  public destroySession(sessionId: string, failed: boolean) {
     let session = this.sessions[sessionId];
     if(!session)
       return;
@@ -192,6 +193,7 @@ export class PoWServer {
     this.sendMessage({
       action: "pow-destroy-session",
       sessionId: sessionId,
+      failed: failed,
     });
 
     delete this.sessions[sessionId];
