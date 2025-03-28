@@ -5,8 +5,12 @@ version: 2
 
 # faucet database (defaults to local sqlite)
 database:
-  driver: "sqlite"
-  file: "faucet-store.db"
+  driver: "mysql"
+  host: "localhost"
+  port: 3308
+  username: faucet
+  password: faucet
+  database: faucet
 
 # logfile for faucet events (comment out for no logging)
 faucetLogFile: "faucet-events.log"
