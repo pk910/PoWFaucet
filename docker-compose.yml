@@ -1,0 +1,16 @@
+services:
+  faucet-db:
+    image: mysql:latest
+    container_name: faucet-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: faucet
+      MYSQL_USER: faucet
+      MYSQL_PASSWORD: faucet
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

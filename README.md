@@ -6,6 +6,8 @@ Forked from https://github.com/pk910/PoWFaucet
 ```sh
 npm i
 
+docker compose up -d # start MySQL
+
 cp .env.example .env
 
 npm run start # start backend
