@@ -108,7 +108,7 @@ export class PoWClient {
     if(!logLevel)
       logLevel = FaucetLogLevel.WARNING;
     let logReqMsg = reqMsg && logLevel !== FaucetLogLevel.INFO;
-    ServiceManager.GetService(FaucetProcess).emitLog(logLevel, "Returned error to client: [" + errCode + "] " + errMessage + (logReqMsg ? "\n    Message: " + JSON.stringify(reqMsg) : ""));
+    //ServiceManager.GetService(FaucetProcess).emitLog(logLevel, "Returned error to client: [" + errCode + "] " + errMessage + (logReqMsg ? "\n    Message: " + JSON.stringify(reqMsg) : ""));
     
     let resObj: any = {
       code: errCode,

@@ -51,7 +51,7 @@ export class PoWServerWorker {
         this.sendMessage({
           action: "pow-sysload",
           ...stats,
-          clients: this.getActiveClients().length
+          activeSessions: this.getActiveClients().map(client => client.getPoWSession().getSessionId()),
         });
       }, 50);
     });
@@ -154,6 +154,10 @@ export class PoWServerWorker {
 
   private async onPoWConnect(request: IPoWConnectRequest, socket: Socket) {
     const headBuffer = Buffer.from(request.head, 'base64');
+    if(!socket) {
+      console.error("PoWServerWorker: socket is null");
+      return;
+    }
 
     const fakeReq = new http.IncomingMessage(socket);
     fakeReq.headers = request.headers;

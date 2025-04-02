@@ -306,7 +306,7 @@ export class PassportResolver {
     let savePromises: Promise<void>[] = [];
 
     if(passport) {
-      let stampHashes = passport.stamps.map((stamp) => stamp.credential.credentialSubject.hash);
+      let stampHashes = passport.stamps.map((stamp) => stamp.credential.credentialSubject.hash || "");
       let stampAssignments = await this.module.getPassportDb().getPassportStamps(stampHashes);
       
       let newestStamp = 0;
@@ -324,11 +324,11 @@ export class PassportResolver {
         };
 
         // check duplicate use
-        let assignedAddr = stampAssignments[stamp.credential.credentialSubject.hash];
+        let assignedAddr = stampAssignments[stamp.credential.credentialSubject.hash || ""];
         if(assignedAddr && assignedAddr.toLowerCase() !== addr.toLowerCase())
           stampInfo.duplicate = assignedAddr;
         else
-          stampAssignments[stamp.credential.credentialSubject.hash] = addr;
+          stampAssignments[stamp.credential.credentialSubject.hash || ""] = addr;
 
         stamps.push(stampInfo);
       }
@@ -340,7 +340,7 @@ export class PassportResolver {
         stamps: stamps,
       };
       savePromises.push(this.module.getPassportDb().updatePassportStamps(stampHashes.filter((stampHash) => {
-        return stampAssignments[stampHash]?.toLowerCase() === addr.toLowerCase();
+        return stampHash && stampAssignments[stampHash]?.toLowerCase() === addr.toLowerCase();
       }), addr, this.module.getModuleConfig().stampDeduplicationTime || this.module.getModuleConfig().cacheTime || 86400));
     }
     else {

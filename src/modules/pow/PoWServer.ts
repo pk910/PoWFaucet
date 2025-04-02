@@ -57,7 +57,7 @@ export class PoWServer {
         this.onSessionFlush(message.sessionId, message.dirtyProps);
         break;
       case "pow-sysload":
-        this.onSysLoad(message.cpu, message.memory, message.eventLoopLag, message.clients);
+        this.onSysLoad(message.cpu, message.memory, message.eventLoopLag, message.activeSessions);
         break;
     }
   }
@@ -166,9 +166,12 @@ export class PoWServer {
     });
   }
 
-  public registerSession(session: FaucetSession) {
+  public async registerSession(session: FaucetSession) {
     let sessionId = session.getSessionId();
     this.sessions[sessionId] = session;
+
+    await this.getReadyPromise();
+
     this.sendMessage({
       action: "pow-register-session",
       sessionId: sessionId,
@@ -216,17 +219,27 @@ export class PoWServer {
       keepOpen: true
     });
 
-    socket.destroy();
+    setTimeout(() => {
+      socket.destroy();
+    }, 100);
   }
 
-  private onSysLoad(cpu: number, memory: {heapUsed: number, heapTotal: number}, eventLoopLag: number, clients: number) {
+  private onSysLoad(cpu: number, memory: {heapUsed: number, heapTotal: number}, eventLoopLag: number, activeSessions: string[]) {
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, 
       ProcessLoadTracker.formatLoadStats(
         `PoW server [${this.serverId}]`,
         { timestamp: Math.floor(Date.now() / 1000), cpu, eventLoopLag, memory },
-        { Sessions: `${clients}/${this.getSessionCount()}` }
+        { Sessions: `${activeSessions.length}/${this.getSessionCount()}` }
       )
     );
+
+    for(let sessionId in this.sessions) {
+      let session = this.sessions[sessionId];
+      if(!session)
+        continue;
+
+      session.setSessionModuleRef("pow.clientActive", activeSessions.indexOf(sessionId) > -1);
+    }
   }
 }
 

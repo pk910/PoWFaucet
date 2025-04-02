@@ -170,6 +170,8 @@ export class PoWShareVerification {
       // penalty for missed verification requests
       this.verifyMinerSessions.forEach((verifierId) => {
         let session = this.server.getPoWSession(verifierId);
+        if(!session)
+          return;
       
         session.pendingVerifications--;
         session.missedVerifications++;

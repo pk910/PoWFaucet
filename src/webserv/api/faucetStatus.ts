@@ -125,7 +125,7 @@ export async function buildSessionStatus(unmasked?: boolean): Promise<IClientSes
       restr: session.data["ipinfo.restriction.data"],
       cliver: session.data["cliver"],
       boost: session.data["passport.score"],
-      connected: runningSession ? !!runningSession.getSessionModuleRef("pow.client") : null,
+      connected: runningSession ? !!runningSession.getSessionModuleRef("pow.clientActive") : null,
       idle: session.data["pow.idleTime"],
       factors: session.data["reward.factors"],
     }

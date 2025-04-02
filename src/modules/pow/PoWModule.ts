@@ -159,6 +159,8 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   private async processSessionRestore(session: FaucetSession): Promise<void> {
     if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
       return;
+    if(session.getSessionStatus() !== FaucetSessionStatus.RUNNING)
+      return;
     await this.getPoWServerForSession(session, true);
   }
 
@@ -219,12 +221,10 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     powServer.connect(session.getSessionId(), req, socket, head);
   }
 
-  private async getPoWServerForSession(session: FaucetSession, create: boolean = false): Promise<PoWServer> {
+  private getPoWServerForSession(session: FaucetSession, create: boolean = false): Promise<PoWServer> {
     let serverPromise = session.getSessionModuleRef("pow.serverPromise");
     if(serverPromise) {
-      let powServer = await serverPromise;
-      if(powServer)
-        return powServer;
+      return serverPromise;
     }
 
     if(!create)
@@ -250,16 +250,12 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       this.powServers[server.getServerId()] = server;
     }
 
-    let registrationPromise = new Promise<PoWServer>(async (resolve, reject) => {
-      await server.getReadyPromise();
-      server.registerSession(session);
-
-      resolve(server);
+    let registrationPromise = server.registerSession(session).then(() => {
+      return server;
     });
 
     session.setSessionModuleRef("pow.serverPromise", registrationPromise);
-    let powServer = await registrationPromise;
-    return powServer;
+    return registrationPromise;
   }
 
   private stopServer(server: PoWServer) {
