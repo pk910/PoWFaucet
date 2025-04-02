@@ -170,11 +170,13 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
     let powServer: PoWServer = await session.getSessionModuleRef("pow.serverPromise");
     if(powServer) {
-      powServer.destroySession(session.getSessionId(), session.getSessionStatus() === FaucetSessionStatus.FAILED);
+      setTimeout(() => {
+        powServer.destroySession(session.getSessionId(), session.getSessionStatus() === FaucetSessionStatus.FAILED);
 
-      if (powServer.getSessionCount() === 0 && Object.keys(this.powServers).length > 1) {
-        this.stopServer(powServer);
-      }
+        if (powServer.getSessionCount() === 0 && Object.keys(this.powServers).length > 1) {
+          this.stopServer(powServer);
+        }
+      }, 1000);
     }
   }
 
