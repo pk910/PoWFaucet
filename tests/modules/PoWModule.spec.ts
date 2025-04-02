@@ -56,8 +56,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
-    let powModule = moduleManager.getModule<PoWModule>("pow");
-    expect(powModule.getPoWParamsStr()).to.equal("scrypt|4096|8|1|16|11", "invalid powParams string");
   });
 
   it("Check client config exports (cryptonight)", async () => {
@@ -85,8 +83,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.h).to.equal(10, "client config mismatch: powParams.h");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
-    let powModule = moduleManager.getModule<PoWModule>("pow");
-    expect(powModule.getPoWParamsStr()).to.equal("cryptonight|0|1|10|11", "invalid powParams string");
   });
 
   it("Check client config exports (argon2)", async () => {
@@ -120,8 +116,6 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
-    let powModule = moduleManager.getModule<PoWModule>("pow");
-    expect(powModule.getPoWParamsStr()).to.equal("argon2|0|13|4|4096|1|16|11", "invalid powParams string");
   });
 
   it("Start mining session and check session params", async () => {
@@ -347,9 +341,10 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.lastNonce": 1337,
       });
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
-      testSession.setSessionData("pow.lastNonce", 1337);
       let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
         id: 42,
@@ -424,8 +419,9 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "oXwNMIuRUOc=",
       });
-      testSession.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
       let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
@@ -467,8 +463,9 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "oXwNMIuRUOc=",
       });
-      testSession.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
       let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
@@ -510,8 +507,9 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "2TobvsN38W8=",
       });
-      testSession.setSessionData("pow.preimage", "2TobvsN38W8=");
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
       let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
@@ -552,8 +550,9 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "oXwNMIuRUOc=",
       });
-      testSession.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
       let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
@@ -598,8 +597,9 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "2TobvsN38W8=",
       });
-      testSession.setSessionData("pow.preimage", "2TobvsN38W8=");
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
       let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
@@ -643,8 +643,9 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "oXwNMIuRUOc=",
       });
-      testSession.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
       let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
       fakeSocket.emit("message", JSON.stringify({
@@ -685,22 +686,22 @@ describe("Faucet module: pow", () => {
         verifyMinerPeerCount: 1,
         verifyMinerPercent: 100,
         verifyMinerRewardPerc: 50,
-        verifyMinerMissPenaltyPerc: 50,
+        verifyMinerMissPenaltyPerc: 0,
       } as IPoWConfig;
       let moduleManager = ServiceManager.GetService(ModuleManager);
       await moduleManager.initialize();
       let testSession1 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "oXwNMIuRUOc=",
       });
       let fakeSocket1 = await injectFakeWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
-      testSession1.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession1.getSessionStatus()).to.equal("running", "unexpected session status");
       let testSession2 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.4.4", {
         addr: "0x0000000000000000000000000000000000001338",
       });
       let fakeSocket2 = await injectFakeWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
       expect(testSession2.getSessionStatus()).to.equal("running", "unexpected session status");
-      await testSession2.addReward(100n);
       fakeSocket1.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -728,7 +729,7 @@ describe("Faucet module: pow", () => {
       await awaitSleepPromise(500, () => fakeSocket2.getSentMessage("updateBalance").length > 0);
       let balanceMsg1 = fakeSocket2.getSentMessage("updateBalance");
       expect(balanceMsg1.length).to.equal(1, "no updateBalance message sent");
-      expect(balanceMsg1[0].data.balance).to.equal("105", "invalid updateBalance message: unexpected balance");
+      expect(balanceMsg1[0].data.balance).to.equal("5", "invalid updateBalance message: unexpected balance");
       expect(balanceMsg1[0].data.reason).to.matches(/valid verification/, "invalid updateBalance message: unexpected reason");
       await awaitSleepPromise(500, () => fakeSocket1.getSentMessage("ok").length > 0);
       let okMsg2 = fakeSocket1.getSentMessage("ok");
@@ -753,22 +754,22 @@ describe("Faucet module: pow", () => {
         verifyMinerPeerCount: 1,
         verifyMinerPercent: 100,
         verifyMinerRewardPerc: 50,
-        verifyMinerMissPenaltyPerc: 50,
+        verifyMinerMissPenaltyPerc: 0,
       } as IPoWConfig;
       let moduleManager = ServiceManager.GetService(ModuleManager);
       await moduleManager.initialize();
       let testSession1 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "oXwNMIuRUOc=",
       });
       let fakeSocket1 = await injectFakeWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
-      testSession1.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession1.getSessionStatus()).to.equal("running", "unexpected session status");
       let testSession2 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.4.4", {
         addr: "0x0000000000000000000000000000000000001338",
       });
       let fakeSocket2 = await injectFakeWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
       expect(testSession2.getSessionStatus()).to.equal("running", "unexpected session status");
-      await testSession2.addReward(100n);
       fakeSocket1.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -828,16 +829,30 @@ describe("Faucet module: pow", () => {
       await moduleManager.initialize();
       let testSession1 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
         addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "oXwNMIuRUOc=",
       });
       let fakeSocket1 = await injectFakeWebSocket("/ws/pow?session=" + testSession1.getSessionId(), "8.8.8.8");
-      testSession1.setSessionData("pow.preimage", "oXwNMIuRUOc=");
       expect(testSession1.getSessionStatus()).to.equal("running", "unexpected session status");
       let testSession2 = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.4.4", {
         addr: "0x0000000000000000000000000000000000001338",
+      }, {
+        "pow.preimage": "oXwNMIuRUOc=",
       });
       let fakeSocket2 = await injectFakeWebSocket("/ws/pow?session=" + testSession2.getSessionId(), "8.8.4.4");
       expect(testSession2.getSessionStatus()).to.equal("running", "unexpected session status");
-      await testSession2.addReward(100n);
+      fakeSocket2.emit("message", JSON.stringify({
+        id: 43,
+        action: "foundShare",
+        data: {
+          nonce: 1524,
+          params: "scrypt|4096|8|1|16|11",
+          hashrate: 12,
+        }
+      }));
+      await awaitSleepPromise(500, () => testSession2.getDropAmount() > 0n);
+      expect(testSession2.getDropAmount()).to.equal(10n, "invalid drop amount");
+
       fakeSocket1.emit("message", JSON.stringify({
         id: 42,
         action: "foundShare",
@@ -858,9 +873,9 @@ describe("Faucet module: pow", () => {
       expect(okMsg2.length).to.equal(1, "no ok message sent");
       expect(okMsg2[0].rsp).to.equal(42, "invalid response id");
       let balanceMsg = fakeSocket2.getSentMessage("updateBalance");
-      expect(balanceMsg.length).to.equal(1, "no updateBalance message sent");
-      expect(balanceMsg[0].data.balance).to.equal("95", "invalid updateBalance message: unexpected balance");
-      expect(balanceMsg[0].data.reason).to.matches(/verify miss/, "invalid updateBalance message: unexpected reason");
+      expect(balanceMsg.length).to.equal(2, "no updateBalance message sent");
+      expect(balanceMsg[1].data.balance).to.equal("5", "invalid updateBalance message: unexpected balance");
+      expect(balanceMsg[1].data.reason).to.matches(/verify miss/, "invalid updateBalance message: unexpected reason");
     }).timeout(5000).retries(3);
 
   });

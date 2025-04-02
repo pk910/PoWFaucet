@@ -12,6 +12,7 @@ import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 import { PoWHashAlgo } from "./PoWConfig.js";
 import { resolveRelativePath } from "../../config/FaucetConfig.js";
 import { base64ToHex } from "../../utils/ConvertHelpers.js";
+import { PoWServerWorker } from "./PoWServerWorker.js";
 
 export interface IPoWShareVerificationResult {
   isValid: boolean;
@@ -28,7 +29,7 @@ export class PoWShareVerification {
   }
 
   private shareId: string;
-  private module: PoWModule;
+  private server: PoWServerWorker;
   private session: PoWSession;
   private nonce: number;
   private data: string;
@@ -40,9 +41,9 @@ export class PoWShareVerification {
   private isInvalid = false;
   private resultDfd: PromiseDfd<IPoWShareVerificationResult>;
 
-  public constructor(module: PoWModule, session: PoWSession, nonce: number, data: string) {
+  public constructor(server: PoWServerWorker, session: PoWSession, nonce: number, data: string) {
     this.shareId = getNewGuid();
-    this.module = module;
+    this.server = server;
     this.session = session;
     this.nonce = nonce;
     this.data = data;
@@ -62,7 +63,7 @@ export class PoWShareVerification {
       return this.resultDfd.promise;
 
     this.resultDfd = new PromiseDfd<IPoWShareVerificationResult>();
-    let powConfig = this.module.getModuleConfig();
+    let powConfig = this.server.getModuleConfig();
 
     let validatorSessions = this.getVerifierSessions();
     let verifyLocalPercent = powConfig.verifyLocalPercent;
@@ -70,12 +71,12 @@ export class PoWShareVerification {
       verifyLocalPercent = powConfig.verifyLocalLowPeerPercent;
 
     this.verifyLocal = (Math.floor(Math.random() * 100) < verifyLocalPercent);
-    if(this.verifyLocal && this.module.getValidator().getValidationQueueLength() >= powConfig.verifyLocalMaxQueue)
+    if(this.verifyLocal && this.server.getValidator().getValidationQueueLength() >= powConfig.verifyLocalMaxQueue)
       this.verifyLocal = false;
 
     if(this.verifyLocal) {
       // verify locally
-      this.module.getValidator().validateShare(this.shareId, this.nonce, this.session.preImage, this.data).then((isValid) => {
+      this.server.getValidator().validateShare(this.shareId, this.nonce, this.session.preImage, this.data).then((isValid) => {
         if(!isValid)
           this.isInvalid = true;
         this.completeVerification();
@@ -87,7 +88,7 @@ export class PoWShareVerification {
       for(let i = 0; i < this.verifyMinerCount; i++) {
         let randSessIdx = Math.floor(Math.random() * validatorSessions.length);
         let validatorSession = validatorSessions.splice(randSessIdx, 1)[0];
-        this.verifyMinerSessions.push(validatorSession.getFaucetSession().getSessionId());
+        this.verifyMinerSessions.push(validatorSession.getSessionId());
 
         validatorSession.pendingVerifications++;
 
@@ -112,17 +113,17 @@ export class PoWShareVerification {
   }
 
   private getVerifierSessions(): PoWSession[] {
-    let powConfig = this.module.getModuleConfig();
+    let powConfig = this.server.getModuleConfig();
     let minBalance = BigInt(powConfig.powShareReward) * BigInt(powConfig.verifyMinerMissPenaltyPerc * 100) / 10000n;
-    let activeClients = this.module.getActiveClients();
+    let activeClients = this.server.getActiveClients();
     return activeClients.map((client) => client.getPoWSession()).filter((session, index) => {
       if(!session.activeClient) {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "PoWModule.getActiveClients returned a inactive client: " + session.getFaucetSession().getSessionId());
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "PoWModule.getActiveClients returned a inactive client: " + session.getSessionId());
         return false;
       }
       return (
         session !== this.session && 
-        session.getFaucetSession().getDropAmount() > minBalance &&
+        session.getDropAmount() >= minBalance &&
         session.missedVerifications < powConfig.verifyMinerMaxMissed &&
         session.pendingVerifications < powConfig.verifyMinerMaxPending
       );
@@ -146,7 +147,7 @@ export class PoWShareVerification {
   }
 
   private completeVerification() {
-    let powConfig = this.module.getModuleConfig();
+    let powConfig = this.server.getModuleConfig();
     if(this.verifyMinerTimer) {
       clearTimeout(this.verifyMinerTimer);
       this.verifyMinerTimer = null;
@@ -155,7 +156,7 @@ export class PoWShareVerification {
     if(this.isInvalid && !this.verifyLocal) {
       // always verify invalid shares locally
       this.verifyLocal = true;
-      this.module.getValidator().validateShare(this.shareId, this.nonce, this.session.preImage, this.data).then((isValid) => {
+      this.server.getValidator().validateShare(this.shareId, this.nonce, this.session.preImage, this.data).then((isValid) => {
         if(isValid)
           this.isInvalid = false;
         this.completeVerification();
@@ -168,32 +169,29 @@ export class PoWShareVerification {
     if(this.verifyMinerSessions.length > 0) {
       // penalty for missed verification requests
       this.verifyMinerSessions.forEach((verifierId) => {
-        let verifierFaucetSession = ServiceManager.GetService(SessionManager).getSession(verifierId, [FaucetSessionStatus.RUNNING]);
-        if(verifierFaucetSession) {
-          let session = this.module.getPoWSession(verifierFaucetSession);
-          session.pendingVerifications--;
-          session.missedVerifications++;
+        let session = this.server.getPoWSession(verifierId);
+      
+        session.pendingVerifications--;
+        session.missedVerifications++;
 
-          let missPenalty = BigInt(powConfig.powShareReward) * BigInt(powConfig.verifyMinerMissPenaltyPerc * 100) / 10000n;
-          if(missPenalty > 0n) {
-            verifierFaucetSession.subPenalty(missPenalty).then(() => {
-              let client: PoWClient;
-              if((client = session.activeClient)) {
-                client.sendMessage("updateBalance", {
-                  balance: verifierFaucetSession.getDropAmount().toString(),
-                  reason: "verify miss (penalty: " + missPenalty.toString() + ")"
-                });
-              }
-            });
-          }
+        let missPenalty = BigInt(powConfig.powShareReward) * BigInt(powConfig.verifyMinerMissPenaltyPerc * 100) / 10000n;
+        if(missPenalty > 0n) {
+          session.subPenalty(missPenalty).then(() => {
+            let client: PoWClient;
+            if((client = session.activeClient)) {
+              client.sendMessage("updateBalance", {
+                balance: session.getDropAmount().toString(),
+                reason: "verify miss (penalty: " + missPenalty.toString() + ")"
+              });
+            }
+          });
         }
       });
     }
     
     Object.keys(this.verifyMinerResults).forEach((verifierId) => {
-      let verifierFaucetSession = ServiceManager.GetService(SessionManager).getSession(verifierId, [FaucetSessionStatus.RUNNING]);
-      if(verifierFaucetSession) {
-        let session = this.module.getPoWSession(verifierFaucetSession);
+      let session = this.server.getPoWSession(verifierId);
+      if(session) {
         session.pendingVerifications--;
 
         if(this.verifyMinerResults[verifierId] !== !this.isInvalid)
@@ -208,7 +206,7 @@ export class PoWShareVerification {
     }
     else {
       // valid share - add rewards
-      shareReward = this.session.getFaucetSession().addReward(BigInt(powConfig.powShareReward));
+      shareReward = this.session.addReward(BigInt(powConfig.powShareReward));
     }
 
     if(powConfig.powHashAlgo === PoWHashAlgo.NICKMINER && powConfig.powNickMinerParams.relevantFile) {
@@ -222,7 +220,7 @@ export class PoWShareVerification {
 
     shareReward.then((amount) => {
       this.session.activeClient?.sendMessage("updateBalance", {
-        balance: this.session.getFaucetSession().getDropAmount().toString(),
+        balance: this.session.getDropAmount().toString(),
         reason: "valid share (reward: " + amount.toString() + ")"
       });
       this.resultDfd.resolve({

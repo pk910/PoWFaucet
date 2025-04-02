@@ -73,7 +73,7 @@ export class FaucetSession {
     this.isDirty = false;
   }
 
-  public async startSession(remoteIP: string, userInput: any): Promise<void> {
+  public async startSession(remoteIP: string, userInput: any, overrides?: any): Promise<void> {
     if(this.status !== FaucetSessionStatus.UNKNOWN)
       throw new FaucetError("INVALID_STATE", "cannot start session: session already in '" + this.status + "' state");
     this.status = FaucetSessionStatus.STARTING;
@@ -83,6 +83,12 @@ export class FaucetSession {
       remoteIP = remoteIP.substring(7);
     this.remoteIP = remoteIP;
     this.dropAmount = -1n;
+
+    if(overrides) {
+      for(let key in overrides) {
+        this.setSessionData(key, overrides[key]);
+      }
+    }
 
     try {
       await ServiceManager.GetService(ModuleManager).processActionHooks([
@@ -244,7 +250,6 @@ export class FaucetSession {
     }
 
     if(this.dropAmount < BigInt(faucetConfig.minDropAmount)) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "session amount too low: [" + this.dropAmount + "] " + JSON.stringify(this.sessionDataDict));
       return await this.setSessionFailed("AMOUNT_TOO_LOW", "drop amount lower than minimum");
     }
     
@@ -360,6 +365,9 @@ export class FaucetSession {
   public async addReward(amount: bigint): Promise<bigint> {
     if(this.getSessionStatus() === FaucetSessionStatus.CLAIMING || this.getSessionStatus() === FaucetSessionStatus.FINISHED || this.getSessionStatus() === FaucetSessionStatus.FAILED)
       return 0n;
+
+    if (typeof amount !== "bigint" || Number.isNaN(amount))
+      amount = BigInt(0);
     
     let rewardFactors: ISessionRewardFactor[] = [];
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionRewardFactor, [this, rewardFactors]);
@@ -387,16 +395,17 @@ export class FaucetSession {
     return rewardAmount;
   }
 
-  public async subPenalty(amount: bigint) {
+  public async subPenalty(amount: bigint): Promise<bigint> {
     if(this.status === FaucetSessionStatus.CLAIMING || this.status === FaucetSessionStatus.FINISHED || this.status === FaucetSessionStatus.FAILED)
-      return;
+      return 0n;
     
     if(this.dropAmount === -1n)
       this.dropAmount = 0n;
+    if(amount > this.dropAmount)
+      amount = this.dropAmount;
     this.dropAmount -= amount;
-    if(this.dropAmount < 0n)
-      this.dropAmount = 0n;
     this.lazySaveSession();
+    return amount;
   }
 
   public async getSessionInfo(): Promise<IClientSessionInfo> {

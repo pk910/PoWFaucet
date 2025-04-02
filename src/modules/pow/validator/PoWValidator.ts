@@ -6,15 +6,16 @@ import { PromiseDfd } from '../../../utils/PromiseDfd.js';
 import { PoWHashAlgo } from '../PoWConfig.js';
 import { PoWModule } from '../PoWModule.js';
 import { IPoWValidatorValidateRequest } from './IPoWValidator.js';
+import { PoWServerWorker } from '../PoWServerWorker.js';
 
 export class PoWValidator {
-  private module: PoWModule;
+  private server: PoWServerWorker;
   private worker: Worker;
   private readyDfd: PromiseDfd<void>;
   private validateQueue: {[shareId: string]: PromiseDfd<boolean>} = {};
 
-  public constructor(module: PoWModule, worker?: Worker) {
-    this.module = module;
+  public constructor(module: PoWServerWorker, worker?: Worker) {
+    this.server = module;
     this.readyDfd = new PromiseDfd<void>();
     this.worker = worker || ServiceManager.GetService(FaucetWorkers).createWorker("pow-validator");
     this.worker.on("message", (msg) => this.onWorkerMessage(msg))
@@ -33,7 +34,7 @@ export class PoWValidator {
 
   public validateShare(shareId: string, nonce: number, preimg: string, data: string): Promise<boolean> {
     let resDfd = new PromiseDfd<boolean>();
-    let config = this.module.getModuleConfig();
+    let config = this.server.getModuleConfig();
     let req: IPoWValidatorValidateRequest = {
       shareId: shareId,
       nonce: nonce,

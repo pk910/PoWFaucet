@@ -1,4 +1,3 @@
-
 import * as fs from 'fs';
 import { faucetConfig, resolveRelativePath } from '../config/FaucetConfig.js';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
@@ -7,6 +6,7 @@ import { EthWalletManager } from '../eth/EthWalletManager.js';
 import { FaucetSession } from '../session/FaucetSession.js';
 import { SessionManager } from '../session/SessionManager.js';
 import { EthClaimInfo } from '../eth/EthClaimManager.js';
+import { ProcessLoadTracker } from '../utils/ProcessLoadTracker.js';
 
 export interface IFaucetStatsConfig {
   logfile: string;
@@ -27,7 +27,7 @@ export class FaucetStatsLog {
   private enabled: boolean;
   private statsFile: string;
   private statsTimer: NodeJS.Timeout;
-
+  private loadTracker: ProcessLoadTracker;
   public initialize() {
     if(this.initialized)
       return;
@@ -42,6 +42,12 @@ export class FaucetStatsLog {
     }
 
     this.sheduleStatsLoop();
+
+    this.loadTracker = new ProcessLoadTracker((stats) => {
+      setTimeout(() => {
+        this.emitSysLoad(stats.cpu, stats.memory, stats.eventLoopLag);
+      }, 20);
+    });
   }
 
   public dispose() {
@@ -50,6 +56,9 @@ export class FaucetStatsLog {
     if(this.statsTimer) {
       clearTimeout(this.statsTimer);
       this.statsTimer = null;
+    }
+    if(this.loadTracker) {
+      this.loadTracker.stop();
     }
   }
 
@@ -154,6 +163,15 @@ export class FaucetStatsLog {
     this.statClaimCount = 0;
     this.statClaimRewards = 0n;
     this.statSlashCount = 0;
+  }
+
+  public emitSysLoad(cpu: number, memory: {heapUsed: number, heapTotal: number}, eventLoopLag: number) {
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, 
+      ProcessLoadTracker.formatLoadStats(
+        "Faucet Process",
+        { timestamp: Math.floor(Date.now() / 1000), cpu, eventLoopLag, memory }
+      )
+    );
   }
 
 }

@@ -6,23 +6,24 @@ import { FaucetProcess, FaucetLogLevel } from '../../common/FaucetProcess.js';
 import { FaucetStatsLog } from '../../services/FaucetStatsLog.js';
 import { FaucetSession } from '../../session/FaucetSession.js';
 import { PoWModule } from './PoWModule.js';
+import { PoWServerWorker } from './PoWServerWorker.js';
 
 export class PoWClient {
-  private module: PoWModule;
+  private server: PoWServerWorker;
   private socket: WebSocket;
   private session: PoWSession;
   private pingTimer: NodeJS.Timeout = null;
   private lastPingPong: Date;
 
-  public constructor(module: PoWModule, session: PoWSession, socket: WebSocket) {
-    this.module = module;
+  public constructor(server: PoWServerWorker, session: PoWSession, socket: WebSocket) {
+    this.server = server;
     this.session = session;
     this.socket = socket;
     this.lastPingPong = new Date();
 
     this.session.activeClient = this;
 
-    this.socket.on("message", (data, isBinary) => this.onClientMessage(data, isBinary));
+    this.socket.on("message", (data, isBinary) => this.onClientMessage(data, isBinary, socket));
     this.socket.on("ping", (data) => {
       this.lastPingPong = new Date();
       if(this.socket)
@@ -49,10 +50,6 @@ export class PoWClient {
     return this.session;
   }
 
-  public getFaucetSession(): FaucetSession {
-    return this.session.getFaucetSession();
-  }
-
   private dispose(reason: string) {
     if(!this.socket)
       return;
@@ -60,8 +57,6 @@ export class PoWClient {
 
     if(this.session && this.session.activeClient === this)
       this.session.activeClient = null;
-
-    this.module.disposePoWClient(this, reason);
 
     if(this.pingTimer) {
       clearInterval(this.pingTimer);
@@ -85,13 +80,13 @@ export class PoWClient {
         return;
       
       let pingpongTime = Math.floor(((new Date()).getTime() - this.lastPingPong.getTime()) / 1000);
-      if(pingpongTime > this.module.getModuleConfig().powPingTimeout) {
+      if(pingpongTime > this.server.getModuleConfig().powPingTimeout) {
         this.killClient("ping timeout");
         return;
       }
       
       this.socket.ping();
-    }, this.module.getModuleConfig().powPingInterval * 1000);
+    }, this.server.getModuleConfig().powPingInterval * 1000);
   }
 
   public sendMessage(action: string, data?: any, rsp?: any) {
@@ -124,7 +119,7 @@ export class PoWClient {
     this.sendMessage("error", resObj, reqMsg ? reqMsg.id : undefined);
   }
 
-  private async onClientMessage(data: RawData, isBinary: boolean): Promise<void> {
+  private async onClientMessage(data: RawData, isBinary: boolean, socket: WebSocket): Promise<void> {
     let message;
     try {
       message = JSON.parse(data.toString());
@@ -160,7 +155,7 @@ export class PoWClient {
     if(typeof message.data !== "object" || !message.data)
       return this.sendErrorResponse("INVALID_SHARE", "Invalid share data", message);
     
-    let moduleConfig = this.module.getModuleConfig();
+    let moduleConfig = this.server.getModuleConfig();
     let shareData: {
       nonce: number;
       data: string;
@@ -168,7 +163,7 @@ export class PoWClient {
       hashrate: number;
     } = message.data;
 
-    if(shareData.params !== this.module.getPoWParamsStr()) 
+    if(shareData.params !== this.server.getPoWParamsStr()) 
       return this.sendErrorResponse("INVALID_SHARE", "Invalid share params", message);
     
     let lastNonce = this.session.lastNonce;
@@ -187,13 +182,13 @@ export class PoWClient {
     this.session.missedVerifications = 0;
     
     if(moduleConfig.powHashrateHardLimit > 0) {
-      let sessionAge = Math.floor((new Date()).getTime() / 1000) - this.getFaucetSession().getStartTime();
+      let sessionAge = Math.floor((new Date()).getTime() / 1000) - this.session.startTime;
       let nonceLimit = (sessionAge + 30) * moduleConfig.powHashrateHardLimit;
       if(lastNonce > nonceLimit)
         return this.sendErrorResponse("HASHRATE_LIMIT", "Nonce too high (did you evade the hashrate limit?) " + sessionAge + "/" + nonceLimit, message);
     }
 
-    let shareVerification = new PoWShareVerification(this.module, this.session, shareData.nonce, shareData.data);
+    let shareVerification = new PoWShareVerification(this.server, this.session, shareData.nonce, shareData.data);
     shareVerification.startVerification().then((result) => {
       if(!result.isValid)
         this.sendErrorResponse("WRONG_SHARE", "Share verification failed", message);
@@ -226,19 +221,19 @@ export class PoWClient {
       isValid: boolean;
     } = message.data;
 
-    if(verifyRes.params && verifyRes.params !== this.module.getPoWParamsStr()) 
+    if(verifyRes.params && verifyRes.params !== this.server.getPoWParamsStr()) 
       return this.sendErrorResponse("INVALID_VERIFYRESULT", "Invalid share params", message);
 
-    let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.getFaucetSession().getSessionId(), verifyRes.isValid);
-    let verifyReward = BigInt(this.module.getModuleConfig().powShareReward) * BigInt(this.module.getModuleConfig().verifyMinerRewardPerc * 100) / 10000n;
+    let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
+    let verifyReward = BigInt(this.server.getModuleConfig().powShareReward) * BigInt(this.server.getModuleConfig().verifyMinerRewardPerc * 100) / 10000n;
     if(verifyValid && verifyReward > 0n) {
-      let addedReward = await this.getFaucetSession().addReward(verifyReward);
+      let addedReward = await this.session.addReward(verifyReward);
 
       let faucetStats = ServiceManager.GetService(FaucetStatsLog);
       faucetStats.statVerifyReward += addedReward;
 
       this.sendMessage("updateBalance", {
-        balance: this.getFaucetSession().getDropAmount().toString(),
+        balance: this.session.getDropAmount().toString(),
         reason: "valid verification"
       });
     }
@@ -246,8 +241,7 @@ export class PoWClient {
 
   private async onCliCloseSession(message: any) {
     let reqId = message.id || undefined;
-    await this.module.processPoWSessionClose(this.session.getFaucetSession());
-    let sessionInfo = await this.session.getFaucetSession().getSessionInfo();
+    let sessionInfo = await this.session.closeSession("closed");
     this.sendMessage("ok", sessionInfo, reqId);
   }
 

@@ -10,7 +10,7 @@ import { faucetConfig, loadFaucetConfig } from '../src/config/FaucetConfig.js';
 import { FakeProvider } from './stubs/FakeProvider.js';
 import { FaucetDbDriver } from '../src/db/FaucetDatabase.js';
 import { PromiseDfd } from '../src/utils/PromiseDfd.js';
-
+import { IFaucetChildProcess } from '../src/common/FaucetWorker.js';
 
 export function bindTestStubs(stubs?) {
   if(!stubs)
@@ -32,6 +32,26 @@ export function bindTestStubs(stubs?) {
       let channel = new MessageChannel();
       let worker: Worker = channel.port1 as any;
       worker.terminate = () => Promise.resolve(0);
+      setTimeout(() => {
+        FaucetWorkers.loadWorkerClass(classKey, channel.port2 as any);
+      }, 1);
+      return worker;
+    }),
+    "FaucetWorkers.createChildProcess": sinon.stub(FaucetWorkers.prototype, "createChildProcess").callsFake((classKey) => {
+      let channel = new MessageChannel();
+      let worker: IFaucetChildProcess = {
+        childProcess: channel.port1 as any,
+        controller: new AbortController(),
+      };
+      (worker.childProcess as any).send = (message: any, objs?: any) => {
+        if(objs) {
+          setTimeout(() => {
+            (channel.port2.onmessage as any)({data: message, objs: objs} as any);
+          }, 1);
+        } else {
+          channel.port1.postMessage(message);
+        }
+      };
       setTimeout(() => {
         FaucetWorkers.loadWorkerClass(classKey, channel.port2 as any);
       }, 1);
