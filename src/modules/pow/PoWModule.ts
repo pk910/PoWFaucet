@@ -176,7 +176,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
         if (powServer.getSessionCount() === 0 && Object.keys(this.powServers).length > 1) {
           this.stopServer(powServer);
         }
-      }, 1000);
+      }, 500);
     }
   }
 

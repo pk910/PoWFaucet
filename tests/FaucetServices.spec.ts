@@ -138,7 +138,7 @@ describe("Faucet Services", () => {
       expect(testSession1.getSessionStatus()).to.equal(FaucetSessionStatus.RUNNING, "unexpected session status");
       let testSession2 = await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
       testSession2.setSessionData("pow.hashrate", 100);
-      testSession2.setSessionModuleRef("pow.client", true);
+      testSession2.setSessionModuleRef("pow.clientActive", true);
       expect(testSession2.getSessionStatus()).to.equal(FaucetSessionStatus.RUNNING, "unexpected session status");
       
       statsLog.statShareCount = 42;
