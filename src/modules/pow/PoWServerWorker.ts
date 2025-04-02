@@ -86,12 +86,13 @@ export class PoWServerWorker {
     });
   }
 
-  public sendSessionReward(sessionId: string, reqId: number, amount: bigint, dirtyProps: {[key: string]: any}) {
+  public sendSessionReward(sessionId: string, reqId: number, amount: bigint, type: string, dirtyProps: {[key: string]: any}) {
     this.sendMessage({
       action: "pow-session-reward",
       sessionId: sessionId,
       reqId: reqId,
       amount: amount.toString(),
+      type: type,
       dirtyProps: dirtyProps,
     });
   }

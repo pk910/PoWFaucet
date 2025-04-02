@@ -177,8 +177,8 @@ export class PoWShareVerification {
         session.missedVerifications++;
 
         let missPenalty = BigInt(powConfig.powShareReward) * BigInt(powConfig.verifyMinerMissPenaltyPerc * 100) / 10000n;
-        if(missPenalty > 0n) {
-          session.subPenalty(missPenalty).then(() => {
+        session.subPenalty(missPenalty, "verify").then((penalty) => {
+          if(penalty != 0n) {
             let client: PoWClient;
             if((client = session.activeClient)) {
               client.sendMessage("updateBalance", {
@@ -186,8 +186,8 @@ export class PoWShareVerification {
                 reason: "verify miss (penalty: " + missPenalty.toString() + ")"
               });
             }
-          });
-        }
+          }
+        });
       });
     }
     
@@ -208,7 +208,7 @@ export class PoWShareVerification {
     }
     else {
       // valid share - add rewards
-      shareReward = this.session.addReward(BigInt(powConfig.powShareReward));
+      shareReward = this.session.addReward(BigInt(powConfig.powShareReward), "share");
     }
 
     if(powConfig.powHashAlgo === PoWHashAlgo.NICKMINER && powConfig.powNickMinerParams.relevantFile) {

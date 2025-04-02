@@ -10,6 +10,7 @@ import { FaucetLogLevel, FaucetProcess } from '../../common/FaucetProcess.js';
 import { EthClaimManager } from '../../eth/EthClaimManager.js';
 import { EthWalletManager } from '../../eth/EthWalletManager.js';
 import { ProcessLoadTracker } from '../../utils/ProcessLoadTracker.js';
+import { FaucetStatsLog } from '../../services/FaucetStatsLog.js';
 
 export class PoWServer {
   private module: PoWModule;
@@ -51,7 +52,7 @@ export class PoWServer {
         this.onSessionAbort(message.sessionId, message.type, message.reason, message.dirtyProps);
         break;
       case "pow-session-reward":
-        this.onSessionReward(message.sessionId, message.reqId, BigInt(message.amount), message.dirtyProps);
+        this.onSessionReward(message.sessionId, message.reqId, BigInt(message.amount), message.type, message.dirtyProps);
         break;
       case "pow-session-flush":
         this.onSessionFlush(message.sessionId, message.dirtyProps);
@@ -96,7 +97,7 @@ export class PoWServer {
     });
   }
 
-  private onSessionReward(sessionId: string, reqId: number, amount: bigint, dirtyProps: {[key: string]: any}) {
+  private onSessionReward(sessionId: string, reqId: number, amount: bigint, type: string, dirtyProps: {[key: string]: any}) {
     let session = this.sessions[sessionId];
     if(!session)
       return;
@@ -115,6 +116,23 @@ export class PoWServer {
     }
 
     rewardPromise.then((amount) => {
+      let faucetStats = ServiceManager.GetService(FaucetStatsLog);
+      switch(type) {
+        case "verify":
+          if(amount > 0n) {
+            faucetStats.statVerifyReward += amount;
+            faucetStats.statVerifyCount++;
+          } else {
+            faucetStats.statVerifyPenalty += amount;
+            faucetStats.statVerifyMisses++;
+          }
+          break;
+        case "share":
+          faucetStats.statShareRewards += amount;
+          faucetStats.statShareCount++;
+          break;
+      }
+
       let balance = session.getDropAmount().toString();
       this.sendMessage({
         action: "pow-session-reward",

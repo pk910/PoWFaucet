@@ -121,7 +121,7 @@ export class FaucetStatsLog {
 
   private processFaucetStats() {
     let sessions = ServiceManager.GetService(SessionManager).getActiveSessions();
-    let idleSessCount = sessions.filter((s) => !s.getSessionModuleRef("pow.client")).length;
+    let idleSessCount = sessions.filter((s) => !s.getSessionModuleRef("pow.clientActive")).length;
     let hashRate = 0;
     let cliCount = sessions.length - idleSessCount;
     sessions.forEach((s) => {

@@ -61,15 +61,15 @@ export class PoWSession {
     return this.balance;
   }
 
-  public async subPenalty(amount: bigint) {
-    return this.addReward(amount * -1n);
+  public async subPenalty(amount: bigint, type: string) {
+    return this.addReward(amount * -1n, type);
   }
 
-  public async addReward(amount: bigint) {
+  public async addReward(amount: bigint, type: string) {
     let dirtyProps = this.getDirtyProps(true);
 
     let reqId = this.rewardCounter++;
-    this.worker.sendSessionReward(this.sessionId, reqId, amount, dirtyProps);
+    this.worker.sendSessionReward(this.sessionId, reqId, amount, type, dirtyProps);
 
     this.rewardDfds[reqId] = new PromiseDfd<[bigint, bigint]>();
     return this.rewardDfds[reqId].promise.then((res) => {

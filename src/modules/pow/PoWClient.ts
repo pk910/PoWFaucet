@@ -197,12 +197,6 @@ export class PoWClient {
           this.sendMessage("ok", null, reqId);
         
         this.session.shareCount++;
-
-        let faucetStats = ServiceManager.GetService(FaucetStatsLog);
-        faucetStats.statShareCount++;
-        faucetStats.statShareRewards += result.reward;
-        faucetStats.statVerifyCount += shareVerification.getMinerVerifyCount();
-        faucetStats.statVerifyMisses += shareVerification.getMinerVerifyMisses();
       }
     }, (err) => {
       if(this.session) {
@@ -227,10 +221,7 @@ export class PoWClient {
     let verifyValid = PoWShareVerification.processVerificationResult(verifyRes.shareId, this.session.getSessionId(), verifyRes.isValid);
     let verifyReward = BigInt(this.server.getModuleConfig().powShareReward) * BigInt(this.server.getModuleConfig().verifyMinerRewardPerc * 100) / 10000n;
     if(verifyValid && verifyReward > 0n) {
-      let addedReward = await this.session.addReward(verifyReward);
-
-      let faucetStats = ServiceManager.GetService(FaucetStatsLog);
-      faucetStats.statVerifyReward += addedReward;
+      await this.session.addReward(verifyReward, "verify");
 
       this.sendMessage("updateBalance", {
         balance: this.session.getDropAmount().toString(),
