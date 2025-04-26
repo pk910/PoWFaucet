@@ -5,6 +5,7 @@ import { IFaucetContext } from '../../../common/FaucetContext';
 import { ArgumentTypeName, PCDGetRequest, PCDRequestType, PCDTypeName } from "./ZupassTypes";
 
 import './ZupassLogin.css';
+import { OverlayChildren } from 'react-bootstrap/esm/Overlay';
 
 export interface IZupassLoginProps {
   faucetContext: IFaucetContext;
@@ -28,7 +29,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
   private messageEvtListener: (evt: MessageEvent) => void;
   private loginPopop: Window;
 
-  constructor(props: IZupassLoginProps, state: IZupassLoginState) {
+  constructor(props: IZupassLoginProps) {
     super(props);
 
     this.messageEvtListener = (evt: MessageEvent) => this.processWindowMessage(evt);
@@ -89,7 +90,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
             <OverlayTrigger
               placement="bottom"
               container={this.props.faucetContext.getContainer()}
-              overlay={this.renderInfoHtml()}
+              overlay={this.renderInfoHtml() as OverlayChildren}
             >
               <span className="zupass-info-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-info-circle" viewBox="0 0 16 16">
@@ -123,7 +124,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
             <OverlayTrigger
               placement="bottom"
               container={this.props.faucetContext.getContainer()}
-              overlay={this.renderInfoHtml()}
+              overlay={this.renderInfoHtml() as OverlayChildren}
             >
               <span className="zupass-info-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-info-circle" viewBox="0 0 16 16">

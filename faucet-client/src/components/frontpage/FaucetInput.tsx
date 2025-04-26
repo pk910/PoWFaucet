@@ -22,7 +22,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
   private githubLogin = React.createRef<GithubLogin>();
   private zupassLogin = React.createRef<ZupassLogin>();
 
-  constructor(props: IFaucetInputProps, state: IFaucetInputState) {
+  constructor(props: IFaucetInputProps) {
     super(props);
 
     this.state = {

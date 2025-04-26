@@ -40,7 +40,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
   private updateTimer: NodeJS.Timer;
   private stoppedMiner: boolean = false;
 
-  constructor(props: IPoWMinerStatusProps, state: IPoWMinerStatusState) {
+  constructor(props: IPoWMinerStatusProps) {
     super(props);
 
     this.state = {

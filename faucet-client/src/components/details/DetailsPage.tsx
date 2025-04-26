@@ -30,7 +30,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
   private loadingStatus: boolean;
   private lastStatusPoll: number;
 
-  constructor(props: IDetailsPageProps, state: IDetailsPageState) {
+  constructor(props: IDetailsPageProps) {
     super(props);
 
     this.state = {

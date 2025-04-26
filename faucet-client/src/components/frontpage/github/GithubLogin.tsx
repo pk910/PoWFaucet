@@ -31,7 +31,7 @@ export class GithubLogin extends React.PureComponent<IGithubLoginProps, IGithubL
   private messageEvtListener: (evt: MessageEvent) => void;
   private loginPopop: Window;
 
-  constructor(props: IGithubLoginProps, state: IGithubLoginState) {
+  constructor(props: IGithubLoginProps) {
     super(props);
 
     this.messageEvtListener = (evt: MessageEvent) => this.processWindowMessage(evt);

@@ -37,7 +37,7 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
   private turnstileWidgetId: string;
   private customControl: IFaucetCustomCaptcha;
 
-  constructor(props: IFaucetCaptchaProps, state: IFaucetCaptchaState) {
+  constructor(props: IFaucetCaptchaProps) {
     super(props);
 
     this.state = {};
@@ -117,7 +117,7 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
       <HCaptcha 
         sitekey={this.props.faucetConfig.modules.captcha.siteKey} 
         onVerify={(token) => this.onTokenChange(token)}
-        ref={(cap) => this.hcapControl = cap} 
+        ref={(cap) => { this.hcapControl = cap; }} 
       />
     );
   }
@@ -127,7 +127,7 @@ export class FaucetCaptcha extends React.PureComponent<IFaucetCaptchaProps, IFau
       <ReCAPTCHA
         sitekey={this.props.faucetConfig.modules.captcha.siteKey}
         onChange={(token) => this.onTokenChange(token)}
-        ref={(cap) => this.recapControl = cap}
+        ref={(cap) => { this.recapControl = cap; }}
       />
     );
   }

@@ -32,7 +32,7 @@ export interface IPassportInfoState {
 export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassportInfoState> {
   private loadingPassport: boolean;
 
-  constructor(props: IPassportInfoProps, state: IPassportInfoState) {
+  constructor(props: IPassportInfoProps) {
     super(props);
 
     this.state = {
