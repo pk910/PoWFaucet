@@ -1,11 +1,11 @@
-const path = require('path');
-const webpack = require('webpack');
-const wpmerge = require('webpack-merge');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const TerserPlugin = require("terser-webpack-plugin");
-const Visualizer = require('webpack-visualizer-plugin2');
-var cliArgs = require('./utils/CliArgs');
-var pkgJson = require('./package.json');
+import path from 'path';
+import webpack from 'webpack';
+import wpmerge from 'webpack-merge';
+import MiniCssExtractPlugin from 'mini-css-extract-plugin';
+import TerserPlugin from "terser-webpack-plugin";
+import Visualizer from 'webpack-visualizer-plugin2';
+import cliArgs from './utils/CliArgs.js';
+import pkgJson from './package.json' with { type: 'json' };
 
 var debug = false;
 if(cliArgs['dev'])
@@ -17,7 +17,7 @@ var webpackModuleConfigs = [
   {
     entry: './src/main',
     output: {
-      path: path.join(__dirname, '/dist'),
+      path: path.join(import.meta.dirname, '/dist'),
       filename: 'powfaucet.js'
     },
     module: {
@@ -39,28 +39,28 @@ var webpackModuleConfigs = [
   {
     entry: './src/worker/worker-scrypt',
     output: {
-      path: path.join(__dirname, '/dist'),
+      path: path.join(import.meta.dirname, '/dist'),
       filename: 'powfaucet-worker-sc.js',
     },
   },
   {
     entry: './src/worker/worker-cryptonight',
     output: {
-      path: path.join(__dirname, '/dist'),
+      path: path.join(import.meta.dirname, '/dist'),
       filename: 'powfaucet-worker-cn.js',
     },
   },
   {
     entry: './src/worker/worker-argon2',
     output: {
-      path: path.join(__dirname, '/dist'),
+      path: path.join(import.meta.dirname, '/dist'),
       filename: 'powfaucet-worker-a2.js',
     },
   },
   {
     entry: './src/worker/worker-nickminer',
     output: {
-      path: path.join(__dirname, '/dist'),
+      path: path.join(import.meta.dirname, '/dist'),
       filename: 'powfaucet-worker-nm.js',
     },
   },
@@ -85,7 +85,9 @@ var webpackBaseConfig = {
           loader: 'babel-loader',
           options: {
             presets: [
-              "@babel/preset-env",
+              ["@babel/preset-env", {
+                modules: false
+              }],
               "@babel/preset-typescript",
               "@babel/preset-react"
             ],
@@ -136,6 +138,8 @@ var webpackBaseConfig = {
 
 
 
-module.exports = webpackModuleConfigs.map(function(moduleConfig) {
+let finalModuleConfigs = webpackModuleConfigs.map(function(moduleConfig) {
   return wpmerge.merge(webpackBaseConfig, moduleConfig);
 });
+
+export default finalModuleConfigs;

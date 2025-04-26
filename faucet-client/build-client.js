@@ -1,12 +1,11 @@
+import fs from 'fs';
+import path from 'path';
+import util from 'util';
+import webpack from 'webpack';
+import babel from "@babel/core";
+import webpackConfig from './webpack.config.js';
 
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
-const webpack = require('webpack');
-const babel = require("@babel/core");
-const webpackConfig = require('./webpack.config');
-
-let distDir = path.join(__dirname, 'dist');
+let distDir = path.join(import.meta.dirname, 'dist');
 if(fs.existsSync(distDir))
   fs.rmdirSync(distDir, { recursive: true });
 fs.mkdirSync(distDir);
@@ -55,7 +54,7 @@ function checkFileExists(filename, dstpath) {
 })).then((res) => {
   console.log(res);
   
-  let staticPath = path.join(__dirname, "..", "static");
+  let staticPath = path.join(import.meta.dirname, "..", "static");
   if(!fs.existsSync(path.join(staticPath, "js")))
     fs.mkdirSync(path.join(staticPath, "js"));
   if(!fs.existsSync(path.join(staticPath, "css")))
@@ -81,7 +80,7 @@ function checkFileExists(filename, dstpath) {
 
   console.log("finished");
 }).then(() => {
-  let staticPath = path.join(__dirname, "..", "static");
+  let staticPath = path.join(import.meta.dirname, "..", "static");
   checkFileExists("powfaucet.css", path.join(staticPath, "css"));
   checkFileExists("powfaucet.js", path.join(staticPath, "js"));
   checkFileExists("powfaucet-worker-sc.js", path.join(staticPath, "js"));

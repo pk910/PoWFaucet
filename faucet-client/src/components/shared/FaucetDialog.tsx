@@ -24,7 +24,7 @@ export interface IFaucetDialogState {
 
 export class FaucetDialog extends React.PureComponent<IFaucetDialogFullProps, IFaucetDialogState> {
 
-  constructor(props: IFaucetDialogFullProps, state: IFaucetDialogState) {
+  constructor(props: IFaucetDialogFullProps) {
     super(props);
 
     this.state = {};

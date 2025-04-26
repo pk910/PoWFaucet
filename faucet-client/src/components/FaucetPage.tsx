@@ -78,7 +78,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
   private pageContext: IFaucetContext;
   private faucetStatucClickCount = 0;
 
-  constructor(props: IFaucetPageProps, state: IFaucetPageState) {
+  constructor(props: IFaucetPageProps) {
     super(props);
 
     let baseUrl = props.baseUrl || "/";
