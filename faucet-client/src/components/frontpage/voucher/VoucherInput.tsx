@@ -1,7 +1,7 @@
 import React, { useState, useImperativeHandle, forwardRef } from 'react';
 import { IFaucetConfig } from '../../../common/FaucetConfig';
 import { IFaucetContext } from '../../../common/FaucetContext';
-import { OverlayTrigger, Popover, Form } from 'react-bootstrap'; // Assuming react-bootstrap is available
+import { OverlayTrigger, Popover, Form, Row, Col } from 'react-bootstrap'; // Assuming react-bootstrap is available
 
 export interface IVoucherInputProps {
   faucetContext: IFaucetContext;
@@ -33,10 +33,10 @@ const VoucherInput = forwardRef<IVoucherInputRef, IVoucherInputProps>((props, re
   ) : null;
 
   return (
-    <div className="voucher-input-container mt-3">
-      <Form.Group controlId="voucherCodeInput">
+    <div className="voucher-input-container my-3">
+      <Form.Group as={Row} controlId="voucherCodeInput" className="align-items-center">
         {voucherConfig.voucherLabel && (
-          <Form.Label>
+          <Form.Label column sm="auto" className="mb-0">
             {voucherConfig.voucherLabel}
             {infoPopover && (
               <OverlayTrigger trigger={['hover', 'focus']} placement="right" overlay={infoPopover}>
@@ -47,12 +47,15 @@ const VoucherInput = forwardRef<IVoucherInputRef, IVoucherInputProps>((props, re
             )}
           </Form.Label>
         )}
-        <Form.Control
-          type="text"
-          placeholder="Enter Voucher Code"
-          value={voucherCode}
-          onChange={(e) => setVoucherCode(e.target.value)}
-        />
+        <Col>
+          <Form.Control
+            type="text"
+            placeholder="Enter Voucher Code"
+            value={voucherCode}
+            onChange={(e) => setVoucherCode(e.target.value)}
+            style={{ fontFamily: 'monospace' }}
+          />
+        </Col>
       </Form.Group>
     </div>
   );
