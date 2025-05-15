@@ -105,10 +105,9 @@ export class EthWalletManager {
     if(this.chainCommon && this.chainCommon.chainId() === chainId)
       return;
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Web3 ChainCommon initialized with chainId " + chainId);
-    this.chainCommon = EthCom.Common.custom({
-      networkId: chainId,
-      chainId: chainId,
-    });
+    this.chainCommon = EthCom.createCustomCommon({
+      chainId: chainId.toString(),
+    }, EthCom.Mainnet);
   }
 
   private startWeb3() {
@@ -392,7 +391,7 @@ export class EthWalletManager {
     if(target.match(/^0X/))
       target = "0x" + target.substring(2);
 
-    let tx: EthTx.LegacyTransaction | EthTx.FeeMarketEIP1559Transaction;
+    let tx: EthTx.LegacyTx | EthTx.FeeMarket1559Tx;
     if(faucetConfig.ethLegacyTx) {
       // legacy transaction
       let gasPrice = await this.web3.eth.getGasPrice();
@@ -400,7 +399,7 @@ export class EthWalletManager {
       if(faucetConfig.ethTxMaxFee > 0 && gasPrice > faucetConfig.ethTxMaxFee)
         gasPrice = BigInt(faucetConfig.ethTxMaxFee);
 
-      tx = EthTx.LegacyTransaction.fromTxData({
+      tx = EthTx.createLegacyTx({
         nonce: nonce,
         gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
         gasPrice: gasPrice,
@@ -413,7 +412,7 @@ export class EthWalletManager {
     }
     else {
       // eip1559 transaction
-      tx = EthTx.FeeMarketEIP1559Transaction.fromTxData({
+      tx = EthTx.createFeeMarket1559Tx({
         nonce: nonce,
         gasLimit: gasLimit || faucetConfig.ethTxGasLimit,
         maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
