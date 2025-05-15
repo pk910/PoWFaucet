@@ -4,6 +4,7 @@ import { IFaucetContext } from '../../common/FaucetContext';
 import { FaucetCaptcha } from '../shared/FaucetCaptcha';
 import { GithubLogin } from './github/GithubLogin';
 import { ZupassLogin } from './zupass/ZupassLogin';
+import VoucherInput, { IVoucherInputRef } from './voucher/VoucherInput';
 
 export interface IFaucetInputProps {
   faucetContext: IFaucetContext;
@@ -21,8 +22,9 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
   private faucetCaptcha = React.createRef<FaucetCaptcha>();
   private githubLogin = React.createRef<GithubLogin>();
   private zupassLogin = React.createRef<ZupassLogin>();
+  private voucherInput = React.createRef<IVoucherInputRef>();
 
-  constructor(props: IFaucetInputProps, state: IFaucetInputState) {
+  constructor(props: IFaucetInputProps) {
     super(props);
 
     this.state = {
@@ -34,6 +36,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
 	public render(): React.ReactElement<IFaucetInputProps> {
     let needGithubAuth = !!this.props.faucetConfig.modules.github;
     let needZupassAuth = !!this.props.faucetConfig.modules.zupass && !!this.props.faucetConfig.modules.zupass.event;
+    let needVoucher = !!this.props.faucetConfig.modules.voucher;
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForStart;
     let inputTypes: string[] = [];
     if(this.props.faucetConfig.modules.ensname?.required) {
@@ -76,6 +79,13 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
               ref={this.zupassLogin}
             />
           </React.Suspense>
+        : null}
+        {needVoucher ?
+          <VoucherInput
+            faucetConfig={this.props.faucetConfig}
+            faucetContext={this.props.faucetContext}
+            ref={this.voucherInput}
+          />
         : null}
         {requestCaptcha ? 
           <div className='faucet-captcha'>
@@ -120,6 +130,9 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       }
       if(this.props.faucetConfig.modules.zupass && this.props.faucetConfig.modules.zupass.event) {
         inputData.zupassToken = await this.zupassLogin.current?.getToken();
+      }
+      if (this.props.faucetConfig.modules.voucher) {
+        inputData.voucherCode = this.voucherInput.current?.getCode();
       }
 
       await this.props.submitInputs(inputData);

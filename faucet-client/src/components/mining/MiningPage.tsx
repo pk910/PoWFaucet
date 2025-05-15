@@ -42,7 +42,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
   private powSession: PoWSession;
   private connectionAlertId: number = null;
 
-  constructor(props: IMiningPageProps, state: IMiningPageState) {
+  constructor(props: IMiningPageProps) {
     super(props);
 
     this.initPoWControls();

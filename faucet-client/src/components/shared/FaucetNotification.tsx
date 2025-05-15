@@ -13,7 +13,7 @@ export interface IFaucetNotificationState {
 
 export class FaucetNotification extends React.PureComponent<IFaucetNotificationProps, IFaucetNotificationState> {
 
-  constructor(props: IFaucetNotificationProps, state: IFaucetNotificationState) {
+  constructor(props: IFaucetNotificationProps) {
     super(props);
 
     this.state = {};

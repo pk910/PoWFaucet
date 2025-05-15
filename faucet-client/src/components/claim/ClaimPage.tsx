@@ -40,7 +40,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   private notificationClientActive: boolean;
   private lastStatusPoll: number;
 
-  constructor(props: IClaimPageProps, state: IClaimPageState) {
+  constructor(props: IClaimPageProps) {
     super(props);
 
     let claimWsEndpoint: string;

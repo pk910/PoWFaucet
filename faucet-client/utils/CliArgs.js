@@ -1,5 +1,5 @@
 ﻿
-module.exports = (function() {
+export default (function() {
     var args = {};
     var arg, key;
     for(var i = 0; i < process.argv.length; i++) {

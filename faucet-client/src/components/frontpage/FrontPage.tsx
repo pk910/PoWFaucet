@@ -21,7 +21,7 @@ export interface IFrontPageState {
 export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageState> {
   private faucetInput = React.createRef<FaucetInput>();
 
-  constructor(props: IFrontPageProps, state: IFrontPageState) {
+  constructor(props: IFrontPageProps) {
     super(props);
 
     this.state = {

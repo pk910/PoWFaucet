@@ -14,7 +14,7 @@ export interface IRestoreSessionState {
 
 export class RestoreSession extends React.PureComponent<IRestoreSessionProps, IRestoreSessionState> {
 
-  constructor(props: IRestoreSessionProps, state: IRestoreSessionState) {
+  constructor(props: IRestoreSessionProps) {
     super(props);
 
     this.state = {};

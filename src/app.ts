@@ -13,6 +13,7 @@ import { EthClaimManager } from "./eth/EthClaimManager.js";
 import { ModuleManager } from "./modules/ModuleManager.js";
 import { SessionManager } from "./session/SessionManager.js";
 import { FaucetStatus } from "./services/FaucetStatus.js";
+import { createVoucher } from "./tools/createVoucher.js";
 
 (async () => {
   let srcfile: string;
@@ -28,31 +29,36 @@ import { FaucetStatus } from "./services/FaucetStatus.js";
 
   if(!isMainThread) {
     FaucetWorkers.loadWorkerClass();
+    return;
   }
-  else if(process.argv.length > 3 && process.argv[2] === "worker") {
-    FaucetWorkers.loadWorkerClass(process.argv[3]);
-  }
-  else {
-    try {
-      loadFaucetConfig();
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Initializing PoWFaucet v" + faucetConfig.faucetVersion + " (AppBasePath: " + faucetConfig.appBasePath + ", InternalBasePath: " + basepath + ")");
-      ServiceManager.GetService(FaucetProcess).initialize();
-      ServiceManager.GetService(FaucetStatus).initialize();
-      ServiceManager.GetService(FaucetStatsLog).initialize();
-      await ServiceManager.GetService(FaucetDatabase).initialize();
-      await ServiceManager.GetService(EthWalletManager).initialize();
-      await ServiceManager.GetService(ModuleManager).initialize();
-      await ServiceManager.GetService(SessionManager).initialize();
-      await ServiceManager.GetService(EthClaimManager).initialize();
-      ServiceManager.GetService(FaucetHttpServer).initialize();
-
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
-    } catch(ex) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Faucet initialization failed: " + ex.toString() + " " + ex.stack);
-      process.exit(0);
+  
+  if(process.argv.length >= 3) {
+    switch(process.argv[2]) {
+      case "worker":
+        FaucetWorkers.loadWorkerClass(process.argv[3]);
+        return;
+      case "create-voucher":
+        createVoucher();
+        return;
     }
   }
+  
+  try {
+    loadFaucetConfig();
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Initializing PoWFaucet v" + faucetConfig.faucetVersion + " (AppBasePath: " + faucetConfig.appBasePath + ", InternalBasePath: " + basepath + ")");
+    ServiceManager.GetService(FaucetProcess).initialize();
+    ServiceManager.GetService(FaucetStatus).initialize();
+    ServiceManager.GetService(FaucetStatsLog).initialize();
+    await ServiceManager.GetService(FaucetDatabase).initialize();
+    await ServiceManager.GetService(EthWalletManager).initialize();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    await ServiceManager.GetService(SessionManager).initialize();
+    await ServiceManager.GetService(EthClaimManager).initialize();
+    ServiceManager.GetService(FaucetHttpServer).initialize();
+
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
+  } catch(ex) {
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Faucet initialization failed: " + ex.toString() + " " + ex.stack);
+    process.exit(0);
+  }
 })();
-
-
-

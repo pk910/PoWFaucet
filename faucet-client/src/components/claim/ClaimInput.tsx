@@ -14,7 +14,7 @@ export interface IClaimInputState {
 export class ClaimInput extends React.PureComponent<IClaimInputProps, IClaimInputState> {
   private faucetCaptcha = React.createRef<FaucetCaptcha>();
 
-  constructor(props: IClaimInputProps, state: IClaimInputState) {
+  constructor(props: IClaimInputProps) {
     super(props);
 
     this.state = {

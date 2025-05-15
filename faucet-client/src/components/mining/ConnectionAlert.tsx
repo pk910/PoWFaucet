@@ -18,7 +18,7 @@ export class ConnectionAlert extends React.PureComponent<IConnectionAlertProps, 
   private updateTimer: NodeJS.Timer;
   private timeoutCbCalled: boolean;
 
-  constructor(props: IConnectionAlertProps, state: IConnectionAlertState) {
+  constructor(props: IConnectionAlertProps) {
     super(props);
 
     this.state = {
