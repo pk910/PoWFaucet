@@ -8,11 +8,13 @@ import { FaucetProcess } from "../common/FaucetProcess.js";
 
 function generateRandomString(length: number, prefix?: string): string {
   const chars = "ABCDEFGHIJKLMNPQRSTUVWXYZ123456789";
-  const randomBytes = crypto.randomBytes(length);
   let result = prefix || "";
   
-  for (let i = 0; i < length; i++) {
-    result += chars[randomBytes[i] % chars.length];
+  while (result.length < (prefix ? prefix.length : 0) + length) {
+    const randomByte = crypto.randomBytes(1)[0];
+    if (randomByte < 256 - (256 % chars.length)) {
+      result += chars[randomByte % chars.length];
+    }
   }
   
   return result;
