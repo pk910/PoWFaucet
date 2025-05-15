@@ -71,7 +71,7 @@ export async function createVoucher() {
   for (let i = 0; i < options.count; i++) {
     let code = generateRandomString(codeLength, prefix);
     try {
-      await addVoucher(code, amount);
+      await addVoucher(code, amount.toString() == "0" ? "" : amount);
       code = code.match(/.{1,5}/g).join(" ");
       console.log(code);
     } catch (error) {
