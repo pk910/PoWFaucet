@@ -61,8 +61,8 @@
   },
   "dependencies": {
     "@brettz9/node-static": "^0.1.1",
-    "@ethereumjs/common": "^4.4.0",
-    "@ethereumjs/tx": "^5.4.0",
+    "@ethereumjs/common": "^10.0.0",
+    "@ethereumjs/tx": "^10.0.0",
     "@types/node": "^22.5.0",
     "bignumber.js": "^9.1.2",
     "hcaptcha": "^0.2.0",
