@@ -30,6 +30,10 @@ export class VoucherModule extends BaseModule<IVoucherConfig> {
       this, ModuleHookAction.SessionStart, 2, "Voucher check",
       (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput)
     );
+    this.moduleManager.addActionHook(
+      this, ModuleHookAction.SessionComplete, 5, "Voucher save session", 
+      (session: FaucetSession) => this.processSessionComplete(session)
+    );
 
     return Promise.resolve();
   }
@@ -66,12 +70,19 @@ export class VoucherModule extends BaseModule<IVoucherConfig> {
       }
     }
 
-    await this.voucherDb.updateVoucher(
+    if (!(await this.voucherDb.updateVoucher(
       voucher.code,
       session.getSessionId(),
-      session.getTargetAddr(),
-      session.getStartTime()
-    );
+      session.getStartTime(),
+      voucher.sessionId
+    ))) {
+      throw new FaucetError(
+        "VOUCHER_USED",
+        "This voucher code has already been used.",
+      );
+    }
+
+    session.setSessionData("voucherCode", voucherCode);
 
     if (voucher.dropAmount) {
       const overrideMaxDropAmount = BigInt(voucher.dropAmount);
@@ -82,5 +93,14 @@ export class VoucherModule extends BaseModule<IVoucherConfig> {
         `Voucher ${voucherCode} overrides max drop amount to ${ServiceManager.GetService(EthWalletManager).readableAmount(BigInt(voucher.dropAmount))} for session ${session.getSessionId()}`
       );
     }
+  }
+
+  private async processSessionComplete(session: FaucetSession): Promise<void> {
+    let voucherCode = session.getSessionData<string>("voucherCode");
+    if (!voucherCode) {
+      return;
+    }
+
+    await this.voucherDb.updateVoucherTarget(voucherCode, session.getSessionId(), session.getTargetAddr());
   }
 }

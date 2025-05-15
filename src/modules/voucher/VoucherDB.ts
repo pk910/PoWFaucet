@@ -3,7 +3,7 @@ import { FaucetModuleDB } from '../../db/FaucetModuleDB.js';
 import { SQL } from '../../db/SQL.js';
 import { FaucetSessionStoreData } from '../../session/FaucetSession.js';
 
-interface IVoucher {
+export interface IVoucher {
   code: string;
   dropAmount: string;
   sessionId?: string;
@@ -72,15 +72,36 @@ export class VoucherDB extends FaucetModuleDB {
     return vouchers[0];
   }
 
-  public async updateVoucher(code: string, sessionId: string, targetAddr: string, startTime: number): Promise<void> {
+  public async updateVoucher(code: string, sessionId: string, startTime: number, oldSessionId: string): Promise<boolean> {
+    let sql = "UPDATE Vouchers SET SessionId = ?, StartTime = ? WHERE Code = ?";
+    let args = [
+      sessionId,
+      startTime,
+      code,
+    ];
+    if(oldSessionId) {
+      sql += " AND SessionId = ?";
+      args.push(oldSessionId);
+    } else {
+      sql += " AND SessionId IS NULL";
+    }
+    let res = await this.db.run(
+      sql,
+      args,
+    );
+    return res.changes > 0;
+  }
+
+  public async updateVoucherTarget(code: string, sessionId: string, targetAddr: string): Promise<void> {
+    let sql = "UPDATE Vouchers SET TargetAddr = ? WHERE Code = ? AND SessionId = ?";
+    let args = [
+      targetAddr,
+      code,
+      sessionId,
+    ];
     await this.db.run(
-      "UPDATE Vouchers SET SessionId = ?, TargetAddr = ?, StartTime = ? WHERE Code = ?",
-      [
-        sessionId,
-        targetAddr,
-        startTime,
-        code,
-      ]
+      sql,
+      args,
     );
   }
 
