@@ -43,11 +43,13 @@ export class VoucherModule extends BaseModule<IVoucherConfig> {
   }
 
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {
-    const voucherCode = userInput?.voucherCode as string | undefined;
+    let voucherCode = userInput?.voucherCode as string | undefined;
 
     if (!voucherCode) {
       throw new FaucetError("VOUCHER_REQUIRED", "A valid voucher code is required.");
     }
+
+    voucherCode = voucherCode.replace(/[^A-Z0-9]/g, "");
 
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, `Voucher code provided for session ${session.getSessionId()}: ${voucherCode}`);
     const voucher = await this.voucherDb.getVoucher(voucherCode);
