@@ -40,7 +40,7 @@
     "url-loader": "^4.1.1",
     "webpack": "^5.93.0",
     "webpack-cli": "^6.0.1",
-    "webpack-visualizer-plugin2": "^1.1.0"
+    "webpack-visualizer-plugin2": "^2.0.0"
   },
   "dependencies": {
     "@hcaptcha/react-hcaptcha": "^1.11.0",
