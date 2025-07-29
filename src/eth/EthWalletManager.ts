@@ -1,4 +1,4 @@
-import * as EthUtil from "ethereumjs-util";
+import { BigIntLike, BytesLike } from "@ethereumjs/util";
 import Web3, {
   AbiFragment,
   ContractAbi,
@@ -639,16 +639,16 @@ export class EthWalletManager {
         gasLimit: params.gasLimit,
         maxPriorityFeePerGas: faucetConfig.ethTxPrioFee,
         maxFeePerGas: faucetConfig.ethTxMaxFee,
-        to,
-        value,
-        data,
+        to: to as any,
+        value: value as BigIntLike,
+        data: data as BytesLike,
       },
       {
         common: this.chainCommon,
       }
     );
 
-    tx = tx.sign(this.walletKey);
+    tx = tx.sign(this.walletKey as unknown as Uint8Array);
     return Buffer.from(tx.serialize()).toString("hex");
   }
 
