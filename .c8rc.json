@@ -1,0 +1,20 @@
+{
+  "all": false,
+  "include": ["dist-test/src/**/*.js"],
+  "exclude": [
+    "**/*.d.ts",
+    "dist-test/tests/**",
+    "node_modules/**",
+    "dist/**",
+    "coverage/**",
+    "libs/**"
+  ],
+  "reporter": ["text", "lcov"],
+  "report-dir": "./coverage",
+  "temp-directory": "./coverage/tmp",
+  "clean": true,
+  "check-coverage": false,
+  "per-file": true,
+  "produce-source-map": true,
+  "src": ["src"]
+}

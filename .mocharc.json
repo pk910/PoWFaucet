@@ -1,9 +1,8 @@
 {
-    "loader": "ts-node/esm",
-    "require": ["ts-node/register"],
-    "extensions": ["ts"],
+    "extensions": ["js"],
     "node-option": [
-        "experimental-specifier-resolution=node",
-        "loader=ts-node/esm"
-    ]
+        "experimental-specifier-resolution=node"
+    ],
+    "timeout": 10000,
+    "bail": false
 }

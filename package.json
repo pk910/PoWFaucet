@@ -10,8 +10,8 @@
     "build-client": "cd faucet-client && node build-client.js",
     "start": "tsc && node dist/app.js",
     "bundle": "tsc && webpack --mode production",
-    "test": "NODE_OPTIONS='--experimental-vm-modules --loader ts-node/esm' NODE_NO_WARNINGS=1 TS_NODE_PROJECT=tsconfig.test.json mocha --exit --trace-warnings 'tests/**/*.ts'",
-    "test-coverage": "NODE_OPTIONS='--experimental-vm-modules --loader ts-node/esm' NODE_NO_WARNINGS=1 TS_NODE_PROJECT=tsconfig.test.json c8 --reporter=text --reporter=lcov mocha --exit -r ts-node/register 'tests/**/*.ts'"
+    "test": "tsc -p tsconfig.test.json && cp -r libs dist-test/ && cp -r static dist-test/ && NODE_OPTIONS='--experimental-vm-modules' NODE_NO_WARNINGS=1 npx mocha --exit 'dist-test/tests/**/*.js'",
+    "test-coverage": "tsc -p tsconfig.test.json && cp -r libs dist-test/ && cp -r static dist-test/ && NODE_OPTIONS='--experimental-vm-modules' NODE_NO_WARNINGS=1 npx c8 --reporter=text --reporter=lcov npx mocha --exit 'dist-test/tests/**/*.js'"
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",

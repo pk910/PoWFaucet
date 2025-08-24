@@ -4,6 +4,7 @@ build/
 bundle/
 coverage/
 dist/
+dist-test/
 node_modules/
 static/index.seo.html
 static/css/powfaucet*
