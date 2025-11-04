@@ -12,6 +12,28 @@ import { ClaimNotificationClient, IClaimNotificationUpdateData } from './ClaimNo
 
 import './ClaimPage.css'
 
+// Component that preserves DOM elements by only setting innerHTML once
+class ResultSharingHtml extends React.Component<{ html: string }> {
+  private divRef = React.createRef<HTMLDivElement>();
+  private htmlSet = false;
+
+  componentDidMount() {
+    if (this.divRef.current && !this.htmlSet) {
+      this.divRef.current.innerHTML = this.props.html;
+      this.htmlSet = true;
+    }
+  }
+
+  shouldComponentUpdate() {
+    // Never update once rendered - preserves iframe and all DOM elements
+    return false;
+  }
+
+  render() {
+    return <div className="sh-html" ref={this.divRef} />;
+  }
+}
+
 export interface IClaimPageProps {
   pageContext: IFaucetContext;
   faucetConfig: IFaucetConfig;
@@ -439,16 +461,16 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     return (
       <div className='result-sharing'>
         {this.props.faucetConfig.resultSharing.preHtml ?
-          <div className="sh-html" dangerouslySetInnerHTML={{__html: this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.preHtml)}} />
+          <ResultSharingHtml key="pre-html" html={this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.preHtml)} />
         : null}
-        {shareEls.length > 0 ? 
+        {shareEls.length > 0 ?
           <div className='sh-opt'>
             <span className='sh-label'>{resultSharingCaption}</span>
             {shareEls}
           </div>
         : null}
         {this.props.faucetConfig.resultSharing.postHtml ?
-          <div className="sh-html" dangerouslySetInnerHTML={{__html: this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.postHtml)}} />
+          <ResultSharingHtml key="post-html" html={this.replaceShareMessagePlaceholders(this.props.faucetConfig.resultSharing.postHtml)} />
         : null}
       </div>
     )
