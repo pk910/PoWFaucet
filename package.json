@@ -63,7 +63,7 @@
     "@brettz9/node-static": "^0.1.1",
     "@ethereumjs/common": "^10.0.0",
     "@ethereumjs/tx": "^10.0.0",
-    "@types/node": "^24.0.7",
+    "@types/node": "^25.2.0",
     "bignumber.js": "^9.1.2",
     "commander": "^14.0.0",
     "hcaptcha": "^0.2.0",
