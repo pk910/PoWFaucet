@@ -30,7 +30,8 @@ export interface IPassportCredential {
   expirationDate: string;
   credentialSubject: {
     id: string;
-    hash: string;
+    hash?: string;
+    nullifiers?: string[];
     provider: string;
   };
 }
@@ -79,6 +80,14 @@ export class PassportResolver {
 
   private getVerifyTime(): number {
     return Math.floor((new Date()).getTime() / 1000);
+  }
+
+  private getStampHash(credentialSubject: IPassportCredential["credentialSubject"]): string {
+    if(credentialSubject.hash)
+      return credentialSubject.hash;
+    if(credentialSubject.nullifiers && credentialSubject.nullifiers.length > 0)
+      return credentialSubject.nullifiers[0];
+    return "";
   }
 
   public increaseScoreNonce() {
@@ -306,7 +315,7 @@ export class PassportResolver {
     let savePromises: Promise<void>[] = [];
 
     if(passport) {
-      let stampHashes = passport.stamps.map((stamp) => stamp.credential.credentialSubject.hash || "");
+      let stampHashes = passport.stamps.map((stamp) => this.getStampHash(stamp.credential.credentialSubject));
       let stampAssignments = await this.module.getPassportDb().getPassportStamps(stampHashes);
       
       let newestStamp = 0;
@@ -324,11 +333,12 @@ export class PassportResolver {
         };
 
         // check duplicate use
-        let assignedAddr = stampAssignments[stamp.credential.credentialSubject.hash || ""];
+        let stampHash = this.getStampHash(stamp.credential.credentialSubject);
+        let assignedAddr = stampAssignments[stampHash];
         if(assignedAddr && assignedAddr.toLowerCase() !== addr.toLowerCase())
           stampInfo.duplicate = assignedAddr;
         else
-          stampAssignments[stamp.credential.credentialSubject.hash || ""] = addr;
+          stampAssignments[stampHash] = addr;
 
         stamps.push(stampInfo);
       }
