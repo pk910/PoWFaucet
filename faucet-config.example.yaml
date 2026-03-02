@@ -21,7 +21,7 @@ serverPort: 8080
 httpProxyCount: 0
 
 # title of the faucet
-faucetTitle: "Holesky PoW Faucet"
+faucetTitle: "Hoodi PoW Faucet"
 
 # url to image displayed on the startpage
 faucetImage: "/images/fauceth_420.jpg"
@@ -30,7 +30,7 @@ faucetImage: "/images/fauceth_420.jpg"
 faucetHomeHtml: |
   <div class='pow-info'>
     <h5>What is a PoW Faucet?</h5>
-    This is an Ethereum Faucet running on the Holesky Testnet.<br>
+    This is an Ethereum Faucet running on the Hoodi Testnet.<br>
     To prevent malicious actors from exhausting all available funds or 
     accumulating enough Ether to mount long running spam attacks, 
     this faucet requires some mining work to be done in exchange for 
@@ -53,7 +53,7 @@ faucetSecret: "RandomStringThatShouldBeVerySecret!"
 
 # ETH execution layer RPC host
 #ethRpcHost: "http://127.0.0.1:8545/"
-ethRpcHost: "https://rpc.holesky.ethpandaops.io"
+ethRpcHost: "https://rpc.hoodi.ethpandaops.io"
 
 # faucet wallet private key (hex, without 0x prefix)
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
@@ -62,7 +62,7 @@ ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
 ethChainId: null
 
 # symbol (short name) of the coin that can be mined
-faucetCoinSymbol: "HolETH"
+faucetCoinSymbol: "HooETH"
 
 # type of coin that can be mined
 # native = native coin (ETH)
@@ -70,7 +70,7 @@ faucetCoinSymbol: "HolETH"
 faucetCoinType: "native"
 
 # coin contract address (only for faucetCoinType = erc20)
-#faucetCoinContract: "0x94373a4919B3240D86eA41593D5eBa789FEF3848" # WETH9 on holesky
+#faucetCoinContract: "0x94373a4919B3240D86eA41593D5eBa789FEF3848" # WETH9 on hoodi
 
 # transaction gas limit
 # use 21000 to prevent transactions to contracts
@@ -94,7 +94,7 @@ ethMaxPending: 12
 ethQueueNoFunds: true
 
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
-ethTxExplorerLink: "https://holesky.etherscan.io/tx/{txid}"
+ethTxExplorerLink: "https://hoodi.etherscan.io/tx/{txid}"
 
 
 # min/max drop amount (max is the default if no module lowers it)
@@ -283,7 +283,7 @@ modules:
     # require minimal erc20 token balances on mainnet wallet
     minErc20Balances: []
       #- name: "TestToken"
-      #  address: "0x94373a4919B3240D86eA41593D5eBa789FEF3848" # WETH9 on holesky
+      #  address: "0x94373a4919B3240D86eA41593D5eBa789FEF3848" # WETH9 on hoodi
       #  decimals: 18
       #  minBalance: 10000000000000000 # 0.01 WETH
 
@@ -555,5 +555,5 @@ resultSharing:
   caption: "Or support this faucet by sharing your result with a "
 
   # result sharing buttons
-  twitter: "Boom! Just got {amount} Holesky ETH from {url} (Mining for {duration} with {hashrate} H/s) #holesky #faucet"
-  mastodon: "Boom! Just got {amount} Holesky ETH from {url} (Mining for {duration} with {hashrate} H/s)"
+  twitter: "Boom! Just got {amount} Hoodi ETH from {url} (Mining for {duration} with {hashrate} H/s) #hoodi #faucet"
+  mastodon: "Boom! Just got {amount} Hoodi ETH from {url} (Mining for {duration} with {hashrate} H/s)"

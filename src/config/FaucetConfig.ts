@@ -115,6 +115,14 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     appBasePath: datadir,
     faucetVersion: faucetVersion,
   } as any);
+
+  // Apply environment variable overrides (used by Docker image with internal nginx)
+  if(process.env.FAUCET_SERVER_PORT) {
+    faucetConfig.serverPort = parseInt(process.env.FAUCET_SERVER_PORT, 10);
+  }
+  if(process.env.FAUCET_HTTP_PROXY_OFFSET) {
+    faucetConfig.httpProxyCount += parseInt(process.env.FAUCET_HTTP_PROXY_OFFSET, 10);
+  }
 }
 
 export function resolveRelativePath(inputPath: string, customBasePath?: string): string {
