@@ -49,15 +49,6 @@ For a more detailed description, take a look into the [Project Wiki](https://git
       </td>
     </tr>
     <tr>
-      <td><a href="https://github.com/eth-clients/holesky">Holešovice Testnet</a></td>
-      <td><a href="https://holesky-faucet.pk910.de">https://holesky-faucet.pk910.de</a></td>
-      <td>
-        <a href="#"><img alt="Faucet Version" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ffaucets.pk910.de%2Fbadges%2Fversion.php%3Ffaucet%3Dholesky-faucet" /></a>
-        <a href="https://stats.uptimerobot.com/lW1jltO2k0/795198747"><img alt="Uptime Robot ratio (30 days)" src="https://img.shields.io/uptimerobot/ratio/m795198747-dbc5794093556ee744ed909a" /></a>
-        <a href="https://holesky.etherscan.io/address/0x6Cc9397c3B38739daCbfaA68EaD5F5D77Ba5F455"><img alt="Faucet Balance" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ffaucets.pk910.de%2Fbadges%2Fbalance.php%3Ffaucet%3Dholesky-faucet" /></a>
-      </td>
-    </tr>
-    <tr>
       <td><a href="https://github.com/ephemery-testnet/ephemery-resources">Ephemery Testnet</a></td>
       <td><a href="https://ephemery-faucet.pk910.de">https://ephemery-faucet.pk910.de</a></td>
       <td>
