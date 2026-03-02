@@ -43,7 +43,7 @@
     "webpack-visualizer-plugin2": "^2.0.0"
   },
   "dependencies": {
-    "@hcaptcha/react-hcaptcha": "^1.11.0",
+    "@hcaptcha/react-hcaptcha": "^2.0.2",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
     "bootstrap": "^5.3.3",
