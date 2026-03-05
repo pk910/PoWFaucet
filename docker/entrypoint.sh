@@ -3,7 +3,7 @@ set -e
 
 # Enable nginx access log to stdout if requested
 if [ "$FAUCET_NGINX_LOG" = "1" ]; then
-  ln -sf /dev/stdout /var/log/nginx/access.log
+  sed -i 's/access_log off/access_log \/dev\/stdout/' /etc/nginx/conf.d/default.conf
 fi
 
 # Forward signals to child processes for graceful shutdown
