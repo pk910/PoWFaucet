@@ -47,10 +47,5 @@ COPY --chmod=755 ./docker/entrypoint.sh /entrypoint.sh
 USER nginx
 WORKDIR /data
 
-# Node backend listens on 8082 internally, nginx on 8080 externally
-# httpProxyCount is incremented by 1 to account for the internal nginx proxy
-ENV FAUCET_SERVER_PORT=8082
-ENV FAUCET_HTTP_PROXY_OFFSET=1
-
 EXPOSE 8080
 ENTRYPOINT [ "/entrypoint.sh" ]
