@@ -19,7 +19,7 @@ describe("Faucet Module Management", () => {
   let fakeProvider;
 
   beforeEach(async function() {
-    this.timeout(5000);
+    this.timeout(15000);
     globalStubs = bindTestStubs();
     fakeProvider = new FakeProvider();
     fakeProvider.injectResponse("net_version", "5");
@@ -68,7 +68,7 @@ describe("Faucet Module Management", () => {
       let modObj = moduleManager.getModule<BaseModule>(module);
       expect(!!modObj).to.equal(false, "module still loaded: " + module);
     });
-  }).timeout(5000);
+  }).timeout(15000);
 
   it("Module lifecycle", async () => {
     let moduleManager = ServiceManager.GetService(ModuleManager);

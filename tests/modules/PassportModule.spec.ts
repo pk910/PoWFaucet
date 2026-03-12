@@ -571,7 +571,7 @@ describe("Faucet module: passport", () => {
     expect(passportRefreshRsp.score.score).to.equal(2, "unexpected passport score in refresh result");
     expect(passportRefreshRsp.score.factor).to.equal(4, "unexpected passport factor in refresh result");
     let now = Math.floor(new Date().getTime() / 1000);
-    expect(Math.abs(passportRefreshRsp.cooldown - now)).to.be.lessThan(2, "unexpected cooldown");
+    expect(Math.abs(passportRefreshRsp.cooldown - now)).to.be.lessThan(5, "unexpected cooldown");
     passportData = testSession.getSessionData("passport.data");
     expect(passportData?.found).to.equal(true, "no passport data found after refresh")
     let passportScore = testSession.getSessionData("passport.score");

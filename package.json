@@ -10,8 +10,8 @@
     "build-client": "cd faucet-client && node build-client.js",
     "start": "tsc && node dist/app.js",
     "bundle": "tsc && webpack --mode production",
-    "test": "tsc -p tsconfig.test.json && cp -r libs dist-test/ && cp -r static dist-test/ && NODE_OPTIONS='--experimental-vm-modules' NODE_NO_WARNINGS=1 npx mocha --exit 'dist-test/tests/**/*.js'",
-    "test-coverage": "tsc -p tsconfig.test.json && cp -r libs dist-test/ && cp -r static dist-test/ && NODE_OPTIONS='--experimental-vm-modules' NODE_NO_WARNINGS=1 npx c8 --reporter=text --reporter=lcov npx mocha --exit 'dist-test/tests/**/*.js'"
+    "test": "tsc -p tsconfig.test.json && shx cp -r libs dist-test/ && shx cp -r static dist-test/ && cross-env NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 mocha --exit \"dist-test/tests/**/*.js\"",
+    "test-coverage": "tsc -p tsconfig.test.json && shx cp -r libs dist-test/ && shx cp -r static dist-test/ && cross-env NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 c8 --reporter=text --reporter=lcov mocha --exit \"dist-test/tests/**/*.js\""
   },
   "author": "pk910 (https://pk910.de)",
   "license": "AGPL-3.0",
@@ -51,6 +51,8 @@
     "mocha": "^11.0.1",
     "mysql-memory-server": "^1.3.0",
     "nyc": "^18.0.0",
+    "cross-env": "^7.0.3",
+    "shx": "^0.3.4",
     "sinon": "^21.0.0",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
