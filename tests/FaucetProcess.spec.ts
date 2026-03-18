@@ -86,6 +86,9 @@ describe("Faucet Process", () => {
   });
 
   it("Check process event handler: SIGUSR1", async () => {
+    if(process.platform === "win32") {
+      return;
+    }
     await ServiceManager.GetService(FaucetProcess).initialize();
     globalStubs["FaucetProcess.emitLog"] = sinon.stub(FaucetProcess.prototype, "emitLog");
     let reloadFired = false;
@@ -101,6 +104,9 @@ describe("Faucet Process", () => {
   });
 
   it("Check process event handler: SIGINT", async () => {
+    if(process.platform === "win32") {
+      return;
+    }
     await ServiceManager.GetService(FaucetProcess).initialize();
     globalStubs["FaucetProcess.emitLog"] = sinon.stub(FaucetProcess.prototype, "emitLog");
     process.kill(process.pid, "SIGINT");
@@ -111,6 +117,9 @@ describe("Faucet Process", () => {
   });
 
   it("Check process event handler: SIGQUIT", async () => {
+    if(process.platform === "win32") {
+      return;
+    }
     await ServiceManager.GetService(FaucetProcess).initialize();
     globalStubs["FaucetProcess.emitLog"] = sinon.stub(FaucetProcess.prototype, "emitLog");
     process.kill(process.pid, "SIGQUIT");
@@ -121,6 +130,9 @@ describe("Faucet Process", () => {
   });
 
   it("Check process event handler: SIGTERM", async () => {
+    if(process.platform === "win32") {
+      return;
+    }
     await ServiceManager.GetService(FaucetProcess).initialize();
     globalStubs["FaucetProcess.emitLog"] = sinon.stub(FaucetProcess.prototype, "emitLog");
     process.kill(process.pid, "SIGTERM");
@@ -162,41 +174,55 @@ describe("Faucet Process", () => {
     let oldDatadir = cliArgs["datadir"];
     let cwd = process.cwd();
 
-    cliArgs["datadir"] = "/test/path"
-    expect(getAppDataDir()).to.equal("/test/path", "invalid datadir (absolute path)");
+    try {
+      const absoluteDatadir = process.platform === "win32" ? "C:\\test\\path" : "/test/path";
+      const appBasePath = process.platform === "win32" ? "C:\\test" : "/test";
 
-    cliArgs["datadir"] = "test/path"
-    expect(getAppDataDir()).to.equal(path.join(cwd, "test/path"), "invalid datadir (relative path)");
+      cliArgs["datadir"] = absoluteDatadir;
+      expect(getAppDataDir()).to.equal(absoluteDatadir, "invalid datadir (absolute path)");
 
-    cliArgs["datadir"] = "~app/"
-    setAppBasePath("/test");
-    expect(getAppDataDir()).to.equal("/test", "invalid datadir (~app path)");
-    setAppBasePath(".");
+      cliArgs["datadir"] = "test/path";
+      expect(getAppDataDir()).to.equal(path.join(cwd, "test/path"), "invalid datadir (relative path)");
 
-    cliArgs["datadir"] = oldDatadir;
+      cliArgs["datadir"] = "~app/";
+      setAppBasePath(appBasePath);
+      expect(getAppDataDir()).to.equal(appBasePath, "invalid datadir (~app path)");
+    } finally {
+      setAppBasePath(".");
+      cliArgs["datadir"] = oldDatadir;
+    }
   });
 
   it("Check config creation & loading", async () => {
     let oldConfigArg = cliArgs["config"];
     let oldDatadir = cliArgs["datadir"];
+    let oldCreateConfigArg = cliArgs["create-config"];
 
     let tempdir = tmpFile("powfaucet-", "-data");
     fs.mkdirSync(tempdir);
-    cliArgs["datadir"] = tempdir;
 
-    // check create-config
-    cliArgs["create-config"] = true;
-    loadFaucetConfig();
-    expect(globalStubs["process.exit"].callCount).to.equal(1, "process.exit not called");
-    expect(fs.existsSync(path.join(tempdir, "faucet-config.yaml"))).to.equal(true, "new default config not created");
-    delete cliArgs["create-config"];
+    try {
+      cliArgs["datadir"] = tempdir;
 
-    fs.renameSync(path.join(tempdir, "faucet-config.yaml"), path.join(tempdir, "test-config.yaml"))
-    cliArgs["config"] = "test-config.yaml"
-    loadFaucetConfig();
+      // check create-config
+      cliArgs["create-config"] = true;
+      loadFaucetConfig();
+      expect(globalStubs["process.exit"].callCount).to.equal(1, "process.exit not called");
+      expect(fs.existsSync(path.join(tempdir, "faucet-config.yaml"))).to.equal(true, "new default config not created");
+      delete cliArgs["create-config"];
 
-    cliArgs["config"] = oldConfigArg;
-    cliArgs["datadir"] = oldDatadir;
+      fs.renameSync(path.join(tempdir, "faucet-config.yaml"), path.join(tempdir, "test-config.yaml"));
+      cliArgs["config"] = "test-config.yaml";
+      loadFaucetConfig();
+    } finally {
+      if(typeof oldCreateConfigArg === "undefined") {
+        delete cliArgs["create-config"];
+      } else {
+        cliArgs["create-config"] = oldCreateConfigArg;
+      }
+      cliArgs["config"] = oldConfigArg;
+      cliArgs["datadir"] = oldDatadir;
+    }
   });
 
   it("Check config validation", async () => {
