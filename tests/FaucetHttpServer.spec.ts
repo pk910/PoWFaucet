@@ -362,6 +362,53 @@ describe("Faucet Web Server", () => {
     }
   });
 
+  it("returns 304 for conditional static resource requests", async function() {
+    faucetConfig.buildSeoIndex = false;
+    faucetConfig.serverPort = 0;
+    faucetConfig.corsAllowOrigin = ["https://example.com"];
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    let listenPort = webServer.getListenPort();
+
+    let staticPath = resolveRelativePath(faucetConfig.staticPath, process.cwd());
+    let jsPath = path.join(staticPath, "js");
+    if(!fs.existsSync(jsPath))
+      fs.mkdirSync(jsPath);
+
+    let resourcePath = path.join(jsPath, "powfaucet.js");
+    if(!fs.existsSync(resourcePath))
+      fs.writeFileSync(resourcePath, "test");
+
+    let initialRsp = await FetchUtil.fetch(
+      "http://localhost:" + listenPort + "/js/powfaucet.js",
+      {
+        method: "GET",
+        headers: {
+          "Origin": "https://example.com"
+        }
+      }
+    );
+
+    let etag = initialRsp.headers.get("etag");
+    expect(etag).to.not.equal(null, "etag missing");
+
+    let cachedRsp = await FetchUtil.fetchWithTimeout(
+      "http://localhost:" + listenPort + "/js/powfaucet.js",
+      {
+        method: "GET",
+        headers: {
+          "Origin": "https://example.com",
+          "If-None-Match": etag
+        }
+      },
+      1000
+    );
+
+    expect(cachedRsp.status).equals(304, "unexpected status");
+    expect(cachedRsp.headers.get("access-control-allow-origin")).equals("https://example.com", "access-control-allow-origin mismatch");
+    expect(cachedRsp.headers.get("content-length")).equals(null, "content-length should be omitted on 304");
+  });
+
   it("FetchUtil: request", async () => {
     faucetConfig.buildSeoIndex = false;
     faucetConfig.serverPort = 0;
