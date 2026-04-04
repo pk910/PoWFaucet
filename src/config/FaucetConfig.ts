@@ -7,6 +7,8 @@ import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
 import { IConfigSchema } from './ConfigSchema.js';
 import { getDefaultConfig } from './DefaultConfig.js';
+import { ICaptchaConfig } from '../modules/captcha/CaptchaConfig.js';
+import { IGithubConfig } from '../modules/github/GithubConfig.js';
 
 export let cliArgs = (function() {
   let args = {};
@@ -116,6 +118,10 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
     faucetVersion: faucetVersion,
   } as any);
 
+  applyEnvOverrides();
+}
+
+function applyEnvOverrides() {
   // Apply environment variable overrides (used by Docker image with internal nginx)
   if(process.env.FAUCET_SERVER_PORT) {
     faucetConfig.serverPort = parseInt(process.env.FAUCET_SERVER_PORT, 10);
@@ -123,6 +129,53 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   if(process.env.FAUCET_HTTP_PROXY_OFFSET) {
     faucetConfig.httpProxyCount += parseInt(process.env.FAUCET_HTTP_PROXY_OFFSET, 10);
   }
+
+  const envMap: {[key: string]: (value: string) => void} = {
+    POWFAUCET_SECRET: (value) => faucetConfig.faucetSecret = value,
+    POWFAUCET_RPC_HOST: (value) => faucetConfig.ethRpcHost = value,
+    POWFAUCET_WALLET_KEY: (value) => faucetConfig.ethWalletKey = value,
+    POWFAUCET_CHAIN_ID: (value) => faucetConfig.ethChainId = parseInt(value, 10),
+    POWFAUCET_TITLE: (value) => faucetConfig.faucetTitle = value,
+    POWFAUCET_IMAGE: (value) => faucetConfig.faucetImage = value,
+    POWFAUCET_COIN_SYMBOL: (value) => faucetConfig.faucetCoinSymbol = value,
+    POWFAUCET_COIN_TYPE: (value) => faucetConfig.faucetCoinType = value as any,
+    POWFAUCET_COIN_CONTRACT: (value) => faucetConfig.faucetCoinContract = value,
+    POWFAUCET_TX_EXPLORER: (value) => faucetConfig.ethTxExplorerLink = value,
+    POWFAUCET_CAPTCHA_SITE_KEY: (value) => {
+      faucetConfig.modules = faucetConfig.modules || {};
+      const captchaConfig = ((faucetConfig.modules.captcha || { enabled: false }) as ICaptchaConfig);
+      captchaConfig.siteKey = value;
+      faucetConfig.modules.captcha = captchaConfig;
+    },
+    POWFAUCET_CAPTCHA_SECRET: (value) => {
+      faucetConfig.modules = faucetConfig.modules || {};
+      const captchaConfig = ((faucetConfig.modules.captcha || { enabled: false }) as ICaptchaConfig);
+      captchaConfig.secret = value;
+      faucetConfig.modules.captcha = captchaConfig;
+    },
+    POWFAUCET_GITHUB_CLIENT_ID: (value) => {
+      faucetConfig.modules = faucetConfig.modules || {};
+      const githubConfig = ((faucetConfig.modules.github || { enabled: false }) as IGithubConfig);
+      githubConfig.appClientId = value;
+      faucetConfig.modules.github = githubConfig;
+    },
+    POWFAUCET_GITHUB_CLIENT_SECRET: (value) => {
+      faucetConfig.modules = faucetConfig.modules || {};
+      const githubConfig = ((faucetConfig.modules.github || { enabled: false }) as IGithubConfig);
+      githubConfig.appSecret = value;
+      faucetConfig.modules.github = githubConfig;
+    },
+    POWFAUCET_CORS_ALLOW_ORIGIN: (value) => {
+      faucetConfig.corsAllowOrigin = value.split(",").map((origin) => origin.trim()).filter(Boolean);
+    },
+  };
+
+  Object.keys(envMap).forEach((envKey) => {
+    const value = process.env[envKey];
+    if(value !== undefined && value !== "") {
+      envMap[envKey](value);
+    }
+  });
 }
 
 export function resolveRelativePath(inputPath: string, customBasePath?: string): string {
