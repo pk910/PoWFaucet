@@ -49,6 +49,7 @@ faucetHomeHtml: |
 
 # random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 # use a random string and do not share / reuse it anywhere. Everyone knowing this secret is theoretically able to claim rewards from the faucet without mining.
+# can be overridden at runtime with FAUCET_SECRET
 faucetSecret: "RandomStringThatShouldBeVerySecret!"
 
 # ETH execution layer RPC host
@@ -56,6 +57,7 @@ faucetSecret: "RandomStringThatShouldBeVerySecret!"
 ethRpcHost: "https://rpc.hoodi.ethpandaops.io"
 
 # faucet wallet private key (hex, without 0x prefix)
+# can be overridden at runtime with FAUCET_ETH_WALLET_KEY
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
 
 # EVM chain id (null for auto-detect from RPC)
@@ -132,6 +134,7 @@ modules:
     siteKey: "00000000-0000-0000-0000-000000000000"
 
     # captcha secret key
+    # can be overridden at runtime with FAUCET_CAPTCHA_SECRET
     secret: "0xCensoredHCaptchaSecretKey"
 
     # require captcha to start a new session (default: false)
@@ -239,6 +242,7 @@ modules:
 
     # github api credentials
     appClientId: "" # client id from github app
+    # can be overridden at runtime with FAUCET_GITHUB_APP_SECRET
     appSecret: "" # app secret from github app
 
     # authentication timeout
@@ -353,6 +357,7 @@ modules:
   ## Passport protection
   passport:
     enabled: false
+    # can be overridden at runtime with FAUCET_PASSPORT_SCORER_API_KEY
     scorerApiKey: "" # Gitcoin Passport Scorer API Key
     trustedIssuers:
       - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport

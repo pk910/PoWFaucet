@@ -5,6 +5,8 @@ All demo instances will drop a useless ERC20 token (["PoWC"](https://holesky.eth
 The demo instances are there to show different configuration scenarios with different modules enabled.\
 If your're looking for native testnet funds, use one of my [productive instances](https://github.com/pk910/PoWFaucet#instances).
 
+Sensitive values shown in the demo configs can also be injected at runtime. The local examples document `FAUCET_SECRET`, `FAUCET_ETH_WALLET_KEY`, `FAUCET_CAPTCHA_SECRET`, `FAUCET_GITHUB_APP_SECRET`, and `FAUCET_PASSPORT_SCORER_API_KEY`.
+
 ### Demo 1
 
 Low protection configuration, mainly based on captchas only.\
@@ -130,4 +132,3 @@ Modules:
 To be clear: The examples above are just examples to demonstrate different scenarios with different protection methods.\
 All faucet modules can be used independently, so you can configure the faucet for your protection needs. \
 For best protection, I recommend using a combination of several modules. I recommend to use the `recurring-limits`, `ethinfo` & `captcha` modules as a "minimum protection".
-
