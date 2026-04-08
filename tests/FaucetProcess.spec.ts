@@ -11,6 +11,9 @@ import { FaucetLogLevel, FaucetProcess } from '../src/common/FaucetProcess.js';
 import { sleepPromise } from '../src/utils/PromiseUtils.js';
 import { cliArgs, faucetConfig, getAppDataDir, loadFaucetConfig, setAppBasePath } from '../src/config/FaucetConfig.js';
 import { FaucetWorkers } from '../src/common/FaucetWorker.js';
+import { ICaptchaConfig } from '../src/modules/captcha/CaptchaConfig.js';
+import { IGithubConfig } from '../src/modules/github/GithubConfig.js';
+import { IPassportConfig } from '../src/modules/passport/PassportConfig.js';
 
 
 describe("Faucet Process", () => {
@@ -202,6 +205,11 @@ describe("Faucet Process", () => {
   it("Check config validation", async () => {
     let oldConfigArg = cliArgs["config"];
     let oldDatadir = cliArgs["datadir"];
+    let oldFaucetSecret = process.env.FAUCET_SECRET;
+    let oldWalletKey = process.env.FAUCET_ETH_WALLET_KEY;
+    let oldCaptchaSecret = process.env.FAUCET_CAPTCHA_SECRET;
+    let oldGithubAppSecret = process.env.FAUCET_GITHUB_APP_SECRET;
+    let oldPassportScorerApiKey = process.env.FAUCET_PASSPORT_SCORER_API_KEY;
 
     let tempdir = tmpFile("powfaucet-", "-data");
     fs.mkdirSync(tempdir);
@@ -219,10 +227,56 @@ describe("Faucet Process", () => {
     expect(error).to.contain("V1 configuration is incompatible", "no error for v1 config");
 
     // check autofilled values
-    fs.writeFileSync(path.join(tempdir, "good-config.yaml"), "version: 2");
+    fs.writeFileSync(path.join(tempdir, "good-config.yaml"), [
+      "version: 2",
+      "modules:",
+      "  captcha:",
+      "    secret: yaml-captcha-secret",
+      "  github:",
+      "    appSecret: yaml-github-secret",
+      "  passport:",
+      "    scorerApiKey: yaml-passport-api-key",
+    ].join("\n"));
     cliArgs["config"] = "good-config.yaml"
     loadFaucetConfig();
     expect(faucetConfig.faucetSecret.length).to.be.above(10, "no random faucetSecret generated");
+
+    process.env.FAUCET_SECRET = "env-faucet-secret";
+    process.env.FAUCET_ETH_WALLET_KEY = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
+    process.env.FAUCET_CAPTCHA_SECRET = "env-captcha-secret";
+    process.env.FAUCET_GITHUB_APP_SECRET = "env-github-secret";
+    process.env.FAUCET_PASSPORT_SCORER_API_KEY = "env-passport-api-key";
+    loadFaucetConfig();
+    expect(faucetConfig.faucetSecret).to.equal(process.env.FAUCET_SECRET, "env override for faucetSecret not applied");
+    expect(faucetConfig.ethWalletKey).to.equal(process.env.FAUCET_ETH_WALLET_KEY, "env override for ethWalletKey not applied");
+    expect((faucetConfig.modules.captcha as ICaptchaConfig).secret).to.equal(process.env.FAUCET_CAPTCHA_SECRET, "env override for captcha secret not applied");
+    expect((faucetConfig.modules.github as IGithubConfig).appSecret).to.equal(process.env.FAUCET_GITHUB_APP_SECRET, "env override for github app secret not applied");
+    expect((faucetConfig.modules.passport as IPassportConfig).scorerApiKey).to.equal(process.env.FAUCET_PASSPORT_SCORER_API_KEY, "env override for passport scorer api key not applied");
+
+    if(typeof oldFaucetSecret === "string")
+      process.env.FAUCET_SECRET = oldFaucetSecret;
+    else
+      delete process.env.FAUCET_SECRET;
+
+    if(typeof oldWalletKey === "string")
+      process.env.FAUCET_ETH_WALLET_KEY = oldWalletKey;
+    else
+      delete process.env.FAUCET_ETH_WALLET_KEY;
+
+    if(typeof oldCaptchaSecret === "string")
+      process.env.FAUCET_CAPTCHA_SECRET = oldCaptchaSecret;
+    else
+      delete process.env.FAUCET_CAPTCHA_SECRET;
+
+    if(typeof oldGithubAppSecret === "string")
+      process.env.FAUCET_GITHUB_APP_SECRET = oldGithubAppSecret;
+    else
+      delete process.env.FAUCET_GITHUB_APP_SECRET;
+
+    if(typeof oldPassportScorerApiKey === "string")
+      process.env.FAUCET_PASSPORT_SCORER_API_KEY = oldPassportScorerApiKey;
+    else
+      delete process.env.FAUCET_PASSPORT_SCORER_API_KEY;
 
     cliArgs["config"] = oldConfigArg;
     cliArgs["datadir"] = oldDatadir;
