@@ -66,6 +66,8 @@ Read the [Faucet Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator
 
 You can also find some demo instances with different module combinations here: [Demo Instances](https://github.com/pk910/PoWFaucet/blob/master/docs/demo/README.md)
 
+Secrets can also be injected at runtime instead of being stored in `faucet-config.yaml`. The local examples document `FAUCET_SECRET`, `FAUCET_ETH_WALLET_KEY`, `FAUCET_CAPTCHA_SECRET`, `FAUCET_GITHUB_APP_SECRET`, and `FAUCET_PASSPORT_SCORER_API_KEY`.
+
 # Bugs & Features
 
 Please feel free to report bugs and add new features via PRs if you like.

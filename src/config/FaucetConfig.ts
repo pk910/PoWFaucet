@@ -7,6 +7,9 @@ import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
 import { IConfigSchema } from './ConfigSchema.js';
 import { getDefaultConfig } from './DefaultConfig.js';
+import { ICaptchaConfig } from '../modules/captcha/CaptchaConfig.js';
+import { IGithubConfig } from '../modules/github/GithubConfig.js';
+import { IPassportConfig } from '../modules/passport/PassportConfig.js';
 
 export let cliArgs = (function() {
   let args = {};
@@ -117,6 +120,27 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   } as any);
 
   // Apply environment variable overrides (used by Docker image with internal nginx)
+  if(process.env.FAUCET_SECRET) {
+    faucetConfig.faucetSecret = process.env.FAUCET_SECRET;
+  }
+  if(process.env.FAUCET_ETH_WALLET_KEY) {
+    faucetConfig.ethWalletKey = process.env.FAUCET_ETH_WALLET_KEY;
+  }
+  if(process.env.FAUCET_CAPTCHA_SECRET) {
+    if(!faucetConfig.modules.captcha)
+      faucetConfig.modules.captcha = {} as ICaptchaConfig;
+    (faucetConfig.modules.captcha as ICaptchaConfig).secret = process.env.FAUCET_CAPTCHA_SECRET;
+  }
+  if(process.env.FAUCET_GITHUB_APP_SECRET) {
+    if(!faucetConfig.modules.github)
+      faucetConfig.modules.github = {} as IGithubConfig;
+    (faucetConfig.modules.github as IGithubConfig).appSecret = process.env.FAUCET_GITHUB_APP_SECRET;
+  }
+  if(process.env.FAUCET_PASSPORT_SCORER_API_KEY) {
+    if(!faucetConfig.modules.passport)
+      faucetConfig.modules.passport = {} as IPassportConfig;
+    (faucetConfig.modules.passport as IPassportConfig).scorerApiKey = process.env.FAUCET_PASSPORT_SCORER_API_KEY;
+  }
   if(process.env.FAUCET_SERVER_PORT) {
     faucetConfig.serverPort = parseInt(process.env.FAUCET_SERVER_PORT, 10);
   }
