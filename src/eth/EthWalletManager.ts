@@ -175,7 +175,7 @@ export class EthWalletManager {
       chainIdPromise,
       tokenBalancePromise,
     ]).catch((ex) => {
-      if(ex.toString().match(/"pending" is not yet supported/)) {
+      if(ex.toString().match(/"pending" is not yet supported|pending state is not available|pending block is not available/i)) {
         return Promise.all([
           this.web3.eth.getBalance(this.walletAddr),
           this.web3.eth.getTransactionCount(this.walletAddr),
