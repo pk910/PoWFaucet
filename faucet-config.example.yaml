@@ -52,9 +52,36 @@ faucetHomeHtml: |
 # can be overridden at runtime with FAUCET_SECRET
 faucetSecret: "RandomStringThatShouldBeVerySecret!"
 
-# ETH execution layer RPC host
+# ETH execution layer RPC host(s)
+# Either a single URL string (legacy) or a list of endpoints with priority/metered flags.
+# - URLs may include basic auth (e.g. "https://user:pass@host"); credentials are stripped from the URL and sent as Authorization header.
+# - name: optional display name shown in logs and on the status page in place of the (sanitized) URL.
+# - priority: higher value = preferred (default: 1). Reads use the highest-priority ready endpoint.
+# - metered: if true, this endpoint is monitored less often to reduce request count (default: false).
+# Examples:
 #ethRpcHost: "http://127.0.0.1:8545/"
+#ethRpcHost:
+#  - url: "http://127.0.0.1:8545/"
+#    name: "local-node"
+#    priority: 10
+#  - url: "https://user:pass@rpc.example.com/"
+#    name: "fallback-provider"
+#    priority: 5
+#    metered: true
 ethRpcHost: "https://rpc.hoodi.ethpandaops.io"
+
+# Mark RPC endpoints offline if their block height falls behind the highest known head by more than this many blocks.
+ethRpcMaxBlockHeightDiff: 10
+
+# Monitoring poll interval (seconds) for non-metered endpoints (block height + availability).
+ethRpcMonitorInterval: 10
+
+# Monitoring poll interval (seconds) for metered endpoints (lower request count, slower failure detection).
+ethRpcMonitorMeteredInterval: 60
+
+# Number of highest-priority ready endpoints to broadcast each transaction to in parallel.
+# At least one successful submission is required; other endpoints' errors (e.g. "already known") are ignored.
+ethTxBroadcastCount: 2
 
 # faucet wallet private key (hex, without 0x prefix)
 # can be overridden at runtime with FAUCET_ETH_WALLET_KEY

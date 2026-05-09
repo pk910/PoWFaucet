@@ -5,7 +5,6 @@ import * as EthCom from '@ethereumjs/common';
 import * as EthTx from '@ethereumjs/tx';
 import * as EthUtil from '@ethereumjs/util';
 import { Contract } from 'web3-eth-contract';
-import { ethRpcMethods } from 'web3-rpc-methods';
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetProcess, FaucetLogLevel } from '../common/FaucetProcess.js';
@@ -16,6 +15,7 @@ import { sleepPromise, timeoutPromise } from '../utils/PromiseUtils.js';
 import { EthClaimInfo } from './EthClaimManager.js';
 import { Erc20Abi } from '../abi/ERC20.js';
 import IpcProvider from 'web3-providers-ipc';
+import { RpcEndpointPool } from './RpcEndpointPool.js';
 
 export interface WalletState {
   ready: boolean;
@@ -27,7 +27,6 @@ export interface WalletState {
 interface FaucetTokenState {
   address: string;
   decimals: number;
-  contract: Contract<ContractAbi>;
   getBalance(addr: string): Promise<bigint>;
   getTransferData(addr: string, amount: bigint): string;
 }
@@ -61,7 +60,7 @@ export class EthWalletManager {
   }
 
   private initialized: boolean;
-  private web3: Web3;
+  private rpcPool: RpcEndpointPool;
   private chainCommon: EthCom.Common;
   private walletKey: Buffer;
   private walletAddr: string;
@@ -69,6 +68,14 @@ export class EthWalletManager {
   private tokenState: FaucetTokenState;
   private lastWalletRefresh: number;
   private txReceiptPollInterval = 12000;
+
+  private get web3(): Web3 {
+    return this.rpcPool.getActiveWeb3();
+  }
+
+  public getRpcPool(): RpcEndpointPool {
+    return this.rpcPool;
+  }
 
   public async initialize(): Promise<void> {
     if(this.initialized)
@@ -85,7 +92,7 @@ export class EthWalletManager {
     this.startWeb3();
     if(typeof faucetConfig.ethChainId === "number")
       this.initChainCommon(BigInt(faucetConfig.ethChainId));
-    
+
     let privkey = faucetConfig.ethWalletKey;
     if(privkey.match(/^0x/))
       privkey = privkey.substring(2);
@@ -101,6 +108,16 @@ export class EthWalletManager {
     });
   }
 
+  public dispose(): void {
+    if(!this.initialized)
+      return;
+    this.initialized = false;
+    if(this.rpcPool) {
+      this.rpcPool.dispose();
+      this.rpcPool = null;
+    }
+  }
+
   private initChainCommon(chainId: bigint) {
     if(this.chainCommon && this.chainCommon.chainId() === chainId)
       return;
@@ -111,43 +128,33 @@ export class EthWalletManager {
   }
 
   private startWeb3() {
-    let provider = EthWalletManager.getWeb3Provider(faucetConfig.ethRpcHost);
-    this.web3 = new Web3(provider);
+    if(this.rpcPool)
+      this.rpcPool.dispose();
+    this.rpcPool = new RpcEndpointPool();
+    this.rpcPool.initialize(faucetConfig.ethRpcHost);
 
     if(faucetConfig.faucetCoinType !== FaucetCoinType.NATIVE)
       this.initWeb3Token();
     else
       this.tokenState = null;
-
-    try {
-      provider.on('error', e => {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 provider error: " + e.toString());
-      });
-      provider.on('end', e => {
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Web3 connection lost...");
-        this.web3 = null;
-
-        setTimeout(() => {
-          this.startWeb3();
-        }, 2000);
-      });
-    } catch(ex) {}
   }
 
   private initWeb3Token() {
     switch(faucetConfig.faucetCoinType) {
       case FaucetCoinType.ERC20:
-        let tokenContract = new this.web3.eth.Contract(Erc20Abi, faucetConfig.faucetCoinContract, {
+        let tokenAddr = faucetConfig.faucetCoinContract;
+        // Build a fresh contract on each call so it always uses the active web3 instance,
+        // surviving RPC failover.
+        let buildContract = () => new this.web3.eth.Contract(Erc20Abi, tokenAddr, {
           from: this.walletAddr,
         });
         this.tokenState = {
-          address: faucetConfig.faucetCoinContract,
-          contract: tokenContract,
+          address: tokenAddr,
           decimals: 0,
-          getBalance: (addr: string) => tokenContract.methods.balanceOf(addr).call(),
-          getTransferData: (addr: string, amount: bigint) => tokenContract.methods['transfer'](addr, amount).encodeABI(),
+          getBalance: (addr: string) => buildContract().methods.balanceOf(addr).call() as Promise<bigint>,
+          getTransferData: (addr: string, amount: bigint) => buildContract().methods['transfer'](addr, amount).encodeABI(),
         };
-        tokenContract.methods.decimals().call().then((res) => {
+        buildContract().methods.decimals().call().then((res) => {
           this.tokenState.decimals = Number(res);
         });
         break;
@@ -430,7 +437,7 @@ export class EthWalletManager {
   }
 
   private async sendTransaction(txhex: string, txnonce: number): Promise<[string, Promise<TransactionReceipt>]> {
-    let txHash = await ethRpcMethods.sendRawTransaction(this.web3.eth.requestManager, "0x" + txhex);
+    let txHash = await this.rpcPool.broadcastSendRawTransaction("0x" + txhex);
 
     return [txHash, this.awaitTransactionReceipt(txHash, txnonce)];
   }

@@ -4,6 +4,7 @@ import { FaucetDatabase } from "../../db/FaucetDatabase.js";
 import { EthClaimManager } from "../../eth/EthClaimManager.js";
 import { EthWalletManager } from "../../eth/EthWalletManager.js";
 import { EthWalletRefill } from "../../eth/EthWalletRefill.js";
+import { IRpcEndpointStatus } from "../../eth/RpcEndpointPool.js";
 import { FaucetBalanceModule } from "../../modules/faucet-balance/FaucetBalanceModule.js";
 import { FaucetOutflowModule } from "../../modules/faucet-outflow/FaucetOutflowModule.js";
 import { ModuleManager } from "../../modules/ModuleManager.js";
@@ -66,6 +67,7 @@ export interface IClientFaucetStatus {
     lowerLimit: number;
     upperLimit: number;
   };
+  rpcEndpoints: IRpcEndpointStatus[];
 }
 
 export interface IClientSessionsStatus {
@@ -98,6 +100,7 @@ export async function buildFaucetStatus(): Promise<IClientFaucetStatus> {
       amount: faucetConfig.ethRefillContract.requestAmount.toString(),
       cooldown: ethWalletRefill.getFaucetRefillCooldown(),
     } : null,
+    rpcEndpoints: ethWalletManager.getRpcPool()?.getStatusList() || [],
   };
 
   return statusRsp;
