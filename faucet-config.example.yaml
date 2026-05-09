@@ -245,10 +245,20 @@ modules:
     # script injection (<authUrl>/client.js).
     authUrl: "https://auth.example.com"
 
-    # expected aud claim. Tokens issued by authenticatoor carry the bare
-    # hostname of the protected service in the aud claim — set this to the
-    # faucet's public hostname (no scheme, no port).
-    expectedAudience: "faucet.example.com"
+    # expected aud claim. By default authenticatoor derives the audience from
+    # its issuer URL by stripping the leftmost label — so an issuer at
+    # https://auth.example.com produces tokens with aud = "example.com",
+    # shared across every service in that parent zone. Set this to whatever
+    # value the authenticatoor's `audience` config resolves to (its parent
+    # zone unless overridden).
+    expectedAudience: "example.com"
+
+    # optional defense-in-depth: when set, the token's `scope` wildcard
+    # pattern must match this host (DNS-label glob, same rules as the auth
+    # service). Use the faucet's public hostname (no scheme, no port).
+    # Tokens without a scope claim are accepted regardless. Leave null to
+    # rely on the audience pin alone.
+    expectedHost: null # e.g. "faucet.example.com"
 
     # require login to start a session. When false the module is purely
     # opt-in and only applies grants when a user is authenticated.

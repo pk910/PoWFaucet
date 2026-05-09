@@ -3,6 +3,7 @@ import { IBaseModuleConfig } from "../BaseModule.js";
 export interface IAuthenticatoorConfig extends IBaseModuleConfig {
   authUrl: string;
   expectedAudience: string | null;
+  expectedHost: string | null;
   requireLogin: boolean;
   concurrencyLimit: number;
   grants: IAuthenticatoorGrantConfig[];
@@ -27,6 +28,7 @@ export const defaultConfig: IAuthenticatoorConfig = {
   enabled: false,
   authUrl: "",
   expectedAudience: null,
+  expectedHost: null,
   requireLogin: false,
   concurrencyLimit: 0,
   grants: [],

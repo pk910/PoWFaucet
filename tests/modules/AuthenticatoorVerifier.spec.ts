@@ -5,7 +5,7 @@ import { exportJWK, generateKeyPair, SignJWT, KeyObject } from 'jose';
 import { FetchUtil } from '../../src/utils/FetchUtil.js';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig } from '../common.js';
 import { ServiceManager } from '../../src/common/ServiceManager.js';
-import { AuthenticatoorVerifier } from '../../src/modules/authenticatoor/AuthenticatoorVerifier.js';
+import { AuthenticatoorVerifier, matchHost } from '../../src/modules/authenticatoor/AuthenticatoorVerifier.js';
 
 interface IFakeFetchResponse {
   url: RegExp;
@@ -191,6 +191,73 @@ describe("Faucet module: authenticatoor (verifier)", () => {
     let token = await mintToken({ email: "alice@example.com" });
     let claims = await verifier.verify(token);
     expect(claims.email).to.equal("alice@example.com");
+  });
+
+  it("Scope check: accepts when scope wildcard matches expectedHost", async () => {
+    let token = await mintToken({ email: "alice@example.com", scope: "*.example.com" });
+    let verifier = new AuthenticatoorVerifier(AUTH_URL, AUDIENCE, "faucet.example.com");
+    let claims = await verifier.verify(token);
+    expect(claims.email).to.equal("alice@example.com");
+  });
+
+  it("Scope check: rejects when scope wildcard does not match expectedHost", async () => {
+    let token = await mintToken({ email: "alice@example.com", scope: "*.other.com" });
+    let verifier = new AuthenticatoorVerifier(AUTH_URL, AUDIENCE, "faucet.example.com");
+    let err: Error | null = null;
+    try { await verifier.verify(token); } catch(ex) { err = ex; }
+    expect(err).to.not.equal(null, "no error thrown");
+    expect(err?.message).to.match(/scope .* does not match host/, "expected scope mismatch error");
+  });
+
+  it("Scope check: tokens without a scope claim are accepted regardless", async () => {
+    let token = await mintToken({ email: "alice@example.com" }); // no scope set
+    let verifier = new AuthenticatoorVerifier(AUTH_URL, AUDIENCE, "faucet.example.com");
+    let claims = await verifier.verify(token);
+    expect(claims.email).to.equal("alice@example.com");
+    expect(claims.scope).to.equal(undefined, "scope should be unset on this token");
+  });
+
+  it("Scope check: when expectedHost unset, scope is not checked", async () => {
+    let token = await mintToken({ email: "alice@example.com", scope: "*.totally-different.com" });
+    let verifier = new AuthenticatoorVerifier(AUTH_URL, AUDIENCE);
+    let claims = await verifier.verify(token);
+    expect(claims.email).to.equal("alice@example.com");
+  });
+
+  describe("matchHost", () => {
+    it("exact match", () => {
+      expect(matchHost("foo.bar", "foo.bar")).to.equal(true);
+      expect(matchHost("foo.bar", "baz.bar")).to.equal(false);
+    });
+    it("leading wildcard requires at least one label", () => {
+      expect(matchHost("*.foo.bar", "x.foo.bar")).to.equal(true);
+      expect(matchHost("*.foo.bar", "x.y.foo.bar")).to.equal(true);
+      expect(matchHost("*.foo.bar", "foo.bar")).to.equal(false);
+    });
+    it("label boundary is enforced (no partial wildcard)", () => {
+      expect(matchHost("*.foo.bar", "evil-foo.bar")).to.equal(false);
+    });
+    it("partial wildcards are not supported", () => {
+      expect(matchHost("foo*.bar", "fooz.bar")).to.equal(false);
+    });
+    it("non-leading wildcards are not supported", () => {
+      expect(matchHost("a.*.b", "a.x.b")).to.equal(false);
+      expect(matchHost("a.b.*", "a.b.c")).to.equal(false);
+    });
+    it("'*' alone matches anything", () => {
+      expect(matchHost("*", "anything.example.com")).to.equal(true);
+      expect(matchHost("*", "x")).to.equal(true);
+    });
+    it("case-insensitive", () => {
+      expect(matchHost("*.Example.COM", "Faucet.example.com")).to.equal(true);
+    });
+    it("empty pattern or host returns false", () => {
+      expect(matchHost("", "foo.bar")).to.equal(false);
+      expect(matchHost("foo.bar", "")).to.equal(false);
+    });
+    it("length mismatch on non-wildcard pattern returns false", () => {
+      expect(matchHost("foo.bar", "x.foo.bar")).to.equal(false);
+    });
   });
 
   it("Strips trailing slashes from authUrl", async () => {

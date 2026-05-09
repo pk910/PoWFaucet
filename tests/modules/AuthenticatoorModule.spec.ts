@@ -50,6 +50,7 @@ describe("Faucet module: authenticatoor (module)", () => {
       enabled: true,
       authUrl: AUTH_URL,
       expectedAudience: AUDIENCE,
+      expectedHost: null,
       requireLogin: false,
       concurrencyLimit: 0,
       grants: [],
@@ -81,6 +82,13 @@ describe("Faucet module: authenticatoor (module)", () => {
     expect((mod as any).grants).to.equal(undefined, "grants leaked to client config");
     expect((mod as any).concurrencyLimit).to.equal(undefined, "concurrencyLimit leaked to client config");
     expect((mod as any).expectedAudience).to.equal(undefined, "expectedAudience leaked to client config");
+  });
+
+  it("expectedHost is propagated to the verifier", async () => {
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).expectedHost = "faucet.example.com";
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let mod = ServiceManager.GetService(ModuleManager).getModule<any>("authenticatoor");
+    expect(mod.verifier.expectedHost).to.equal("faucet.example.com");
   });
 
   it("Module reload reinitializes verifier", async () => {

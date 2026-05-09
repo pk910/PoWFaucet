@@ -80,7 +80,7 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
     if(!audience) {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "authenticatoor module: expectedAudience is not configured; verification will fail until set");
     }
-    this.verifier = new AuthenticatoorVerifier(this.moduleConfig.authUrl, audience || "");
+    this.verifier = new AuthenticatoorVerifier(this.moduleConfig.authUrl, audience || "", this.moduleConfig.expectedHost || "");
   }
 
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {
