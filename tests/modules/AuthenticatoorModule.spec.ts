@@ -24,7 +24,7 @@ function tokenFor(email: string): string {
 }
 
 describe("Faucet module: authenticatoor (module)", () => {
-  let globalStubs;
+  let globalStubs: any;
   let verifyStub: sinon.SinonStub;
 
   beforeEach(async () => {

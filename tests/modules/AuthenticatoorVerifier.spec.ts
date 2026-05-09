@@ -21,7 +21,7 @@ const AUDIENCE = "faucet.test.local";
 const KID = "test-key-1";
 
 describe("Faucet module: authenticatoor (verifier)", () => {
-  let globalStubs;
+  let globalStubs: any;
   let fakeFetchResponses: IFakeFetchResponse[];
   let privateKey: KeyObject;
   let publicJWK: any;
@@ -127,7 +127,7 @@ describe("Faucet module: authenticatoor (verifier)", () => {
     let err: Error | null = null;
     try { await verifier.verify(token); } catch(ex) { err = ex; }
     expect(err).to.not.equal(null, "no error thrown");
-    expect(err.message.toLowerCase()).to.match(/aud/, "expected aud-related error");
+    expect(err?.message.toLowerCase()).to.match(/aud/, "expected aud-related error");
   });
 
   it("Reject token with wrong issuer", async () => {
@@ -136,7 +136,7 @@ describe("Faucet module: authenticatoor (verifier)", () => {
     let err: Error | null = null;
     try { await verifier.verify(token); } catch(ex) { err = ex; }
     expect(err).to.not.equal(null, "no error thrown");
-    expect(err.message.toLowerCase()).to.match(/iss/, "expected iss-related error");
+    expect(err?.message.toLowerCase()).to.match(/iss/, "expected iss-related error");
   });
 
   it("Reject expired token", async () => {
@@ -145,7 +145,7 @@ describe("Faucet module: authenticatoor (verifier)", () => {
     let err: Error | null = null;
     try { await verifier.verify(token); } catch(ex) { err = ex; }
     expect(err).to.not.equal(null, "no error thrown");
-    expect(err.message.toLowerCase()).to.match(/exp/, "expected exp-related error");
+    expect(err?.message.toLowerCase()).to.match(/exp/, "expected exp-related error");
   });
 
   it("Reject tampered token", async () => {
@@ -155,7 +155,7 @@ describe("Faucet module: authenticatoor (verifier)", () => {
     let err: Error | null = null;
     try { await verifier.verify(tampered); } catch(ex) { err = ex; }
     expect(err).to.not.equal(null, "no error thrown");
-    expect(err.message.toLowerCase()).to.match(/signature/, "expected signature error");
+    expect(err?.message.toLowerCase()).to.match(/signature/, "expected signature error");
   });
 
   it("Reject when discovery endpoint fails", async () => {
@@ -164,7 +164,7 @@ describe("Faucet module: authenticatoor (verifier)", () => {
     let err: Error | null = null;
     try { await verifier.verify("any.token"); } catch(ex) { err = ex; }
     expect(err).to.not.equal(null, "no error thrown");
-    expect(err.message).to.match(/discovery failed: HTTP 502/, "expected discovery http error");
+    expect(err?.message).to.match(/discovery failed: HTTP 502/, "expected discovery http error");
   });
 
   it("Reject when discovery doc is missing fields", async () => {
@@ -173,7 +173,7 @@ describe("Faucet module: authenticatoor (verifier)", () => {
     let err: Error | null = null;
     try { await verifier.verify("any.token"); } catch(ex) { err = ex; }
     expect(err).to.not.equal(null, "no error thrown");
-    expect(err.message).to.match(/missing issuer or jwks_uri/, "expected missing fields error");
+    expect(err?.message).to.match(/missing issuer or jwks_uri/, "expected missing fields error");
   });
 
   it("Discovery failure resets so a later verify can retry", async () => {
