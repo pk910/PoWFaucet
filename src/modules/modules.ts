@@ -1,3 +1,4 @@
+import { AuthenticatoorModule } from "./authenticatoor/AuthenticatoorModule.js";
 import { CaptchaModule } from "./captcha/CaptchaModule.js";
 import { ConcurrencyLimitModule } from "./concurrency-limit/ConcurrencyLimitModule.js";
 import { EnsNameModule } from "./ensname/EnsNameModule.js";
@@ -15,6 +16,7 @@ import { WhitelistModule } from "./whitelist/WhitelistModule.js";
 import { ZupassModule } from "./zupass/ZupassModule.js";
 
 export const MODULE_CLASSES = {
+  "authenticatoor": AuthenticatoorModule,
   "captcha": CaptchaModule,
   "concurrency-limit": ConcurrencyLimitModule,
   "ensname": EnsNameModule,
