@@ -235,6 +235,65 @@ modules:
     lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
     upperLimit: 500000000000000000000 # 500 ETH
 
+  ## Authenticatoor login (ethpandaops/service-authenticatoor)
+  authenticatoor:
+    # enable / disable authenticatoor login
+    enabled: false
+
+    # base URL of the authenticatoor service. Used for both backend JWKS
+    # verification (<authUrl>/.well-known/openid-configuration) and frontend
+    # script injection (<authUrl>/client.js).
+    authUrl: "https://auth.example.com"
+
+    # expected aud claim. By default authenticatoor derives the audience from
+    # its issuer URL by stripping the leftmost label — so an issuer at
+    # https://auth.example.com produces tokens with aud = "example.com",
+    # shared across every service in that parent zone. Set this to whatever
+    # value the authenticatoor's `audience` config resolves to (its parent
+    # zone unless overridden).
+    expectedAudience: "example.com"
+
+    # optional defense-in-depth: when set, the token's `scope` wildcard
+    # pattern must match this host (DNS-label glob, same rules as the auth
+    # service). Use the faucet's public hostname (no scheme, no port).
+    # Tokens without a scope claim are accepted regardless. Leave null to
+    # rely on the audience pin alone.
+    expectedHost: null # e.g. "faucet.example.com"
+
+    # require login to start a session. When false the module is purely
+    # opt-in and only applies grants when a user is authenticated.
+    requireLogin: false
+
+    # max concurrent sessions per authenticated user (0 = unlimited)
+    concurrencyLimit: 0
+
+    # recurring grants applied on session start. Evaluated in order; later
+    # grants override perks of earlier ones. Use grants without limits as
+    # the always-on baseline for logged-in users, and stricter grants as
+    # tier-specific bonuses.
+    grants:
+      # baseline grant for any authenticated user — double reward
+      - limitCount: 0
+        limitAmount: 0
+        duration: 86400 # 1 day
+        rewardFactor: 2
+
+      # static drop without mining: 0.5 ETH max once per day, skips PoW.
+      # Once consumed the user falls back to the previous grant tier.
+      - limitCount: 1
+        duration: 86400 # 1 day
+        skipModules: ["pow", "recurring-limits", "faucet-outflow"]
+        overrideMaxDrop: 500000000000000000 # 0.5 ETH
+
+    # frontend customization
+    loginLabel: "Login for additional benefits"
+    userLabel: "Authenticated"
+    loginLogo: null
+    infoHtml: |
+      <strong>Authenticated users get:</strong><br>
+      - 2x reward factor<br>
+      - 1 free static drop per day (no mining)
+
   ## Github login protection
   github:
     # enable / disable github login protection

@@ -1,0 +1,44 @@
+.faucet-page .logo.logo-authenticatoor {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23343a40'%3E%3Cpath d='M8 1a3.5 3.5 0 0 0-3.5 3.5V7H4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-.5V4.5A3.5 3.5 0 0 0 8 1Zm2.5 6V4.5a2.5 2.5 0 0 0-5 0V7h5Z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 100%;
+  height: 100%;
+}
+
+.faucet-page .faucet-authenticatoor-auth {
+  margin: 16px 0;
+  display: flex;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-icon {
+  height: 50px;
+  width: 50px;
+  padding: 4px;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-field {
+  margin: 0 16px;
+  flex-grow: 1;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-field .auth-info {
+  color: #343a40;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-info-icon {
+  margin-left: 8px;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-logout {
+  float: right;
+}
+
+#authenticatoor-tooltip .tooltip-inner {
+  max-width: 500px;
+}
+
+#authenticatoor-tooltip .authenticatoor-info {
+  text-align: left;
+}
