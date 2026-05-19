@@ -139,7 +139,13 @@ export class FaucetHttpServer {
                 this.staticServer.serveFile("/index.html", 200, {}, req, rsp);
               break;
             default:
-              let pathname = decodeURI(new URL(req.url, 'http://localhost').pathname);
+              let pathname: string;
+              try {
+                pathname = decodeURI(new URL(req.url, 'http://localhost').pathname);
+              } catch {
+                this.sendApiResponse(req, rsp, 400, "Bad Request", {}, "");
+                return;
+              }
               this.staticServer.servePath(pathname, 200, this.getCorsHeaders(req), req, rsp, (status, headers) => {
                 if(!rsp.headersSent && !rsp.writableEnded) {
                   rsp.writeHead(status, headers);

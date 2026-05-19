@@ -93,6 +93,19 @@ describe("Faucet Web Server", () => {
     expect(indexData).contains("<!-- pow-faucet-header -->", "not index contents");
   });
 
+  it("rejects invalid static request urls without crashing", async () => {
+    faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
+    faucetConfig.buildSeoIndex = false;
+    faucetConfig.serverPort = 0;
+    let webServer = ServiceManager.GetService(FaucetHttpServer);
+    webServer.initialize();
+    await returnDelayedPromise(true, null);
+    let listenPort = webServer.getListenPort();
+    let response = await FetchUtil.fetch("http://localhost:" + listenPort + "//", {method: "GET"});
+    expect(response.status).equals(400, "unexpected response status");
+    expect(response.statusText).equals("Bad Request", "unexpected response status text");
+  });
+
   it("check api call (GET)", async () => {
     faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
     faucetConfig.buildSeoIndex = false;
