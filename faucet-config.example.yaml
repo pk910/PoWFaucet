@@ -49,13 +49,42 @@ faucetHomeHtml: |
 
 # random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 # use a random string and do not share / reuse it anywhere. Everyone knowing this secret is theoretically able to claim rewards from the faucet without mining.
+# can be overridden at runtime with FAUCET_SECRET
 faucetSecret: "RandomStringThatShouldBeVerySecret!"
 
-# ETH execution layer RPC host
+# ETH execution layer RPC host(s)
+# Either a single URL string (legacy) or a list of endpoints with priority/metered flags.
+# - URLs may include basic auth (e.g. "https://user:pass@host"); credentials are stripped from the URL and sent as Authorization header.
+# - name: optional display name shown in logs and on the status page in place of the (sanitized) URL.
+# - priority: higher value = preferred (default: 1). Reads use the highest-priority ready endpoint.
+# - metered: if true, this endpoint is monitored less often to reduce request count (default: false).
+# Examples:
 #ethRpcHost: "http://127.0.0.1:8545/"
+#ethRpcHost:
+#  - url: "http://127.0.0.1:8545/"
+#    name: "local-node"
+#    priority: 10
+#  - url: "https://user:pass@rpc.example.com/"
+#    name: "fallback-provider"
+#    priority: 5
+#    metered: true
 ethRpcHost: "https://rpc.hoodi.ethpandaops.io"
 
+# Mark RPC endpoints offline if their block height falls behind the highest known head by more than this many blocks.
+ethRpcMaxBlockHeightDiff: 10
+
+# Monitoring poll interval (seconds) for non-metered endpoints (block height + availability).
+ethRpcMonitorInterval: 10
+
+# Monitoring poll interval (seconds) for metered endpoints (lower request count, slower failure detection).
+ethRpcMonitorMeteredInterval: 60
+
+# Number of highest-priority ready endpoints to broadcast each transaction to in parallel.
+# At least one successful submission is required; other endpoints' errors (e.g. "already known") are ignored.
+ethTxBroadcastCount: 2
+
 # faucet wallet private key (hex, without 0x prefix)
+# can be overridden at runtime with FAUCET_ETH_WALLET_KEY
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
 
 # EVM chain id (null for auto-detect from RPC)
@@ -132,6 +161,7 @@ modules:
     siteKey: "00000000-0000-0000-0000-000000000000"
 
     # captcha secret key
+    # can be overridden at runtime with FAUCET_CAPTCHA_SECRET
     secret: "0xCensoredHCaptchaSecretKey"
 
     # require captcha to start a new session (default: false)
@@ -232,6 +262,65 @@ modules:
     lowerLimit: -500000000000000000000 # -500 ETH (when outflow balance gets smaller or equal to this, the reward will be 0%)
     upperLimit: 500000000000000000000 # 500 ETH
 
+  ## Authenticatoor login (ethpandaops/service-authenticatoor)
+  authenticatoor:
+    # enable / disable authenticatoor login
+    enabled: false
+
+    # base URL of the authenticatoor service. Used for both backend JWKS
+    # verification (<authUrl>/.well-known/openid-configuration) and frontend
+    # script injection (<authUrl>/client.js).
+    authUrl: "https://auth.example.com"
+
+    # expected aud claim. By default authenticatoor derives the audience from
+    # its issuer URL by stripping the leftmost label — so an issuer at
+    # https://auth.example.com produces tokens with aud = "example.com",
+    # shared across every service in that parent zone. Set this to whatever
+    # value the authenticatoor's `audience` config resolves to (its parent
+    # zone unless overridden).
+    expectedAudience: "example.com"
+
+    # optional defense-in-depth: when set, the token's `scope` wildcard
+    # pattern must match this host (DNS-label glob, same rules as the auth
+    # service). Use the faucet's public hostname (no scheme, no port).
+    # Tokens without a scope claim are accepted regardless. Leave null to
+    # rely on the audience pin alone.
+    expectedHost: null # e.g. "faucet.example.com"
+
+    # require login to start a session. When false the module is purely
+    # opt-in and only applies grants when a user is authenticated.
+    requireLogin: false
+
+    # max concurrent sessions per authenticated user (0 = unlimited)
+    concurrencyLimit: 0
+
+    # recurring grants applied on session start. Evaluated in order; later
+    # grants override perks of earlier ones. Use grants without limits as
+    # the always-on baseline for logged-in users, and stricter grants as
+    # tier-specific bonuses.
+    grants:
+      # baseline grant for any authenticated user — double reward
+      - limitCount: 0
+        limitAmount: 0
+        duration: 86400 # 1 day
+        rewardFactor: 2
+
+      # static drop without mining: 0.5 ETH max once per day, skips PoW.
+      # Once consumed the user falls back to the previous grant tier.
+      - limitCount: 1
+        duration: 86400 # 1 day
+        skipModules: ["pow", "recurring-limits", "faucet-outflow"]
+        overrideMaxDrop: 500000000000000000 # 0.5 ETH
+
+    # frontend customization
+    loginLabel: "Login for additional benefits"
+    userLabel: "Authenticated"
+    loginLogo: null
+    infoHtml: |
+      <strong>Authenticated users get:</strong><br>
+      - 2x reward factor<br>
+      - 1 free static drop per day (no mining)
+
   ## Github login protection
   github:
     # enable / disable github login protection
@@ -239,6 +328,7 @@ modules:
 
     # github api credentials
     appClientId: "" # client id from github app
+    # can be overridden at runtime with FAUCET_GITHUB_APP_SECRET
     appSecret: "" # app secret from github app
 
     # authentication timeout
@@ -353,6 +443,7 @@ modules:
   ## Passport protection
   passport:
     enabled: false
+    # can be overridden at runtime with FAUCET_PASSPORT_SCORER_API_KEY
     scorerApiKey: "" # Gitcoin Passport Scorer API Key
     trustedIssuers:
       - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport

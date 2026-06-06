@@ -44,6 +44,7 @@ faucetHomeHtml: |
 
 # random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 # use a random string and do not share / reuse it anywhere. Everyone knowing this secret is theoretically able to claim rewards from the faucet without mining.
+# can be overridden at runtime with FAUCET_SECRET
 faucetSecret: "***censored***"
 
 # ETH execution layer RPC host
@@ -51,6 +52,7 @@ ethRpcHost: "https://holesky.infura.io/v3/***censored***"
 #ethRpcHost: "https://rpc.holesky.ethpandaops.io"
 
 # faucet wallet private key (hex, without 0x prefix)
+# can be overridden at runtime with FAUCET_ETH_WALLET_KEY
 ethWalletKey: "***censored***"
 
 # EVM chain id (null for auto-detect from RPC)
@@ -123,6 +125,7 @@ modules:
     siteKey: "a62dab4f-e790-42ab-acbf-47f1c029870a"
 
     # captcha secret key
+    # can be overridden at runtime with FAUCET_CAPTCHA_SECRET
     secret: "0x***censored***"
 
     # require captcha to start a new session (default: false)

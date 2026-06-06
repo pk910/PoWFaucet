@@ -7,7 +7,7 @@ import { renderDate, renderTime, renderTimespan } from '../../utils/DateUtils';
 import getCountryIcon from 'country-flag-icons/unicode'
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { IFaucetContext } from '../../common/FaucetContext';
-import { IClientClaimStatus, IClientSessionStatus, IFaucetStatusGeneralStatus, IFaucetStatusOutflowStatus, IFaucetStatusRefillStatus } from '../../types/FaucetStatus';
+import { IClientClaimStatus, IClientSessionStatus, IFaucetRpcEndpointStatus, IFaucetStatusGeneralStatus, IFaucetStatusOutflowStatus, IFaucetStatusRefillStatus } from '../../types/FaucetStatus';
 
 import "./FaucetStatus.css";
 
@@ -22,6 +22,7 @@ export interface IFaucetStatusPageState {
   status: IFaucetStatusGeneralStatus;
   refillStatus: IFaucetStatusRefillStatus;
   outflowStatus: IFaucetStatusOutflowStatus;
+  rpcEndpoints: IFaucetRpcEndpointStatus[];
   activeSessions: IClientSessionStatus[];
   activeClaims: IClientClaimStatus[];
 }
@@ -36,6 +37,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       status: null,
       refillStatus: null,
       outflowStatus: null,
+      rpcEndpoints: [],
       activeSessions: [],
       activeClaims: [],
 		};
@@ -77,6 +79,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         status: faucetStatus.status,
         refillStatus: faucetStatus.refill,
         outflowStatus: faucetStatus.outflowRestriction,
+        rpcEndpoints: faucetStatus.rpcEndpoints || [],
         activeSessions: activeSessions,
         activeClaims: activeClaims,
       });
@@ -101,6 +104,14 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
               {this.renderFaucetStatus()}
             </div>
           </div>
+          {this.state.rpcEndpoints.length > 0 ?
+          <div className='col-12 card status-panel'>
+            <div className="card-body">
+              <h5 className="card-title">RPC Endpoints</h5>
+              {this.renderRpcEndpoints()}
+            </div>
+          </div>
+          : null}
           <div className='col-12 card status-panel'>
             <div className="card-body">
               <h5 className="card-title">Active mining sessions</h5>
@@ -219,6 +230,68 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
           : null}
         </div>
       </div>
+    );
+  }
+
+  private renderRpcEndpoints(): React.ReactElement {
+    return (
+      <table className="table table-striped status-sessions">
+        <thead>
+          <tr>
+            <th scope="col">RPC URL</th>
+            <th scope="col">Priority</th>
+            <th scope="col">Metered</th>
+            <th scope="col">Status</th>
+            <th scope="col">Head Block</th>
+            <th scope="col">Last Check</th>
+            <th scope="col">Requests</th>
+          </tr>
+        </thead>
+        <tbody>
+          {this.state.rpcEndpoints.map((ep, idx) => this.renderRpcEndpointRow(ep, idx))}
+        </tbody>
+      </table>
+    );
+  }
+
+  private renderRpcEndpointRow(ep: IFaucetRpcEndpointStatus, idx: number): React.ReactElement {
+    let statusBadges: React.ReactElement[] = [];
+    if (ep.ready)
+      statusBadges.push(<span key="ready" className="badge bg-success">Ready</span>);
+    else if (ep.online && ep.blockLag)
+      statusBadges.push(<span key="lag" className="badge bg-warning text-dark">Block lag</span>);
+    else
+      statusBadges.push(<span key="offline" className="badge bg-danger">Offline</span>);
+
+    let lastCheck = ep.lastCheck ? renderDate(new Date(ep.lastCheck * 1000), true, true) : "-";
+    let urlNode: React.ReactElement = <span>{ep.url}</span>;
+    if (ep.lastError) {
+      urlNode = (
+        <OverlayTrigger
+          placement="auto"
+          delay={{ show: 250, hide: 400 }}
+          container={this.props.pageContext.getContainer()}
+          overlay={(props) => (
+            <Tooltip id={"rpc-err-" + idx} {...props}>
+              <div className='ipaddr-info claim-error'>{ep.lastError}</div>
+            </Tooltip>
+          )}
+        >
+          <span>{ep.url}</span>
+        </OverlayTrigger>
+      );
+    }
+
+    return (
+      <tr key={idx}>
+        <th scope="row">{urlNode}</th>
+        <td>{ep.priority}</td>
+        <td>{ep.metered ? "yes" : "no"}</td>
+        <td>{statusBadges}</td>
+        <td>{ep.blockHeight || "-"}</td>
+        <td>{lastCheck}</td>
+        <td>{ep.requestCount}</td>
+      </tr>
     );
   }
 

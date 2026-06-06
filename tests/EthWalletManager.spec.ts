@@ -39,6 +39,7 @@ describe("ETH Wallet Manager", () => {
   it("check wallet state initialization", async () => {
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_chainId", 1337);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_getBalance", "1000");
     fakeProvider.injectResponse("eth_getTransactionCount", 42);
     await ethWalletManager.initialize();
@@ -56,6 +57,7 @@ describe("ETH Wallet Manager", () => {
   it("check wallet state initialization (pending not supported)", async () => {
     let ethWalletManager = new EthWalletManager();
     fakeProvider.injectResponse("eth_chainId", 1337);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_getBalance", (payload) => {
       if(payload.params[1] === "pending")
         throw '"pending" is not yet supported';
@@ -80,6 +82,7 @@ describe("ETH Wallet Manager", () => {
 
   it("check wallet state initialization (fixed chainId)", async () => {
     let ethWalletManager = new EthWalletManager();
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
     fakeProvider.injectResponse("eth_getBalance", (payload) => {
       if(payload.params[1] === "pending")
         throw '"pending" is not yet supported';

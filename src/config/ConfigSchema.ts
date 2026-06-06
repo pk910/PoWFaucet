@@ -6,6 +6,15 @@ import { IFaucetResultSharingConfig } from './ConfigShared.js';
 import { FaucetDatabaseOptions } from '../db/FaucetDatabase.js';
 import { IFaucetStatusConfig } from '../services/FaucetStatus.js';
 
+export interface IRpcEndpointConfig {
+  url: string | object; // RPC URL (http://, https://, ws://, wss://, or absolute path for IPC; supports user:pass@host) or pre-built provider object
+  name?: string; // optional display name shown in logs and the status page in place of the (sanitized) URL
+  priority?: number; // higher priority endpoints are preferred (default: 1)
+  metered?: boolean; // metered endpoints are monitored less frequently to reduce request count (default: false)
+}
+
+export type EthRpcHostConfig = string | object | IRpcEndpointConfig | (string | object | IRpcEndpointConfig)[];
+
 export interface IConfigSchema {
   version?: 2;
 
@@ -30,7 +39,11 @@ export interface IConfigSchema {
   httpProxyCount: number; // number of http proxies in front of this faucet
   faucetSecret: string; // random secret string that is used by the faucet to "sign" session data, so sessions can be restored automatically by clients when faucet is restarted / crashed
 
-  ethRpcHost: string; // ETH execution layer RPC host
+  ethRpcHost: EthRpcHostConfig; // ETH execution layer RPC host(s) - string for single, list for multiple endpoints with failover
+  ethRpcMaxBlockHeightDiff: number; // mark endpoints offline if their block height falls behind the highest by more than this many blocks
+  ethRpcMonitorInterval: number; // monitoring interval (seconds) for non-metered endpoints
+  ethRpcMonitorMeteredInterval: number; // monitoring interval (seconds) for metered endpoints (use longer to reduce request count)
+  ethTxBroadcastCount: number; // number of highest-priority ready endpoints to broadcast transactions to in parallel
   ethWalletKey: string; // faucet wallet private key
   ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)

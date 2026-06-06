@@ -37,8 +37,22 @@ export interface IClientFaucetStatusRsp {
   status: IFaucetStatusGeneralStatus;
   refill: IFaucetStatusRefillStatus;
   outflowRestriction: IFaucetStatusOutflowStatus;
+  rpcEndpoints: IFaucetRpcEndpointStatus[];
   sessions: IClientSessionStatus[];
   claims: IClientClaimStatus[];
+}
+
+export interface IFaucetRpcEndpointStatus {
+  url: string;
+  priority: number;
+  metered: boolean;
+  online: boolean;
+  ready: boolean;
+  blockLag: boolean;
+  blockHeight: number;
+  lastCheck: number;
+  lastError: string | null;
+  requestCount: number;
 }
 
 export interface IFaucetStatusGeneralStatus {

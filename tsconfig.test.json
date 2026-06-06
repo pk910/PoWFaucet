@@ -3,6 +3,8 @@
     "module": "ES2022",
     "target": "ES2022",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "strict": false,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

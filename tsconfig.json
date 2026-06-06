@@ -4,7 +4,10 @@
     "esModuleInterop": true,
     "target": "esnext",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "strict": false,
     "sourceMap": true,
+    "rootDir": "./src",
     "outDir": "dist",
     "skipLibCheck": true,
     "resolveJsonModule": true

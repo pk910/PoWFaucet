@@ -21,6 +21,7 @@ export interface IFaucetConfig {
     [provider: string]: string;
   };
   modules: {
+    authenticatoor?: IAuthenticatoorModuleConfig;
     captcha?: ICaptchaModuleConfig;
     ensname?: IEnsNameModuleConfig;
     github?: IGithubModuleConfig;
@@ -29,6 +30,15 @@ export interface IFaucetConfig {
     voucher?: IVoucherModuleConfig;
     zupass?: IZupassModuleConfig;
   };
+}
+
+export interface IAuthenticatoorModuleConfig {
+  authUrl: string;
+  requireLogin: boolean;
+  loginLabel: string | null;
+  userLabel: string | null;
+  infoHtml: string | null;
+  loginLogo: string | null;
 }
 
 export interface ICaptchaModuleConfig {

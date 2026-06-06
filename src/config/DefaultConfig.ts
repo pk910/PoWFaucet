@@ -32,6 +32,10 @@ export function getDefaultConfig(): IConfigSchema {
     faucetSecret: null, // mandatory
 
     ethRpcHost: null, // mandatory
+    ethRpcMaxBlockHeightDiff: 10,
+    ethRpcMonitorInterval: 10,
+    ethRpcMonitorMeteredInterval: 60,
+    ethTxBroadcastCount: 2,
     ethWalletKey: null, // mandatory
     ethChainId: null,
     ethTxGasLimit: 100000,
