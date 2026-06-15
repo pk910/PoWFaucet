@@ -13,7 +13,9 @@ import { FaucetError } from '../src/common/FaucetError.js';
 import { FaucetSession, FaucetSessionStatus } from '../src/session/FaucetSession.js';
 
 
-describe("Session Management with MySQL DB Driver", () => {
+const describeMySQL = process.platform === "win32" ? describe.skip : describe;
+
+describeMySQL("Session Management with MySQL DB Driver", () => {
   let globalStubs;
   let fakeProvider;
   let mysqlDb;
