@@ -34,7 +34,7 @@
     "css-loader": "^7.1.2",
     "mini-css-extract-plugin": "^2.9.1",
     "sass": "^1.77.8",
-    "sass-loader": "^16.0.1",
+    "sass-loader": "^17.0.0",
     "style-loader": "^4.0.0",
     "typescript": "^6.0.2",
     "url-loader": "^4.1.1",
