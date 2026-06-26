@@ -386,6 +386,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
     if (result.isValid) {
       session.setSessionData("pow.restSubmittedNonce", input.nonce);
+      session.setSessionData("pow.restSession", true);
       let rewardAmount = BigInt(this.moduleConfig.powShareReward);
       await session.addReward(rewardAmount);
 

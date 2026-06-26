@@ -87,6 +87,11 @@ ethTxBroadcastCount: 2
 # can be overridden at runtime with FAUCET_ETH_WALLET_KEY
 ethWalletKey: "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000"
 
+# optional second wallet for REST-API sessions (see llm.txt / agents.md)
+# REST claims use this wallet so the main wallet is not depleted by automated agents.
+# can be overridden at runtime with FAUCET_ETH_REST_WALLET_KEY
+#ethRestWalletKey: "..."
+
 # EVM chain id (null for auto-detect from RPC)
 ethChainId: null
 

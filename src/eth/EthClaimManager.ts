@@ -43,6 +43,7 @@ export interface EthClaimInfo {
   target: string;
   amount: string;
   claim: EthClaimData;
+  restClaim?: boolean;
 }
 
 export interface EthClaimData {
@@ -86,6 +87,7 @@ export class EthClaimManager {
         target: sessionData.targetAddr,
         amount: sessionData.dropAmount,
         claim: sessionData.claim,
+        restClaim: !!sessionData.data?.["pow.restSession"],
       };
       switch(claimInfo.claim.claimStatus) {
         case ClaimTxStatus.QUEUE:
@@ -96,7 +98,10 @@ export class EthClaimManager {
         case ClaimTxStatus.PENDING:
           this.pendingTxQueue[claimInfo.claim.txHash] = claimInfo;
           this.claimTxDict[claimInfo.session] = claimInfo;
-          this.awaitTxReceipt(claimInfo, ServiceManager.GetService(EthWalletManager).watchClaimTx(claimInfo));
+          this.awaitTxReceipt(claimInfo, claimInfo.restClaim
+            ? ServiceManager.GetService(EthWalletManager).watchRestClaimTx(claimInfo)
+            : ServiceManager.GetService(EthWalletManager).watchClaimTx(claimInfo)
+          );
           break;
         default:
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Cannot restore claimTx: unexpected claim status '" + claimInfo.claim.claimStatus + "'");
@@ -201,6 +206,7 @@ export class EthClaimManager {
       target: sessionData.targetAddr,
       amount: sessionData.dropAmount,
       claim: sessionData.claim,
+      restClaim: !!sessionData.data?.["pow.restSession"],
     };
     
     try {
@@ -237,11 +243,16 @@ export class EthClaimManager {
     this.queueProcessing = true;
 
     try {
-      let walletState = ServiceManager.GetService(EthWalletManager).getWalletState();
+      let ethWalletManager = ServiceManager.GetService(EthWalletManager);
       while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
+        let nextClaim = this.claimTxQueue[0];
+        let walletState = nextClaim.restClaim
+          ? ethWalletManager.getRestWalletState()
+          : ethWalletManager.getWalletState();
+
         if(faucetConfig.ethQueueNoFunds && (
-          !walletState.ready || 
-          walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(this.claimTxQueue[0].amount) ||
+          !walletState || !walletState.ready || 
+          walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(nextClaim.amount) ||
           walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
         )) {
           break; // skip processing (out of funds)
@@ -253,7 +264,8 @@ export class EthClaimManager {
       }
 
       let now = Math.floor(new Date().getTime() / 1000);
-      let walletRefreshTime = walletState.ready ? 600 : 10;
+      let mainWalletState = ethWalletManager.getWalletState();
+      let walletRefreshTime = mainWalletState?.ready ? 600 : 10;
       if(Object.keys(this.pendingTxQueue).length === 0 && now - ServiceManager.GetService(EthWalletManager).getLastWalletRefresh() > walletRefreshTime) {
         await ServiceManager.GetService(EthWalletManager).loadWalletState();
       }
@@ -282,10 +294,10 @@ export class EthClaimManager {
 
   private async processQueueTx(claimTx: EthClaimInfo) {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    let walletState = ethWalletManager.getWalletState();
-    if(!walletState.ready) {
+    let walletState = claimTx.restClaim ? ethWalletManager.getRestWalletState() : ethWalletManager.getWalletState();
+    if(!walletState || !walletState.ready) {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Network RPC is currently unreachable.";
+      claimTx.claim.txError = claimTx.restClaim ? "REST wallet is not configured or RPC is unreachable." : "Network RPC is currently unreachable.";
       this.updateClaimStatus(claimTx);
       return;
     }
@@ -303,10 +315,12 @@ export class EthClaimManager {
       claimTx.claim.claimStatus = ClaimTxStatus.PROCESSING;
 
       // send transaction
-      let { txPromise } = await ethWalletManager.sendClaimTx(claimTx);
+      let { txPromise } = claimTx.restClaim
+        ? await ethWalletManager.sendRestClaimTx(claimTx)
+        : await ethWalletManager.sendClaimTx(claimTx);
       this.pendingTxQueue[claimTx.claim.txHash] = claimTx;
       
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount)) + "] to: " + claimTx.target + ": " + claimTx.claim.txHash);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted " + (claimTx.restClaim ? "REST " : "") + "claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount)) + "] to: " + claimTx.target + ": " + claimTx.claim.txHash);
       claimTx.claim.claimStatus = ClaimTxStatus.PENDING;
       this.updateClaimStatus(claimTx);
 

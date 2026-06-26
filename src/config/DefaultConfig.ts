@@ -37,6 +37,7 @@ export function getDefaultConfig(): IConfigSchema {
     ethRpcMonitorMeteredInterval: 60,
     ethTxBroadcastCount: 2,
     ethWalletKey: null, // mandatory
+    ethRestWalletKey: null, // optional second wallet for REST-API sessions
     ethChainId: null,
     ethTxGasLimit: 100000,
     ethLegacyTx: false,

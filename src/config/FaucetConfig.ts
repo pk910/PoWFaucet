@@ -126,6 +126,9 @@ export function loadFaucetConfig(loadDefaultsOnly?: boolean) {
   if(process.env.FAUCET_ETH_WALLET_KEY) {
     faucetConfig.ethWalletKey = process.env.FAUCET_ETH_WALLET_KEY;
   }
+  if(process.env.FAUCET_ETH_REST_WALLET_KEY) {
+    faucetConfig.ethRestWalletKey = process.env.FAUCET_ETH_REST_WALLET_KEY;
+  }
   if(process.env.FAUCET_CAPTCHA_SECRET) {
     if(!faucetConfig.modules.captcha)
       faucetConfig.modules.captcha = {} as ICaptchaConfig;

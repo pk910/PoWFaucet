@@ -65,6 +65,9 @@ export class EthWalletManager {
   private walletKey: Buffer;
   private walletAddr: string;
   private walletState: WalletState;
+  private restWalletKey: Buffer;
+  private restWalletAddr: string;
+  private restWalletState: WalletState;
   private tokenState: FaucetTokenState;
   private lastWalletRefresh: number;
   private txReceiptPollInterval = 12000;
@@ -88,6 +91,12 @@ export class EthWalletManager {
       balance: 0n,
       nativeBalance: 0n,
     };
+    this.restWalletState = {
+      ready: false,
+      nonce: 0,
+      balance: 0n,
+      nativeBalance: 0n,
+    };
 
     this.startWeb3();
     if(typeof faucetConfig.ethChainId === "number")
@@ -98,6 +107,14 @@ export class EthWalletManager {
       privkey = privkey.substring(2);
     this.walletKey = Buffer.from(privkey, "hex");
     this.walletAddr = EthUtil.toChecksumAddress(EthUtil.bytesToHex(EthUtil.privateToAddress(this.walletKey)));
+
+    if(faucetConfig.ethRestWalletKey) {
+      let restPrivkey = faucetConfig.ethRestWalletKey;
+      if(restPrivkey.match(/^0x/))
+        restPrivkey = restPrivkey.substring(2);
+      this.restWalletKey = Buffer.from(restPrivkey, "hex");
+      this.restWalletAddr = EthUtil.toChecksumAddress(EthUtil.bytesToHex(EthUtil.privateToAddress(this.restWalletKey)));
+    }
 
     await this.loadWalletState();
 
@@ -168,6 +185,14 @@ export class EthWalletManager {
     return this.walletState;
   }
 
+  public getRestWalletState(): WalletState | null {
+    return this.restWalletAddr ? this.restWalletState : null;
+  }
+
+  public getRestFaucetAddress(): string | null {
+    return this.restWalletAddr || null;
+  }
+
   public getLastWalletRefresh(): number {
     return this.lastWalletRefresh;
   }
@@ -176,7 +201,8 @@ export class EthWalletManager {
     this.lastWalletRefresh = Math.floor(new Date().getTime() / 1000);
     let chainIdPromise = typeof faucetConfig.ethChainId === "number" ? Promise.resolve(faucetConfig.ethChainId) : this.web3.eth.getChainId();
     let tokenBalancePromise = this.tokenState?.getBalance(this.walletAddr);
-    return Promise.all([
+
+    let mainWalletPromise = Promise.all([
       this.web3.eth.getBalance(this.walletAddr, "pending"),
       this.web3.eth.getTransactionCount(this.walletAddr, "pending"),
       chainIdPromise,
@@ -200,7 +226,7 @@ export class EthWalletManager {
         nativeBalance: BigInt(res[0]),
         nonce: Number(res[1]),
       });
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Wallet " + this.walletAddr + ":  " + this.readableAmount(this.walletState.balance) + "  [Nonce: " + this.walletState.nonce + "]");
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Main wallet " + this.walletAddr + ":  " + this.readableAmount(this.walletState.balance) + "  [Nonce: " + this.walletState.nonce + "]");
     }, (err) => {
       Object.assign(this.walletState, {
         ready: false,
@@ -209,7 +235,35 @@ export class EthWalletManager {
         nonce: 0,
       });
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error loading wallet state for " + this.walletAddr + ": " + err.toString());
-    }).then(() => {
+    });
+
+    let restWalletPromise = this.restWalletAddr ? Promise.all([
+      this.web3.eth.getBalance(this.restWalletAddr),
+      this.web3.eth.getTransactionCount(this.restWalletAddr),
+    ]).then((res) => {
+      Object.assign(this.restWalletState, {
+        ready: true,
+        balance: this.tokenState ? 0n : BigInt(res[0]),
+        nativeBalance: BigInt(res[0]),
+        nonce: Number(res[1]),
+      });
+      if(this.tokenState) {
+        this.tokenState.getBalance(this.restWalletAddr).then((bal) => {
+          this.restWalletState.balance = bal;
+        }).catch(() => {});
+      }
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "REST wallet " + this.restWalletAddr + ":  " + this.readableAmount(this.restWalletState.balance) + "  [Nonce: " + this.restWalletState.nonce + "]");
+    }, (err) => {
+      Object.assign(this.restWalletState, {
+        ready: false,
+        balance: 0n,
+        nativeBalance: 0n,
+        nonce: 0,
+      });
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error loading REST wallet state for " + this.restWalletAddr + ": " + err.toString());
+    }) : Promise.resolve();
+
+    return Promise.all([mainWalletPromise, restWalletPromise]).then(() => {
       this.updateFaucetStatus();
     });
   }
@@ -394,7 +448,57 @@ export class EthWalletManager {
     };
   }
 
-  private async buildEthTx(target: string, amount: bigint, nonce: number, data?: string, gasLimit?: number): Promise<string> {
+  public async sendRestClaimTx(claimInfo: EthClaimInfo): Promise<TransactionResult> {
+    if(!this.restWalletAddr)
+      throw new Error("REST wallet not configured");
+
+    let txPromise: Promise<TransactionReceipt>;
+    let retryCount = 0;
+    let txError: Error;
+    let buildTx = () => {
+      claimInfo.claim.txNonce = this.restWalletState.nonce;
+      if(this.tokenState)
+        return this.buildEthTx(this.tokenState.address, 0n, claimInfo.claim.txNonce, this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount)), undefined, this.restWalletKey);
+      else
+        return this.buildEthTx(claimInfo.target, BigInt(claimInfo.amount), claimInfo.claim.txNonce, undefined, undefined, this.restWalletKey);
+    };
+
+    do {
+      try {
+        claimInfo.claim.txHex = await buildTx();
+        let txResult = await this.sendTransaction(claimInfo.claim.txHex, claimInfo.claim.txNonce);
+        claimInfo.claim.txHash = txResult[0];
+        txPromise = txResult[1];
+      } catch(ex) {
+        if(!txError)
+          txError = ex;
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Sending REST TX for " + claimInfo.target + " failed [try: " + retryCount + "]: " + ex.toString());
+        await sleepPromise(2000);
+        await this.loadWalletState();
+      }
+    } while(!txPromise && retryCount++ < 3);
+    if(!txPromise)
+      throw txError;
+
+    this.restWalletState.nonce++;
+    this.restWalletState.balance -= BigInt(claimInfo.amount);
+    this.updateFaucetStatus();
+    return {
+      txHash: claimInfo.claim.txHash,
+      txPromise : txPromise.then((receipt) => {
+        let txfee = BigInt(receipt.effectiveGasPrice) * BigInt(receipt.gasUsed);
+        this.restWalletState.nativeBalance -= txfee;
+        return {
+          status: Number(receipt.status) > 0,
+          block: Number(receipt.blockNumber),
+          fee: txfee,
+          receipt: receipt,
+        };
+      }),
+    };
+  }
+
+  private async buildEthTx(target: string, amount: bigint, nonce: number, data?: string, gasLimit?: number, signKey?: Buffer): Promise<string> {
     if(target.match(/^0X/))
       target = "0x" + target.substring(2);
 
@@ -432,7 +536,7 @@ export class EthWalletManager {
       });
     }
 
-    tx = tx.sign(this.walletKey);
+    tx = tx.sign(signKey || this.walletKey);
     return Buffer.from(tx.serialize()).toString('hex');
   }
 

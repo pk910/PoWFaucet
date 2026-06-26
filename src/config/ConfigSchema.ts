@@ -44,7 +44,8 @@ export interface IConfigSchema {
   ethRpcMonitorInterval: number; // monitoring interval (seconds) for non-metered endpoints
   ethRpcMonitorMeteredInterval: number; // monitoring interval (seconds) for metered endpoints (use longer to reduce request count)
   ethTxBroadcastCount: number; // number of highest-priority ready endpoints to broadcast transactions to in parallel
-  ethWalletKey: string; // faucet wallet private key
+  ethWalletKey: string; // faucet wallet private key (used for captcha/mined sessions)
+  ethRestWalletKey: string | null; // optional second wallet for REST-API sessions
   ethChainId: number | null; // ETH chain id
   ethTxGasLimit: number; // transaction gas limit (wei)
   ethLegacyTx: boolean; // use legacy (non-eip1559) transaction type
