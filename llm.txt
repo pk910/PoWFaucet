@@ -1,0 +1,251 @@
+# PoWFaucet REST API — LLM Agent Guide
+
+This faucet distributes testnet ETH to addresses that complete a Proof-of-Work
+challenge.  The PoW prevents bots from draining the wallet.  This document
+describes the pure-REST flow — no browser, no WebSocket, no captcha.
+
+## Endpoint summary
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/startSession` | Create a mining session (needs target address) |
+| GET  | `/api/getFaucetConfig` | Read faucet status + PoW module params |
+| GET  | `/api/powChallenge`   | Fetch a nonce range to mine against |
+| POST | `/api/powSubmit`      | Submit a solved PoW share |
+| GET  | `/api/getSessionStatus` | Check current balance / state |
+| POST | `/api/powCloseSession` | Signal you're done mining (moves to claimable) |
+| POST | `/api/claimReward`    | Claim accumulated balance to your address |
+
+## Full workflow
+
+### 1. Start a session
+
+```http
+POST /api/startSession
+Content-Type: application/json
+
+{"addr": "0xYourAddressHere"}
+```
+
+Response:
+```json
+{
+  "session": "abc123...",
+  "status": "running",
+  "balance": "0",
+  "target": "0xYourAddressHere",
+  "modules": {
+    "pow": {
+      "preImage": "dGhpcyBpcyBhIHByZWltYWdl"
+    }
+  }
+}
+```
+
+Save the `session` id — you'll need it for every subsequent call.  
+The `preImage` is the base64-encoded challenge seed.
+
+### 2. Read faucet config
+
+```http
+GET /api/getFaucetConfig?session=<sessionId>
+```
+
+The response contains `modules.pow` with the hash algorithm, parameters, and
+difficulty target.  Example extract:
+
+```json
+{
+  "modules": {
+    "pow": {
+      "powParams": { "a": "argon2", "t": 0, "v": 13, "i": 4, "m": 4096, "p": 1, "l": 16 },
+      "powDifficulty": 11
+    }
+  }
+}
+```
+
+The supported algorithms are `scrypt`, `argon2`, `cryptonight`, and `nickminer`.
+The specific params depend on the faucet operator's config.
+
+### 3. Get a challenge (nonce range)
+
+```http
+GET /api/powChallenge?session=<sessionId>
+```
+
+Response:
+```json
+{
+  "algo": "argon2",
+  "params": { "type": 0, "version": 13, "timeCost": 4, "memoryCost": 4096, "parallelization": 1, "keyLength": 16 },
+  "difficulty": 11,
+  "preimage": "dGhpcyBpcyBhIHByZWltYWdl",
+  "nonceStart": 0,
+  "nonceCount": 50000,
+  "shareReward": 2000000000000000
+}
+```
+
+**Your task**: compute `hash(nonceHex || preimageHex)` for each nonce in
+`[nonceStart, nonceStart + nonceCount)` until the result meets the difficulty
+target.  See "Mining algorithm" below.
+
+### 4. Submit a valid share
+
+```http
+POST /api/powSubmit
+Content-Type: application/json
+
+{"session": "<sessionId>", "nonce": 42}
+```
+
+Response (success):
+```json
+{ "valid": true, "balance": "2000000000000000" }
+```
+
+Response (failure):
+```json
+{ "valid": false, "error": "Invalid share (hash does not meet difficulty target)" }
+```
+
+Keep calling `powChallenge` + `powSubmit` until your balance is high enough.
+
+### 5. Close the session & claim
+
+```http
+POST /api/powCloseSession?session=<sessionId>
+```
+
+This resolves the internal "mining" blocking task so the session becomes
+claimable.  Response:
+```json
+{ "session": "...", "status": "claimable", "balance": "4000000000000000", "target": "0x..." }
+```
+
+Then claim:
+
+```http
+POST /api/claimReward
+Content-Type: application/json
+
+{"session": "<sessionId>"}
+```
+
+Response:
+```json
+{ "session": "...", "status": "claiming", "claimIdx": 0, "claimStatus": "pending" }
+```
+
+Poll with `GET /api/getSessionStatus?session=<sessionId>` until
+`claimStatus` becomes `"confirmed"` and `claimHash` contains the transaction
+hash.
+
+## Mining algorithm
+
+The PoW is: given a **preimage** (base64 string) and a **nonce** (64-bit
+integer), compute
+
+```
+hash = H( nonceHex(16) . preimageHex )
+```
+
+where `.` is concatenation, `nonceHex` is the nonce zero-padded to 16 hex
+characters (64 bits), and `preimageHex` is the base64-to-hex decoded preimage.
+
+The hash output must satisfy:
+
+```
+hash[0:maskLen] <= difficultyMask
+```
+
+where `maskLen = floor(difficulty / 8) + 1` and `difficultyMask` has the
+upper `(8 - difficulty % 8)` bits of the most significant byte set to 1.
+
+Equivalently: the first `difficulty` bits of the hash must be zero.
+
+| difficulty | avg hashes to find one share |
+|-----------|-----------------------------|
+| 11        | ~2,048                      |
+| 14        | ~16,384                     |
+| 16        | ~65,536                     |
+
+### Difficulty check (pseudocode)
+
+```python
+def is_valid(nonce_hex: str, preimage_hex: str, params: dict, difficulty: int, algo: str) -> bool:
+    hash_hex = hash_function(nonce_hex, preimage_hex, params, algo)
+    byte_count = difficulty // 8 + 1
+    bit_count = difficulty - (byte_count - 1) * 8
+    max_value = 2 ** (8 - bit_count)
+    mask_hex = format(max_value, 'x').zfill(byte_count * 2)
+    return hash_hex[:len(mask_hex)] <= mask_hex
+```
+
+## Hash function details by algorithm
+
+### Argon2 (default)
+
+```
+hash = argon2(
+    password = nonceHex,
+    salt     = preimageHex,
+    keyLen   = params.keyLength,
+    timeCost = params.timeCost,
+    memCost  = params.memoryCost,
+    parallelism = params.parallelization,
+    type     = params.type,
+    version  = params.version
+)
+```
+
+Output is hex-encoded raw hash bytes (no `0x` prefix).
+
+### Scrypt
+
+```
+hash = scrypt(
+    password = nonceHex,
+    salt     = preimageHex,
+    N        = params.cpuAndMemory,
+    r        = params.blockSize,
+    p        = params.parallelization,
+    keyLen   = params.keyLength
+)
+```
+
+### CryptoNight
+
+```
+hash = cryptonight(
+    input   = preimageHex + nonceHex,
+    algo    = params.algo,
+    variant = params.variant,
+    height  = params.height
+)
+```
+
+### NickMiner
+
+Only useful for miners with specialized hardware.  The `data` field in submit
+must contain the full hash result string (starting with `0x`).
+
+---
+
+## Important notes
+
+- **Session timeout**: Sessions expire after `sessionTimeout` (configured by
+  the faucet operator, typically several hours).  Claim before it expires.
+- **Nonce uniqueness**: Each `powChallenge` call returns a fresh nonce range.
+  Nonces from earlier ranges are still valid as long as they haven't been
+  submitted yet.  Submit each nonce at most once.
+- **Nonce range size**: `nonceCount = 50000` by default.  You can request
+  multiple challenges to get more nonces.  Nonces from any previously issued
+  range are accepted, as long as they haven't been used.
+- **Other modules**: The faucet may enforce additional limits (IP-based,
+  mainnet balance check, Concurrency limits, faucet balance, faucet outflow
+  rate).  These apply to REST sessions just as they do to browser sessions.
+- **Error codes**: Common error codes from `startSession` / `claimReward`:
+  `INVALID_ADDR`, `FAUCET_DISABLED`, `SESSION_TIMEOUT`, `AMOUNT_TOO_LOW`,
+  `NOT_CLAIMABLE`, `CONCURRENCY_LIMIT`.

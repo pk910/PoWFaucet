@@ -14,9 +14,12 @@ import { PoWClient } from "./PoWClient.js";
 import { PoWSession } from "./PoWSession.js";
 import { FaucetError } from "../../common/FaucetError.js";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
+import { FaucetStatsLog } from "../../services/FaucetStatsLog.js";
 import { PoWServer } from "./PoWServer.js";
 import { Socket } from "node:net";
 import { getNewGuid } from "../../utils/GuidUtils.js";
+import { FaucetHttpResponse } from "../../webserv/FaucetHttpServer.js";
+import { FaucetWebApi, IFaucetApiUrl } from "../../webserv/FaucetWebApi.js";
 
 export class PoWModule extends BaseModule<IPoWConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -26,6 +29,12 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   protected override startModule(): Promise<void> {
     // register websocket endpoint (/pow)
     ServiceManager.GetService(FaucetHttpServer).addRawEndpoint("pow", /^\/ws\/pow($|\?)/, (req, socket, head, ip) => this.processPoWClientWebSocket(req, socket, head, ip));
+
+    // register REST API endpoints for agent-friendly PoW
+    let webApi = ServiceManager.GetService(FaucetWebApi);
+    webApi.registerApiEndpoint("powChallenge", (req, url, body) => this.handlePowChallenge(req, url));
+    webApi.registerApiEndpoint("powSubmit", (req, url, body) => this.handlePowSubmit(req, url));
+    webApi.registerApiEndpoint("powCloseSession", (req, url, body) => this.handlePowCloseSession(req, url));
 
     // register faucet action hooks
     this.moduleManager.addActionHook(
@@ -53,6 +62,9 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
   protected override stopModule(): Promise<void> {
     ServiceManager.GetService(FaucetHttpServer).removeWssEndpoint("pow");
+    ServiceManager.GetService(FaucetWebApi).removeApiEndpoint("powChallenge");
+    ServiceManager.GetService(FaucetWebApi).removeApiEndpoint("powSubmit");
+    ServiceManager.GetService(FaucetWebApi).removeApiEndpoint("powCloseSession");
 
     let shutdownPromises: Promise<void>[] = [];
     for(let serverId in this.powServers) {
@@ -258,6 +270,150 @@ export class PoWModule extends BaseModule<IPoWConfig> {
 
     session.setSessionModuleRef("pow.serverPromise", registrationPromise);
     return registrationPromise;
+  }
+
+  private async handlePowChallenge(req: IncomingMessage, url: IFaucetApiUrl): Promise<any> {
+    let sessionId = url.query['session'] as string;
+    if (!sessionId)
+      return new FaucetHttpResponse(400, "Bad Request", "Missing session parameter");
+
+    let session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]);
+    if (!session)
+      return new FaucetHttpResponse(404, "Not Found", "Session not found");
+
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return new FaucetHttpResponse(400, "Bad Request", "PoW module is skipped for this session");
+
+    let preimage = session.getSessionData("pow.preimage");
+    if (!preimage)
+      return new FaucetHttpResponse(400, "Bad Request", "PoW not initialized for session");
+
+    let restNonceStart = session.getSessionData("pow.restNonce", 0) as number;
+    let nonceCount = 50000;
+    session.setSessionData("pow.restNonce", restNonceStart + nonceCount);
+
+    let powParams: any;
+    switch(this.moduleConfig.powHashAlgo) {
+      case PoWHashAlgo.SCRYPT:
+        powParams = {
+          n: this.moduleConfig.powScryptParams.cpuAndMemory,
+          r: this.moduleConfig.powScryptParams.blockSize,
+          p: this.moduleConfig.powScryptParams.parallelization,
+          l: this.moduleConfig.powScryptParams.keyLength,
+        };
+        break;
+      case PoWHashAlgo.ARGON2:
+        powParams = {
+          type: this.moduleConfig.powArgon2Params.type,
+          version: this.moduleConfig.powArgon2Params.version,
+          timeCost: this.moduleConfig.powArgon2Params.timeCost,
+          memoryCost: this.moduleConfig.powArgon2Params.memoryCost,
+          parallelization: this.moduleConfig.powArgon2Params.parallelization,
+          keyLength: this.moduleConfig.powArgon2Params.keyLength,
+        };
+        break;
+      case PoWHashAlgo.CRYPTONIGHT:
+        powParams = {
+          algo: this.moduleConfig.powCryptoNightParams.algo,
+          variant: this.moduleConfig.powCryptoNightParams.variant,
+          height: this.moduleConfig.powCryptoNightParams.height,
+        };
+        break;
+      case PoWHashAlgo.NICKMINER:
+        powParams = {
+          hash: this.moduleConfig.powNickMinerParams.hash,
+          sigR: this.moduleConfig.powNickMinerParams.sigR,
+          sigV: this.moduleConfig.powNickMinerParams.sigV,
+          count: this.moduleConfig.powNickMinerParams.count,
+          suffix: this.moduleConfig.powNickMinerParams.suffix,
+          prefix: this.moduleConfig.powNickMinerParams.prefix,
+        };
+        break;
+    }
+
+    return {
+      algo: this.moduleConfig.powHashAlgo,
+      params: powParams,
+      difficulty: this.moduleConfig.powDifficulty,
+      preimage,
+      nonceStart: restNonceStart,
+      nonceCount,
+      shareReward: this.moduleConfig.powShareReward,
+    };
+  }
+
+  private async handlePowSubmit(req: IncomingMessage, url: IFaucetApiUrl, body: Buffer): Promise<any> {
+    if (req.method !== "POST")
+      return new FaucetHttpResponse(405, "Method Not Allowed");
+
+    let input: any;
+    try {
+      input = JSON.parse(body.toString("utf8"));
+    } catch(ex) {
+      return { valid: false, error: "Invalid JSON body" };
+    }
+
+    if (!input.session || input.nonce === undefined)
+      return { valid: false, error: "Missing session or nonce" };
+
+    let session = ServiceManager.GetService(SessionManager).getSession(input.session, [FaucetSessionStatus.RUNNING]);
+    if (!session)
+      return { valid: false, error: "Session not found or not running" };
+
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return { valid: false, error: "PoW module is skipped for this session" };
+
+    let restNonceEnd = session.getSessionData("pow.restNonce", 0) as number;
+    let restSubmittedNonce = session.getSessionData("pow.restSubmittedNonce", 0) as number;
+    if (input.nonce < restSubmittedNonce || input.nonce >= restNonceEnd)
+      return { valid: false, error: "Nonce out of range or already submitted" };
+
+    let powServer: PoWServer;
+    try {
+      powServer = await session.getSessionModuleRef("pow.serverPromise");
+      if (!powServer)
+        return { valid: false, error: "PoW server not ready" };
+    } catch(ex) {
+      return { valid: false, error: "PoW server not available" };
+    }
+
+    let result: {isValid: boolean};
+    try {
+      result = await powServer.validateShareREST(session.getSessionId(), input.nonce, input.data || "");
+    } catch(ex) {
+      return { valid: false, error: "Validation error: " + (ex.message || ex) };
+    }
+
+    if (result.isValid) {
+      session.setSessionData("pow.restSubmittedNonce", input.nonce);
+      let rewardAmount = BigInt(this.moduleConfig.powShareReward);
+      await session.addReward(rewardAmount);
+
+      let faucetStats = ServiceManager.GetService(FaucetStatsLog);
+      faucetStats.statShareRewards += rewardAmount;
+      faucetStats.statShareCount++;
+
+      return {
+        valid: true,
+        balance: session.getDropAmount().toString(),
+      };
+    }
+
+    return { valid: false, error: "Invalid share (hash does not meet difficulty target)" };
+  }
+
+  private async handlePowCloseSession(req: IncomingMessage, url: IFaucetApiUrl): Promise<any> {
+    let sessionId = url.query['session'] as string;
+    if (!sessionId)
+      return new FaucetHttpResponse(400, "Bad Request", "Missing session parameter");
+
+    let session = ServiceManager.GetService(SessionManager).getSession(sessionId, [FaucetSessionStatus.RUNNING]);
+    if (!session)
+      return new FaucetHttpResponse(404, "Not Found", "Session not found or not running");
+
+    this.processPoWSessionClose(session);
+    let info = await session.getSessionInfo();
+    return info;
   }
 
   private stopServer(server: PoWServer) {

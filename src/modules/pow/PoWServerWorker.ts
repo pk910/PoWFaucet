@@ -8,6 +8,7 @@ import { IPoWConfig, PoWHashAlgo } from "./PoWConfig.js";
 import { PoWValidator } from "./validator/PoWValidator.js";
 import { PoWClient } from "./PoWClient.js";
 import { ProcessLoadTracker } from "../../utils/ProcessLoadTracker.js";
+import { base64ToHex } from "../../utils/ConvertHelpers.js";
 
 interface IPoWConnectRequest {
   action: "pow-connect";
@@ -129,6 +130,9 @@ export class PoWServerWorker {
         break;
       case "pow-session-reward":
         this.onPoWSessionReward(message.sessionId, message.reqId, BigInt(message.amount), BigInt(message.balance));
+        break;
+      case "pow-validate-rest-share":
+        this.onPoWValidateRestShare(message);
         break;
     }
   }
@@ -295,6 +299,35 @@ export class PoWServerWorker {
 
   public getPoWSession(sessionId: string): PoWSession {
     return this.sessions[sessionId];
+  }
+
+  private async onPoWValidateRestShare(msg: any) {
+    let session = this.sessions[msg.sessionId];
+    if (!session) {
+      this.sendMessage({ action: "pow-rest-share-validated", shareId: msg.shareId, isValid: false });
+      return;
+    }
+
+    // REST activity resets the idle timer — without a WebSocket client the
+    // child process would otherwise kill the session after powIdleTimeout.
+    if (session.idleTimer) {
+      clearTimeout(session.idleTimer);
+      session.idleTimer = null;
+    }
+
+    let preimg = base64ToHex(session.preImage || "");
+    let internalShareId = "rest-" + msg.shareId;
+
+    try {
+      let isValid = await this.validator.validateShare(internalShareId, msg.nonce, preimg, msg.data);
+      this.sendMessage({
+        action: "pow-rest-share-validated",
+        shareId: msg.shareId,
+        isValid,
+      });
+    } catch(ex) {
+      this.sendMessage({ action: "pow-rest-share-validated", shareId: msg.shareId, isValid: false });
+    }
   }
 
   private resetSessionIdleTimer(session: PoWSession) {

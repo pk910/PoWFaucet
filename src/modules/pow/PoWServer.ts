@@ -2,6 +2,7 @@ import * as http from 'node:http';
 import { FaucetWorkers, IFaucetChildProcess } from '../../common/FaucetWorker.js';
 import { ServiceManager } from '../../common/ServiceManager.js';
 import { PromiseDfd } from '../../utils/PromiseDfd.js';
+import { getNewGuid } from '../../utils/GuidUtils.js';
 import { Socket } from 'node:net';
 import { FaucetSession } from '../../session/FaucetSession.js';
 import { IPoWConfig } from './PoWConfig.js';
@@ -19,6 +20,7 @@ export class PoWServer {
   private readyDfd: PromiseDfd<void>;
   private shutdownDfd: PromiseDfd<void>;
   private sessions: {[sessionId: string]: FaucetSession} = {};
+  private restValidateQueue: {[shareId: string]: PromiseDfd<{isValid: boolean}>} = {};
 
   public constructor(module: PoWModule, serverId: string, worker?: IFaucetChildProcess) {
     this.module = module;
@@ -59,6 +61,13 @@ export class PoWServer {
         break;
       case "pow-sysload":
         this.onSysLoad(message.cpu, message.memory, message.eventLoopLag, message.activeSessions);
+        break;
+      case "pow-rest-share-validated":
+        let qdfd = this.restValidateQueue[message.shareId];
+        if(qdfd) {
+          delete this.restValidateQueue[message.shareId];
+          qdfd.resolve({isValid: message.isValid});
+        }
         break;
     }
   }
@@ -156,6 +165,36 @@ export class PoWServer {
 
   public getSessionCount(): number {
     return Object.keys(this.sessions).length;
+  }
+
+  public async validateShareREST(sessionId: string, nonce: number, data: string): Promise<{isValid: boolean}> {
+    await this.readyDfd.promise;
+
+    let shareId = getNewGuid();
+    let dfd = new PromiseDfd<{isValid: boolean}>();
+    this.restValidateQueue[shareId] = dfd;
+
+    this.sendMessage({
+      action: "pow-validate-rest-share",
+      sessionId,
+      shareId,
+      nonce,
+      data: data || "",
+    });
+
+    let timeout = setTimeout(() => {
+      let queued = this.restValidateQueue[shareId];
+      if(queued) {
+        delete this.restValidateQueue[shareId];
+        queued.reject(new Error("Validation timeout"));
+      }
+    }, 30000);
+
+    try {
+      return await dfd.promise;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   public getReadyPromise(): Promise<void> {
