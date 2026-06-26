@@ -38,7 +38,7 @@ export function getDefaultConfig(): IConfigSchema {
     ethTxBroadcastCount: 2,
     ethWalletKey: null, // mandatory
     ethChainId: null,
-    ethTxGasLimit: 100000,
+    ethTxGasLimit: 250000, // must cover new-account state-creation gas (~207k on EIP-8037 chains)
     ethLegacyTx: false,
     ethTxMaxFee: 100000000000,
     ethTxPrioFee: 2000000000,
