@@ -16,8 +16,6 @@ import QueueStatusPage from './status/QueueStatusPage';
 
 import './FaucetPage.scss'
 import { PoWMinerWorkerSrc, getPoWMinerDefaultSrc } from '../types/PoWMinerSrc';
-import path from 'path';
-import { URL } from 'url';
 import { joinUrl } from '../utils/QueryUtils';
 
 export interface IFaucetPageProps {
