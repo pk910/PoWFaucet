@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import util from 'util';
 import webpack from 'webpack';
-import babel from "@babel/core";
 import webpackConfig from './webpack.config.js';
 
 let distDir = path.join(import.meta.dirname, 'dist');
