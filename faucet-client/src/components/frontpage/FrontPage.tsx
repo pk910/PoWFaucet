@@ -12,6 +12,7 @@ export interface IFrontPageProps {
   faucetContext: IFaucetContext;
   faucetConfig: IFaucetConfig;
   navigateFn: NavigateFunction;
+  defaultAddr?: string;
 }
 
 export interface IFrontPageState {
@@ -97,6 +98,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
           ref={this.faucetInput} 
           faucetContext={this.props.faucetContext} 
           faucetConfig={this.props.faucetConfig} 
+          defaultAddr={this.props.defaultAddr}
           submitInputs={(inputData) => this.onSubmitInputs(inputData)}/>
         
         <div className='faucet-description'>
@@ -220,12 +222,16 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
 }
 
 export default (props) => {
+  const searchParams = new URLSearchParams(window.location.search);
+  const addressParam = searchParams.get('address');
+
   return (
     <FrontPage 
       {...props}
       faucetContext={useContext(FaucetPageContext)}
       faucetConfig={useContext(FaucetConfigContext)}
       navigateFn={useNavigate()}
+      defaultAddr={addressParam || undefined}
     />
   );
 };
