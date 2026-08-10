@@ -43,7 +43,7 @@
     }
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/chai": "^5.0.0",
     "@types/json-bigint": "^1.0.4",
     "@types/mocha": "^10.0.7",
