@@ -1,4 +1,5 @@
 import { IFaucetConfig } from '../../common/FaucetConfig';
+import { getPanels, IMiningPanelApi, IMiningPanelProps, IRegisteredPanel } from '../../sdk/slots';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 import React, { useContext } from 'react';
 import { useParams, useNavigate, NavigateFunction } from "react-router";
@@ -12,6 +13,10 @@ import { PoWMinerStatus } from './PoWMinerStatus';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { PassportInfo } from '../passport/PassportInfo';
 import { ConnectionAlert } from './ConnectionAlert';
+
+/** how long to wait for the faucet to resolve the module's blocking task on Leave */
+const LEAVE_STATUS_RETRIES = 8;
+const LEAVE_STATUS_RETRY_MS = 500;
 
 export interface IMiningPageProps {
   pageContext: IFaucetContext;
@@ -27,6 +32,7 @@ export interface IMiningPageState {
   closingSession: boolean;
   isClaimable: boolean;
   refreshIdx: number;
+  panelStarted: boolean;
 }
 
 export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPageState> {
@@ -41,6 +47,33 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
   private powMiner: PoWMiner;
   private powSession: PoWSession;
   private connectionAlertId: number = null;
+  /**
+   * The control surface a registered panel handed up.
+   *
+   * The page used to own the module's session itself; now a module owns it and
+   * gives the page the one thing the page needs of it - the Stop button has to
+   * be able to end a session it did not create.
+   */
+  private panelApi: IMiningPanelApi = null;
+  /** the module's client config block, handed to whatever panel is registered */
+  private panelConfig: unknown = null;
+  private panel: IRegisteredPanel = null;
+  private panelBalance: bigint = 0n;
+  /**
+   * Whether this session also mines, which is what decides the layout.
+   *
+   * It used to be `mode === "only"` - the core comparing a session state string
+   * it did not define against a literal one module happened to use. What the
+   * layout actually turns on is whether there is a second thing on the page, and
+   * the core knows that for itself: a session with no pow task has nothing above
+   * the panel, so the panel is the page.
+   */
+  private powTaskPresent: boolean = false;
+  /** ...and whether anything else is, which is true with or without a panel to draw it */
+  private moduleTaskPresent: boolean = false;
+  private powActive: boolean = false;
+  /** A module's session can report a leave twice (socket close and its own fallback) */
+  private leaveRouted: boolean = false;
 
   constructor(props: IMiningPageProps) {
     super(props);
@@ -65,7 +98,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
         event: "balanceUpdate",
         listener: () => {
           this.setState({
-            isClaimable: (this.powSession.getBalance() >= this.props.faucetConfig.minClaim),
+            isClaimable: (this.powSession.getBalance() >= BigInt(this.props.faucetConfig.minClaim)),
           });
           FaucetSession.persistSessionInfo(this.faucetSession);
         },
@@ -89,20 +122,22 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       closingSession: false,
       isClaimable: false,
       refreshIdx: 0,
+      panelStarted: false,
 		};
   }
 
   private initPoWControls() {
-    if(!this.props.faucetConfig.modules.pow)
-      return;
-    
     if(this.props.pageContext.activeSession && this.props.pageContext.activeSession.getSessionId() === this.props.sessionId) {
       this.faucetSession = this.props.pageContext.activeSession;
       this.props.pageContext.activeSession = null;
     }
     else
       this.faucetSession = new FaucetSession(this.props.pageContext, this.props.sessionId);
-    
+
+    // a session with only a module panel has no pow task, so the pow stack is never built
+    if(!this.props.faucetConfig.modules.pow)
+      return;
+
     let powWsEndpoint: string;
     if(this.props.faucetConfig.modules.pow.powWsUrl)
       powWsEndpoint = this.props.faucetConfig.modules.pow.powWsUrl;
@@ -171,15 +206,36 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
     });
     if(!this.state.loadedSession) {
       this.faucetSession.loadSessionInfo().then((sessionInfo) => {
-        if(sessionInfo.status === "running" && sessionInfo.tasks?.filter((task) => task.module === "pow").length > 0) {
-          this.updateConnectionState(false, true);
-          this.powClient.start();
-          this.powSession.resumeSession();
-          this.powMiner.startMiner();
+        let hasPowTask = sessionInfo.tasks?.filter((task) => task.module === "pow").length > 0;
+        this.powTaskPresent = hasPowTask;
+        // A task of somebody else's is a running session whether or not anything
+        // is registered to draw it.
+        //
+        // Asked of the *session*, not of the registered panels, and the
+        // difference is the whole point: a faucet serving a module whose client
+        // failed to load - a 404 on its script, a build refused, a bundle that
+        // threw - still has a player with a session, a balance and a Stop button
+        // they are entitled to press. Deciding this from the slots instead left
+        // that player on a page that never finished loading, which is what
+        // `CoreWithoutModules` caught.
+        this.moduleTaskPresent = sessionInfo.tasks?.filter((task) => task.module !== "pow").length > 0;
+        let panel = this.detectPanel(sessionInfo);
+
+        if(sessionInfo.status === "running" && (hasPowTask || this.moduleTaskPresent || panel)) {
+          if(hasPowTask && this.powClient) {
+            this.powActive = true;
+            this.updateConnectionState(false, true);
+            this.powClient.start();
+            this.powSession.resumeSession();
+            this.powMiner.startMiner();
+          }
+          if(panel)
+            this.notePanel(panel.panel, panel.config);
 
           this.setState({
             loadedSession: true,
-            isClaimable: (this.powSession.getBalance() >= this.props.faucetConfig.minClaim),
+            clientConnected: this.powActive ? this.state.clientConnected : true,
+            isClaimable: (this.getSessionBalance() >= BigInt(this.props.faucetConfig.minClaim)),
           });
           FaucetSession.persistSessionInfo(this.faucetSession);
         }
@@ -202,16 +258,119 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       eventListener.emmiter.off(eventListener.event, eventListener.listener as any);
       eventListener.bound = false;
     });
-    if(this.powClient) {
+    if(this.powClient && this.powActive) {
       this.powClient.stop();
     }
-    if(this.powMiner) {
+    if(this.powMiner && this.powActive) {
       this.powMiner.stopMiner();
     }
+    // the panel stops the session it owns when it unmounts; this only drops the handle
+    this.panelApi = null;
     if(this.connectionAlertId) {
       this.props.pageContext.hideStatusAlert(this.connectionAlertId);
       this.connectionAlertId = null;
     }
+  }
+
+  /**
+   * Which registered panel, if any, this session is running.
+   *
+   * The registered panels say which module they belong to, so the page asks the
+   * session whether that module has any state and takes the first that does. It
+   * used to scan the config for module names carrying a particular prefix, which
+   * meant the core had to know what that kind of module was before it could
+   * render one.
+   *
+   * A session runs at most one panel; a module records its state under its own
+   * name.
+   */
+  private detectPanel(sessionInfo: IFaucetSessionInfo): { panel: IRegisteredPanel, config: unknown } {
+    let registered = getPanels("mining");
+    for(let i = 0; i < registered.length; i++) {
+      let state = sessionInfo.modules ? sessionInfo.modules[registered[i].module] : null;
+      if(state)
+        return { panel: registered[i], config: this.props.faucetConfig.modules[registered[i].module] };
+    }
+    return null;
+  }
+
+  /**
+   * What the page keeps of a module's session: which panel, and its config.
+   *
+   * Everything else - the registry lookup, the dev flags, the websocket url, the
+   * session object - lives in the panel the module registers, because none of it
+   * was this page's business. What is left is what the page really uses: the
+   * panel's own captions, the config it hands down, and the balance, which is
+   * routed through the same place the miner's is.
+   */
+  private notePanel(panel: IRegisteredPanel, moduleConfig: unknown) {
+    this.panel = panel;
+    this.panelConfig = moduleConfig;
+    this.panelBalance = this.faucetSession.getDropAmount();
+    this.setState({ panelStarted: true });
+  }
+
+  private onModuleBalance(balanceWei: string, reason: string) {
+    if(this.powActive && this.powSession) {
+      // route through the pow session so the miner status and the panel
+      // always show the same number
+      this.powSession.updateBalance({ balance: balanceWei, reason: reason });
+    }
+    else {
+      this.panelBalance = BigInt(balanceWei);
+      this.setState({
+        isClaimable: (this.panelBalance >= BigInt(this.props.faucetConfig.minClaim)),
+        refreshIdx: this.state.refreshIdx + 1,
+      });
+    }
+  }
+
+  private getSessionBalance(): bigint {
+    if(this.powActive && this.powSession)
+      return this.powSession.getBalance();
+    return this.panelBalance;
+  }
+
+  /**
+   * Routes a finished panel-only session.
+   *
+   * Two things make this less direct than it looks. The faucet resolves the
+   * module's blocking task on its own turn, so right after the Leave the
+   * session can still report as running - hence the short poll. And
+   * `/getSession` only serves *running* sessions: the moment the session turns
+   * claimable it answers "Session not found", so the status has to come from
+   * `/getSessionStatus`, which serves finished ones too.
+   */
+  private onModuleLeft(attempt?: number) {
+    if(this.leaveRouted)
+      return;
+    let tries = attempt || 0;
+    this.props.pageContext.faucetApi.getSessionStatus(this.props.sessionId).then(
+      (sessionStatus) => {
+        if(this.leaveRouted)
+          return;
+        let status = sessionStatus ? sessionStatus.status : null;
+        if(status === "running" && tries < LEAVE_STATUS_RETRIES) {
+          setTimeout(() => this.onModuleLeft(tries + 1), LEAVE_STATUS_RETRY_MS);
+          return;
+        }
+        this.leaveRouted = true;
+        if(status === "claimable") {
+          this.faucetSession.setStatus(status);
+          FaucetSession.persistSessionInfo(this.faucetSession);
+          this.props.navigateFn("/claim/" + this.props.sessionId);
+          return;
+        }
+        FaucetSession.persistSessionInfo(null);
+        this.props.navigateFn("/details/" + this.props.sessionId);
+      },
+      () => {
+        if(this.leaveRouted)
+          return;
+        this.leaveRouted = true;
+        this.props.navigateFn("/details/" + this.props.sessionId);
+      },
+    );
   }
 
 	public render(): React.ReactElement<IMiningPageProps> {
@@ -242,50 +401,125 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       );
     }
 
-    this.powMiner.setPoWParams(this.props.faucetConfig.modules.pow.powParams, this.props.faucetConfig.modules.pow.powDifficulty);
+    if(this.powActive)
+      this.powMiner.setPoWParams(this.props.faucetConfig.modules.pow.powParams, this.props.faucetConfig.modules.pow.powDifficulty);
+
+    let panelOnly = (!!this.panel || this.moduleTaskPresent) && !this.powTaskPresent;
 
     return (
-      <div className='page-mining'>
-        <div className="pow-status-container">
-          <PoWMinerStatus 
-            pageContext={this.props.pageContext}
-            powClient={this.powClient}
-            powMiner={this.powMiner} 
-            powSession={this.powSession} 
-            time={this.props.pageContext.faucetApi.getFaucetTime()} 
-            faucetConfig={this.props.faucetConfig} 
-            passportScoreInfo={this.faucetSession.getModuleState("passport")}
-            openPassportInfo={() => this.onOpenPassportClick()}
-          />
-        </div>
+      <div className={'page-mining' + (panelOnly ? ' panel-only' : '')}>
+        {this.powActive ?
+          <div className="pow-status-container">
+            <PoWMinerStatus 
+              pageContext={this.props.pageContext}
+              powClient={this.powClient}
+              powMiner={this.powMiner} 
+              powSession={this.powSession} 
+              time={this.props.pageContext.faucetApi.getFaucetTime()} 
+              faucetConfig={this.props.faucetConfig} 
+              passportScoreInfo={this.faucetSession.getModuleState("passport")}
+              openPassportInfo={() => this.onOpenPassportClick()}
+            />
+          </div>
+        : null}
+        {this.renderPanels(panelOnly)}
         <div className="faucet-actions center">
           <button 
             className="btn btn-danger stop-action" 
             onClick={(evt) => this.onStopMiningClick(false)} 
             disabled={!this.state.clientConnected || this.state.closingSession}>
-              {this.state.isClaimable ? "Stop Mining & Claim Rewards" : "Stop Mining"}
+              {this.stopButtonCaption(panelOnly)}
           </button>
           </div>
       </div>
     );
 	}
 
+  /**
+   * Whatever a module put in the mining slot, where the first panel used to be
+   * hard-wired.
+   *
+   * None registered - a build with no modules, or a faucet that offers none - and
+   * this renders nothing at all, which is the page as it was before any module
+   * existed. The props are the ones the first panel was given, plus the two a
+   * panel needs because it owns the session: the module's config and a way to
+   * hand its Stop back up.
+   */
+  private renderPanels(panelOnly: boolean): React.ReactNode {
+    if(!this.state.panelStarted || !this.panel)
+      return null;
+    // The panel this session is running, not every panel registered: the page
+    // resolved which module was running at load, and rendering the others would
+    // mount a module the session has no state for.
+    let Panel = this.panel.component;
+    let props: IMiningPanelProps = {
+      sessionId: this.props.sessionId,
+      moduleState: this.faucetSession ? this.faucetSession.getModuleState(this.panel.module) : null,
+      moduleName: this.panel.module,
+      moduleConfig: this.panelConfig,
+      faucetConfig: this.props.faucetConfig,
+      wsBaseUrl: this.props.pageContext.faucetUrls.wsBaseUrl || null,
+      collapsible: !panelOnly,
+      getBalance: () => this.getSessionBalance(),
+      onBalance: (balanceWei, reason) => this.onModuleBalance(balanceWei, reason),
+      setMinerThrottle: (fraction) => {
+        if(this.powActive && this.powMiner)
+          this.powMiner.setThrottle(fraction);
+      },
+      onLeave: () => this.onModuleLeft(),
+      onPanelReady: (api) => { this.panelApi = api; },
+    };
+    return <Panel {...props} />;
+  }
+
+  /**
+   * The button that ends the session, in the words of whatever is running.
+   *
+   * When the panel is the whole page the words are the panel's - it said them
+   * when it registered - and the core adds only the claim. The fallback is the
+   * core's own, because mining is the core's own.
+   */
+  private stopButtonCaption(panelOnly: boolean): string {
+    if(panelOnly) {
+      let stop = this.panelCaptions().stop;
+      return this.state.isClaimable ? stop + " & Claim Rewards" : stop;
+    }
+    return this.state.isClaimable ? "Stop Mining & Claim Rewards" : "Stop Mining";
+  }
+
+  /**
+   * What the running panel asked to be called, or a neutral fallback.
+   *
+   * A panel that registered without captions still has to be described by two
+   * buttons and a heading, and the core has nothing true to say about what it
+   * does - so it says the only thing it knows, which is that there is a session.
+   */
+  private panelCaptions(): { balance: string; resume: string; stop: string } {
+    let said = this.panel && this.panel.captions;
+    return {
+      balance: said && said.balance ? said.balance : "Session",
+      resume: said && said.resume ? said.resume : "Continue",
+      stop: said && said.stop ? said.stop : "Stop",
+    };
+  }
+
   private async onStopMiningClick(force?: boolean) {
-    if(!this.state.isClaimable && this.powSession.getBalance() > 0n && !force) {
+    let panelOnly = (!!this.panel || this.moduleTaskPresent) && !this.powTaskPresent;
+    if(!this.state.isClaimable && this.getSessionBalance() > 0n && !force) {
       this.props.pageContext.showDialog({
-        title: "Mining balance too low",
+        title: (panelOnly ? this.panelCaptions().balance : "Mining") + " balance too low",
         body: (
           <div className='alert alert-warning'>
-            Your mining balance of {toReadableAmount(this.powSession.getBalance(), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)} is too low to be claimed.<br />
+            Your balance of {toReadableAmount(this.getSessionBalance(), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)} is too low to be claimed.<br />
             The minimum allowed amount is {toReadableAmount(this.props.faucetConfig.minClaim, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}.<br />
-            Do you want to stop mining and loose the rewards you've already collected?
+            Do you want to stop and loose the rewards you've already collected?
             </div>
         ),
         closeButton: {
-          caption: "Continue mining",
+          caption: panelOnly ? this.panelCaptions().resume : "Continue mining",
         },
         applyButton: {
-          caption: "Stop mining",
+          caption: panelOnly ? this.panelCaptions().stop : "Stop mining",
           applyFn: () => {
             this.onStopMiningClick(true);
           }
@@ -298,7 +532,14 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       closingSession: true
     });
     try {
-      await this.powSession.closeSession();
+      if(this.powActive)
+        await this.powSession.closeSession();
+      else if(this.panelApi) {
+        // a panel-only session ends by resolving its blocking task, which an
+        // explicit Leave does; the leave handler then routes to the claim page
+        this.panelApi.leave();
+        return;
+      }
     } catch(ex) {
       this.props.pageContext.showDialog({
         title: "Could not close session",

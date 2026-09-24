@@ -15,7 +15,9 @@ export interface IPoWSessionOptions {
 }
 
 export interface IPoWSessionBalanceUpdate {
-  balance: number;
+  // wei, which can exceed Number.MAX_SAFE_INTEGER; updateBalance() parses it
+  // with BigInt(), so a decimal string keeps full precision
+  balance: number | string;
   reason: string;
 }
 

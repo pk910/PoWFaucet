@@ -13,6 +13,9 @@ export function getDefaultConfig(): IConfigSchema {
     faucetPidFile: null, // path to file to write the process pid to
 
     buildSeoIndex: true,
+    // off: a faucet that has never asked for a shared-memory worker should not have its captcha
+    // broken by a header it did not ask for
+    crossOriginIsolation: "off",
     buildSeoMeta: {},
     database: {
       driver: FaucetDbDriver.SQLITE,

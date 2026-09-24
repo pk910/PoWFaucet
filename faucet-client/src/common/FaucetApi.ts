@@ -4,6 +4,29 @@ import { IFaucetConfig } from "./FaucetConfig";
 import { IFaucetSessionInfo, IFaucetSessionStatus } from "./FaucetSession";
 import { FaucetTime } from "./FaucetTime";
 
+/**
+ * Body of `POST /startSession`.
+ *
+ * `module` names the module a session is being started with - the value its
+ * panel registered under - and `params` is whatever that module wants said at
+ * the start. **The core neither names nor parses `params`**: it is an object of
+ * strings, it is stored under the module's own session-data key, and the
+ * module's server half is the only thing that reads it.
+ *
+ * Before this shape the two fields were named for the one module that existed, and the
+ * mode was typed here as a union of its two values - one module's vocabulary
+ * *and* its list of choices, in the platform's API type. A second module could
+ * not have expressed itself in it at all.
+ */
+export interface IStartSessionInput {
+  addr?: string;
+  /** the module this session is being started with, as its panel registered */
+  module?: string;
+  /** opaque to the core; `params.mode` is what the first module reads */
+  params?: Record<string, string>;
+  [input: string]: any;
+}
+
 export class FaucetApi {
   private faucetTime: FaucetTime;
   private apiBaseUrl: string;
@@ -33,7 +56,7 @@ export class FaucetApi {
     return apiUrl;
   }
 
-  private apiGet(endpoint: string, args?: {[arg: string]: string|number}): Promise<any> {
+  private apiGet(endpoint: string, args?: {[arg: string]: string|number|undefined}): Promise<any> {
     if(!endpoint.match(/^\//))
       endpoint = "/" + endpoint;
     
@@ -54,7 +77,7 @@ export class FaucetApi {
       .then((rsp) => rsp.json());
   }
 
-  private apiPost(endpoint: string, args?: {[arg: string]: string|number}, data?: any): Promise<any> {
+  private apiPost(endpoint: string, args?: {[arg: string]: string|number|undefined}, data?: any): Promise<any> {
     if(!endpoint.match(/^\//))
       endpoint = "/" + endpoint;
     
@@ -103,7 +126,7 @@ export class FaucetApi {
     });
   }
 
-  public startSession(inputData: any): Promise<IFaucetSessionInfo> {
+  public startSession(inputData: IStartSessionInput): Promise<IFaucetSessionInfo> {
     return this.apiPost("/startSession", {
       cliver: FAUCET_CLIENT_VERSION,
     }, inputData);

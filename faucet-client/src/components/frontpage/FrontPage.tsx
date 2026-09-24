@@ -1,4 +1,4 @@
-import { IFaucetConfig } from '../../common/FaucetConfig';
+import { IFaucetConfig, hasPlayableTask } from '../../common/FaucetConfig';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 import React, { useContext } from 'react';
 import { useNavigate, NavigateFunction } from "react-router";
@@ -45,8 +45,9 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
               actionFn = () => this.props.navigateFn("/claim/" + sessionInfo.session);
               break;
             case "running":
-              if(sessionInfo.tasks.filter(t => t.module === "pow").length > 0) {
-                actionLabel = "Continue Mining";
+              // a module's session has that module's task, not "pow"
+              if(hasPlayableTask(sessionInfo.tasks)) {
+                actionLabel = sessionInfo.tasks.filter(t => t.module === "pow").length > 0 ? "Continue Mining" : "Continue Playing";
                 actionFn = () => this.props.navigateFn("/mine/" + sessionInfo.session);
               }
               else
@@ -194,7 +195,8 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
           this.props.navigateFn("/claim/" + sessionInfo.session);
           return;
         case "running":
-          if(sessionInfo.tasks?.filter((task) => task.module === "pow").length > 0) {
+          // a session without mining has its module's task and no "pow" one
+          if(hasPlayableTask(sessionInfo.tasks)) {
             // redirect to mining page
             console.log("redirect to mining page!", session);
             this.props.navigateFn("/mine/" + sessionInfo.session);

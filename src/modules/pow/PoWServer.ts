@@ -11,6 +11,7 @@ import { EthClaimManager } from '../../eth/EthClaimManager.js';
 import { EthWalletManager } from '../../eth/EthWalletManager.js';
 import { ProcessLoadTracker } from '../../utils/ProcessLoadTracker.js';
 import { FaucetStatsLog } from '../../services/FaucetStatsLog.js';
+import { SocketCapture } from '../../utils/SocketCapture.js';
 
 export class PoWServer {
   private module: PoWModule;
@@ -220,11 +221,25 @@ export class PoWServer {
     delete this.sessions[sessionId];
   }
 
-  public async connect(sessionId: string, req: http.IncomingMessage, socket: Socket, head: Buffer) {
-    socket.pause();
-    socket.removeAllListeners();
-
+  public async connect(sessionId: string, req: http.IncomingMessage, socket: Socket, head: Buffer, capture?: SocketCapture) {
     await this.readyDfd.promise;
+
+    // once the handle has reached the worker, forward anything that arrived
+    // while it was in flight and drop this process' copy, so it stops competing with the
+    // worker for the client's bytes.
+    let handedOver = false;
+    let finishHandover = (destroy: boolean) => {
+      if(handedOver)
+        return;
+      handedOver = true;
+      if(capture) {
+        let late = capture.drainLate();
+        if(late.length > 0)
+          this.sendMessage({ action: "pow-connect-data", sessionId: sessionId, data: late.toString('base64') });
+      }
+      if(destroy)
+        socket.destroy();
+    };
 
     this.worker.childProcess.send({
       action: "pow-connect",
@@ -232,14 +247,26 @@ export class PoWServer {
       url: req.url,
       method: req.method,
       headers: req.headers,
-      head: head.toString('base64'),
+      // synchronous with the send: whatever the client already sent travels with the handle
+      head: (capture ? capture.release(head) : head).toString('base64'),
     }, socket, {
       keepOpen: true
-    });
+    }, () => finishHandover(true));
 
-    setTimeout(() => {
-      socket.destroy();
-    }, 100);
+    // MD-WIRING-5: the destroy waits for that callback and nothing sooner. Node sends at
+    // most one socket handle at a time and queues the rest until the child has
+    // acknowledged the one before, so when several miners connect in the same tick most
+    // of their sockets are still in `_handleQueue` when the next tick arrives - closing
+    // one there means the file descriptor is gone by the time it should be duplicated,
+    // and the client gets the connection accepted and then dropped with no response.
+    // Found on another module's gateway, which has the identical hand-over; measured there as 4
+    // of 24 connects surviving at concurrency 8, against 25/25 one after the other.
+    //
+    // A worker running in-process (the unit tests' createChildProcess stub) never calls
+    // the callback and shares this very socket object, so there the capture is detached
+    // on the next tick and the socket is left alone.
+    if(typeof (this.worker.childProcess as any).kill !== "function")
+      setImmediate(() => finishHandover(false));
   }
 
   private onSysLoad(cpu: number, memory: {heapUsed: number, heapTotal: number}, eventLoopLag: number, activeSessions: string[]) {

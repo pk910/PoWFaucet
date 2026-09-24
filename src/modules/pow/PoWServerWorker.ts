@@ -21,11 +21,12 @@ interface IPoWConnectRequest {
 export class PoWServerWorker {
   private serverSymbol = Symbol("pow-server-worker");
   private port: MessagePort;
-  private server: http.Server;
   private wss: WebSocketServer;
   private moduleConfig: IPoWConfig;
   private validator: PoWValidator;
   private sessions: {[sessionId: string]: PoWSession} = {};
+  /** the handed-over sockets, for the late-bytes hand-over */
+  private sockets: {[sessionId: string]: Socket} = {};
   private loadTracker: ProcessLoadTracker;
 
   public constructor(port: MessagePort) {
@@ -35,9 +36,6 @@ export class PoWServerWorker {
     } else if(process.send) {
       process.on("message", this.onMessage.bind(this));
     }
-
-    this.server = http.createServer();
-    this.server.on("upgrade", this.onPoWUpgrade.bind(this));
 
     this.wss = new WebSocketServer({ noServer: true });
     this.wss.on("connection", this.onPoWConnection.bind(this));
@@ -124,6 +122,9 @@ export class PoWServerWorker {
       case "pow-connect":
         this.onPoWConnect(message, handle);
         break;
+      case "pow-connect-data":
+        this.onPoWConnectData(message.sessionId, message.data);
+        break;
       case "pow-session-close":
         this.onPoWSessionClose(message.sessionId, message.info);
         break;
@@ -172,15 +173,34 @@ export class PoWServerWorker {
       this.wss.emit('connection', testWs, fakeReq);
       return;
     }
-    
-    socket.resume();
-    this.server.emit('upgrade', fakeReq, socket, headBuffer);
+
+    // do not resume before ws has a reader - a socket in flowing mode with
+    // no 'data' listener discards whatever arrives. handleUpgrade attaches its reader and
+    // calls back synchronously, so the connection handler sees the very first frame.
+    this.sockets[request.sessionId] = socket;
+    socket.once("close", () => {
+      if(this.sockets[request.sessionId] === socket)
+        delete this.sockets[request.sessionId];
+    });
+    this.wss.handleUpgrade(fakeReq, socket, headBuffer, (ws) => {
+      this.wss.emit('connection', ws, fakeReq);
+    });
+    // a handle received over IPC can arrive explicitly paused, and on('data') does not lift that
+    if(socket.isPaused())
+      socket.resume();
   }
 
-  private onPoWUpgrade(req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) {
-    this.wss.handleUpgrade(req, socket, head, (ws) => {
-      this.wss.emit('connection', ws, req);
-    });
+  /**
+   * Bytes the main process read off the socket after the handle was sent but before it let
+   * go of it. They precede anything this process can read, so they go to the
+   * front of the stream where the websocket reader picks them up next.
+   */
+  private onPoWConnectData(sessionId: string, data: string) {
+    let socket = this.sockets[sessionId];
+    let payload = Buffer.from(data, 'base64');
+    if(!socket || payload.length === 0)
+      return;
+    socket.unshift(payload);
   }
 
   private onPoWConnection(ws: WebSocket, req: http.IncomingMessage) {
@@ -239,7 +259,6 @@ export class PoWServerWorker {
     }
 
     this.wss.close();
-    this.server.close();
 
     setTimeout(() => {
       process.exit(0);

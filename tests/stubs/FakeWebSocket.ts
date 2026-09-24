@@ -38,6 +38,13 @@ export async function injectFakeWebSocket(url: string, ip: string): Promise<Fake
     fakeSocket.removeAllListeners = () => {};
     fakeSocket.pause = () => {};
     fakeSocket.resume = () => {};
+    // the raw endpoints treat the socket as a stream (SocketCapture)
+    fakeSocket.on = () => fakeSocket;
+    fakeSocket.once = () => fakeSocket;
+    fakeSocket.removeListener = () => fakeSocket;
+    fakeSocket.read = () => null;
+    fakeSocket.isPaused = () => false;
+    fakeSocket.unshift = () => {};
     await rawHandler({
       url: url,
     } as any, fakeSocket, Buffer.from(""), ip)

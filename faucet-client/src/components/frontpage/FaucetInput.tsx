@@ -1,5 +1,6 @@
 import React from 'react';
 import { IFaucetConfig } from '../../common/FaucetConfig';
+import { getPanels, IRegisteredPanel } from '../../sdk/slots';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { FaucetCaptcha } from '../shared/FaucetCaptcha';
 import { AuthenticatoorLogin } from './authenticatoor/AuthenticatoorLogin';
@@ -17,6 +18,11 @@ export interface IFaucetInputProps {
 export interface IFaucetInputState {
   submitting: boolean;
   targetAddr: string;
+  /** the module a session would be started with, "" = mine only */
+  /** the module a session would be started with, "" for mining alone */
+  startModule: string;
+  /** what goes in the start request's `params.mode`; opaque here */
+  startMode: string;
 }
 
 export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetInputState> {
@@ -32,6 +38,8 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     this.state = {
       submitting: false,
       targetAddr: this.props.defaultAddr || "",
+      startModule: "",
+      startMode: "",
 		};
   }
 
@@ -51,8 +59,22 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
         inputTypes.push("ENS name");
     }
 
+    let panels = getPanels("mining").filter((panel) => panel.modes && panel.modes.length > 0);
+    let hasMining = !!this.props.faucetConfig.modules.pow;
+    let playing = !!this.state.startModule;
+
     let submitBtnCaption: string;
-    if(this.props.faucetConfig.modules.pow) {
+    // "does this session still mine" is the core's own question, and the mode the
+    // player picked answers it - the panel said so when it registered. The core
+    // does not know what the mode *means*, only that one.
+    let picked = this.pickedMode(panels);
+    if(playing && picked && !picked.withMining) {
+      submitBtnCaption = "Start " + (picked.label || "Playing");
+    }
+    else if(playing) {
+      submitBtnCaption = "Start Mining & " + (picked && picked.label ? picked.label : "Playing");
+    }
+    else if(hasMining) {
       submitBtnCaption = "Start Mining";
     }
     else {
@@ -97,6 +119,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
             ref={this.voucherInput}
           />
         : null}
+        {panels.length > 0 ? this.renderStartModes(panels, hasMining) : null}
         {requestCaptcha ? 
           <div className='faucet-captcha'>
             <FaucetCaptcha 
@@ -123,6 +146,80 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     );
 	}
 
+  /** the mode the player has chosen, or null when they are mining alone */
+  private pickedMode(panels: IRegisteredPanel[]) {
+    if(!this.state.startModule)
+      return null;
+    let panel = panels.filter((entry) => entry.module === this.state.startModule)[0];
+    if(!panel || !panel.modes)
+      return null;
+    return panel.modes.filter((mode) => mode.key === this.state.startMode)[0] || null;
+  }
+
+  /**
+   * How to start: mining alone, or one of the ways a registered panel offers.
+   *
+   * The core used to write these out - "Mine + Play", "Play only", and a config
+   * flag saying whether the second was allowed - which is the platform knowing
+   * that playing is a thing, that a module might replace mining with it, and
+   * what to call it. A panel declares its own now, and a session starts with
+   * `{ module, params: { mode } }` where the core has never read `mode`.
+   *
+   * A mode whose `withMining` is true needs something to mine with, so it is not
+   * offered on a faucet with no pow module.
+   */
+  private renderStartModes(panels: IRegisteredPanel[], hasMining: boolean): React.ReactElement {
+    let options: { key: string; module: string; mode: string; label: string; hint: string }[] = [];
+    panels.forEach((panel) => {
+      let prefix = panels.length > 1 ? (panel.title || panel.module) + ": " : "";
+      (panel.modes || []).forEach((mode) => {
+        if(mode.withMining && !hasMining)
+          return;
+        options.push({
+          key: panel.module + ":" + mode.key,
+          module: panel.module,
+          mode: mode.key,
+          label: prefix + mode.label,
+          hint: mode.hint || "",
+        });
+      });
+    });
+    if(options.length === 0)
+      return null;
+
+    return (
+      <div className="faucet-start-modes">
+        <div className="start-modes-label">How do you want to earn?</div>
+        <div className="start-modes-options">
+          {hasMining ?
+            <button
+              type="button"
+              className={"btn btn-sm start-mode" + (this.state.startModule === "" ? " btn-primary active" : " btn-outline-primary")}
+              onClick={() => this.setState({ startModule: "", startMode: "" })}
+              title="Mining only"
+            >
+              Mine
+            </button>
+          : null}
+          {options.map((option) => {
+            let selected = this.state.startModule === option.module && this.state.startMode === option.mode;
+            return (
+              <button
+                type="button"
+                key={option.key}
+                className={"btn btn-sm start-mode" + (selected ? " btn-primary active" : " btn-outline-primary")}
+                onClick={() => this.setState({ startModule: option.module, startMode: option.mode })}
+                title={option.hint}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   private async onSubmitBtnClick() {
     this.setState({
       submitting: true
@@ -146,6 +243,13 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       }
       if (this.props.faucetConfig.modules.voucher) {
         inputData.voucherCode = this.voucherInput.current?.getCode();
+      }
+      if(this.state.startModule) {
+        // `params` is the module's to fill and the core's to forward untouched
+        // `mode` is a key the panel gave us and we have never
+        // read; the module's server half is the only thing that knows it.
+        inputData.module = this.state.startModule;
+        inputData.params = { mode: this.state.startMode };
       }
 
       await this.props.submitInputs(inputData);

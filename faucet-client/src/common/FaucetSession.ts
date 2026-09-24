@@ -64,7 +64,7 @@ export class FaucetSession {
     }
   }
 
-  public static recoverSessionInfo(): IFaucetSessionRecoveryInfo {
+  public static recoverSessionInfo(): IFaucetSessionRecoveryInfo | null {
     let statusJson = localStorage.getItem("powSessionStatus");
     if(!statusJson)
       return null;
@@ -78,12 +78,14 @@ export class FaucetSession {
   private faucetContext: IFaucetContext;
   private sessionId: string;
   private sessionInfo: IFaucetSessionInfo;
-  private sessionInfoPromise: Promise<IFaucetSessionInfo>;
+  private sessionInfoPromise: Promise<IFaucetSessionInfo> | null = null;
 
   public constructor(faucetContext: IFaucetContext, sessionId: string, sessionInfo?: IFaucetSessionInfo) {
     this.faucetContext = faucetContext;
     this.sessionId = sessionId;
-    this.sessionInfo = sessionInfo;
+    // every read of it is guarded with `?.`, and a session is constructed
+    // without one on purpose - `loadSessionInfo` fetches it
+    this.sessionInfo = sessionInfo as IFaucetSessionInfo;
   }
 
   public loadSessionInfo(): Promise<IFaucetSessionInfo> {
@@ -117,7 +119,7 @@ export class FaucetSession {
   }
 
   public setModuleState(module: string, state: any): any {
-    this.sessionInfo.modules[module] = state;
+    this.sessionInfo.modules![module] = state;
   }
 
   public getStatus(): string {

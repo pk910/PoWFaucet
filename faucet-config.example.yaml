@@ -440,6 +440,33 @@ modules:
     # pow module settings have been trimmed for readability.
     # you can find all available settings on https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki#module-pow
 
+  ## A module package's own modules
+  ##
+  ## Anything installed as a module package is configured here by its key, exactly like the
+  ## built-in ones above. The faucet does not ship these settings and cannot document them: the
+  ## keys under a module's block belong to that module, and its own docs describe them.
+  ##
+  ## Install a package by unpacking it into `<datadir>/modules/`, or point `modulePaths:` at it.
+  ##
+  ## The shape is always this, whatever the package is:
+  #
+  # <the key the package's manifest registers>:
+  #   enabled: true
+  #   <blocks the module defines, documented by the module>
+  #
+  ## Three hundred lines of one package's settings used to live here, which meant the faucet
+  ## documented a module it no longer ships - and would have gone stale the first time that module
+  ## changed. Its own `docs/` carries them now, and travels with it.
+  ##
+  ## **How a module gets parameters from the page.** A session can be started *for* a module: the
+  ## page sends `module: "<the key above>"` and `params: { … }` to `POST /api/startSession`, and the
+  ## faucet checks only that the name is a module enabled here and that the values are strings. It
+  ## stores them under that module's own session-data key (`<key>.params`) and never reads a key in
+  ## them - what `params` may contain is the module's, and its docs describe it the same way they
+  ## describe the block above. There is nothing to configure here; it is listed because an operator
+  ## reading a module's docs will see `params` and should know the faucet passes it through
+  ## untouched.
+
   ## Passport protection
   passport:
     enabled: false
@@ -629,6 +656,18 @@ faucetStats:
 # build SEO optimized index.seo.html and deliver as index page
 # the blank loader page just looks bad when parsed by search engines
 buildSeoIndex: true
+
+# Cross-origin isolation for the faucet's pages: "off", "credentialless" or "require-corp".
+#
+# A browser only hands `SharedArrayBuffer` to a page it calls cross-origin isolated, so a module
+# whose client shares memory with a worker - a simulation running per-frame in the page, say - needs
+# this on. It is **off by default because it can break a captcha**: under isolation
+# every cross-origin thing the page loads has to opt in, and hCaptcha, reCAPTCHA and Turnstile are all
+# iframes from another origin. "credentialless" asks that of iframes only and leaves ordinary images,
+# fonts and scripts alone, so reach for it first; "require-corp" asks it of everything.
+#
+# If you turn this on, **load the faucet and check your captcha still appears** before shipping it.
+# crossOriginIsolation: "credentialless"
 
 # some additional meta tags to add to the SEO optimized page
 buildSeoMeta:

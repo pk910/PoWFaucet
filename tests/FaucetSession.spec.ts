@@ -11,6 +11,7 @@ import { SessionManager } from '../src/session/SessionManager.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
 import { FaucetError } from '../src/common/FaucetError.js';
 import { FaucetSession, FaucetSessionStatus } from '../src/session/FaucetSession.js';
+import { FaucetProcess } from '../src/common/FaucetProcess.js';
 
 
 describe("Faucet Session Management", () => {
@@ -56,6 +57,81 @@ describe("Faucet Session Management", () => {
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
     expect(error?.getCode()).to.equal("INVALID_ADDR", "unexpected error code");
+  });
+
+  describe("the module a session is started for", () => {
+    // `module` + `params` are the whole of the core's module vocabulary: a name it
+    // can resolve, and a flat map of strings it stores without reading. They replaced two fields
+    // named after one module's subject matter, in a core type, that only that module ever read.
+    const ADDR = "0x0000000000000000000000000000000000001337";
+
+    beforeEach(async () => {
+      // any real module will do - the core's rule is about the *name* resolving, not about what the
+      // module does. The reload listener is how a running faucet picks up a config change, so it is
+      // also how a spec adds a module after `initialize()`.
+      faucetConfig.modules["whitelist"] = {
+        enabled: true,
+        whitelistPattern: {},
+        whitelistFile: null,
+      } as any;
+      ServiceManager.GetService(FaucetProcess).emit("reload");
+      await ServiceManager.GetService(ModuleManager).getLoadingPromise();
+    });
+
+    it("stores the parameters under the module's own session-data key", async () => {
+      let session = await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", {
+        addr: ADDR, module: "whitelist", params: { mode: "only", level: "3" },
+      });
+      expect(session.getSessionStatus()).to.not.equal(FaucetSessionStatus.FAILED, "session did not start");
+      let params = session.getSessionData<Record<string, string>>("whitelist.params", null);
+      expect(!!params).to.equal(true, "no params were stored");
+      expect(params.mode).to.equal("only", "unexpected mode");
+      // the core knows neither key: it carries what the panel sent
+      expect(params.level).to.equal("3", "unexpected level");
+    });
+
+    it("starts a plain session when there is neither", async () => {
+      let session = await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", { addr: ADDR });
+      expect(session.getSessionStatus()).to.not.equal(FaucetSessionStatus.FAILED, "session did not start");
+      expect(session.getSessionData("whitelist.params", null)).to.equal(null, "params were invented");
+    });
+
+    it("refuses an unknown module, and names it", async () => {
+      let error: FaucetError | null = null;
+      try {
+        await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", {
+          addr: ADDR, module: "not-installed-here", params: { mode: "only" },
+        });
+      } catch(ex) { error = ex; }
+      expect(error).to.not.equal(null, "no exception thrown");
+      expect(error?.getCode()).to.equal("INVALID_MODULE", "unexpected error code");
+      // the only useful answer says which name failed: a client that sends a module this faucet does
+      // not have is usually talking to the wrong faucet, and "invalid request" sends nobody anywhere
+      expect(error?.message.indexOf("not-installed-here") !== -1).to.equal(true,
+        "the error does not name the module: " + error?.message);
+    });
+
+    it("refuses parameters that name no module", async () => {
+      let error: FaucetError | null = null;
+      try {
+        await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", {
+          addr: ADDR, params: { mode: "only" },
+        });
+      } catch(ex) { error = ex; }
+      expect(error?.getCode()).to.equal("INVALID_PARAMS", "unexpected error code");
+    });
+
+    it("refuses a parameter that is not a string", async () => {
+      let error: FaucetError | null = null;
+      try {
+        await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", {
+          addr: ADDR, module: "whitelist", params: { level: 3 },
+        });
+      } catch(ex) { error = ex; }
+      expect(error?.getCode()).to.equal("INVALID_PARAMS", "unexpected error code");
+      expect(error?.message.indexOf("level") !== -1).to.equal(true,
+        "the error does not name the parameter: " + error?.message);
+    });
   });
 
   it("Create invalid session (invalid addr)", async () => {

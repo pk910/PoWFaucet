@@ -2,6 +2,8 @@ import 'mocha';
 import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as http from 'http';
+import * as zlib from 'zlib';
 import { WebSocket } from 'ws';
 import { bindTestStubs, loadDefaultTestConfig, returnDelayedPromise, unbindTestStubs } from './common.js';
 import { ServiceManager } from '../src/common/ServiceManager.js';
@@ -18,6 +20,13 @@ import { FaucetProcess } from '../src/common/FaucetProcess.js';
 import { FetchUtil } from '../src/utils/FetchUtil.js';
 
 describe("Faucet Web Server", () => {
+  /** files these tests wrote into the real static folder, removed after each one */
+  let temporaryFiles: (() => void)[] = [];
+  afterEach(() => {
+    temporaryFiles.forEach((remove) => remove());
+    temporaryFiles = [];
+  });
+
   let globalStubs;
 
   beforeEach(async () => {
@@ -38,15 +47,6 @@ describe("Faucet Web Server", () => {
     faucetConfig.buildSeoIndex = true;
     faucetConfig.serverPort = 0;
 
-    let clientFile = path.join(faucetConfig.staticPath, "js", "powfaucet.js");
-    let oldClientFile;
-    if(!fs.existsSync(path.join(faucetConfig.staticPath, "js")))
-      fs.mkdirSync(path.join(faucetConfig.staticPath, "js"));
-    if(fs.existsSync(clientFile)) {
-      oldClientFile = fs.readFileSync(clientFile, "utf8");
-    }
-    fs.writeFileSync(clientFile, '/* @pow-faucet-client: {"version":"0.0.0","build":1337} */');
-
     let webServer = ServiceManager.GetService(FaucetHttpServer);
     webServer.initialize();
     webServer.initialize();
@@ -59,10 +59,6 @@ describe("Faucet Web Server", () => {
     fs.unlinkSync(seoFile);
     ServiceManager.GetService(FaucetProcess).emit("reload");
     expect(fs.existsSync(seoFile), "seo file not found after refresh");
-
-    if(oldClientFile) {
-      fs.writeFileSync(clientFile, oldClientFile);
-    }
   });
 
   it("check basic http call", async () => {
@@ -320,6 +316,35 @@ describe("Faucet Web Server", () => {
     expect(configOptionsRsp.headers.get("access-control-allow-methods")).equals(null, "access-control-allow-methods mismatch");
   });
 
+  /**
+   * A file to serve, removed again when the test ends.
+   *
+   * These tests need *a* static resource and do not care which, so they used to write
+   * `powfaucet.js` into the static folder and leave it there. That folder is the real one -
+   * `faucetConfig.staticPath` resolves against the working directory - and the build now names
+   * every artifact by its content hash, with `check-modules` refusing any build output that no
+   * manifest entry names. A leftover from a test run fails the deploy gate, and it did:
+   * `static/js/powfaucet.js` reappeared between a client build and a `deploy-test.sh pack`, and
+   * the pack refused on a file the test suite had written.
+   *
+   * A file that was already there is left alone - that one is a real build output.
+   */
+  function temporaryStaticFile(relative: string) {
+    let staticPath = resolveRelativePath(faucetConfig.staticPath, process.cwd());
+    let file = path.join(staticPath, relative);
+    let dir = path.dirname(file);
+    let madeDir = !fs.existsSync(dir);
+    if(madeDir)
+      fs.mkdirSync(dir, { recursive: true });
+    if(fs.existsSync(file))
+      return;
+    fs.writeFileSync(file, "test");
+    temporaryFiles.push(() => {
+      try { fs.rmSync(file); } catch(ex) {}
+      if(madeDir) { try { fs.rmdirSync(dir); } catch(ex) {} }
+    });
+  }
+
   it("check cors resource calls", async function() {
     faucetConfig.faucetTitle = "test_title_" + Math.floor(Math.random() * 99999999).toString();
     faucetConfig.buildSeoIndex = true;
@@ -345,9 +370,7 @@ describe("Faucet Web Server", () => {
     for(let i = 0; i < checkResources.length; i++) {
       let resource = checkResources[i];
 
-      let resourcePath = path.join(staticPath, resource);
-      if(!fs.existsSync(resourcePath))
-        fs.writeFileSync(resourcePath, "test");
+      temporaryStaticFile(resource);
 
       let optionsRsp = await FetchUtil.fetch(
         "http://localhost:" + listenPort + resource, 
@@ -388,9 +411,7 @@ describe("Faucet Web Server", () => {
     if(!fs.existsSync(jsPath))
       fs.mkdirSync(jsPath);
 
-    let resourcePath = path.join(jsPath, "powfaucet.js");
-    if(!fs.existsSync(resourcePath))
-      fs.writeFileSync(resourcePath, "test");
+    temporaryStaticFile(path.join("js", "powfaucet.js"));
 
     let initialRsp = await FetchUtil.fetch(
       "http://localhost:" + listenPort + "/js/powfaucet.js",
@@ -463,6 +484,85 @@ describe("Faucet Web Server", () => {
     }
     expect(!!err).to.equals(true, "no error thrown");
     expect(err.toString()).to.matches(/failed/, "unexpected error message");
+  });
+
+  /**
+   * the wasm module is the largest thing a player downloads, so
+   * `npm run bundle` compresses it once at build time and the static handler serves the
+   * sibling the client can decode. These drive it over a real socket with node's own http
+   * client, which - unlike fetch - neither sends an Accept-Encoding of its own nor
+   * decompresses what comes back, so the bytes asserted on are the bytes on the wire.
+   */
+  // `precompressed wasm delivery` lived here: a wasm in `static/js` served with its `.br`/`.gz`
+  // sibling. The faucet builds no wasm and its static tree must hold no module's
+  // asset, so the behaviour moved to the module asset route with the cases - brotli, gzip-only,
+  // a q=0 refusal, no sibling, the immutable headers and the HEAD that has to take the same
+  // branch as GET are all in `tests/loader/ModuleAssets.spec.ts` now.
+
+  /**
+   * every method outside the handled set used to fall through
+   * `onHttpRequest` with no response written, so the client waited until it timed out -
+   * `curl -I` against any url on the faucet hung. These use node's http client directly,
+   * because fetch cannot send a bodyless HEAD and read the headers back the same way.
+   */
+  describe("http methods", () => {
+    function request(port: number, method: string, url: string, headers: {[key: string]: string} = {}): Promise<{status: number, headers: IncomingHttpHeaders, body: Buffer}> {
+      return new Promise((resolve, reject) => {
+        let req = http.request({ host: "127.0.0.1", port: port, path: url, method: method, headers: headers }, (rsp) => {
+          let chunks: Buffer[] = [];
+          rsp.on("data", (chunk) => chunks.push(chunk));
+          rsp.on("end", () => resolve({
+            status: rsp.statusCode,
+            headers: rsp.headers,
+            body: Buffer.concat(chunks),
+          }));
+        });
+        req.on("error", reject);
+        req.end();
+      });
+    }
+
+    function startServer(): number {
+      faucetConfig.buildSeoIndex = false;
+      faucetConfig.serverPort = 0;
+      let webServer = ServiceManager.GetService(FaucetHttpServer);
+      webServer.initialize();
+      return webServer.getListenPort();
+    }
+
+    it("answers GET, HEAD, POST and OPTIONS, and refuses the rest", async () => {
+      let port = startServer();
+
+      let get = await request(port, "GET", "/api/getFaucetConfig");
+      expect(get.status).to.equal(200, "GET status");
+      expect(get.body.length > 0).to.equal(true, "GET has no body");
+
+      let post = await request(port, "POST", "/api/getFaucetConfig");
+      expect(post.status).to.equal(200, "POST status");
+
+      let options = await request(port, "OPTIONS", "/api/getFaucetConfig");
+      expect(options.status).to.equal(200, "OPTIONS status");
+
+      let put = await request(port, "PUT", "/api/getFaucetConfig");
+      expect(put.status).to.equal(405, "PUT status");
+      expect(put.headers["allow"]).to.equal("GET, HEAD, POST, OPTIONS", "Allow header mismatch");
+      expect(put.body.length).to.equal(0, "405 must not carry a body");
+
+      let del = await request(port, "DELETE", "/");
+      expect(del.status).to.equal(405, "DELETE status");
+    });
+
+    it("answers HEAD with the GET headers and no body", async () => {
+      let port = startServer();
+
+      let get = await request(port, "GET", "/api/getFaucetConfig");
+      let head = await request(port, "HEAD", "/api/getFaucetConfig");
+
+      expect(head.status).to.equal(get.status, "HEAD status differs from GET");
+      expect(head.body.length).to.equal(0, "HEAD returned a body");
+      expect(head.headers["content-type"]).to.equal(get.headers["content-type"], "HEAD content type differs from GET");
+    });
+
   });
 
 });

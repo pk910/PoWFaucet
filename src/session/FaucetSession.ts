@@ -98,6 +98,9 @@ export class FaucetSession {
             throw new FaucetError("FAUCET_DISABLED", denyMessage);
           }
         }},
+        {prio: 2, hook: () => { // prio 2: which module this session is started for, and its parameters
+          this.applyStartModule(userInput);
+        }},
         {prio: 5, hook: () => { // prio 5: get target address from userInput if not set provided by a module
           let targetAddr = this.targetAddr || userInput.addr;
           if(typeof targetAddr !== "string")
@@ -125,6 +128,54 @@ export class FaucetSession {
     await this.tryProceedSession();
     if(this.status === FaucetSessionStatus.RUNNING)
       this.saveSession();
+  }
+
+  /**
+   * `module` and `params` from the start request - the whole of the core's module vocabulary.
+   *
+   * A session can be started *for* a module: the one whose panel the page started it from. The
+   * core needs two things from that and deliberately not a third. It needs the name to be a
+   * module that is actually enabled here, because a name it cannot resolve is a client talking to
+   * the wrong faucet and the only useful answer says which name failed. And it needs the
+   * parameters stored where that module will look for them, which is its own session-data key -
+   * the same `<module>.<key>` shape a module writes itself.
+   *
+   * What it does **not** do is read them. `params` is a flat map of strings and their meaning is
+   * the module's: `mode`, a level, a difficulty, whatever the panel that was registered offers.
+   * This used to be two fields named after one module's subject matter, in a core type, read by
+   * that module alone - one module's vocabulary in the platform's source, which is what the module split set
+   * out to remove. The core now carries the parameters without knowing a single key in them.
+   *
+   * The module's own `SessionStart` hook still reads `userInput.params` directly (it runs after
+   * this one, at a higher prio); storing them here is what makes them survive a restore and what
+   * keeps the validation in one place rather than in each module that takes parameters.
+   */
+  private applyStartModule(userInput: any) {
+    let moduleName = userInput ? userInput.module : undefined;
+    let params = userInput ? userInput.params : undefined;
+
+    if(moduleName === undefined || moduleName === null) {
+      // parameters for nobody: a panel that sends them without naming itself has a bug, and
+      // dropping them silently turns it into a session that starts and then behaves oddly
+      if(params !== undefined && params !== null)
+        throw new FaucetError("INVALID_PARAMS", "Start parameters were sent without naming a module.");
+      return;
+    }
+    if(typeof moduleName !== "string" || !moduleName)
+      throw new FaucetError("INVALID_MODULE", "Invalid module name in start request.");
+    if(!ServiceManager.GetService(ModuleManager).getModule(moduleName))
+      throw new FaucetError("INVALID_MODULE", "Unknown module '" + moduleName + "': it is not enabled on this faucet.");
+
+    if(params !== undefined && params !== null) {
+      if(typeof params !== "object" || Array.isArray(params))
+        throw new FaucetError("INVALID_PARAMS", "Start parameters must be an object of strings.");
+      for(let key in params) {
+        if(typeof params[key] !== "string")
+          throw new FaucetError("INVALID_PARAMS", "Start parameter '" + key + "' is not a string.");
+      }
+    }
+
+    this.setSessionData(moduleName + ".params", params || {});
   }
 
   public async restoreSession(sessionData: FaucetSessionStoreData): Promise<void> {

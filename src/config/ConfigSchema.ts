@@ -21,9 +21,36 @@ export interface IConfigSchema {
   appBasePath: string; // base path (set automatically)
   faucetVersion: string; // faucet version (set automatically)
   staticPath: string; // path to the /static directory (set automatically)
+  /**
+   * Extra module directories to load, besides the two the loader finds by itself.
+   *
+   * `modulePaths` and not `modules`: `modules` is already the per-module **config map**
+   * (`modules: { <module key>: {...} }`), and a package's modules are configured there by name
+   * exactly like a built-in one (PLAN_MODULE_SPLIT ss.2). Two different things cannot share a key -
+   * renaming this one to `modules` made the schema declare `modules` twice, which is how this rename
+   * announced itself.
+   *
+   * Relative paths resolve against the datadir, which is where an operator thinks in terms of.
+   */
+  modulePaths?: string[];
   faucetPidFile: string; // path to file to write the process pid to
 
   buildSeoIndex: boolean; // build SEO optimized index.seo.html and deliver as index page (the blank loader page just looks bad when parsed by search engines)
+  /**
+   * Cross-origin isolation for the faucet's pages: `"off"`, `"credentialless"` or `"require-corp"`.
+   *
+   * A page is only allowed `SharedArrayBuffer` when the browser calls it cross-origin isolated,
+   * which takes `Cross-Origin-Opener-Policy: same-origin` *and* a `Cross-Origin-Embedder-Policy`.
+   * A module whose client runs a worker on a shared ring wants this, so an installation that has one
+   * needs this on.
+   *
+   * **Off by default, because it can break a captcha.** Under isolation every cross-origin thing the
+   * page loads has to opt in: `credentialless` asks that of iframes only, `require-corp` asks it of
+   * every image, font and script as well. hCaptcha and FriendlyCaptcha are iframes from another
+   * origin, so an operator who turns this on has to check their captcha still appears - which is why
+   * this is a flag and not a default, and why `credentialless` is the mode to reach for first.
+   */
+  crossOriginIsolation: "off" | "credentialless" | "require-corp";
   buildSeoMeta: {[name: string]: string}; // some additional meta tags to add to the SEO optimized page
   database: FaucetDatabaseOptions;
 
