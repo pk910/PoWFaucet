@@ -1,5 +1,6 @@
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
+import { SlotOutlet } from '../../sdk/SlotOutlet';
 import React, { useContext } from 'react';
 import { Button, Collapse } from 'react-bootstrap'
 import { useParams, useNavigate, NavigateFunction } from "react-router";
@@ -121,6 +122,8 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
             </div>
           </div>
           {this.renderSession()}
+          <SlotOutlet slot="details.section" faucetConfig={this.props.faucetConfig}
+            sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
         </div>
       </div>
     )

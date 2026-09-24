@@ -3,12 +3,40 @@
   "version": "2.5.1",
   "description": "PoW Faucet Server",
   "main": "dist/app.js",
-  "bin": "bundle/powfaucet.cjs",
+  "bin": {
+    "powfaucet": "bundle/powfaucet.cjs"
+  },
   "type": "module",
+  "files": [
+    "dist",
+    "bundle",
+    "static",
+    "libs",
+    "faucet-config.example.yaml",
+    "README.md",
+    "LICENSE",
+    "sdk-dist"
+  ],
+  "exports": {
+    ".": "./dist/app.js",
+    "./sdk": {
+      "types": "./sdk-dist/sdk/index.d.ts",
+      "default": "./dist/sdk/index.js"
+    },
+    "./sdk/module": {
+      "types": "./sdk-dist/sdk/modulePackage.d.ts",
+      "default": "./dist/sdk/modulePackage.js"
+    },
+    "./sdk/testing": {
+      "types": "./sdk-dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "tsc && node scripts/copy-modules.mjs dist/modules",
     "build-client": "cd faucet-client && node build-client.js",
-    "sdk": "rm -rf sdk-dist && tsc -p tsconfig.sdk.json",
+    "sdk": "rm -rf sdk-dist && tsc -p tsconfig.sdk.json && node scripts/sdk-package.mjs",
     "start": "tsc && node dist/app.js",
     "bundle": "tsc && webpack --mode production && node scripts/copy-modules.mjs bundle/modules",
     "test": "rm -rf dist-test && tsc -p tsconfig.test.json && cp -r libs dist-test/ && cp -r static dist-test/ && NODE_OPTIONS='--experimental-vm-modules' NODE_NO_WARNINGS=1 npx mocha --exit 'dist-test/tests/**/*.js'",

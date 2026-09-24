@@ -15,7 +15,9 @@ import FaucetStatusPage from './status/FaucetStatusPage';
 import QueueStatusPage from './status/QueueStatusPage';
 import { getCoreFlags } from '../sdk/flags';
 import { getRoutes } from '../sdk/slots';
-import { publishFaucetConfig } from '../sdk/sdk';
+import { publishFaucetConfig, publishFaucetContext } from '../sdk/sdk';
+import { emitHookSafe } from '../sdk/hooks';
+import { SlotOutlet } from '../sdk/SlotOutlet';
 
 import './FaucetPage.scss'
 import { PoWMinerWorkerSrc, getPoWMinerDefaultSrc } from '../types/PoWMinerSrc';
@@ -92,6 +94,15 @@ function DevOnlyRoute(props: { children: React.ReactNode }): React.ReactElement 
   return <React.Fragment>{props.children}</React.Fragment>;
 }
 
+/** Emits the `page` hook whenever the router's location changes; renders nothing. */
+function PageHookObserver(): null {
+  let location = useLocation();
+  React.useEffect(() => {
+    emitHookSafe("page", { path: location.pathname });
+  }, [location.pathname]);
+  return null;
+}
+
 export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPageState> {
   private configRefreshInterval: NodeJS.Timer;
   private faucetContainerElement: HTMLElement;
@@ -129,6 +140,8 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       getContainer: () => this.faucetContainerElement,
       refreshConfig: () => this.loadFaucetConfig(),
     };
+    // the modules' `api` and `session` accessors read the page's context; published once, never by a module
+    publishFaucetContext(this.pageContext);
 
     this.state = {
       initializing: true,
@@ -180,6 +193,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       // Published on every refresh, so a module that asks late gets what
       // the page has now.
       publishFaucetConfig(faucetConfig);
+      emitHookSafe("config", { config: faucetConfig });
       this.setState({
         initializing: false,
         faucetConfig: faucetConfig,
@@ -209,10 +223,12 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
               <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
               <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
             </div>
+            <SlotOutlet slot="header" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
             {this.renderStatusAlerts()}
             <div className="faucet-body">
               {this.props.children && (!Array.isArray(this.props.children) || this.props.children.length > 0) ? this.props.children :
               <Router>
+                <PageHookObserver />
                 <Routes>
                   <Route
                     path='/'
@@ -271,6 +287,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
             </div>
             {this.renderDialogs()}
             {this.renderNotifications()}
+            <SlotOutlet slot="footer" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
             <div className='faucet-footer'>
               <div className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</div>
             </div>

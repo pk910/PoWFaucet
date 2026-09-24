@@ -56,7 +56,7 @@ export class FaucetApi {
     return apiUrl;
   }
 
-  private apiGet(endpoint: string, args?: {[arg: string]: string|number|undefined}): Promise<any> {
+  public apiGet(endpoint: string, args?: {[arg: string]: string|number|undefined}): Promise<any> {
     if(!endpoint.match(/^\//))
       endpoint = "/" + endpoint;
     
@@ -77,7 +77,7 @@ export class FaucetApi {
       .then((rsp) => rsp.json());
   }
 
-  private apiPost(endpoint: string, args?: {[arg: string]: string|number|undefined}, data?: any): Promise<any> {
+  public apiPost(endpoint: string, args?: {[arg: string]: string|number|undefined}, data?: any): Promise<any> {
     if(!endpoint.match(/^\//))
       endpoint = "/" + endpoint;
     

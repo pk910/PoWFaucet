@@ -141,6 +141,59 @@ export interface IRegisteredPanel {
 }
 
 /** Every panel registered for a slot, in registration order. */
+/**
+ * The places a module may put something on the core's pages, and the only ones.
+ *
+ * Each is rendered by the page it belongs to, with the same props for every slot: the page's
+ * session (or null), the faucet config, the registering module's config block and a navigate
+ * function. Several modules may fill one slot; they render in `order`, then registration order.
+ */
+export type FaucetSlotName =
+  | "header" | "footer"
+  | "front.info" | "front.after"
+  | "mining.status"
+  | "claim.before" | "claim.after"
+  | "details.section" | "status.section" | "queue.section";
+
+export const FAUCET_SLOTS: FaucetSlotName[] = [
+  "header", "footer", "front.info", "front.after", "mining.status",
+  "claim.before", "claim.after", "details.section", "status.section", "queue.section",
+];
+
+export interface ISlotProps {
+  /** the session the page is showing, or null on pages without one */
+  sessionId: string | null;
+  faucetConfig: IFaucetConfig;
+  /** the registering module's own config block, or null */
+  moduleConfig: unknown;
+  moduleName: string;
+  navigate: (path: string) => void;
+}
+
+export interface IRegisteredSlot {
+  slot: FaucetSlotName;
+  component: React.ComponentType<ISlotProps>;
+  module: string;
+  order: number;
+}
+
+let slots: Map<string, IRegisteredSlot[]> = new Map();
+
+export function registerSlot(slot: FaucetSlotName, component: React.ComponentType<ISlotProps>,
+                             options: { module: string; order?: number }): void {
+  if(FAUCET_SLOTS.indexOf(slot) === -1)
+    console.warn("[PoWFaucet] '" + slot + "' is not a slot any page renders; it will not be shown");
+  let list = slots.get(slot);
+  if(!list)
+    slots.set(slot, list = []);
+  list.push({ slot: slot, component: component, module: options.module, order: options.order ?? 100 });
+  list.sort((a, b) => a.order - b.order);
+}
+
+export function getSlot(slot: FaucetSlotName): IRegisteredSlot[] {
+  return (slots.get(slot) || []).slice();
+}
+
 let panels: Map<string, IRegisteredPanel[]> = new Map();
 let routes: IRegisteredRoute[] = [];
 
@@ -197,4 +250,5 @@ export function getRoutes(): IRegisteredRoute[] {
 export function resetSlots(): void {
   panels = new Map();
   routes = [];
+  slots = new Map();
 }

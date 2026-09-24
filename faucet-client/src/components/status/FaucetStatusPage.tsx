@@ -1,6 +1,7 @@
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 import React, { useContext } from 'react';
+import { SlotOutlet } from '../../sdk/SlotOutlet';
 import { useNavigate, NavigateFunction } from "react-router";
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { renderDate, renderTime, renderTimespan } from '../../utils/DateUtils';
@@ -124,6 +125,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
               {this.renderActiveClaims()}
             </div>
           </div>
+          <SlotOutlet slot="status.section" faucetConfig={this.props.faucetConfig} navigate={(path) => this.props.navigateFn(path)} />
         </div>
       </div>
     );

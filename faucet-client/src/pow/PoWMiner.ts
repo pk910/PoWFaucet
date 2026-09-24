@@ -1,3 +1,4 @@
+import { emitHookSafe } from '../sdk/hooks';
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { getPoWParamsStr } from '../utils/PoWParamsHelper';
 import { PoWParams } from "../common/FaucetConfig";
@@ -115,9 +116,11 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
 
   public startMiner() {
     this.startStopWorkers();
+    emitHookSafe("mining.start", {});
   }
 
   public stopMiner() {
+    emitHookSafe("mining.stop", {});
     this.stopAllWorker();
     if(this.verifyWorker) {
       this.verifyWorker.worker.terminate();

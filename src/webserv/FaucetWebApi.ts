@@ -118,6 +118,10 @@ export class FaucetWebApi {
     return new FaucetHttpResponse(404, "Not Found");
   }
 
+  public hasApiEndpoint(endpoint: string): boolean {
+    return !!this.apiEndpoints[endpoint.toLowerCase()];
+  }
+
   public registerApiEndpoint(endpoint: string, handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>) {
     this.apiEndpoints[endpoint.toLowerCase()] = handler;
   }

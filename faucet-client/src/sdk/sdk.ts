@@ -4,7 +4,10 @@ import { Fragment, jsx, jsxs } from 'react/jsx-runtime';
 import * as common from '../common';
 import * as types from '../types';
 import { getCoreFlags, ICoreFlags } from './flags';
-import { getPanels, getRoutes, IMiningPanelProps, registerPanel, registerRoute, resetSlots } from './slots';
+import { getPanels, getRoutes, getSlot, IMiningPanelProps, ISlotProps, FaucetSlotName, registerPanel, registerRoute, registerSlot, resetSlots } from './slots';
+import { FaucetHookHandler, FaucetHookName, getHookCount, offHook, onHook, resetHooks } from './hooks';
+import { IFaucetContext } from '../common/FaucetContext';
+import { IFaucetSessionInfo } from '../common/FaucetSession';
 
 /**
  * The surface a module may rely on, and the only one.
@@ -51,6 +54,12 @@ export interface IFaucetClientSdk {
    * does, so the surface is proved by the thing that used to be hard-wired.
    */
   ui: IFaucetClientUi;
+  /** the page's named moments a module may attach logic to */
+  hooks: IFaucetClientHooks;
+  /** the session the page is on, if any, and a way to be told when that changes */
+  session: IFaucetClientSessionAccess;
+  /** the faucet's own api transport, for a module's own endpoints (`registerApiEndpoint` on the server side) */
+  api: IFaucetClientApiAccess;
   /** what the faucet published for a module, without handing over the whole config */
   config: IFaucetClientConfigAccess;
   /** the page's own switches; `dev` gates routes registered `{dev: true}` */
@@ -66,10 +75,37 @@ export interface IFaucetClientUi {
   registerRoute: (path: string, component: React.ComponentType<Record<string, never>>,
                   options?: { dev?: boolean }) => void;
   /** what is registered, for the pages that render it */
+  /** a component into one of the pages' slots (`header`, `front.info`, `mining.status`, `claim.after`, ...) */
+  registerSlot: (slot: FaucetSlotName, component: React.ComponentType<ISlotProps>,
+                 options: { module: string; order?: number }) => void;
   getPanels: typeof getPanels;
   getRoutes: typeof getRoutes;
+  getSlot: typeof getSlot;
   /** forget every registration: a host reloading its modules, or a page under test */
   reset: typeof resetSlots;
+}
+
+export interface IFaucetClientHooks {
+  /** registers a handler; returns the function that removes it */
+  on: (name: FaucetHookName, handler: FaucetHookHandler, options?: { module?: string; prio?: number }) => () => void;
+  off: (name: FaucetHookName, handler: FaucetHookHandler) => void;
+  count: (name: FaucetHookName) => number;
+}
+
+export interface IFaucetClientSessionAccess {
+  /** the session the page currently shows, or null */
+  current: () => IFaucetSessionInfo | null;
+  /** called with the session whenever the page's session changes (null when it leaves one); returns the unsubscribe */
+  subscribe: (fn: (session: IFaucetSessionInfo | null) => void) => () => void;
+}
+
+export interface IFaucetClientApiAccess {
+  /** GET `/api/<endpoint>` with query args; the answer is parsed json */
+  get: (endpoint: string, args?: {[arg: string]: string | number | undefined}) => Promise<any>;
+  /** POST `/api/<endpoint>` with a json body */
+  post: (endpoint: string, data?: any, args?: {[arg: string]: string | number | undefined}) => Promise<any>;
+  /** the page's api, ws and images urls */
+  urls: () => IFaucetContext["faucetUrls"] | null;
 }
 
 export interface IFaucetClientConfigAccess {
@@ -140,6 +176,23 @@ export function publishFaucetConfig(config: unknown): void {
   currentConfig = config as { modules?: Record<string, unknown> };
 }
 
+let currentContext: IFaucetContext | null = null;
+let currentSession: IFaucetSessionInfo | null = null;
+let sessionSubscribers: ((session: IFaucetSessionInfo | null) => void)[] = [];
+
+/** Called by the page shell once it has its context, and never by a module. */
+export function publishFaucetContext(context: IFaucetContext): void {
+  currentContext = context;
+}
+
+/** Called by a page that shows a session on mount (and with null on unmount), and never by a module. */
+export function publishSession(session: IFaucetSessionInfo | null): void {
+  currentSession = session;
+  for(let fn of sessionSubscribers.slice()) {
+    try { fn(session); } catch(ex) { console.error("[PoWFaucet] a session subscriber failed: " + (ex instanceof Error ? ex.message : ex)); }
+  }
+}
+
 function moduleConfig(name: string): unknown {
   if(!currentConfig || !currentConfig.modules)
     return null;
@@ -160,9 +213,30 @@ export function buildClientSdk(): IFaucetClientSdk {
     ui: {
       registerPanel: registerPanel,
       registerRoute: registerRoute,
+      registerSlot: registerSlot,
       getPanels: getPanels,
       getRoutes: getRoutes,
-      reset: resetSlots,
+      getSlot: getSlot,
+      reset: () => { resetSlots(); resetHooks(); },
+    },
+    hooks: {
+      on: onHook,
+      off: offHook,
+      count: getHookCount,
+    },
+    session: {
+      current: () => currentSession,
+      subscribe: (fn) => {
+        sessionSubscribers.push(fn);
+        return () => { sessionSubscribers = sessionSubscribers.filter((entry) => entry !== fn); };
+      },
+    },
+    api: {
+      get: (endpoint, args) => currentContext ? currentContext.faucetApi.apiGet(endpoint, args)
+        : Promise.reject(new Error("the page is not ready")),
+      post: (endpoint, data, args) => currentContext ? currentContext.faucetApi.apiPost(endpoint, args, data)
+        : Promise.reject(new Error("the page is not ready")),
+      urls: () => currentContext ? currentContext.faucetUrls : null,
     },
     config: {
       module: (name: string) => moduleConfig(name),

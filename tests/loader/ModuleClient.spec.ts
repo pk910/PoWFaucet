@@ -117,6 +117,11 @@ describe("module client half in a browser", () => {
         "the faucet had already rendered when the module script ran - a view registered here " +
         "would have been registered too late");
       expect(seen.registered).to.equal(true, "the module's registration did not take");
+      expect(seen.slots).to.equal(1, "the front-page slot the module registered is not in the registry");
+      expect(seen.hookCount).to.equal(1, "the config hook the module registered is not in the registry");
+      expect(seen.configHooks).to.be.greaterThan(0, "the config hook never ran, though the page loaded its config");
+      let slotShown = await page.evaluate(() => !!document.querySelector(".echo-plugin-slot"));
+      expect(slotShown).to.equal(true, "the module's front.info slot did not render on the front page");
       expect(seen.singletons?.ok).to.equal(true,
         "checkSingletons called with the faucet's own instances should report them clean, got " +
         JSON.stringify(seen.singletons));

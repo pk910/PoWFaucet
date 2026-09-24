@@ -56,6 +56,9 @@ module.exports = {
     seen.faucetVersion = sdk.faucetVersion;
     seen.apiVersion = sdk.apiVersion;
     seen.moduleDir = sdk.moduleDir;
+    // an endpoint of its own, served by the faucet at /api/echo/ping
+    if(typeof sdk.registerApiEndpoint === "function")
+      sdk.registerApiEndpoint("echo/ping", async () => ({ pong: true, module: "echo" }));
     sdk.log("info", "echo module initialised");
     seen.logged.push("init");
   },

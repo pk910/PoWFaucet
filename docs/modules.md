@@ -90,27 +90,57 @@ the export name and loads exactly that, through the same injected SDK.
 
 ## The client
 
-`client/module.js` runs before the faucet renders. `window.PoWFaucet` gives it React, ReactDOM,
-the JSX runtime, the two slots it may fill, its own config and the dev flag:
+`client/module.js` runs before the faucet renders. `window.PoWFaucet` gives it React, ReactDOM
+and the JSX runtime (declare them as externals - `checkSingletons` throws if a module bundled
+its own), its config block, and four ways in:
+
+**Slots** - a component into a named place on the core's pages. Every slot renders its
+components with the same props (`sessionId`, `faucetConfig`, `moduleConfig`, `moduleName`,
+`navigate`); several modules may fill one slot, in `order`.
 
 ```js
 var sdk = window.PoWFaucet;
-sdk.checkSingletons({ React: React, ReactDOM: ReactDOM });       // throws if any is a copy
-sdk.ui.registerPanel("mining", MyPanel);                         // rendered on the mining page
-sdk.ui.registerRoute("/mymodule-dev", MyDevPage, { dev: true }); // mounted only under ?dev=1
-var settings = sdk.config.module("solver");                      // this module's config block
+sdk.ui.registerSlot("front.info", InfoBox, { module: "solver", order: 10 });
 ```
 
-A module bundle declares `react`, `react-dom`, `react-dom/client` and `@powfaucet/client-sdk`
-as externals resolving to `PoWFaucet.*`; a second React in the page fails later and elsewhere,
-which is what `checkSingletons` turns into one message at load time.
+| slot | where |
+|---|---|
+| `header`, `footer` | above and below every page |
+| `front.info`, `front.after` | the front page, above the start form and below the description |
+| `mining.status` | the mining page, below the miner and the panel |
+| `claim.before`, `claim.after` | the claim page |
+| `details.section`, `status.section`, `queue.section` | the session details, faucet status and queue pages |
 
-A panel may declare start modes; the front page offers them and starts the session with
-`POST /api/startSession { addr, module: "<key>", params: {...} }`. The faucet checks that the
-module is enabled and that `params` is a flat map of strings, stores them under the module's
-own session-data key, and reads nothing else - the module's `SessionStart` hook decides.
+**Panels and routes** - `ui.registerPanel("mining", Panel, { module, captions, modes })` owns the
+mining page for a session started for this module (its start modes appear on the front page and
+go to the server as `params.mode`); `ui.registerRoute(path, Page, { dev })` adds a page, mounted
+only under `?dev=1` when `dev` is set.
 
-`?dev=1` is the faucet's only dev switch; a module reads its own switches beside it.
+**Hooks** - logic without UI, at the page's named moments. Handlers run in `prio` order and may
+be async; a `session.start` or `session.claim` handler may throw to refuse, and the page shows
+the message.
+
+```js
+sdk.hooks.on("session.start", (evt) => { evt.input.params = { ...evt.input.params, ref: myRef }; });
+sdk.hooks.on("session.balance", (evt) => console.log(evt.sessionId, evt.balance));
+```
+
+`config`, `page`, `session.start`, `session.started`, `session.restored`, `session.balance`,
+`session.claim`, `session.claimed`, `session.closed`, `mining.start`, `mining.stop`.
+
+**Session and api** - `sdk.session.current()` / `sdk.session.subscribe(fn)` give the session the
+page is on; `sdk.api.get("solver/state", { session })` and `sdk.api.post("solver/act", body)` go
+through the faucet's own transport to an endpoint the module registered on the server side:
+
+```js
+// backend.cjs
+sdk.registerApiEndpoint("solver/state", async (req, url, body) => ({ ok: true }));
+```
+
+`POST /api/startSession { addr, module: "<key>", params: {...} }` starts a session *for* a
+module: the faucet checks that the module is enabled and that `params` is a flat map of
+strings, stores them under the module's own session-data key, and reads nothing else - the
+module's `SessionStart` hook decides.
 
 ## Building and testing
 

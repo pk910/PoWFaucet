@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { createRequire } from "node:module";
 import { ServiceManager } from "../common/ServiceManager.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
+import { FaucetWebApi } from "../webserv/FaucetWebApi.js";
 import { FaucetWorkers } from "../common/FaucetWorker.js";
 import { MODULE_CLASSES, registerModuleClass } from "../modules/modules.js";
 import { IModulePackage, IFaucetSdk, IModuleManifest, MODULE_API_VERSION } from "../sdk/modulePackage.js";
@@ -447,6 +448,12 @@ export class ModuleLoader {
       registerModule: (name, moduleClass) => registerModuleClass(name, moduleClass),
       registerWorker: (name, workerClass, source) =>
         FaucetWorkers.registerWorkerClass(name, workerClass, source),
+      registerApiEndpoint: (endpoint, handler) => {
+        let webApi = ServiceManager.GetService(FaucetWebApi);
+        if(webApi.hasApiEndpoint(endpoint))
+          throw new Error("'" + manifest.name + "' wants api endpoint '" + endpoint + "', which is taken");
+        webApi.registerApiEndpoint(endpoint, handler);
+      },
       log: (level, message) => this.emitLog(toLogLevel(level), "[" + manifest.name + "] " + message),
     };
   }

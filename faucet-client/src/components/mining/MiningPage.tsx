@@ -1,5 +1,8 @@
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { getPanels, IMiningPanelApi, IMiningPanelProps, IRegisteredPanel } from '../../sdk/slots';
+import { SlotOutlet } from '../../sdk/SlotOutlet';
+import { emitHookSafe } from '../../sdk/hooks';
+import { publishSession } from '../../sdk/sdk';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 import React, { useContext } from 'react';
 import { useParams, useNavigate, NavigateFunction } from "react-router";
@@ -206,6 +209,9 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
     });
     if(!this.state.loadedSession) {
       this.faucetSession.loadSessionInfo().then((sessionInfo) => {
+        // the session this page is on, for `PoWFaucet.session` and the modules' `session.restored` hook
+        publishSession(sessionInfo);
+        emitHookSafe("session.restored", { session: sessionInfo });
         let hasPowTask = sessionInfo.tasks?.filter((task) => task.module === "pow").length > 0;
         this.powTaskPresent = hasPowTask;
         // A task of somebody else's is a running session whether or not anything
@@ -251,6 +257,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
   }
 
   public componentWillUnmount() {
+    publishSession(null);
     Object.keys(this.eventListeners).forEach((listenerKey) => {
       let eventListener = this.eventListeners[listenerKey];
       if(!eventListener.bound)
@@ -311,6 +318,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
   }
 
   private onModuleBalance(balanceWei: string, reason: string) {
+    emitHookSafe("session.balance", { sessionId: this.props.sessionId, balance: BigInt(balanceWei), reason: reason });
     if(this.powActive && this.powSession) {
       // route through the pow session so the miner status and the panel
       // always show the same number
@@ -355,6 +363,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
           return;
         }
         this.leaveRouted = true;
+        emitHookSafe("session.closed", { sessionId: this.props.sessionId, status: status });
         if(status === "claimable") {
           this.faucetSession.setStatus(status);
           FaucetSession.persistSessionInfo(this.faucetSession);
@@ -423,6 +432,8 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
           </div>
         : null}
         {this.renderPanels(panelOnly)}
+        <SlotOutlet slot="mining.status" faucetConfig={this.props.faucetConfig}
+          sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
         <div className="faucet-actions center">
           <button 
             className="btn btn-danger stop-action" 
@@ -532,8 +543,10 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       closingSession: true
     });
     try {
-      if(this.powActive)
+      if(this.powActive) {
         await this.powSession.closeSession();
+        emitHookSafe("session.closed", { sessionId: this.props.sessionId, status: "closed" });
+      }
       else if(this.panelApi) {
         // a panel-only session ends by resolving its blocking task, which an
         // explicit Leave does; the leave handler then routes to the claim page

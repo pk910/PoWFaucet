@@ -6,6 +6,8 @@ import { FaucetInput } from './FaucetInput';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { FaucetSession } from '../../common/FaucetSession';
 import { RestoreSession } from './RestoreSession';
+import { SlotOutlet } from '../../sdk/SlotOutlet';
+import { emitHook, emitHookSafe } from '../../sdk/hooks';
 import { PassportInfo } from '../passport/PassportInfo';
 
 export interface IFrontPageProps {
@@ -95,6 +97,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
             <img src={faucetImage} className="image" />
           : null}
         </div>
+        <SlotOutlet slot="front.info" faucetConfig={this.props.faucetConfig} navigate={(path) => this.props.navigateFn(path)} />
         <FaucetInput 
           ref={this.faucetInput} 
           faucetContext={this.props.faucetContext} 
@@ -107,13 +110,18 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
             <div className="pow-home-container" dangerouslySetInnerHTML={{__html: this.props.faucetConfig.faucetHtml}} />
           : null}
         </div>
+        <SlotOutlet slot="front.after" faucetConfig={this.props.faucetConfig} navigate={(path) => this.props.navigateFn(path)} />
       </div>
     );
 	}
 
   private async onSubmitInputs(inputData: any): Promise<void> {
     try {
+      // a module may add to `inputData.params` here, or throw to refuse the start with a reason
+      await emitHook("session.start", { input: inputData });
       let sessionInfo = await this.props.faucetContext.faucetApi.startSession(inputData);
+      if(sessionInfo.status !== "failed")
+        emitHookSafe("session.started", { session: sessionInfo });
       if(sessionInfo.status === "failed") {
         let canStartWithScore = false;
         let requiredScore = 0;
