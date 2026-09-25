@@ -52,10 +52,12 @@ jobs:
     # publish npm packages: @powfaucet/server (the runnable faucet) and @powfaucet/sdk (what a
     # module builds against). A version that is already on the registry is skipped, so a re-run of
     # this workflow is harmless; anything else that goes wrong fails the job instead of being hidden.
-    # Auth: npm trusted publishing through the job's OIDC token (configure this workflow as a trusted
-    # publisher for both packages on npmjs.com), or NPM_TOKEN when that secret is set.
+    # Auth: npm trusted publishing - this workflow is registered as the trusted publisher of both
+    # packages on npmjs.com, so the job's OIDC token (`id-token: write`) is the credential and no
+    # secret is involved; `--provenance` attaches the build attestation. Needs npm >= 11.5.
     - name: Publish npm packages
       run: |
+        npm install -g npm@latest
         npm run sdk
         publish_one() {
           local dir="$1" name version
@@ -69,8 +71,6 @@ jobs:
         }
         publish_one .
         publish_one sdk-dist
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     # package bundled release
     - name: Package bundled release
