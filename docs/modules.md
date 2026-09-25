@@ -130,11 +130,15 @@ sdk.hooks.on("session.balance", (evt) => console.log(evt.sessionId, evt.balance)
 
 **Session and api** - `sdk.session.current()` / `sdk.session.subscribe(fn)` give the session the
 page is on; `sdk.api.get("solver/state", { session })` and `sdk.api.post("solver/act", body)` go
-through the faucet's own transport to an endpoint the module registered on the server side:
+through the faucet's own transport to the endpoint the module registered on the server side -
+one path segment, the module's own name, with the sub-path in `url.path[1]`:
 
 ```js
 // backend.cjs
-sdk.registerApiEndpoint("solver/state", async (req, url, body) => ({ ok: true }));
+sdk.registerApiEndpoint("solver", async (req, url, body) => {
+  if(url.path[1] === "state") return { ok: true };
+  return { action: "error", data: { code: "NOT_FOUND", message: "no such solver endpoint" } };
+});
 ```
 
 `POST /api/startSession { addr, module: "<key>", params: {...} }` starts a session *for* a
