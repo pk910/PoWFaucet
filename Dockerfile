@@ -7,6 +7,8 @@ COPY ./libs libs
 COPY ./tsconfig.json .
 COPY ./webpack.config.js .
 COPY ./src src
+# `npm run bundle` ends in scripts/copy-modules.mjs (which copies nothing when there is no modules/ directory)
+COPY ./scripts scripts
 RUN npm run bundle
 
 # build-client env
