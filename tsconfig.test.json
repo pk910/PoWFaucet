@@ -15,6 +15,11 @@
     "src/**/*",
     "tests/**/*"
   ],
+  // The client-side entries of the one module that lived here went with it: the specs that
+  // reached into those modules are the module's own tests now, and so
+  // is the compiler config that has to name them (a spec's dynamic import is invisible to tsc, so
+  // whichever config compiles those specs has to list them). This one is the core's: `src` and the
+  // tests that are left.
   "exclude": [
     "node_modules",
     "dist",

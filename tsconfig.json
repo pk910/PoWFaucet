@@ -15,7 +15,10 @@
   "include": [
     "src/@types",
     "src/app.ts",
-    "src/tools/migrateDB.ts"
+    "src/tools/migrateDB.ts",
+    "src/sdk/index.ts",
+    "src/sdk/modulePackage.ts",
+    "src/testing/index.ts"
   ],
   "exclude": [
     "tests",

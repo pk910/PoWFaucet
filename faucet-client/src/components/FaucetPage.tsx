@@ -1,5 +1,5 @@
 import React, { ReactElement } from 'react';
-import { HashRouter as Router, Routes, Route, Link } from "react-router";
+import { HashRouter as Router, Routes, Route, Link, useLocation } from "react-router";
 
 import { FaucetApi } from '../common/FaucetApi';
 import { IFaucetConfig, IFaucetStatus } from '../common/FaucetConfig';
@@ -13,6 +13,11 @@ import ClaimPage from './claim/ClaimPage';
 import DetailsPage from './details/DetailsPage';
 import FaucetStatusPage from './status/FaucetStatusPage';
 import QueueStatusPage from './status/QueueStatusPage';
+import { getCoreFlags } from '../sdk/flags';
+import { getRoutes } from '../sdk/slots';
+import { publishFaucetConfig, publishFaucetContext } from '../sdk/sdk';
+import { emitHookSafe } from '../sdk/hooks';
+import { SlotOutlet } from '../sdk/SlotOutlet';
 
 import './FaucetPage.scss'
 import { PoWMinerWorkerSrc, getPoWMinerDefaultSrc } from '../types/PoWMinerSrc';
@@ -62,6 +67,42 @@ export interface IFaucetStatusAlert {
 export const FaucetPageContext = React.createContext<IFaucetContext>(null);
 export const FaucetConfigContext = React.createContext<IFaucetConfig>(null);
 
+/**
+ * A route only a developer may see.
+ *
+ * The check is **inside** the router's subtree on purpose. The obvious version -
+ * filtering the route list where it is built - reads the flag in `FaucetPage`'s
+ * own render, and `FaucetPage` does not re-render when the router navigates: the
+ * list is whatever it was when the page first rendered, so arriving at
+ * `#/route?dev=1` from a page that started without the flag produced a route
+ * that existed in the registry, matched the path, and was not in the tree. It
+ * took three wrong diagnoses - the flag parser, the query in the hash, the
+ * plugin's script - before the frozen list was the answer.
+ *
+ * Rendered here, the condition is asked again on every navigation, which is when
+ * it can change.
+ */
+function DevOnlyRoute(props: { children: React.ReactNode }): React.ReactElement {
+  // `useLocation` is what makes this re-run. The flag lives in the URL, and the
+  // URL is the router's state: without reading it through the router, React has
+  // no reason to render this again when only the query changes - the path is the
+  // same `/route` it already matched, so the element it built stays as it was.
+  // That is the second half of the same lesson, and it cost the same hour.
+  useLocation();
+  if(!getCoreFlags().dev)
+    return null;
+  return <React.Fragment>{props.children}</React.Fragment>;
+}
+
+/** Emits the `page` hook whenever the router's location changes; renders nothing. */
+function PageHookObserver(): null {
+  let location = useLocation();
+  React.useEffect(() => {
+    emitHookSafe("page", { path: location.pathname });
+  }, [location.pathname]);
+  return null;
+}
+
 export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPageState> {
   private configRefreshInterval: NodeJS.Timer;
   private faucetContainerElement: HTMLElement;
@@ -99,6 +140,8 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       getContainer: () => this.faucetContainerElement,
       refreshConfig: () => this.loadFaucetConfig(),
     };
+    // the modules' `api` and `session` accessors read the page's context; published once, never by a module
+    publishFaucetContext(this.pageContext);
 
     this.state = {
       initializing: true,
@@ -145,6 +188,12 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
 
     this.pageContext.faucetApi.getFaucetConfig().then((faucetConfig) => {
       this.lastConfigRefresh = (new Date()).getTime();
+      // ...and to the modules, who read their own block through
+      // `PoWFaucet.config.module(name)` rather than being handed the whole of it
+      // Published on every refresh, so a module that asks late gets what
+      // the page has now.
+      publishFaucetConfig(faucetConfig);
+      emitHookSafe("config", { config: faucetConfig });
       this.setState({
         initializing: false,
         faucetConfig: faucetConfig,
@@ -174,10 +223,12 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
               <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
               <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
             </div>
+            <SlotOutlet slot="header" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
             {this.renderStatusAlerts()}
             <div className="faucet-body">
               {this.props.children && (!Array.isArray(this.props.children) || this.props.children.length > 0) ? this.props.children :
               <Router>
+                <PageHookObserver />
                 <Routes>
                   <Route
                     path='/'
@@ -215,12 +266,28 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
                       <QueueStatusPage />
                     )}
                   />
+                  {/*
+                    * Whatever a module registered. A `{dev: true}` route
+                    * exists only for a developer - the same condition the first
+                    * dev entry was written with, now asked of the page
+                    * rather than of a module.
+                    */}
+                  {getRoutes().map((route) => (
+                    <Route
+                      key={route.path}
+                      path={route.path}
+                      element={route.dev
+                        ? <DevOnlyRoute><route.component /></DevOnlyRoute>
+                        : <route.component />}
+                    />
+                  ))}
                 </Routes>
               </Router>
               }
             </div>
             {this.renderDialogs()}
             {this.renderNotifications()}
+            <SlotOutlet slot="footer" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
             <div className='faucet-footer'>
               <div className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</div>
             </div>

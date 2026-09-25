@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "outDir": "sdk-dist",
+    "rootDir": "src",
+    "removeComments": false
+  },
+  // `src/testing/**` too: a module package's specs boot a real faucet and need the harness and a
+  // few internals the SDK withholds at run time (`src/testing/index.ts` is the list). Compiling it
+  // here is what gives them the *same declarations* the module's own code uses - `FaucetSession` has
+  // private members, so a session from a second emit is not assignable to a parameter from the first.
+  "include": ["src/sdk/**/*", "src/@types/**/*", "src/testing/**/*"],
+  "exclude": ["node_modules", "dist", "dist-test", "tests"]
+}

@@ -112,16 +112,30 @@ html.powfaucet, html.powfaucet body {
 }
 
 
+// The card is 450 px wide on a desktop and never wider than the screen it is
+// on: a phone lays out at 390 css px, where a fixed 450 pushes the header link,
+// the footer and the right edge of every page off the side and scrolls the whole
+// document sideways under a thumb that meant to steer.
+//
+// `width` and `max-width`, not `min(450px, 100%)`: a percentage makes the card's
+// width depend on its parent *and* on its content, and a module's panel inside it
+// deliberately breaks out to the window width (2545 px on this screen). The card
+// followed it out to 2020 px and the arena hung off the side of it - pk910:
+// "the general page layout looks broken in non-fullscreen mode". A definite
+// width does not move, and `max-width` still gives the phone what it needed.
 .faucet-page {
   width: 450px;
+  max-width: 100%;
 }
 
 .faucet-page:has(.page-mining), .faucet-page:has(.page-frontpage) {
   width: 450px;
+  max-width: 100%;
 }
 
 .faucet-page:has(.page-claim), .faucet-page:has(.page-details) {
   width: 600px;
+  max-width: 100%;
 }
 
 .faucet-page:has(.faucet-status) {
@@ -291,3 +305,4 @@ html.powfaucet, html.powfaucet body {
 .modal-dialog.modal-700px {
   max-width: 700px;
 }
+

@@ -18,18 +18,40 @@ export interface IFaucetConfig {
     preHtml?: string;
     postHtml?: string;
     caption?: string;
-    [provider: string]: string;
+    [provider: string]: string | undefined;
   };
-  modules: {
-    authenticatoor?: IAuthenticatoorModuleConfig;
-    captcha?: ICaptchaModuleConfig;
-    ensname?: IEnsNameModuleConfig;
-    github?: IGithubModuleConfig;
-    pow?: IPoWModuleConfig;
-    passport?: IPassportModuleConfig;
-    voucher?: IVoucherModuleConfig;
-    zupass?: IZupassModuleConfig;
-  };
+  modules: IFaucetModules;
+}
+
+export interface IFaucetModules {
+  authenticatoor?: IAuthenticatoorModuleConfig;
+  captcha?: ICaptchaModuleConfig;
+  ensname?: IEnsNameModuleConfig;
+  github?: IGithubModuleConfig;
+  pow?: IPoWModuleConfig;
+  passport?: IPassportModuleConfig;
+  voucher?: IVoucherModuleConfig;
+  zupass?: IZupassModuleConfig;
+  // A module's own config block is published under its module name, and the core
+  // does not know what is in it - the module's client is what reads its shape
+  // Only the core's own modules can be named here.
+  [module: string]: any;
+}
+
+/**
+ * True when a running session has something for the mining page to do.
+ *
+ * Any task at all: mining is the core's own, and everything else belongs to a
+ * module that registered a panel to draw it. It used to ask whether the task's
+ * module was named with a particular prefix, which meant the core had to know
+ * what one kind of module was before it could decide where to send the player -
+ * and, worse, a module named anything else would have been dropped on the floor
+ * here with no symptom but a session the page refused to open.
+ */
+export function hasPlayableTask(tasks: { module: string }[]): boolean {
+  if(!tasks)
+    return false;
+  return tasks.length > 0;
 }
 
 export interface IAuthenticatoorModuleConfig {

@@ -1,3 +1,4 @@
+import { emitHookSafe } from '../sdk/hooks';
 import { TypedEmitter } from 'tiny-typed-emitter';
 import { getPoWParamsStr } from '../utils/PoWParamsHelper';
 import { PoWParams } from "../common/FaucetConfig";
@@ -83,6 +84,7 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   private lastShareTime: Date;
   private targetNoncePrefill: number;
   private latestStats: IPoWMinerStats;
+  private throttleFraction: number = 1;
 
   public constructor(options: IPoWMinerOptions) {
     super();
@@ -114,9 +116,11 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
 
   public startMiner() {
     this.startStopWorkers();
+    emitHookSafe("mining.start", {});
   }
 
   public stopMiner() {
+    emitHookSafe("mining.stop", {});
     this.stopAllWorker();
     if(this.verifyWorker) {
       this.verifyWorker.worker.terminate();
@@ -173,6 +177,33 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     return this.settings.workerCount;
   }
 
+  /**
+   * Scales the number of active workers down while something else needs the
+   * CPU - a module's panel does this while it is on screen. The user's worker
+   * count setting is untouched, and no worker is re-initialized, so mining
+   * continues throughout; passing 1 restores the full count.
+   */
+  public setThrottle(fraction: number) {
+    if(!(fraction > 0))
+      fraction = 0;
+    if(fraction > 1)
+      fraction = 1;
+    if(this.throttleFraction === fraction)
+      return;
+    this.throttleFraction = fraction;
+    this.startStopWorkers();
+  }
+
+  public getThrottle(): number {
+    return this.throttleFraction;
+  }
+
+  private getThrottledWorkerCount(): number {
+    if(this.throttleFraction >= 1)
+      return this.settings.workerCount;
+    return Math.max(1, Math.round(this.settings.workerCount * this.throttleFraction));
+  }
+
   private getWorkerCode(algo: PoWHashAlgo): Promise<string> {
     if(this.workerSrc[algo])
       return this.workerSrc[algo];
@@ -219,11 +250,12 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
   }
 
   private async startStopWorkers() {
-    while(this.workers.length > this.settings.workerCount) {
+    let workerCount = this.getThrottledWorkerCount();
+    while(this.workers.length > workerCount) {
       // stop worker
       this.stopWorker();
     }
-    while(this.workers.length < this.settings.workerCount) {
+    while(this.workers.length < workerCount) {
       // start worker
       this.workers.push(this.startWorker());
     }

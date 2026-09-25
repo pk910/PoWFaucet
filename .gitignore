@@ -5,6 +5,9 @@ bundle/
 coverage/
 dist/
 dist-test/
+# `npm run sdk` output: a plugin build needs it on disk, and a generated tree in the
+# repository drifts against the source it came from
+sdk-dist/
 node_modules/
 static/index.seo.html
 static/css/powfaucet*
@@ -18,3 +21,5 @@ faucet-stats.log
 faucet-events.log
 faucet-pid.txt
 tmp*
+# module packages are separate repositories dropped in here (private modules included); never tracked
+modules/

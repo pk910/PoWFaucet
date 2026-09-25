@@ -17,6 +17,7 @@ import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 import { PoWServer } from "./PoWServer.js";
 import { Socket } from "node:net";
 import { getNewGuid } from "../../utils/GuidUtils.js";
+import { SocketCapture } from "../../utils/SocketCapture.js";
 
 export class PoWModule extends BaseModule<IPoWConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -186,6 +187,11 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   }
 
   private async processPoWClientWebSocket(req: IncomingMessage, socket: Socket, head: Buffer, remoteIp: string): Promise<void> {
+    // read from the first moment, so nothing the client sends between the
+    // upgrade and the hand-over to the worker is lost. See SocketCapture - another module's
+    // gateway had the same shape and dropped the client's first frame 95% of the time.
+    let capture = new SocketCapture(socket);
+
     let sessionId: string;
     let clientVersion: string;
     try {
@@ -220,7 +226,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
     session.setSessionData("cliver", clientVersion);
 
     let powServer = await this.getPoWServerForSession(session, true);
-    powServer.connect(session.getSessionId(), req, socket, head);
+    powServer.connect(session.getSessionId(), req, socket, head, capture);
   }
 
   private getPoWServerForSession(session: FaucetSession, create: boolean = false): Promise<PoWServer> {

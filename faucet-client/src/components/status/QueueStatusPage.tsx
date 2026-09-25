@@ -1,4 +1,5 @@
 import React, { useContext } from 'react';
+import { SlotOutlet } from '../../sdk/SlotOutlet';
 import { useNavigate, NavigateFunction } from "react-router";
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { IFaucetConfig } from '../../common/FaucetConfig';
@@ -76,6 +77,7 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
               {this.renderActiveClaims()}
             </div>
           </div>
+          <SlotOutlet slot="queue.section" faucetConfig={this.props.faucetConfig} navigate={(path) => this.props.navigateFn(path)} />
         </div>
       </div>
     );

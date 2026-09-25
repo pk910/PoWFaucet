@@ -48,7 +48,7 @@ export class FaucetDialog extends React.PureComponent<IFaucetDialogFullProps, IF
           {this.props.applyButton ? 
             <Button onClick={async () => {
               try {
-                await this.props.applyButton.applyFn();
+                await this.props.applyButton!.applyFn();
                 if(this.props.closeFn)
                   this.props.closeFn();
               } catch(ex) {}

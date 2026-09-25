@@ -10,6 +10,7 @@ import { ModuleHookAction, ModuleManager } from "../modules/ModuleManager.js";
 import { IFaucetResultSharingConfig } from "../config/ConfigShared.js";
 import { FaucetError } from "../common/FaucetError.js";
 import { EthClaimInfo, EthClaimManager } from "../eth/EthClaimManager.js";
+import { ModuleLoader, moduleAssetUrl } from "../loader/ModuleLoader.js";
 import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus.js";
 import { sha256 } from "../utils/CryptoUtils.js";
 
@@ -18,7 +19,24 @@ export interface IFaucetApiUrl {
   query: {[key: string]: string|boolean};
 }
 
+/** One entry per loaded module, for a client that has to load its assets. */
+export interface IClientModuleInfo {
+  name: string;
+  version: string;
+  script: string;
+  css: string;
+}
+
 export interface IClientFaucetConfig {
+  /**
+   * The module **packages** whose client half the page must load after the core bundle.
+   *
+   * `modulePackages` and not `modules`, because `modules` further down this same interface is the
+   * per-module *config* the client already receives - the two meanings of the word collide in one
+   * object, and the compiler said so the moment the rename tried to put both under `modules`
+   * (PLAN_MODULE_SPLIT ss.2 keeps the config map as it is).
+   */
+  modulePackages?: IClientModuleInfo[];
   faucetTitle: string;
   faucetStatus: IFaucetStatus[];
   faucetStatusHash: string;
@@ -98,6 +116,10 @@ export class FaucetWebApi {
           return handler(req, apiUrl, body);
     }
     return new FaucetHttpResponse(404, "Not Found");
+  }
+
+  public hasApiEndpoint(endpoint: string): boolean {
+    return !!this.apiEndpoints[endpoint.toLowerCase()];
   }
 
   public registerApiEndpoint(endpoint: string, handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>) {
@@ -181,6 +203,20 @@ export class FaucetWebApi {
       time: Math.floor((new Date()).getTime() / 1000),
       resultSharing: faucetConfig.resultSharing,
       modules: moduleConfig,
+      // what a client has to load besides the core bundle. The version is the cache key:
+      // a module's assets are served immutable when the request carries `?v=`, so the
+      // client has to ask for the version it was told about rather than the bare path.
+      modulePackages: ServiceManager.GetService(ModuleLoader).getLoaded().map((entry) => ({
+        name: entry.manifest.name,
+        version: entry.manifest.version,
+        // urls the client can fetch as-is, not the manifest's on-disk paths. The assets
+        // are served out of `<module>/client/` at `/modules/<name>/`, so publishing
+        // `client/module.js` would have the client ask for `/modules/echo/client/...`
+        // and get a 404 - and the `?v=` is what makes the response cacheable, so it
+        // belongs in the url the client is handed rather than in a rule it must know.
+        script: moduleAssetUrl(entry.manifest, entry.manifest.client?.script),
+        css: moduleAssetUrl(entry.manifest, entry.manifest.client?.css),
+      })),
     };
   }
 

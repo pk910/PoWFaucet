@@ -78,12 +78,17 @@ export class FaucetStatsLog {
     }, loopDelay);
   }
 
-  private addStatsEntry(type: string, data: any) {
+  /** Appends a line to the faucet stats log. Used by modules that log their own entry types. */
+  public addEntry(type: string, data: any) {
     if(!this.enabled)
       return;
     let now = Math.floor((new Date()).getTime() / 1000);
     let entry = type + " " + now + " " + JSON.stringify(data) + "\n";
     fs.appendFileSync(this.statsFile, entry);
+  }
+
+  private addStatsEntry(type: string, data: any) {
+    this.addEntry(type, data);
   }
 
   public addSessionStats(session: FaucetSession) {

@@ -9,7 +9,7 @@ export function joinUrl(base: string, add: string): string {
   return result;
 }
 
-export function toQuery(params, delimiter = '&'): string {
+export function toQuery(params: {[key: string]: any}, delimiter = '&'): string {
   const keys = Object.keys(params);
 
   return keys.reduce((str, key, index) => {

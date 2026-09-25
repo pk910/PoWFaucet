@@ -1,0 +1,9 @@
+{
+  "name": "echo",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "backend": "backend.cjs",
+  "modules": { "echo": "EchoModule" },
+  "workers": { "echo-worker": "EchoWorker" },
+  "client": { "script": "client/module.js", "css": "client/module.css" }
+}

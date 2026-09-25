@@ -7,6 +7,8 @@ import { FaucetSession, IFaucetSessionStatus } from '../../common/FaucetSession'
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { renderDate, renderTimespan } from '../../utils/DateUtils';
 import { ClaimInput } from './ClaimInput';
+import { SlotOutlet } from '../../sdk/SlotOutlet';
+import { emitHook, emitHookSafe } from '../../sdk/hooks';
 import { OverlayTrigger, Spinner, Tooltip } from 'react-bootstrap';
 import { ClaimNotificationClient, IClaimNotificationUpdateData } from './ClaimNotificationClient';
 
@@ -224,7 +226,11 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
               <h5>Claim Rewards</h5>
             </div>
           </div>
+          <SlotOutlet slot="claim.before" faucetConfig={this.props.faucetConfig}
+            sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
           {this.renderClaim()}
+          <SlotOutlet slot="claim.after" faucetConfig={this.props.faucetConfig}
+            sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
         </div>
       </div>
     )
@@ -503,9 +509,12 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
         session: this.props.sessionId
       }, claimData ||{});
 
+      // a module may refuse the claim here with a reason, before the request leaves the page
+      await emitHook("session.claim", { sessionId: this.props.sessionId, input: claimData });
       let sessionStatus = await this.props.pageContext.faucetApi.claimReward(claimData);
       if(sessionStatus.status === "failed")
         throw sessionStatus;
+      emitHookSafe("session.claimed", { sessionId: this.props.sessionId, status: sessionStatus });
       
       this.lastStatusPoll = new Date().getTime();
       this.setState({
