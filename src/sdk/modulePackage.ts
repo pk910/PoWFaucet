@@ -87,9 +87,11 @@ export interface IFaucetSdk {
 
   /** Logs through the faucet's own log, prefixed with the module name. */
   /**
-   * Serves `/api/<endpoint>` from this module. The handler gets the raw request, the parsed url
-   * (`url.path` past the endpoint, `url.query`) and the body, and returns what is sent as json.
-   * A module names its endpoints after itself; the core refuses a name a built-in already has.
+   * Serves `/api/<endpoint>/...` from this module. `endpoint` is one path segment - the faucet
+   * routes by the first segment - so a module registers its own name and dispatches on
+   * `url.path[1]` for its sub-endpoints. The handler gets the raw request, the parsed url
+   * (`url.path`, `url.query`) and the body, and returns what is sent as json. The core refuses a
+   * name a built-in already has.
    */
   registerApiEndpoint(endpoint: string, handler: (req: any, url: any, body: Buffer) => Promise<any>): void;
 
