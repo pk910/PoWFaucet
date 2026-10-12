@@ -110,7 +110,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
       <div className="pow-boost-info">
         {this.props.children ?
           this.props.children :
-          <div className="boost-descr">Increase your passport score by verifying stamps on your <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Gitcoin Passport</a>.</div>
+          <div className="boost-descr">Increase your passport score by verifying stamps on your <a href="https://app.passport.xyz/#/dashboard" target="_blank">Human Passport</a>.</div>
         }
         <div className="boost-passport">
           <div className="passport-summary container">
@@ -254,7 +254,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                     container={this.props.pageContext.getContainer()}
                     overlay={
                       <Tooltip>
-                        This stamp has been expired. Please refresh it on passport.gitcoin.co
+                        This stamp has been expired. Please refresh it on app.passport.xyz
                       </Tooltip>
                     }
                   >
@@ -289,13 +289,13 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
       <div className="passport-manual-refresh container">
         <div className="row">
           <div className="col">
-            You can find the Passport JSON by visiting the <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Dashboard</a> and clicking on "Passport Details".<br />
+            You can find the Passport JSON by visiting the <a href="https://app.passport.xyz/#/dashboard" target="_blank">Dashboard</a> and clicking on "Passport Details".<br />
             (<a href="https://support.passport.xyz/passport-knowledge-base/common-questions/how-can-i-access-my-passport-json" target='_blank'>See FAQ for more details</a>)
           </div>
         </div>
         <div className="row form-header mt-2">
           <div className="col">
-            Upload Gitcoin Passport JSON for verification:
+            Upload Passport JSON for verification:
           </div>
         </div>
         <div className="row">
@@ -307,7 +307,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
               <textarea 
                 className="passport-json"
                 value={this.state.passportJson} 
-                placeholder="Please paste your Gitcoin Passport JSON here"
+                placeholder="Please paste your Passport JSON here"
                 onChange={(evt) => this.setState({ passportJson: evt.target.value })} 
                 disabled={this.state.manualRefreshRunning}
               >
@@ -402,7 +402,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
       this.setState({
         refreshProcessing: false,
         refreshError: false,
-        refreshStatus: "Gitcoin Passport Refreshed",
+        refreshStatus: "Passport refreshed",
         passportInfo: {
           passport: res.passport,
           score: res.score,
@@ -446,7 +446,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
         manualRefreshRunning: false,
         showRefreshForm: false,
         refreshError: false,
-        refreshStatus: "Gitcoin Passport verified successfully",
+        refreshStatus: "Passport verified successfully",
         passportInfo: {
           passport: res.passport,
           score: res.score,

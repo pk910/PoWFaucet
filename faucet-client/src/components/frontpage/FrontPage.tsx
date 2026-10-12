@@ -175,7 +175,7 @@ export class FrontPage extends React.PureComponent<IFrontPageProps, IFrontPageSt
                   <div>
                     <div className='alert alert-danger'>{errMsg}</div>
                     <div className="boost-descr">
-                      You can verify your unique identity and increase your score using <a href="https://passport.gitcoin.co/#/dashboard" target="_blank">Gitcoin Passport</a>.
+                      You can verify your unique identity and increase your score using <a href="https://app.passport.xyz/#/dashboard" target="_blank">Human Passport</a>.
                     </div>
                     <div className="boost-descr2">
                       Ensure your provided address achieves a minimum score of {requiredScore} to initiate a session.

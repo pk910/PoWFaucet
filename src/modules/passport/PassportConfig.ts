@@ -1,6 +1,7 @@
 import { IBaseModuleConfig } from "../BaseModule.js";
 
 export interface IPassportConfig extends IBaseModuleConfig {
+  apiUrl: string;
   scorerApiKey: string;
   cachePath: string;
   cacheTime: number;
@@ -18,10 +19,14 @@ export interface IPassportConfig extends IBaseModuleConfig {
 
 export const defaultConfig: IPassportConfig = {
   enabled: false,
+  apiUrl: "https://api.passport.xyz",
   scorerApiKey: null,
   cachePath: null,
   cacheTime: 86400,
-  trustedIssuers: [ "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" ],
+  trustedIssuers: [
+    "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC", // legacy Gitcoin Passport issuer (Ed25519)
+    "did:ethr:0xd6f8d6ca86aa01e551a311d670a0d1bd8577e5fb", // Human Passport issuer (EIP712)
+  ],
   refreshCooldown: 300,
   stampDeduplicationTime: 86400 * 3,
   stampScoring: {},
