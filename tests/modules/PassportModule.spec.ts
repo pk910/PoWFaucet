@@ -141,6 +141,123 @@ describe("Faucet module: passport", () => {
     expect(error.code).to.equal("PASSPORT_SCORE", "unexpected error code");
   });
 
+  it("Start session with paginated passport response", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    let allItems = (testData as any).testPassport1Rsp.items;
+    globalStubs["fetch"].onFirstCall().returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve({
+        next: "https://api.passport.xyz/registry/stamps/0x332e43696a505ef45b9319973785f837ce5267b9?token=test-token&limit=1000",
+        prev: null,
+        items: allItems.slice(0, 2),
+      })
+    }));
+    globalStubs["fetch"].onSecondCall().returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve({
+        next: null,
+        prev: null,
+        items: allItems.slice(2),
+      })
+    }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
+    });
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
+    expect(globalStubs["fetch"].callCount).to.equal(2, "unexpected fetch call count");
+    expect(globalStubs["fetch"].firstCall.args[0]).to.match(/^https:\/\/api\.passport\.xyz\/v2\/stamps\/0x332E43696A505EF45b9319973785F837ce5267b9\?/, "unexpected api url");
+    expect(globalStubs["fetch"].firstCall.args[1]?.headers?.["X-API-KEY"]).to.equal("test-api-key", "api key not sent");
+    expect(globalStubs["fetch"].secondCall.args[0]).to.match(/^https:\/\/api\.passport\.xyz\/registry\/stamps\/.*token=test-token/, "pagination link not followed");
+    let passportData = testSession.getSessionData("passport.data");
+    expect(passportData?.found).to.equal(true, "no passport data found");
+    expect(passportData?.stamps?.length).to.equal(allItems.length, "unexpected stamp count");
+    let passportScore = testSession.getSessionData("passport.score");
+    expect(passportScore?.score).to.equal(2, "unexpected passport score");
+  });
+
+  it("Start session with pagination link to foreign host", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+      },
+      boostFactor: {
+        1: 2,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve({
+        next: "https://evil.example.com/v2/stamps/0x332e43696a505ef45b9319973785f837ce5267b9?token=test-token",
+        prev: null,
+        items: (testData as any).testPassport1Rsp.items.slice(0, 2),
+      })
+    }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
+    });
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
+    expect(globalStubs["fetch"].callCount).to.equal(1, "api key must not be sent to a foreign host");
+    let passportData = testSession.getSessionData("passport.data");
+    expect(passportData?.found).to.equal(false, "unexpected passport data found");
+  });
+
+  it("Keep cached passport when passport api fails on refresh", async () => {
+    faucetConfig.modules["passport"] = {
+      enabled: true,
+      scorerApiKey: "test-api-key",
+      refreshCooldown: 0,
+      stampScoring: {
+        "TwitterTweetGT10": 1,
+        "TwitterFollowerGT100": 1,
+      },
+      boostFactor: {
+        2: 4,
+      },
+    } as any;
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve((testData as any).testPassport1Rsp)
+    }));
+    globalStubs["PassportResolver.getVerifyTime"] = sinon.stub(PassportResolver.prototype as any, "getVerifyTime").returns(1686844923);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test", 1);
+    });
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x332E43696A505EF45b9319973785F837ce5267b9",
+    });
+    expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+    expect(testSession.getSessionData("passport.data")?.found).to.equal(true, "no passport data found");
+
+    globalStubs["fetch"].returns(returnDelayedPromise(false, "test api error"));
+    let refreshRsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/refreshPassport?session=" + testSession.getSessionId(),
+    } as any, undefined);
+    expect(refreshRsp instanceof FaucetHttpResponse).to.equal(false, "unexpected plain http response");
+    expect(!!refreshRsp.error).to.equal(false, "unexpected error returned");
+    expect(globalStubs["fetch"].callCount).to.equal(2, "unexpected fetch call count");
+    expect(refreshRsp.passport?.found).to.equal(true, "cached passport dropped after api error");
+    expect(refreshRsp.passport?.stamps?.length).to.equal((testData as any).testPassport1Rsp.items.length, "unexpected stamp count");
+    expect(refreshRsp.score?.score).to.equal(2, "unexpected passport score");
+    expect(testSession.getSessionData("passport.data")?.found).to.equal(true, "session passport dropped after api error");
+  });
+
   it("Start session with passport api error", async () => {
     faucetConfig.modules["passport"] = {
       enabled: true,

@@ -469,10 +469,12 @@ modules:
   ## Passport protection
   passport:
     enabled: false
-    # can be overridden at runtime with FAUCET_PASSPORT_SCORER_API_KEY
-    scorerApiKey: "" # Gitcoin Passport Scorer API Key
-    trustedIssuers:
-      - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
+    apiUrl: "https://api.passport.xyz" # Human Passport (formerly Gitcoin Passport) Stamps API
+    # api key from https://developer.passport.xyz, can be overridden at runtime with FAUCET_PASSPORT_SCORER_API_KEY
+    scorerApiKey: "" # Passport API Key
+    trustedIssuers: # issuers accepted for manually uploaded passport JSON
+      - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # legacy Gitcoin Passport issuer
+      - "did:ethr:0xd6f8d6ca86aa01e551a311d670a0d1bd8577e5fb" # Human Passport issuer
     passportCachePath: "passport-cache"
     
     refreshCooldown: 300 # allow refreshing every 5mins
@@ -489,71 +491,66 @@ modules:
       1: 1.1 # x1.1 if score >= 1
       5: 1.5 # x1.5 if score >= 5
       10: 2 # x2 if score >= 10
-    stampScoring:
-      "Google": 1
-      "Twitter": 1
-      "Ens": 2
-      "GnosisSafe": 2
-      "Poh": 4
-      "POAP": 1
-      "GitPOAP": 1
-      "Facebook": 1
-      "FacebookFriends": 1
-      "FacebookProfilePicture": 1
-      "Brightid": 8
-      "Github": 1
-      "Coinbase": 1
-      "FiveOrMoreGithubRepos": 1
-      "TenOrMoreGithubFollowers": 2
-      "FiftyOrMoreGithubFollowers": 4
-      "ForkedGithubRepoProvider": 1
-      "StarredGithubRepoProvider": 1
-      "Linkedin": 1
-      "Discord": 1
-      "TwitterTweetGT10": 1
-      "TwitterFollowerGT100": 1
-      "TwitterFollowerGT500": 2
-      "TwitterFollowerGTE1000": 3
-      "TwitterFollowerGT5000": 5
-      "SelfStakingBronze": 1
-      "SelfStakingSilver": 1
-      "SelfStakingGold": 1
-      "CommunityStakingBronze": 1
-      "CommunityStakingSilver": 1
-      "CommunityStakingGold": 1
-      "ClearTextSimple": 1
-      "ClearTextTwitter": 1
-      "ClearTextGithubOrg": 1
-      "SnapshotProposalsProvider": 1
-      "SnapshotVotesProvider": 1
-      "EthGasProvider": 1
-      "FirstEthTxnProvider": 1
-      "EthGTEOneTxnProvider": 1
-      "GitcoinContributorStatistics#numGrantsContributeToGte#1": 1
-      "GitcoinContributorStatistics#numGrantsContributeToGte#10": 1
-      "GitcoinContributorStatistics#numGrantsContributeToGte#25": 2
-      "GitcoinContributorStatistics#numGrantsContributeToGte#100": 2
-      "GitcoinContributorStatistics#totalContributionAmountGte#10": 1
-      "GitcoinContributorStatistics#totalContributionAmountGte#100": 2
-      "GitcoinContributorStatistics#totalContributionAmountGte#1000": 2
-      "GitcoinContributorStatistics#numRoundsContributedToGte#1": 1
-      "GitcoinContributorStatistics#numGr14ContributionsGte#1": 1
-      "GitcoinGranteeStatistics#numOwnedGrants#1": 1
-      "GitcoinGranteeStatistics#numGrantContributors#10": 1
-      "GitcoinGranteeStatistics#numGrantContributors#25": 1
-      "GitcoinGranteeStatistics#numGrantContributors#100": 2
-      "GitcoinGranteeStatistics#totalContributionAmount#100": 1
-      "GitcoinGranteeStatistics#totalContributionAmount#1000": 2
-      "GitcoinGranteeStatistics#totalContributionAmount#10000": 4
-      "GitcoinGranteeStatistics#numGrantsInEcoAndCauseRound#1": 1
-      "gtcPossessionsGte#100": 2
-      "gtcPossessionsGte#10": 1
-      "ethPossessionsGte#32": 1
-      "ethPossessionsGte#10": 1
-      "ethPossessionsGte#1": 1
-      "NFT": 1
-      "Lens": 1
-      "ZkSync": 1
+    stampScoring: # score per stamp provider, defaults to the weights passport uses itself (see https://api.passport.xyz/ceramic-cache/weights)
+      SelfStakingBronze: 0.897                                      # 0.897  [Self Staking]: Bronze Staker
+      SelfStakingSilver: 2.066                                      # 2.066  [Self Staking]: Silver Staker
+      SelfStakingGold: 2.7                                          # 2.7    [Self Staking]: Gold Staker
+      BeginnerCommunityStaker: 0.673                                # 0.673  [Community Staking]: Community Participant
+      ExperiencedCommunityStaker: 2.161                             # 2.161  [Community Staking]: Active Community Member
+      TrustedCitizen: 4.009                                         # 4.009  [Community Staking]: Trusted Community Leader
+      GitcoinContributorStatistics#totalContributionAmountGte#10: 0.223   # 0.223  [Donation Tiers]: Bronze Contributor
+      GitcoinContributorStatistics#totalContributionAmountGte#100: 1.017   # 1.017  [Donation Tiers]: Silver Contributor
+      GitcoinContributorStatistics#totalContributionAmountGte#1000: 4.997   # 4.997  [Donation Tiers]: Gold Contributor
+      Discord: 2.8                                                  # 2.8    [Account Verification]: Discord Engagement Verification
+      Google: 0.525                                                 # 0.525  [Account Verification]: Verify Google Account Ownership
+      githubContributionActivityGte#30: 1.879                       # 1.879  [Developer Activity]: Regular Contributor
+      githubContributionActivityGte#60: 1.888                       # 1.888  [Developer Activity]: Active Developer
+      githubContributionActivityGte#120: 2.259                      # 2.259  [Developer Activity]: Dedicated Coder
+      Linkedin: 1.531                                               # 1.531  [Account Verification]: Verify LinkedIn Account Ownership
+      Ens: 0.208                                                    # 0.208  [Domain Verification]: ENS Domain Owner
+      Brightid: 0.202                                               # 0.202  [Community Verification]: Peer-Verified Identity
+      ETHScore#50: 16.021                                           # 16.021  [Network Participation Levels]: ETH Enthusiast
+      ETHScore#75: 2.399                                            # 2.399  [Network Participation Levels]: ETH Advocate
+      ETHScore#90: 2.926                                            # 2.926  [Network Participation Levels]: ETH Maxi
+      ETHGasSpent#0.25: 0.778                                       # 0.778  [Ethereum Activity Metrics]: Spend more than 0.25 ETH on gas
+      ETHnumTransactions#100: 0.21                                  # 0.21   [Ethereum Activity Metrics]: Execute over 100 transactions
+      ETHDaysActive#50: 0.207                                       # 0.207  [Ethereum Activity Metrics]: Active on over 50 distinct days
+      SnapshotProposalsProvider: 0.239                              # 0.239  [DAO Governance]: Proposal Creator
+      NFTScore#50: 16.246                                           # 16.246  [Collector's Journey]: Digital Collector
+      NFTScore#75: 2.362                                            # 2.362  [Collector's Journey]: Art Aficionado
+      NFTScore#90: 2.413                                            # 2.413  [Collector's Journey]: NFT Visionary
+      NFT: 1.032                                                    # 1.032  [NFT Ownership Verification]: Holds at least 1 NFT (ERC-721)
+      zkSyncScore#5: 1.67                                           # 1.67   [Engagement Levels in zkSync Era]: Engagement Explorer
+      zkSyncScore#20: 1.67                                          # 1.67   [Engagement Levels in zkSync Era]: L2 Believer
+      zkSyncScore#50: 1.67                                          # 1.67   [Engagement Levels in zkSync Era]: zkSync Champion
+      ZkSyncEra: 0.606                                              # 0.606  [Transactional Verification]: Verified Transactor
+      Lens: 0.0                                                     # 0.0    [Social Verification]: Lens Handle Owner
+      GnosisSafe: 0.222                                             # 0.222  [Safe Verification]: Safe Wallet Owner
+      CoinbaseDualVerification2: 0.0                                # 0.0    [Coinbase Verification]: Coinbase KYC Verified
+      GuildAdmin: 0.468                                             # 0.468  [Guild Admin]: Owner or Administrator of one or more guilds
+      GuildPassportMember: 0                                        # 0      [Human Passport Guild]: Member with 1 or more roles in Passport Guild
+      IdenaState#Newbie: 5.892                                      # 5.892  [Identity State]: Newbie
+      IdenaState#Verified: 1.924                                    # 1.924  [Identity State]: Verified
+      IdenaState#Human: 1.921                                       # 1.921  [Identity State]: Human
+      CivicCaptchaPass: 0.823                                       # 0.823  [CAPTCHA Pass]: holds a Civic CAPTCHA Pass
+      CivicUniquenessPass: 5.005                                    # 5.005  [Uniqueness Pass]: holds a Civic Uniqueness Pass
+      CivicLivenessPass: 3.038                                      # 3.038  [Liveness Pass]: holds a Civic Liveness Pass
+      TrustaLabs: 0.511                                             # 0.511  [Trusta Labs]: TrustScan Non-Sybil Account
+      Outdid: 0                                                     # 0      [ZK Passport]: ZK-prove your identity with Outdid
+      AllowList: 0                                                  # 0      [Guest List]: Allow List Provider
+      BinanceBABT2: 10.021                                          # 10.021  [Binance Verification]: Verify your Binance Account Bound Token (BABT)
+      CleanHands: 3.0                                               # 3.0    [Proof of Clean Hands]: Sanctions-Free Identity Verified
+      HolonymGovIdProvider: 16.026                                  # 16.026  [Privacy-Preserving KYC]: Government ID Holder
+      HolonymPhone: 1.521                                           # 1.521  [Phone Verification]: Verified Phone Number
+      Biometrics: 6.001                                             # 6.001  [Biometric Verification]: Unique Biometric Identity
+      ZKEmail#AmazonCasualPurchaser: 1.0                            # 1.0    [Amazon]: Casual Purchaser
+      ZKEmail#AmazonRegularCustomer: 0.6                            # 0.6    [Amazon]: Regular Purchaser
+      ZKEmail#AmazonHeavyUser: 0.4                                  # 0.4    [Amazon]: Heavy Purchaser
+      ZKEmail#UberOccasionalRider: 1.0                              # 1.0    [Uber]: Occasional Rider
+      ZKEmail#UberRegularRider: 0.6                                 # 0.6    [Uber]: Regular Rider
+      ZKEmail#UberPowerUser: 0.4                                    # 0.4    [Uber]: Power User
+      X: 3.2                                                        # 3.2    [Account Verification]: Verify X Verified Account
+      Steam: 2.8                                                    # 2.8    [Gaming Credentials]: Verify Steam Gaming Credentials
 
   ## Zupass protection
   zupass:

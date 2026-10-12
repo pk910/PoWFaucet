@@ -162,10 +162,12 @@ modules:
   ## Passport protection
   passport:
     enabled: true
-    # can be overridden at runtime with FAUCET_PASSPORT_SCORER_API_KEY
-    scorerApiKey: "***censored***" # Gitcoin Passport Scorer API Key
-    trustedIssuers:
-      - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # Gitcoin Passport
+    apiUrl: "https://api.passport.xyz" # Human Passport (formerly Gitcoin Passport) Stamps API
+    # api key from https://developer.passport.xyz, can be overridden at runtime with FAUCET_PASSPORT_SCORER_API_KEY
+    scorerApiKey: "***censored***" # Passport API Key
+    trustedIssuers: # issuers accepted for manually uploaded passport JSON
+      - "did:key:z6MkghvGHLobLEdj1bgRLhS4LPGJAvbMA1tn2zcRyqmYU5LC" # legacy Gitcoin Passport issuer
+      - "did:ethr:0xd6f8d6ca86aa01e551a311d670a0d1bd8577e5fb" # Human Passport issuer
     
     refreshCooldown: 300 # allow refreshing every 5mins
     cacheTime: 86400 # cache passports for 1 day (does not affect manual refreshing)

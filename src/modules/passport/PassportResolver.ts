@@ -5,6 +5,7 @@ import { resolveRelativePath } from '../../config/FaucetConfig.js';
 import { FaucetProcess, FaucetLogLevel } from "../../common/FaucetProcess.js";
 import { ServiceManager } from '../../common/ServiceManager.js';
 import { PassportModule } from './PassportModule.js';
+import { defaultConfig } from './PassportConfig.js';
 
 type DIDKitLib = {
   verifyCredential: (vc: string, proofOptions: string) => Promise<string>;
@@ -68,6 +69,11 @@ export interface IPassportVerificationResult extends IPassportVerification {
 }
 
 export class PassportResolver {
+  private static readonly API_PAGE_SIZE = 1000;
+  private static readonly API_MAX_PAGES = 10;
+  private static readonly API_TIMEOUT = 20000;
+  private static readonly API_ERROR_RETRY_TIME = 300; // retry a failed lookup after 5 minutes instead of caching "no passport" for a day
+
   private module: PassportModule;
   private didkitPromise: Promise<DIDKitLib>;
   private passportCache: {[addr: string]: Promise<IPassportInfo>} = {};
@@ -105,14 +111,23 @@ export class PassportResolver {
     if(this.passportCache.hasOwnProperty(addr))
       return this.passportCache[addr];
 
-    let passportInfoPromise = this.passportCache[addr] = this.module.getPassportDb().getPassportInfo(addr).then((cachedPassportInfo) => {
+    let passportInfoPromise = this.passportCache[addr] = this.module.getPassportDb().getPassportInfo(addr).then(async (cachedPassportInfo) => {
       let now = Math.floor((new Date()).getTime() / 1000);
       if(cachedPassportInfo && !refresh && cachedPassportInfo.parsed > now - (this.module.getModuleConfig().cacheTime || 60)) {
         return cachedPassportInfo;
       }
-      else {
-        return this.refreshPassport(addr).then((passport) => this.buildPassportInfo(addr, passport));
+
+      let passport: IPassport;
+      try {
+        passport = await this.refreshPassport(addr);
+      } catch(ex) {
+        // passport api unavailable: keep the last known passport instead of replacing it with "no passport"
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "API Error while fetching passport for " + addr + ": " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
+        if(cachedPassportInfo)
+          return cachedPassportInfo;
+        return this.buildPassportInfo(addr, null, PassportResolver.API_ERROR_RETRY_TIME);
       }
+      return this.buildPassportInfo(addr, passport);
     });
     passportInfoPromise.finally(() => {
       delete this.passportCache[addr];
@@ -129,11 +144,11 @@ export class PassportResolver {
     try {
       passport = JSON.parse(passportJson);
     } catch(ex) {
-      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://passport.gitcoin.co"]};
+      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://app.passport.xyz"]};
     }
 
     if(!passport || typeof passport !== "object" || !passport.stamps || !Array.isArray(passport.stamps))
-      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://passport.gitcoin.co"]};
+      return {valid: false, errors: ["Invalid Passport JSON! Please copy your passport JSON from https://app.passport.xyz"]};
 
     // verify integrity
     let verifyResult = await this.verifyPassportIntegrity(addr, passport);
@@ -168,46 +183,81 @@ export class PassportResolver {
     let cacheFile = this.getPassportCacheFile(addr);
     let cachedPassport: IPassport = null;
     if(cacheFile && fs.existsSync(cacheFile)) {
-      cachedPassport = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+      try {
+        cachedPassport = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+      } catch(ex) {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Cannot read cached passport " + cacheFile + ": " + ex.toString());
+      }
     }
-    try {
-      if(!passport) {
-        // load passport from api (20 sec timeout)
-        let passportRsp = await FetchUtil.fetchWithTimeout("https://api.scorer.gitcoin.co/registry/stamps/" + addr, {
-          method: 'GET',
-          headers: {'X-API-KEY': this.module.getModuleConfig().scorerApiKey}
-        }, 20000).then((rsp) => rsp.json() as any, (ex) => {
-          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "API Error while fetching passport: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
-        });
-        let gotPassport = passportRsp && passportRsp.items && passportRsp.items.length > 0;
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Requested gitcoin passport for " + addr + ": " + (gotPassport ? "got " + passportRsp.items.length + " stamps" : "no passport"));
-        if(gotPassport) {
-          passport = {
-            issuanceDate: null,
-            expiryDate: null,
-            stamps: passportRsp.items.map((item) => {
-              return {
-                provider: item.credential.credentialSubject.provider,
-                credential: item.credential,
-              };
-            }),
-          };
-        }
+
+    if(!passport) {
+      try {
+        passport = await this.fetchPassport(addr);
+      } catch(ex) {
+        if(!cachedPassport)
+          throw ex;
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "API Error while fetching passport for " + addr + ", using cached passport: " + ex.toString());
+        return cachedPassport;
       }
-      if(passport) {
-        if(cachedPassport && this.getNewestPassportStampTime(cachedPassport) > this.getNewestPassportStampTime(passport)) {
-          // passport from cache is newer.. so use the cached one
-          return cachedPassport;
-        }
-        if(cacheFile) {
-          // save to cache
-          this.savePassportToCache(passport, cacheFile);
-        }
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Requested passport for " + addr + ": " + (passport ? "got " + passport.stamps.length + " stamps" : "no passport"));
+    }
+
+    if(passport) {
+      if(cachedPassport && this.getNewestPassportStampTime(cachedPassport) > this.getNewestPassportStampTime(passport)) {
+        // passport from cache is newer.. so use the cached one
+        return cachedPassport;
       }
-    } catch(ex) {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Exception while fetching passport: " + ex.toString() + `\r\n   Stack Trace: ${ex && ex.stack ? ex.stack : null}`);
+      if(cacheFile) {
+        // save to cache
+        this.savePassportToCache(passport, cacheFile);
+      }
     }
     return passport || cachedPassport || null;
+  }
+
+  // loads all stamps for an address from the passport api (GET /v2/stamps/{address}, paginated)
+  // throws on api errors, resolves null if the address has no stamps
+  private async fetchPassport(addr: string): Promise<IPassport> {
+    let apiUrl = (this.module.getModuleConfig().apiUrl || defaultConfig.apiUrl).replace(/\/+$/, "");
+    let url = apiUrl + "/v2/stamps/" + addr + "?limit=" + PassportResolver.API_PAGE_SIZE;
+    let items: any[] = [];
+
+    for(let page = 0; url && page < PassportResolver.API_MAX_PAGES; page++) {
+      if(url.substring(0, apiUrl.length + 1) !== apiUrl + "/")
+        throw new Error("Refusing to follow pagination link to foreign host: " + url);
+
+      let rsp = await FetchUtil.fetchWithTimeout(url, {
+        method: 'GET',
+        headers: {'X-API-KEY': this.module.getModuleConfig().scorerApiKey}
+      }, PassportResolver.API_TIMEOUT);
+      if(rsp.ok === false)
+        throw new Error("HTTP " + rsp.status + " " + (await rsp.text().catch(() => "")).substring(0, 200));
+
+      let rspData = await rsp.json() as any;
+      if(!rspData || !Array.isArray(rspData.items)) {
+        if(rspData && rspData.error)
+          throw new Error("API error: " + rspData.error);
+        throw new Error("Unexpected API response");
+      }
+
+      items.push(...rspData.items);
+      url = typeof rspData.next === "string" && rspData.next ? rspData.next : null;
+    }
+
+    let stamps: IPassport["stamps"] = items.filter((item) => item?.credential?.credentialSubject?.provider).map((item) => {
+      return {
+        provider: item.credential.credentialSubject.provider,
+        credential: item.credential,
+      };
+    });
+    if(stamps.length === 0)
+      return null;
+
+    return {
+      issuanceDate: null,
+      expiryDate: null,
+      stamps: stamps,
+    };
   }
 
   private async verifyPassportIntegrity(addr: string, passport: IPassport): Promise<IPassportVerification> {
@@ -309,7 +359,7 @@ export class PassportResolver {
     fs.writeFileSync(cacheFile, JSON.stringify(trimmedPassport));
   }
 
-  private async buildPassportInfo(addr: string, passport: IPassport): Promise<IPassportInfo> {
+  private async buildPassportInfo(addr: string, passport: IPassport, cacheDuration?: number): Promise<IPassportInfo> {
     let passportInfo: IPassportInfo;
     let now = Math.floor((new Date()).getTime() / 1000);
     let savePromises: Promise<void>[] = [];
@@ -361,7 +411,7 @@ export class PassportResolver {
       };
     }
     
-    savePromises.push(this.module.getPassportDb().setPassportInfo(addr, passportInfo));
+    savePromises.push(this.module.getPassportDb().setPassportInfo(addr, passportInfo, cacheDuration));
     await Promise.all(savePromises);
 
     return passportInfo;
