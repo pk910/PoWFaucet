@@ -74,8 +74,7 @@ faucetCoinType: "erc20"
 faucetCoinContract: "0xaC7BE2aeF3b59079F76fE333e131A76FB44497C3"
 
 # transaction gas limit
-# use 21000 to prevent transactions to contracts
-ethTxGasLimit: 100000
+ethTxGasLimit: 250000
 
 # use legacy (non-eip1559) transaction type
 # true: Type 0 (Legacy Transactions), false: Type 2 (EIP1559 Transactions)
