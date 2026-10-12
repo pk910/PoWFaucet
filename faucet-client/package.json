@@ -1,6 +1,6 @@
 {
   "name": "@powfaucet/client",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "PoW Faucet Client",
   "type": "module",
   "scripts": {
