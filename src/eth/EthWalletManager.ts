@@ -479,8 +479,8 @@ export class EthWalletManager {
       try {
         return await this.web3.eth.getTransactionReceipt(txhash);
       } catch(ex) {
-        if(ex instanceof TransactionNotFound || ex.toString().match(/CONNECTION ERROR/) || ex.toString().match(/invalid json response/)) {
-          // just retry when RPC connection issue
+        if(ex instanceof TransactionNotFound || ex?.name === "FetchError" || ex.toString().match(/CONNECTION ERROR/) || ex.toString().match(/invalid json response/)) {
+          // just retry when RPC connection issue (the tx is already broadcast, a transport error on one poll says nothing about it)
         } else {
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + ex.toString());
           console.log("err ", ex);

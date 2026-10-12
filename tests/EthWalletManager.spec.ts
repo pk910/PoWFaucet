@@ -590,6 +590,72 @@ describe("ETH Wallet Manager", () => {
     expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
   }).timeout(15000);
 
+  it("send ClaimTx transaction (RPC transport timeout on receipt poll)", async () => {
+    faucetConfig.ethChainId = 1337;
+    faucetConfig.spareFundsAmount = 0;
+    faucetConfig.ethTxGasLimit = 21000;
+    faucetConfig.ethTxMaxFee = 100000000000; // 100 gwei
+    faucetConfig.ethTxPrioFee = 2000000000; // 2 gwei
+    faucetConfig.minDropAmount = 1000;
+    await ServiceManager.GetService(FaucetDatabase).initialize();
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    let ethClaimManager = ServiceManager.GetService(EthClaimManager);
+    fakeProvider.injectResponse("eth_getBalance", "1000000000000000000"); // 1 ETH
+    fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
+        default:
+          console.log("unknown call: ", payload);
+      }
+    });
+    fakeProvider.injectResponse("eth_sendRawTransaction", "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337");
+    let rpcResponseError = true;
+    fakeProvider.injectResponse("eth_getTransactionReceipt", (payload) => {
+      if(rpcResponseError) {
+        return {
+          _throw: new FetchError("request to http://127.0.0.1:8545/ failed, reason: ", "system", { code: "ETIMEDOUT" }),
+        }
+      }
+      return {
+        "blockHash": "0xfce202c4104864d81d8bd78b7202a77e5dca634914a3fd6636f2765d65fa9a07",
+        "blockNumber": "0x8aa5ae",
+        "contractAddress": null,
+        "cumulativeGasUsed": "0x1752665",
+        "effectiveGasPrice": "0x3b9aca00", // 1 gwei
+        "from": "0x917c0A57A0FaA917f8ac7cA8Dd52db0b906a59d2",
+        "gasUsed": "0x5208", // 21000
+        "logs": [],
+        "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "status": "0x1",
+        "to": "0x0000000000000000000000000000000000001337",
+        "transactionHash": "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337",
+        "transactionIndex": "0x3d",
+        "type": "0x2"
+      };
+    });
+    await ethWalletManager.initialize();
+    (ethWalletManager as any).txReceiptPollInterval = 1000;
+    await ethWalletManager.loadWalletState();
+    let testSessionData: FaucetSessionStoreData = {
+      sessionId: "f081154a-3b93-4972-9ae7-b83f3307bb0f",
+      status: FaucetSessionStatus.CLAIMABLE,
+      startTime: Math.floor(new Date().getTime() / 1000),
+      targetAddr: "0x0000000000000000000000000000000000001337",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [], data: {}, claim: null,
+    };
+    let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
+    await ethClaimManager.processQueue();
+    await awaitSleepPromise(7000, () => claimTx.claim.claimStatus !== ClaimTxStatus.PENDING);
+    rpcResponseError = false;
+    await awaitSleepPromise(5000, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "unexpected claimTx status");
+  }).timeout(15000);
+
   it("send ClaimTx transaction (reverted transaction)", async () => {
     faucetConfig.ethChainId = 1337;
     faucetConfig.spareFundsAmount = 0;
