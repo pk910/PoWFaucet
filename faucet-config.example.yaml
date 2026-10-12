@@ -102,8 +102,7 @@ faucetCoinType: "native"
 #faucetCoinContract: "0x94373a4919B3240D86eA41593D5eBa789FEF3848" # WETH9 on hoodi
 
 # transaction gas limit
-# use 21000 to prevent transactions to contracts
-ethTxGasLimit: 21000
+ethTxGasLimit: 250000
 
 # use legacy (non-eip1559) transaction type
 # true: Type 0 (Legacy Transactions), false: Type 2 (EIP1559 Transactions)
