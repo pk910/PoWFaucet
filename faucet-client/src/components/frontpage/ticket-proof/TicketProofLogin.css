@@ -1,0 +1,85 @@
+.faucet-page .logo.logo-ticketproof {
+  background-size: contain;
+  background-repeat: no-repeat;
+  width: 100%;
+  height: 100%;
+}
+
+.faucet-page .logo.logo-ticketproof-default {
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  color: #495057;
+}
+
+.faucet-page .faucet-ticketproof-auth {
+  margin: 16px 0;
+  display: flex;
+}
+
+.faucet-page .faucet-ticketproof-auth .auth-icon {
+  height: 50px;
+  width: 50px;
+  padding: 0;
+}
+
+.faucet-page .faucet-ticketproof-auth .auth-field {
+  margin: 0 8px;
+  flex-grow: 1;
+}
+
+.faucet-page .faucet-ticketproof-auth .ticketproof-info-icon {
+  margin-left: 8px;
+}
+
+.faucet-page .faucet-ticketproof-auth .auth-field .auth-info {
+  color: #343a40;
+}
+
+.faucet-page .faucet-ticketproof-auth .auth-hint {
+  color: #6c757d;
+  font-size: 0.9em;
+}
+
+.faucet-page .faucet-ticketproof-auth .auth-tier {
+  margin-left: 6px;
+  color: #6c757d;
+}
+
+.faucet-page .faucet-ticketproof-auth .auth-ident-truncated {
+  display: inline-block;
+  max-width: 200px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  vertical-align: bottom;
+  margin-left: 4px;
+}
+
+.faucet-page .faucet-ticketproof-auth .auth-logout {
+  float: right;
+}
+
+#ticketproof-tooltip .tooltip-inner {
+  max-width: 500px;
+}
+
+#ticketproof-tooltip .ticketproof-info,
+#ticketproof-tooltip .ticketproof-info td {
+  text-align: left;
+}
+
+#ticketproof-tooltip .ticketproof-info td.ticketproof-title {
+  width: 80px;
+  vertical-align: top;
+}
+
+#ticketproof-tooltip .ticketproof-info td.ticketproof-value {
+  max-width: 280px;
+  word-break: break-all;
+}
+
+#ticketproof-tooltip .ticketproof-info .ticketproof-note {
+  margin-top: 6px;
+  font-size: 0.85em;
+  opacity: 0.8;
+}

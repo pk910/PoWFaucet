@@ -587,6 +587,45 @@ modules:
       </ul>
 
 
+  ## Event ticket proofs (Devcon 8 "partner ticket proofs")
+  # The event app signs a pseudonymous proof for one ticket and sends the attendee
+  # to this faucet with it in the query string. Only the signer address is needed
+  # to verify it; pin it from the event app's /api/ticket-proof/signer endpoint.
+  ticket-proof:
+    enabled: false
+    signerAddress: "0xa2C50E1Af4876a6297f8Abd0F36D2976f09c25b8" # Devcon 8 event app signer
+    domain: "devcon-ticket-proof-v1" # domain separator the signature was made with
+    version: 1 # wire format version
+    partner: "powfaucet" # the partner key the event app registered for this faucet
+    events: [] # accepted pretix event slugs (empty = any)
+    tiers: [] # accepted ticket tiers, e.g. ["india", "standard"] (empty = any)
+    appUrl: "https://app.devcon.org/ticket" # where attendees get their proof
+    appLabel: "Devcon App"
+    tokenValidity: 604800 # how long the faucet login survives after the proof was swapped (seconds, 0 = forever)
+    requireLogin: false
+    concurrencyLimit: 2
+    grants:
+      - limitAmount: 100000000000000000000 # 100 ETH
+        duration: 86400
+        skipModules: ["recurring-limits"]
+        rewardFactor: 2
+      - limitCount: 1
+        duration: 86400
+        rewardFactor: 2
+        skipModules: ["recurring-limits", "pow", "faucet-outflow", "faucet-balance", "ipinfo"]
+        #tiers: ["standard"] # restrict a grant to some tiers
+    loginLogo: null # path to a logo image, a generic ticket icon is shown without one
+    loginLabel: "Devcon attendee? Login with your Ticket."
+    userLabel: "Authenticated with Devcon Ticket."
+    infoHtml: |
+      Benefits of authenticating with your devcon ticket:<br>
+      <ul>
+        <li>Request funds without mining (once a day)</li>
+        <li>Skip IP based limitations</li>
+        <li>Mine with double rewards (up to 100ETH/day)</li>
+      </ul>
+
+
 
 ### Fund Management
 
