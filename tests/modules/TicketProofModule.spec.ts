@@ -113,16 +113,13 @@ describe("Faucet module: ticket-proof", () => {
     expect(clientConfig.modules['ticket-proof'].signerAddress).to.equal(undefined, "signer address must not be published to the client");
   });
 
-  it("Refuse to start without signer or partner", async () => {
+  it("Loads without signer or partner but refuses every proof", async () => {
     (faucetConfig.modules["ticket-proof"] as ITicketProofConfig).signerAddress = null;
-    let error: Error | null = null;
-    try {
-      await ServiceManager.GetService(ModuleManager).initialize();
-    } catch(ex) {
-      error = ex;
-    }
-    expect(error).to.not.equal(null, "no exception thrown");
-    expect(error?.message).to.matches(/signerAddress is required/, "unexpected error message");
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let module: TicketProofModule = ServiceManager.GetService(ModuleManager).getModule<any>("ticket-proof");
+    expect(module.isEnabled()).to.equal(true, "module not enabled");
+    let rsp = await loginWithProof(mintProof());
+    expect(rsp.errorCode).to.equal("PROOF_NOT_CONFIGURED", "unexpected response: " + JSON.stringify(rsp));
   });
 
   describe("Proof verification", () => {

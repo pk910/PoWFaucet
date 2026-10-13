@@ -36,10 +36,10 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
   private ticketToken: TicketProofToken;
 
   protected override async startModule(): Promise<void> {
-    if(!this.moduleConfig.signerAddress)
-      throw new Error("ticket-proof module: signerAddress is required");
-    if(!this.moduleConfig.partner)
-      throw new Error("ticket-proof module: partner is required");
+    // a module with no signer or partner loads like any other (the module manager
+    // enables every module from a bare config) but refuses every proof until configured
+    if(!this.isConfigured())
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "ticket-proof module: signerAddress and partner are required, no proof will be accepted");
 
     this.ticketDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(TicketProofDB, this);
     this.ticketToken = new TicketProofToken(this.moduleName);
@@ -81,6 +81,10 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
   protected override stopModule(): Promise<void> {
     ServiceManager.GetService(FaucetWebApi).removeApiEndpoint("ticketProofLogin");
     return Promise.resolve();
+  }
+
+  private isConfigured(): boolean {
+    return !!this.moduleConfig.signerAddress && !!this.moduleConfig.partner;
   }
 
   public getTicketDb(): TicketProofDB {
@@ -186,6 +190,9 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
         return { errorCode: "PROOF_INVALID", errorMessage: "Invalid request body." };
       }
     }
+
+    if(!this.isConfigured())
+      return { errorCode: "PROOF_NOT_CONFIGURED", errorMessage: "Ticket login is not configured on this faucet." };
 
     let proof = parseTicketProof(params);
     if(!proof)
