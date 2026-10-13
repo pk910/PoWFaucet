@@ -13,6 +13,7 @@ import { FaucetSession, FaucetSessionStatus } from '../../src/session/FaucetSess
 import { sleepPromise } from '../../src/utils/PromiseUtils.js';
 import { ITicketProofConfig } from '../../src/modules/ticket-proof/TicketProofConfig.js';
 import { TicketProofModule } from '../../src/modules/ticket-proof/TicketProofModule.js';
+import { TicketProofToken } from '../../src/modules/ticket-proof/TicketProofToken.js';
 import { ITicketProof, parseTicketProof, ticketProofPayloadHash, verifyTicketProof } from '../../src/modules/ticket-proof/TicketProofVerifier.js';
 
 
@@ -236,6 +237,26 @@ describe("Faucet module: ticket-proof", () => {
   });
 
   describe("Login token", () => {
+    it("rejects a token issued for another partner", async () => {
+      await ServiceManager.GetService(ModuleManager).initialize();
+      let foreignToken = new TicketProofToken("ticket-proof", "other-partner").generate({
+        identifier: IDENTIFIER,
+        tier: "standard",
+        event: "devcon-8",
+        issuedAt: Math.floor(Date.now() / 1000),
+      });
+      let error: FaucetError | null = null;
+      try {
+        await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+          addr: "0x0000000000000000000000000000000000001337",
+          ticketProofToken: foreignToken,
+        });
+      } catch(ex) {
+        error = ex;
+      }
+      expect(error?.getCode()).to.equal("TICKETPROOF_TOKEN", "token of another partner accepted");
+    });
+
     it("rejects a tampered token", async () => {
       await ServiceManager.GetService(ModuleManager).initialize();
       let module: TicketProofModule = ServiceManager.GetService(ModuleManager).getModule<any>("ticket-proof");
@@ -485,6 +506,89 @@ describe("Faucet module: ticket-proof", () => {
     }
     expect(error).to.not.equal(null, "no exception thrown");
     expect(error?.getCode()).to.equal("TICKETPROOF_CONCURRENCY_LIMIT", "unexpected error code");
+  });
+
+  it("Check grant: count limit holds for concurrent starts with one ticket", async () => {
+    (faucetConfig.modules["ticket-proof"] as ITicketProofConfig).grants = [{
+      limitAmount: 0,
+      limitCount: 1,
+      duration: 86400,
+      required: true,
+    }];
+    await ServiceManager.GetService(ModuleManager).initialize();
+
+    // a burst of starts with the same token, all in flight before any of them is in the db
+    let token = generateTestToken(IDENTIFIER, "standard", "devcon-8");
+    let results = await Promise.allSettled(Array.from({length: 8}, () => ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      ticketProofToken: token,
+    })));
+    let claimable = results.filter((res) => res.status === "fulfilled" && res.value.getSessionStatus() === "claimable");
+    let rejected = results.filter((res) => res.status === "rejected");
+    expect(claimable.length).to.equal(1, "more than one session got the drop for one ticket");
+    expect(rejected.length).to.equal(7, "unexpected number of rejected sessions");
+    rejected.forEach((res) => {
+      expect(["TICKETPROOF_LIMIT", "TICKETPROOF_CONCURRENCY_LIMIT"]).to.include((res as PromiseRejectedResult).reason?.getCode(), "unexpected error code");
+    });
+
+    // and once the burst settled, the db knows about the one session
+    await sleepPromise(50);
+    let error: FaucetError | null = null;
+    try {
+      await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+        ticketProofToken: token,
+      });
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error?.getCode()).to.equal("TICKETPROOF_LIMIT", "unexpected error code after the burst");
+  });
+
+  it("Check grant: a failed start does not use up the ticket", async () => {
+    (faucetConfig.modules["ticket-proof"] as ITicketProofConfig).grants = [{
+      limitAmount: 0,
+      limitCount: 1,
+      duration: 86400,
+      required: true,
+    }];
+    await ServiceManager.GetService(ModuleManager).initialize();
+
+    let token = generateTestToken(IDENTIFIER, "standard", "devcon-8");
+    let error: FaucetError | null = null;
+    try {
+      await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "not-an-address",
+        ticketProofToken: token,
+      });
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error?.getCode()).to.equal("INVALID_ADDR", "unexpected error code for the failed start");
+
+    let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      ticketProofToken: token,
+    });
+    expect(testSession.getSessionStatus()).to.equal("claimable", "session after a failed start did not get the drop");
+  });
+
+  it("Check concurrency limit holds for concurrent starts with one ticket", async () => {
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test", 1);
+    });
+
+    let token = generateTestToken(IDENTIFIER, "standard", "devcon-8");
+    let results = await Promise.allSettled(Array.from({length: 5}, () => ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      ticketProofToken: token,
+    })));
+    let running = results.filter((res) => res.status === "fulfilled" && res.value.getSessionStatus() === "running");
+    expect(running.length).to.equal(1, "more than one running session for one ticket");
+    results.filter((res) => res.status === "rejected").forEach((res) => {
+      expect((res as PromiseRejectedResult).reason?.getCode()).to.equal("TICKETPROOF_CONCURRENCY_LIMIT", "unexpected error code");
+    });
   });
 
 });

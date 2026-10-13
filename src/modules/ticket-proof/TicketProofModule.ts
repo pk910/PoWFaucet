@@ -1,6 +1,7 @@
 import { ServiceManager } from "../../common/ServiceManager.js";
+import { faucetConfig } from "../../config/FaucetConfig.js";
 import { EthWalletManager } from "../../eth/EthWalletManager.js";
-import { FaucetSession } from "../../session/FaucetSession.js";
+import { FaucetSession, FaucetSessionStatus } from "../../session/FaucetSession.js";
 import { BaseModule } from "../BaseModule.js";
 import { ModuleHookAction } from "../ModuleManager.js";
 import { defaultConfig, ITicketProofConfig, ITicketProofGrantConfig } from './TicketProofConfig.js';
@@ -34,6 +35,19 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
   private ticketDb: TicketProofDB;
   private ticketToken: TicketProofToken;
+  /**
+   * Sessions this process let through, per ticket, until the database knows them.
+   *
+   * The grant check reads the database, but a session only gets there after it
+   * completed (the ticket row in SessionComplete, the session row by the lazy save),
+   * and the session manager lists a session only once it is running. A burst of
+   * starts with the same token overlaps that window: every start reads zero sessions
+   * and every one gets the drop. So the module remembers the sessions it admitted
+   * itself, synchronously before its first await, and counts them along with the
+   * database rows. Failed sessions are forgotten on the next lookup, sessions the
+   * database returns are dropped from here.
+   */
+  private ticketSessions: {[identifier: string]: FaucetSession[]} = {};
 
   protected override async startModule(): Promise<void> {
     // a module with no signer or partner loads like any other (the module manager
@@ -42,7 +56,7 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "ticket-proof module: signerAddress and partner are required, no proof will be accepted");
 
     this.ticketDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(TicketProofDB, this);
-    this.ticketToken = new TicketProofToken(this.moduleName);
+    this.ticketToken = new TicketProofToken(this.moduleName, this.moduleConfig.partner);
 
     this.moduleManager.addActionHook(
       this, ModuleHookAction.ClientConfig, 1, "Ticket proof login config",
@@ -80,6 +94,7 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
 
   protected override stopModule(): Promise<void> {
     ServiceManager.GetService(FaucetWebApi).removeApiEndpoint("ticketProofLogin");
+    this.ticketSessions = {};
     return Promise.resolve();
   }
 
@@ -125,11 +140,14 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
     }
 
     if(ticketInfo) {
+      // no await between the concurrency check and the registration: a second start
+      // with the same ticket must see this one, whatever it is still waiting on
       this.checkLimit(ticketInfo, session);
+      this.trackSession(ticketInfo.identifier, session);
 
       let perks: TicketProofGrantPerks = {};
       for(let i = 0; i < this.moduleConfig.grants.length; i++) {
-        await this.checkGrant(ticketInfo, this.moduleConfig.grants[i], perks);
+        await this.checkGrant(ticketInfo, this.moduleConfig.grants[i], perks, session);
       }
 
       session.setSessionData("ticketproof.data", {
@@ -223,19 +241,50 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
     return { data: data };
   }
 
-  private async checkGrant(ticketData: ITicketProofData, grant: ITicketProofGrantConfig, perks: TicketProofGrantPerks): Promise<void> {
+  private trackSession(identifier: string, session: FaucetSession): void {
+    if(!this.ticketSessions[identifier])
+      this.ticketSessions[identifier] = [];
+    this.ticketSessions[identifier].push(session);
+  }
+
+  /**
+   * The sessions of a ticket this process admitted and has not forgotten yet: not
+   * failed, not among `knownIds` (the database has those). The list is pruned to
+   * exactly that, so it never grows beyond the sessions the database lacks.
+   */
+  private getTrackedSessions(identifier: string, knownIds?: Set<string>): FaucetSession[] {
+    let sessions = this.ticketSessions[identifier];
+    if(!sessions)
+      return [];
+    sessions = sessions.filter((sess) => {
+      if(sess.getSessionStatus() === FaucetSessionStatus.FAILED)
+        return false;
+      return !knownIds || !knownIds.has(sess.getSessionId());
+    });
+    if(sessions.length > 0)
+      this.ticketSessions[identifier] = sessions;
+    else
+      delete this.ticketSessions[identifier];
+    return sessions;
+  }
+
+  private async checkGrant(ticketData: ITicketProofData, grant: ITicketProofGrantConfig, perks: TicketProofGrantPerks, session: FaucetSession): Promise<void> {
     if(grant.tiers && grant.tiers.length > 0 && grant.tiers.indexOf(ticketData.tier) === -1)
       return;
 
     let finishedSessions = await this.ticketDb.getTicketSessions(ticketData.identifier, grant.duration, true);
+    // sessions in flight or completed but not written yet; the starting one is this session
+    let pendingSessions = this.getTrackedSessions(ticketData.identifier, new Set(finishedSessions.map((sess) => sess.sessionId)))
+      .filter((sess) => sess !== session);
+    let sessionCount = finishedSessions.length + pendingSessions.length;
 
-    if(grant.limitCount > 0 && finishedSessions.length >= grant.limitCount) {
+    if(grant.limitCount > 0 && sessionCount >= grant.limitCount) {
       if(!grant.required)
         return;
       let errMsg = grant.message || [
         "You have already created ",
-        finishedSessions.length,
-        (finishedSessions.length > 1 ? " sessions" : " session"),
+        sessionCount,
+        (sessionCount > 1 ? " sessions" : " session"),
         " in the last ",
         renderTimespan(grant.duration)
       ].join("");
@@ -247,7 +296,9 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
 
     if(grant.limitAmount > 0) {
       let totalAmount = 0n;
-      finishedSessions.forEach((session) => totalAmount += BigInt(session.dropAmount));
+      finishedSessions.forEach((sess) => totalAmount += BigInt(sess.dropAmount));
+      // a session still starting has no amount yet; assume the most it could get
+      pendingSessions.forEach((sess) => totalAmount += (sess.getDropAmount() > 0n ? sess.getDropAmount() : BigInt(faucetConfig.maxDropAmount)));
       if(totalAmount >= BigInt(grant.limitAmount)) {
         if(!grant.required)
           return;
@@ -280,15 +331,23 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
     if(this.moduleConfig.concurrencyLimit === 0)
       return;
 
-    let activeSessions = ServiceManager.GetService(SessionManager).getActiveSessions();
-    let concurrentSessionCount = activeSessions.filter((sess) => {
+    // sessions admitted here that are still starting or running, plus running sessions
+    // the manager knows that were not started by this process (restored after a restart)
+    let concurrentSessions = this.getTrackedSessions(ticketData.identifier).filter((sess) => {
       if(sess === session)
         return false;
+      let status = sess.getSessionStatus();
+      return status === FaucetSessionStatus.STARTING || status === FaucetSessionStatus.RUNNING;
+    });
+    let activeSessions = ServiceManager.GetService(SessionManager).getActiveSessions();
+    activeSessions.forEach((sess) => {
+      if(sess === session || concurrentSessions.indexOf(sess) !== -1)
+        return;
       let ticketInfo = sess.getSessionData<ITicketProofData>("ticketproof.data");
-      if(!ticketInfo)
-        return false;
-      return ticketInfo.identifier === ticketData.identifier;
-    }).length;
+      if(ticketInfo && ticketInfo.identifier === ticketData.identifier)
+        concurrentSessions.push(sess);
+    });
+    let concurrentSessionCount = concurrentSessions.length;
 
     if(concurrentSessionCount >= this.moduleConfig.concurrencyLimit) {
       throw new FaucetError(

@@ -20,13 +20,20 @@ export interface ITicketProofData {
 
 export class TicketProofToken {
   private moduleName: string;
+  private partner: string;
 
-  public constructor(moduleName: string) {
+  public constructor(moduleName: string, partner: string | null) {
     this.moduleName = moduleName;
+    this.partner = partner || "";
   }
 
+  /**
+   * The partner is part of the key: the identifier inside is scoped to the partner by
+   * the issuer, so a token must not be good for another instance even if two faucets
+   * ever share a faucetSecret.
+   */
   private getPassphrase(): string {
-    return faucetConfig.faucetSecret + "-" + this.moduleName + "-authtoken";
+    return faucetConfig.faucetSecret + "-" + this.moduleName + "-" + this.partner + "-authtoken";
   }
 
   private checksum(fields: string[]): string {
