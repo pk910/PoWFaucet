@@ -253,7 +253,9 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
   }
 
   private async checkGrant(zupassData: IZupassPDCData, grant: IZupassGrantConfig, perks: ZupassGrantPerks): Promise<void> {
-    let finishedSessions = await this.zupassDb.getZupassSessions(zupassData.attendeeId, grant.duration, true);
+    // per ticket, never per attendee identity: a Zupass account can be recreated at
+    // will and gets the same ticket re-issued under a new semaphore identity
+    let finishedSessions = await this.zupassDb.getZupassSessions(zupassData.ticketId, grant.duration, true);
 
     if(grant.limitCount > 0 && finishedSessions.length >= grant.limitCount) {
       if(!grant.required)
@@ -313,13 +315,13 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
       let zupassInfo = sess.getSessionData<IZupassPDCData>("zupass.data");
       if(!zupassInfo)
         return false;
-      return zupassInfo.attendeeId === zupassData.attendeeId;
+      return zupassInfo.ticketId === zupassData.ticketId;
     }).length;
 
     if(concurrentSessionCount >= this.moduleConfig.concurrencyLimit) {
       throw new FaucetError(
         "ZUPASS_CONCURRENCY_LIMIT", 
-        "Only " + this.moduleConfig.concurrencyLimit + " concurrent sessions allowed per ticket holder",
+        "Only " + this.moduleConfig.concurrencyLimit + " concurrent sessions allowed per ticket",
       );
     }
   }

@@ -295,6 +295,71 @@ describe("Faucet module: zupass", () => {
     expect(error?.message).to.matches(/You have already created/, "unexpected error message");
   });
 
+  it("Check zupass grants: count limit is per ticket, not per attendee identity", async () => {
+    // A Zupass account can be recreated at will; the issuer then re-signs the same
+    // ticket for the new semaphore identity. The ticket id is what stays constant,
+    // so the limit must follow it (Devconnect 2025: 22 tickets, ~9,500 identities).
+    await ServiceManager.GetService(ModuleManager).initialize();
+    (faucetConfig.modules["zupass"] as IZupassConfig).grants.push({
+      duration: 3600,
+      limitAmount: 0,
+      limitCount: 1,
+      required: true,
+    });
+
+    let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      zupassToken: generateTestToken("102c8990-9efc-11ee-85f8-de4e23c7523a", "6768a2e0-986f-11ee-abf3-126a2f5f3c5c", "a1c822c4-60bd-11ee-8732-763dbf30819c", "1"),
+    });
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status (1st run)");
+
+    // same ticket, fresh identity: refused
+    let error: FaucetError | null = null;
+    try {
+      await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001338",
+        zupassToken: generateTestToken("102c8990-9efc-11ee-85f8-de4e23c7523a", "6768a2e0-986f-11ee-abf3-126a2f5f3c5c", "a1c822c4-60bd-11ee-8732-763dbf30819c", "2"),
+      });
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error).to.not.equal(null, "no exception thrown for the same ticket under a new identity");
+    expect(error?.getCode()).to.equal("ZUPASS_LIMIT", "unexpected error code");
+
+    // another ticket under the first identity: its own allowance
+    let otherTicket = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001339",
+      zupassToken: generateTestToken("2b4a7c10-0000-4000-8000-000000000002", "6768a2e0-986f-11ee-abf3-126a2f5f3c5c", "a1c822c4-60bd-11ee-8732-763dbf30819c", "1"),
+    });
+    expect(otherTicket.getSessionStatus()).to.equal("claimable", "unexpected session status (other ticket)");
+  });
+
+  it("Check zupass concurrency limit is per ticket, not per attendee identity", async () => {
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test", 1);
+    });
+
+    let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      zupassToken: generateTestToken("102c8990-9efc-11ee-85f8-de4e23c7523a", "6768a2e0-986f-11ee-abf3-126a2f5f3c5c", "a1c822c4-60bd-11ee-8732-763dbf30819c", "1"),
+    });
+    expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status (1st run)");
+    await sleepPromise(50);
+
+    let error: FaucetError | null = null;
+    try {
+      await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001338",
+        zupassToken: generateTestToken("102c8990-9efc-11ee-85f8-de4e23c7523a", "6768a2e0-986f-11ee-abf3-126a2f5f3c5c", "a1c822c4-60bd-11ee-8732-763dbf30819c", "2"),
+      });
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error).to.not.equal(null, "no exception thrown for the same ticket under a new identity");
+    expect(error?.getCode()).to.equal("ZUPASS_CONCURRENCY_LIMIT", "unexpected error code");
+  });
+
   it("Check zupass grants: amount limit", async () => {
     await ServiceManager.GetService(ModuleManager).initialize();
     (faucetConfig.modules["zupass"] as IZupassConfig).grants.push({

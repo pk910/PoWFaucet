@@ -22,4 +22,4 @@ faucet-events.log
 faucet-pid.txt
 tmp*
 # module packages are separate repositories dropped in here (private modules included); never tracked
-modules/
+/modules/
