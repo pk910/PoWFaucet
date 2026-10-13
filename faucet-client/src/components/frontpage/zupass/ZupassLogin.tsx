@@ -89,7 +89,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
           {this.props.faucetConfig.modules.zupass.infoHtml ?
             <OverlayTrigger
               placement="bottom"
-              container={this.props.faucetContext.getContainer()}
+              container={() => this.props.faucetContext.getContainer()}
               overlay={this.renderInfoHtml() as OverlayChildren}
             >
               <span className="zupass-info-icon">
@@ -123,7 +123,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
           {this.props.faucetConfig.modules.zupass.infoHtml ?
             <OverlayTrigger
               placement="bottom"
-              container={this.props.faucetContext.getContainer()}
+              container={() => this.props.faucetContext.getContainer()}
               overlay={this.renderInfoHtml() as OverlayChildren}
             >
               <span className="zupass-info-icon">
@@ -145,7 +145,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
           <OverlayTrigger
             placement="bottom"
             delay={{ show: 250, hide: 400 }}
-            container={this.props.faucetContext.getContainer()}
+            container={() => this.props.faucetContext.getContainer()}
             overlay={(props) => this.renderZupassTicketInfo(this.state.authInfo, props)}
           >
             <span className="auth-ident-truncated">{this.state.authInfo.attendeeId}</span>

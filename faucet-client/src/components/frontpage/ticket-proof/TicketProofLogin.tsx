@@ -89,13 +89,19 @@ export class TicketProofLogin extends React.PureComponent<ITicketProofLoginProps
     );
   }
 
+  /*
+   * The overlay container is handed over as a function: this component first renders
+   * while the page's container ref is still null, and an OverlayTrigger that got
+   * `undefined` then falls back to document.body, outside the `.faucet-bootstrap`
+   * scope that carries the tooltip styles (bare text floating over the page).
+   */
   private renderInfoIcon(): React.ReactElement | null {
     if(!this.moduleConfig.infoHtml)
       return null;
     return (
       <OverlayTrigger
         placement="bottom"
-        container={this.props.faucetContext.getContainer()}
+        container={() => this.props.faucetContext.getContainer()}
         overlay={this.renderInfoHtml() as OverlayChildren}
       >
         <span className="ticketproof-info-icon">
@@ -159,7 +165,7 @@ export class TicketProofLogin extends React.PureComponent<ITicketProofLoginProps
           <OverlayTrigger
             placement="bottom"
             delay={{ show: 250, hide: 400 }}
-            container={this.props.faucetContext.getContainer()}
+            container={() => this.props.faucetContext.getContainer()}
             overlay={(props) => this.renderTicketInfo(authInfo, props)}
           >
             <span className="auth-ident-truncated">{authInfo.identifier}</span>
