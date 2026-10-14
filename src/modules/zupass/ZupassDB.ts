@@ -4,7 +4,7 @@ import { SQL } from '../../db/SQL.js';
 import { FaucetSessionStoreData } from '../../session/FaucetSession.js';
 
 export class ZupassDB extends FaucetModuleDB {
-  protected override latestSchemaVersion = 1;
+  protected override latestSchemaVersion = 2;
   
   protected override async upgradeSchema(version: number): Promise<number> {
     switch(version) {
@@ -34,6 +34,13 @@ export class ZupassDB extends FaucetModuleDB {
           [FaucetDbDriver.SQLITE]: `CREATE INDEX "ZupassSessionsAttendeeIdx" ON "ZupassSessions" ("AttendeeId"	ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE ZupassSessions ADD INDEX ZupassSessionsAttendeeIdx (AttendeeId);`,
         }));
+      case 1:
+        // limits are keyed on the ticket now (see getZupassSessions), so the lookup needs its index
+        version = 2;
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `CREATE INDEX "ZupassSessionsTicketIdx" ON "ZupassSessions" ("TicketId" ASC);`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE ZupassSessions ADD INDEX ZupassSessionsTicketIdx (TicketId);`,
+        }));
     }
     return version;
   }
@@ -59,13 +66,20 @@ export class ZupassDB extends FaucetModuleDB {
     await Promise.all(promises);
   }
 
-  public getZupassSessions(attendeeId: string, duration: number, skipData?: boolean): Promise<FaucetSessionStoreData[]> {
+  /**
+   * Sessions that used a ticket. Keyed on the ticket id, not on the attendee's
+   * semaphore identity: the identity belongs to the Zupass account, and the issuer
+   * re-signs the same ticket for whatever account logs in with the ticket's email,
+   * so a fresh account is a fresh identity on the same ticket. The ticket id is a
+   * uuid derived from the Pretix position and stays the same across re-issues.
+   */
+  public getZupassSessions(ticketId: string, duration: number, skipData?: boolean): Promise<FaucetSessionStoreData[]> {
     let now = this.now();
     return this.faucetStore.selectSessionsSql([
       "FROM ZupassSessions",
       "INNER JOIN Sessions ON Sessions.SessionId = ZupassSessions.SessionId",
-      "WHERE ZupassSessions.AttendeeId = ? AND Sessions.StartTime > ? AND Sessions.Status IN ('claimable','claiming','finished')",
-    ].join(" "), [ attendeeId, now - duration ], skipData);
+      "WHERE ZupassSessions.TicketId = ? AND Sessions.StartTime > ? AND Sessions.Status IN ('claimable','claiming','finished')",
+    ].join(" "), [ ticketId, now - duration ], skipData);
   }
 
   public async setZupassSession(sessionId: string, attendeeId: string, ticketId: string, eventId: string, productId: string): Promise<void> {
