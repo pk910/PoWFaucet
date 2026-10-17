@@ -662,9 +662,44 @@ $enable-dark-mode: false;
 .faucet-page .faucet-status {
   max-width: none;
 }
-.faucet-page .faucet-status > .row:first-child {
-  align-items: center;
+.faucet-page .faucet-status .status-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 12px;
+}
+.faucet-page .faucet-status .status-head-meta {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  color: var(--pf-ink-3);
+}
+.faucet-page .faucet-status .status-key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.faucet-page .faucet-status .status-key label {
+  font-size: 12px;
+  color: var(--pf-ink-3);
+}
+.faucet-page .faucet-status .status-key input {
+  width: 180px;
+  height: 34px;
+  border-radius: var(--pf-radius-sm);
+  font-size: 13px;
+}
+.faucet-page .faucet-status .status-key .btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--pf-radius-sm);
+  font-size: 13px;
+}
+.faucet-page .faucet-status .status-key-error {
+  margin: 0 0 12px 0;
+  font-size: 13px;
 }
 .faucet-page .faucet-status h4, .faucet-page .faucet-status h5 {
   margin: 0;

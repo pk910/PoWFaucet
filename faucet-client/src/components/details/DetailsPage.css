@@ -1,16 +1,46 @@
+.faucet-page .details-section h3 {
+  margin: 0 0 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pf-ink-3);
+}
 
-.faucet-page .details-advanced {
+.faucet-page .details-operator {
+  padding: 14px 16px;
+  border-radius: var(--pf-radius-sm);
+  border: 1px dashed rgba(42, 120, 214, 0.5);
+  background: #f8fafd;
+}
+
+.faucet-page .details-operator h3 {
+  color: #1b4f91;
+}
+
+.faucet-page .details-operator-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
 }
 
-.faucet-page .details-advanced a {
-  font-size: 9pt;
-  margin: 4px 0;
-  color: darkgray;
+.faucet-page .details-operator .pf-kv-list {
+  font-size: 13px;
 }
 
-.faucet-page .details-advanced .session-json {
-  border: 1px solid darkgray;
-  font-size: 11pt;
-  padding: 16px;
+.faucet-page .details-raw {
+  margin-top: 12px;
+}
+
+.faucet-page .details-raw .session-json {
+  margin: 10px 0 0 0;
+  padding: 12px;
+  max-height: 400px;
+  overflow: auto;
+  border-radius: var(--pf-radius-sm);
+  border: 1px solid var(--pf-border);
+  background: var(--pf-surface);
+  font-size: 12px;
 }
