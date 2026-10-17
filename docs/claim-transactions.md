@@ -132,7 +132,9 @@ Queue behaviour:
 - One batch transaction is in flight at a time, whatever `ethMaxPending` says: transaction pools
   (geth and reth among them) allow a delegated account a single in-flight transaction, and a
   second one is refused or trickles in a block at a time. Throughput is `maxClaims` per block, so
-  raise `maxClaims` rather than `ethMaxPending` (50 plain transfers cost about 1.8M gas).
+  raise `maxClaims` rather than `ethMaxPending` (50 plain transfers cost about 1.8M gas). The
+  receipt of the transaction in flight is polled every 3 seconds (12 otherwise), so the next batch
+  usually makes the next block.
 - A batch is sized to stay under `ethTxFeeCap` (1 ETH by default, geth's own default): nodes
   refuse a transaction whose gas limit times max fee is above their cap, and a batch's gas limit is
   its worst case. With `ethTxMaxFee` at 250 gwei that is about 60 plain transfers per batch, with

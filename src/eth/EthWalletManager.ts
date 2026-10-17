@@ -104,6 +104,13 @@ export class EthWalletManager {
   private batchDelegation: BatchDelegation | null = null;
   private lastWalletRefresh: number;
   private txReceiptPollInterval = 12000;
+  /**
+   * While the wallet is delegated one claim transaction is in flight at a time, and the time between
+   * its receipt and the poll that sees it is the queue's throughput: a batch mined in one slot
+   * only gets a successor into the next slot when the poll notices within that slot. 3 s instead of
+   * 12 for one pending transaction costs nothing.
+   */
+  private static readonly BATCHING_RECEIPT_POLL_INTERVAL = 3000;
 
   /** the pool's routing client: each call goes to the highest-priority ready endpoint at that moment */
   private get client(): IEthRpcClient {
@@ -646,6 +653,13 @@ export class EthWalletManager {
     };
   }
 
+  /** 12 s between receipt polls, 3 s while the wallet is delegated (one transaction in flight, see BATCHING_RECEIPT_POLL_INTERVAL). */
+  private receiptPollInterval(): number {
+    if(this.claimTxBuilder?.isBatchActive())
+      return Math.min(this.txReceiptPollInterval, EthWalletManager.BATCHING_RECEIPT_POLL_INTERVAL);
+    return this.txReceiptPollInterval;
+  }
+
   /**
    * Poll for the receipt. On a poll without one the same bytes go out again when the node does not
    * know the transaction (a pool that evicted or never got it) or, with `resendEveryPoll`, when no
@@ -684,7 +698,7 @@ export class EthWalletManager {
         }
       }
 
-      await sleepPromise(this.txReceiptPollInterval); // 12 secs
+      await sleepPromise(this.receiptPollInterval());
     }
   }
 
