@@ -31,8 +31,8 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
   private clientSocket: WebSocket;
   private clientStatus: ClaimNotificationClientStatus;
   private readyDfd: PromiseDfd<void>;
-  private reconnectTimer: NodeJS.Timeout;
-  private disconnectTimer: NodeJS.Timeout;
+  private reconnectTimer: ReturnType<typeof setTimeout>;
+  private disconnectTimer: ReturnType<typeof setTimeout>;
 
   public constructor(options: IClaimNotificationClientOptions) {
     super();

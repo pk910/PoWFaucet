@@ -1,4 +1,4 @@
-import { PoWParams } from "../common/FaucetConfig";
+import type { PoWParams } from "../common/FaucetConfig";
 import { PoWHashAlgo } from "../types/PoWMinerSrc";
 
 export function getPoWParamsStr(params: PoWParams, difficulty: number): string {

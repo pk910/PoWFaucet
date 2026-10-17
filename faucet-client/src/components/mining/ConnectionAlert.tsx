@@ -15,7 +15,7 @@ export interface IConnectionAlertState {
 }
 
 export class ConnectionAlert extends React.PureComponent<IConnectionAlertProps, IConnectionAlertState> {
-  private updateTimer: NodeJS.Timer;
+  private updateTimer: ReturnType<typeof setInterval>;
   private timeoutCbCalled: boolean;
 
   constructor(props: IConnectionAlertProps) {

@@ -1,5 +1,5 @@
 import { getPoWParamsStr } from "../utils/PoWParamsHelper";
-import { PoWParams } from "../common/FaucetConfig";
+import type { PoWParams } from "../common/FaucetConfig";
 import { base64ToHex } from "../utils/ConvertHelpers";
 import { PoWHashAlgo } from "../types/PoWMinerSrc";
 

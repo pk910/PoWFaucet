@@ -101,7 +101,11 @@ var webpackBaseConfig = {
               ["@babel/preset-env", {
                 modules: false
               }],
-              "@babel/preset-typescript",
+              // Babel 8 keeps imports that are only used as types unless told otherwise; webpack then
+              // warns "export X was not found" for every interface import
+              ["@babel/preset-typescript", {
+                onlyRemoveTypeImports: false
+              }],
               ["@babel/preset-react", {
                 development: debug
               }]

@@ -18,3 +18,16 @@ updates:
       "Client dependencies":
         patterns:
           - "*"
+  # the workflows pin every action to a commit sha; dependabot moves the sha and the version comment
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      "GitHub Actions":
+        patterns:
+          - "*"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"

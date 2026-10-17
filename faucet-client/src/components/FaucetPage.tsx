@@ -48,7 +48,7 @@ export interface IFaucetNotification {
   message: string;
   time?: number;
   timeout?: number;
-  timerId?: NodeJS.Timeout;
+  timerId?: ReturnType<typeof setTimeout>;
 }
 
 export interface IFaucetDialog {
@@ -104,7 +104,7 @@ function PageHookObserver(): null {
 }
 
 export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPageState> {
-  private configRefreshInterval: NodeJS.Timer;
+  private configRefreshInterval: ReturnType<typeof setInterval>;
   private faucetContainerElement: HTMLElement;
   private lastConfigRefresh = 0;
   private lastConfigRefreshStart = 0;

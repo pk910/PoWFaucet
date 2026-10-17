@@ -2,6 +2,7 @@ import { createRemoteJWKSet, customFetch, jwtVerify, JWTPayload } from "jose";
 import { ServiceManager } from "../../common/ServiceManager.js";
 import { FaucetLogLevel, FaucetProcess } from "../../common/FaucetProcess.js";
 import { FetchUtil } from "../../utils/FetchUtil.js";
+import { strTrimEnd } from "../../utils/StringUtils.js";
 
 export interface IAuthenticatoorClaims extends JWTPayload {
   email?: string;
@@ -62,7 +63,7 @@ export class AuthenticatoorVerifier {
   private discoveryPromise: Promise<void>;
 
   public constructor(authUrl: string, expectedAudience: string, expectedHost?: string) {
-    this.authUrl = authUrl.replace(/\/+$/, "");
+    this.authUrl = strTrimEnd(authUrl, "/");
     this.expectedAudience = expectedAudience;
     this.expectedHost = expectedHost || "";
   }

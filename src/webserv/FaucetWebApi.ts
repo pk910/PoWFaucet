@@ -81,7 +81,13 @@ export interface IClientSessionStatus {
 export const FAUCETSTATUS_CACHE_TIME = 10;
 
 export class FaucetWebApi {
-  private apiEndpoints: {[endpoint: string]: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>} = {};
+  /**
+   * Module endpoints by lower-cased first path segment. A Map and not a plain object: the key is
+   * the request path, so an object would also answer to `constructor`, `__proto__` or
+   * `hasOwnProperty` and dispatch the request into Object.prototype (CodeQL
+   * js/unvalidated-dynamic-method-call).
+   */
+  private apiEndpoints = new Map<string, (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>>();
   private cachedStatusData: {[key: string]: {
     time: number;
     data: any;
@@ -111,23 +117,23 @@ export class FaucetWebApi {
       case "getFaucetStatus".toLowerCase():
         return this.onGetFaucetStatus(apiUrl.query['key'] as string);
       default:
-        let handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>;
-        if((handler = this.apiEndpoints[apiUrl.path[0].toLowerCase()]))
+        let handler = this.apiEndpoints.get(apiUrl.path[0].toLowerCase());
+        if(handler)
           return handler(req, apiUrl, body);
     }
     return new FaucetHttpResponse(404, "Not Found");
   }
 
   public hasApiEndpoint(endpoint: string): boolean {
-    return !!this.apiEndpoints[endpoint.toLowerCase()];
+    return this.apiEndpoints.has(endpoint.toLowerCase());
   }
 
   public registerApiEndpoint(endpoint: string, handler: (req: IncomingMessage, url: IFaucetApiUrl, body: Buffer) => Promise<any>) {
-    this.apiEndpoints[endpoint.toLowerCase()] = handler;
+    this.apiEndpoints.set(endpoint.toLowerCase(), handler);
   }
 
   public removeApiEndpoint(endpoint: string) {
-    delete this.apiEndpoints[endpoint.toLowerCase()];
+    this.apiEndpoints.delete(endpoint.toLowerCase());
   }
 
   private parseApiUrl(url: string): IFaucetApiUrl {
@@ -136,7 +142,8 @@ export class FaucetWebApi {
       return null;
     let urlRes: IFaucetApiUrl = {
       path: urlMatch[1] && urlMatch[1].length > 0 ? urlMatch[1].split("/") : [],
-      query: {}
+      // null prototype: the keys are the request's query parameter names
+      query: Object.create(null)
     };
     if(urlMatch[2] && urlMatch[2].length > 0) {
       urlMatch[2].split("&").forEach((query) => {

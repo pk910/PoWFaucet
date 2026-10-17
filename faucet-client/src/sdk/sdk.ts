@@ -4,7 +4,7 @@ import { Fragment, jsx, jsxs } from 'react/jsx-runtime';
 import * as common from '../common';
 import * as types from '../types';
 import { getCoreFlags, ICoreFlags } from './flags';
-import { getPanels, getRoutes, getSlot, IMiningPanelProps, ISlotProps, FaucetSlotName, registerPanel, registerRoute, registerSlot, resetSlots } from './slots';
+import { getPanels, getRoutes, getSlot, IMiningPanelProps, IPanelCaptions, IPanelSessionMode, ISlotProps, FaucetSlotName, registerPanel, registerRoute, registerSlot, resetSlots } from './slots';
 import { FaucetHookHandler, FaucetHookName, getHookCount, offHook, onHook, resetHooks } from './hooks';
 import { IFaucetContext } from '../common/FaucetContext';
 import { IFaucetSessionInfo } from '../common/FaucetSession';
@@ -70,7 +70,8 @@ export interface IFaucetClientSdk {
 
 export interface IFaucetClientUi {
   /** put a component in a slot; "mining" is the mining page's panel row */
-  registerPanel: (slot: string, component: React.ComponentType<IMiningPanelProps>) => void;
+  registerPanel: (slot: string, component: React.ComponentType<IMiningPanelProps>,
+                  options: { module: string; captions?: IPanelCaptions; title?: string; modes?: IPanelSessionMode[] }) => void;
   /** mount a component at a path; `{dev: true}` only when the page is in dev mode */
   registerRoute: (path: string, component: React.ComponentType<Record<string, never>>,
                   options?: { dev?: boolean }) => void;
