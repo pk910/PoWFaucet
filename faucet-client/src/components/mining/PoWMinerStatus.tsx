@@ -149,127 +149,96 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
     let lastShareTime = this.state.lastShareTime || now;
     let miningTime = lastShareTime - this.state.startTime;
 
+    let coin = (amount: bigint | number) => toReadableAmount(amount, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol);
+    let imagesUrl = this.props.pageContext.faucetUrls.imagesUrl || "/images";
+
     return (
-      <div className='grid pow-status'>
-        <div className='row'>
-          <div className='col pow-status-image'>
-            <div className='pow-progress-actions'>
-              <OverlayTrigger
-                placement="bottom"
-                container={this.props.pageContext.getContainer()}
-                overlay={
-                  <Tooltip>
-                    Stop animation for better performance
-                  </Tooltip>
-                }
-              >
-                <a href='#' onClick={(evt) => { this.onProgressGifToggle(); evt.preventDefault(); }}>
-                {this.state.disableProgressGif ?
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-play-fill" viewBox="0 0 16 16">
-                    <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
-                  </svg> :
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-x-square" viewBox="0 0 16 16">
-                    <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
-                    <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>
-                  </svg>
-                }
-                </a>
-              </OverlayTrigger>
-            </div>
-
-            <img src={(this.props.pageContext.faucetUrls.imagesUrl || "/images") + (this.state.disableProgressGif ? "/progress.png" : "/progress.gif")} />
-          </div>
+      <div className='pow-status'>
+        <div className='pow-status-image'>
+          <img src={imagesUrl + (this.state.disableProgressGif ? "/progress.png" : "/progress.gif")} alt="" />
+          <OverlayTrigger
+            placement="bottom"
+            container={this.props.pageContext.getContainer()}
+            overlay={
+              <Tooltip>
+                {this.state.disableProgressGif ? "Play the animation" : "Stop the animation for better performance"}
+              </Tooltip>
+            }
+          >
+            <button
+              type="button"
+              className="pow-progress-toggle"
+              aria-label={this.state.disableProgressGif ? "Play the animation" : "Stop the animation for better performance"}
+              onClick={() => this.onProgressGifToggle()}
+            >
+              {this.state.disableProgressGif ?
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                  <path d="M3 1.5v9l7-4.5z"/>
+                </svg> :
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                  <rect x="2" y="2" width="3" height="8" rx="0.8"/><rect x="7" y="2" width="3" height="8" rx="0.8"/>
+                </svg>
+              }
+            </button>
+          </OverlayTrigger>
         </div>
 
-        <div className='row pow-status-addr'>
-          <div className='col-6'>
-            <div className='status-title'>Target Address:</div>
+        <div className='pf-stats'>
+          <div className='pf-stat'>
+            <span>Your mining reward</span>
+            <b>{coin(this.state.balance)}</b>
           </div>
-          <div className='col-12'>
-            <div className='status-value'>{this.props.powSession.getTargetAddr()}</div>
-          </div>
-        </div>
-        <div className='row pow-status-top'>
-          <div className='col-6'>
-            <div className='status-title'>Your Mining Reward:</div>
-            <div className='status-value'>{toReadableAmount(this.state.balance, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</div>
-          </div>
-          <div className='col-6'>
-            <div className='status-title'>Current Hashrate:</div>
-            <div className='status-value'>{Math.round(this.state.hashRate * 100) / 100} H/s</div>
+          <div className='pf-stat'>
+            <span>Current hashrate</span>
+            <b>{Math.round(this.state.hashRate * 100) / 100} H/s</b>
           </div>
         </div>
-        <div className='row pow-status-spacer'></div>
-        
-        <div className='row pow-status-other'>
-          <div className='col-6'>
-            <div className='status-title'>Number of Workers:</div>
+
+        <div className='pf-kv-list'>
+          <div className='pf-kv'>
+            <span>Target address</span>
+            <b className='pf-mono'>{this.props.powSession.getTargetAddr()}</b>
           </div>
-          <div className='col-3'>
-            <div className='status-value'>{this.state.workerCount} / {this.state.workerCountInput}</div>
+          <div className='pf-kv'>
+            <span>Workers</span>
+            <span className='pf-kv-value pow-worker-controls'>
+              <button type="button" aria-label="Fewer workers" disabled={this.state.workerCountInput <= 1} onClick={() => this.onChangeWorkerCountButtonClick(-1)}>&minus;</button>
+              <b>{this.state.workerCount} / {this.state.workerCountInput}</b>
+              <button type="button" aria-label="More workers" disabled={this.state.workerCountInput >= 32} onClick={() => this.onChangeWorkerCountButtonClick(1)}>+</button>
+            </span>
           </div>
-          <div className='col-3 pow-worker-controls'>
-            <button type="button" className="btn btn-primary btn-sm" disabled={this.state.workerCountInput >= 32} onClick={() => this.onChangeWorkerCountButtonClick(1)}>+</button>
-            <button type="button" className="btn btn-primary btn-sm" disabled={this.state.workerCountInput <= 1} onClick={() => this.onChangeWorkerCountButtonClick(-1)}>-</button>
+          <div className='pf-kv'>
+            <span>Minimum claim</span>
+            <b>{coin(this.props.faucetConfig.minClaim)}</b>
           </div>
-        </div>
-        <div className='row pow-status-other'>
-          <div className='col-6'>
-            <div className='status-title'>Minimum Claim Reward:</div>
+          <div className='pf-kv'>
+            <span>Maximum claim</span>
+            <b>{coin(this.props.faucetConfig.maxClaim)}</b>
           </div>
-          <div className='col-6'>
-            <div className='status-value'>{toReadableAmount(this.props.faucetConfig.minClaim, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</div>
+          <div className='pf-kv'>
+            <span>Remaining session time</span>
+            <b>{renderTimespan(sessionLifetime)}</b>
           </div>
-        </div>
-        <div className='row pow-status-other'>
-          <div className='col-6'>
-            <div className='status-title'>Maximum Claim Reward:</div>
+          <div className='pf-kv'>
+            <span>Total shares</span>
+            <b>{this.state.totalShares}</b>
           </div>
-          <div className='col-6'>
-            <div className='status-value'>{toReadableAmount(this.props.faucetConfig.maxClaim, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</div>
+          <div className='pf-kv'>
+            <span>Avg. reward per hour</span>
+            <b>{coin(BigInt(this.state.balance||0) * 3600n / BigInt(miningTime||1))}/h</b>
           </div>
-        </div>
-        <div className='row pow-status-other'>
-          <div className='col-6'>
-            <div className='status-title'>Remaining Session Time:</div>
-          </div>
-          <div className='col-6'>
-            <div className='status-value'>{renderTimespan(sessionLifetime)}</div>
-          </div>
-        </div>
-        <div className='row pow-status-other'>
-          <div className='col-6'>
-            <div className='status-title'>Total Shares:</div>
-          </div>
-          <div className='col-6'>
-            <div className='status-value'>{this.state.totalShares}</div>
-          </div>
-        </div>
-        <div className='row pow-status-other'>
-          <div className='col-6'>
-            <div className='status-title'>Avg. Reward per Hour:</div>
-          </div>
-          <div className='col-6'>
-            <div className='status-value'>{toReadableAmount(BigInt(this.state.balance||0) * 3600n / BigInt(miningTime||1), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}/h</div>
-          </div>
-        </div>
-        {this.props.faucetConfig.modules.passport ?
-          <div className='row pow-status-other'>
-            <div className='col-6'>
-              <div className='status-title'>Reward Boost:</div>
+          {this.props.faucetConfig.modules.passport ?
+            <div className='pf-kv'>
+              <span>Reward boost</span>
+              <span className='pf-kv-value'>
+                {this.props.passportScoreInfo ?
+                  <b className='pow-boost-value'>+ {Math.round((this.props.passportScoreInfo.factor - 1) * 100)}%</b>
+                : <b className='pow-boost-none'>+ 0%</b>}
+                <button type="button" className="pow-boost-button" onClick={() => this.props.openPassportInfo()}>Boost with Passport</button>
+              </span>
             </div>
-            <div className='col-3'>
-              <div className='status-value'>
-                {this.props.passportScoreInfo ? 
-                  <span className='boost-value'>+ {Math.round((this.props.passportScoreInfo.factor - 1) * 100)}%</span>
-                : <span className='boost-none'>+ 0%</span>}
-              </div>
-            </div>
-            <div className='col-3 pow-passport-controls'>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => this.props.openPassportInfo()}>Boost</button>
-            </div>
-          </div>
-        : null}
+          : null}
+        </div>
       </div>
     );
 	}

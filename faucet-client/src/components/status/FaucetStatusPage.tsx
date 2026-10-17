@@ -101,7 +101,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         <div className='row'>
         <div className='col-12 card status-panel'>
             <div className="card-body">
-              <h5 className="card-title">Faucet Status</h5>
+              <h5 className="card-title">Overview</h5>
               {this.renderFaucetStatus()}
             </div>
           </div>

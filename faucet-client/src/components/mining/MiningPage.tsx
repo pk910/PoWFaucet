@@ -14,6 +14,7 @@ import { PoWSession } from '../../pow/PoWSession';
 import { PoWMiner } from '../../pow/PoWMiner';
 import { PoWMinerStatus } from './PoWMinerStatus';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
+import { renderTime } from '../../utils/DateUtils';
 import { PassportInfo } from '../passport/PassportInfo';
 import { ConnectionAlert } from './ConnectionAlert';
 
@@ -417,6 +418,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
 
     return (
       <div className={'page-mining' + (panelOnly ? ' panel-only' : '')}>
+        {this.renderHead(panelOnly)}
         {this.powActive ?
           <div className="pow-status-container">
             <PoWMinerStatus 
@@ -445,6 +447,29 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       </div>
     );
 	}
+
+  /** the heading row: what runs here, the wallet it pays to, and whether the connection is up */
+  private renderHead(panelOnly: boolean): React.ReactElement {
+    let target = this.faucetSession.getTargetAddr() || "";
+    let shortTarget = target.length > 12 ? target.substring(0, 6) + "\u2026" + target.substring(target.length - 4) : target;
+    let startTime = this.powActive && this.powSession ? this.powSession.getStartTime() : 0;
+    let meta = (startTime ? "Started " + renderTime(new Date(startTime * 1000)) + " \u00b7 " : "") + shortTarget;
+    let title = panelOnly ? this.panelCaptions().balance : "Mining";
+    let pill: React.ReactElement;
+    if(!this.state.clientConnected)
+      pill = <span className="pf-pill pf-pill-warn">Reconnecting</span>;
+    else
+      pill = <span className="pf-pill pf-pill-live">{panelOnly ? "Running" : "Mining"}</span>;
+    return (
+      <div className="pf-head">
+        <div>
+          <h2>{title}</h2>
+          <p className="pf-head-meta pf-mono">{meta}</p>
+        </div>
+        {pill}
+      </div>
+    );
+  }
 
   /**
    * Whatever a module put in the mining slot, where the first panel used to be

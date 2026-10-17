@@ -21,6 +21,7 @@ import { SlotOutlet } from '../sdk/SlotOutlet';
 
 import './FaucetPage.scss'
 import { PoWMinerWorkerSrc, getPoWMinerDefaultSrc } from '../types/PoWMinerSrc';
+import { toReadableAmount } from '../utils/ConvertHelpers';
 import { joinUrl } from '../utils/QueryUtils';
 
 export interface IFaucetPageProps {
@@ -214,13 +215,14 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       );
     }
     return (
-      <div className='faucet-page' ref={(ref) => {
+      <div className='faucet-page' data-bs-theme="light" ref={(ref) => {
         this.faucetContainerElement = ref;
       }}>
         <FaucetConfigContext.Provider value={this.state.faucetConfig}>
           <FaucetPageContext.Provider value={this.pageContext}>
             <div className="faucet-title">
-              <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
+              <h1>{this.state.faucetConfig.faucetTitle}</h1>
+              {this.renderTitleMeta()}
               <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
             </div>
             <SlotOutlet slot="header" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
@@ -289,13 +291,25 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
             {this.renderNotifications()}
             <SlotOutlet slot="footer" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
             <div className='faucet-footer'>
-              <div className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</div>
+              <span className="faucet-client-version">PoWFaucet client v{FAUCET_CLIENT_VERSION}</span>
+              <a href="https://github.com/pk910/PoWFaucet" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
             </div>
           </FaucetPageContext.Provider>
         </FaucetConfigContext.Provider>
       </div>
     );
 	}
+
+  /** the claim range under the title; nothing when the config has no range to speak of */
+  private renderTitleMeta(): React.ReactElement {
+    let config = this.state.faucetConfig;
+    if(!config.maxClaim)
+      return null;
+    let parts = ["Up to " + toReadableAmount(config.maxClaim, config.faucetCoinDecimals, config.faucetCoinSymbol) + " per session"];
+    if(config.minClaim)
+      parts.push("minimum claim " + toReadableAmount(config.minClaim, config.faucetCoinDecimals, config.faucetCoinSymbol));
+    return <p className="faucet-meta">{parts.join(" \u00b7 ")}</p>;
+  }
 
   private renderStatusAlerts(): React.ReactElement {
     let faucetStatusEntries = [];

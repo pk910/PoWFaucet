@@ -45,7 +45,7 @@ describe("browser: mining flow", function() {
     expect(sessionId, "no session id in the mining url").to.be.a("string");
 
     // mining page: the status block and the stop button
-    await page.getByText("Your Mining Reward").waitFor({ timeout: 30000 });
+    await page.getByText("Your mining reward").waitFor({ timeout: 30000 });
     expect(await page.getByText(TEST_TARGET_ADDR).count()).to.be.greaterThan(0, "target address not shown");
     let stopButton = page.getByRole("button", { name: /^Stop Mining/ });
     await stopButton.waitFor();
