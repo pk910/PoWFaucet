@@ -71,16 +71,22 @@ describe("browser: progress animation", function() {
     expect(visible.length).to.be.at.least(3, "the animation does not advance: " + JSON.stringify(visible));
   });
 
-  it("shows the still picture when the system asks for reduced motion", async function() {
+  it("holds the first frame when the system asks for reduced motion", async function() {
     if(skipReason) return this.skip();
     fixture = await bootFaucet();
     context = await browser.newContext({ reducedMotion: "reduce" });
     page = await context.newPage();
     await startMining(page);
+    await page.locator(".pow-status-image svg.pf-progress").waitFor({ timeout: 30000 });
 
-    let shown = await picture(page);
-    expect(shown.still).to.equal(true, "no still picture");
-    expect(shown.svg).to.equal(false, "the animation runs despite reduced motion");
+    // the svg's own media rule: no animation, frame 0 visible
+    let frames = await page.evaluate(() => Array.from(document.querySelectorAll(".pow-status-image svg.pf-progress g")).map((g) => ({
+      animation: getComputedStyle(g).animationName,
+      opacity: getComputedStyle(g).opacity,
+    })));
+    expect(frames.every((f) => f.animation === "none")).to.equal(true, "the frames still animate under reduced motion");
+    expect(frames[0].opacity).to.equal("1", "the first frame is not the one shown");
+    expect(frames.slice(1).every((f) => f.opacity === "0")).to.equal(true, "more than one frame is visible");
   });
 
   it("the button switches to the still picture, remembers it, and back", async function() {

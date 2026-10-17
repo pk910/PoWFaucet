@@ -13,9 +13,7 @@
   },
   "include": [
     "src/**/*",
-    "tests/**/*",
-    // the client's probe decision is pure and gets its unit test here
-    "faucet-client/src/pow/AnimationProbe.ts"
+    "tests/**/*"
   ],
   // The client-side entries of the one module that lived here went with it: the specs that
   // reached into those modules are the module's own tests now, and so
