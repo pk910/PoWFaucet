@@ -18,9 +18,10 @@ pragma solidity 0.8.30;
 //
 // A sub-call that fails (a recipient that reverts, a token transfer that returns false) does not
 // revert the batch: it is reported with `CallFailed`, carrying its position in the stream; the
-// faucet knows which claim it belongs to. Every sub-call runs with bounded gas, so one recipient
-// cannot burn the batch. A token or call sub-call may not target the wallet itself: a nested
-// `execute` would pass the self-only gate with a stream of its own.
+// faucet knows which claim it belongs to. Every sub-call runs with bounded gas and its return data
+// is never copied (one word at most, for the token result), so one recipient cannot burn the
+// batch, neither with its stipend nor with a return-data bomb. A token or call sub-call may not
+// target the wallet itself: a nested `execute` would pass the self-only gate with a stream of its own.
 //
 // A batch that ran emits `BatchExecuted` at the end. Without it the faucet knows the transaction
 // did not run this code (the wallet's code was something else when it mined) and pays nobody twice
@@ -29,10 +30,6 @@ pragma solidity 0.8.30;
 // Deployed by the faucet through the deterministic deployment proxy
 // (0x4e59b44847b379578588920cA78FbF26c0B4956C), so one compiler setting set gives one address on
 // every chain; scripts/compile-contracts.mjs produces the artifact the faucet ships.
-
-interface IERC20Minimal {
-  function transfer(address to, uint256 value) external returns (bool);
-}
 
 contract PoWFaucetBatcher {
 
@@ -67,8 +64,7 @@ contract PoWFaucetBatcher {
         address to = address(bytes20(calls[offset:offset + 20]));
         uint256 amount = uint96(bytes12(calls[offset + 20:offset + 32]));
         offset += 32;
-        (bool ok, ) = payable(to).call{value: amount, gas: TRANSFER_GAS}("");
-        if (!ok)
+        if (!_transfer(to, amount))
           emit CallFailed(index, kind, to, amount);
       } else if (kind == KIND_TOKEN) {
         address token = address(bytes20(calls[offset:offset + 20]));
@@ -76,13 +72,7 @@ contract PoWFaucetBatcher {
         uint256 amount = uint96(bytes12(calls[offset + 40:offset + 52]));
         offset += 52;
         require(token != address(this), "self call");
-        bool ok = false;
-        try IERC20Minimal(token).transfer{gas: TRANSFER_GAS * 2}(to, amount) returns (bool result) {
-          ok = result;
-        } catch {
-          ok = false;
-        }
-        if (!ok)
+        if (!_tokenTransfer(token, to, amount))
           emit CallFailed(index, kind, to, amount);
       } else if (kind == KIND_CALL) {
         address to = address(bytes20(calls[offset:offset + 20]));
@@ -93,8 +83,7 @@ contract PoWFaucetBatcher {
         bytes calldata data = calls[offset:offset + length];
         offset += length;
         require(to != address(this), "self call");
-        (bool ok, ) = to.call{value: value, gas: gasLimit}(data);
-        if (!ok)
+        if (!_call(to, value, gasLimit, data))
           emit CallFailed(index, kind, to, value);
       } else {
         revert("unknown call kind");
@@ -103,6 +92,43 @@ contract PoWFaucetBatcher {
     }
     require(offset == calls.length, "malformed stream");
     emit BatchExecuted(index);
+  }
+
+  // native coin with the transfer stipend; no return data is copied
+  function _transfer(address to, uint256 amount) private returns (bool ok) {
+    uint256 gasLimit = TRANSFER_GAS;
+    assembly {
+      ok := call(gasLimit, to, amount, 0, 0, 0, 0)
+    }
+  }
+
+  // an arbitrary call with the stream's gas; the callee's return data is left where it is
+  function _call(address to, uint256 value, uint256 gasLimit, bytes calldata data) private returns (bool ok) {
+    assembly {
+      let ptr := mload(0x40)
+      calldatacopy(ptr, data.offset, data.length)
+      ok := call(gasLimit, to, value, ptr, data.length, 0, 0)
+    }
+  }
+
+  // ERC20 transfer(to, amount) with twice the transfer stipend. Copies at most one word of return
+  // data: a token returning nothing passes when it has code, a token returning a word must return true.
+  function _tokenTransfer(address token, address to, uint256 amount) private returns (bool ok) {
+    uint256 gasLimit = TRANSFER_GAS * 2;
+    assembly {
+      let ptr := mload(0x40)
+      mstore(ptr, 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
+      mstore(add(ptr, 4), to)
+      mstore(add(ptr, 36), amount)
+      let success := call(gasLimit, token, 0, ptr, 68, ptr, 32)
+      switch returndatasize()
+      case 0 {
+        ok := and(success, gt(extcodesize(token), 0))
+      }
+      default {
+        ok := and(success, and(gt(returndatasize(), 31), eq(mload(ptr), 1)))
+      }
+    }
   }
 
 }

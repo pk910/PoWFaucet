@@ -163,8 +163,10 @@ A token or call sub-call may not target the faucet wallet itself. Inside `execut
 batcher rejects such a sub-call and the faucet refuses to build one.
 
 Every sub-call runs with bounded gas: 50k for a transfer, 100k for a token transfer, and for a
-`call` whatever its `gas` field says (200k by default). A recipient that burns its gas fails its
-own sub-call, never the batch.
+`call` whatever its `gas` field says (200k by default). The batcher never copies a callee's return
+data (one word at most, for the token transfer's result), so a recipient cannot make the batch pay
+for a large return either. A recipient that burns its gas or returns garbage fails its own
+sub-call, never the batch.
 
 A batch that ran emits `BatchExecuted` at the end. A mined `execute` transaction without that
 event did not run the batcher (the wallet's code was something else at the time) and paid nobody,
