@@ -109,10 +109,17 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   }
 
   public componentDidMount() {
+    this.updateHeader();
     this.refreshSessionStatus();
   }
 
+  public componentDidUpdate(prevProps: IClaimPageProps, prevState: IClaimPageState) {
+    if(prevState.sessionStatus !== this.state.sessionStatus || prevState.isTimedOut !== this.state.isTimedOut)
+      this.updateHeader();
+  }
+
   public componentWillUnmount() {
+    this.props.pageContext.setPageHeader(null);
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);
       this.updateTimer = null;
@@ -221,13 +228,6 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
 
     return (
       <div className='page-claim'>
-        <div className='pf-head'>
-          <div>
-            <h2>Claim Rewards</h2>
-            <p className='pf-head-meta pf-mono'>Session {this.props.sessionId}</p>
-          </div>
-          {this.renderStatusPill()}
-        </div>
         <SlotOutlet slot="claim.before" faucetConfig={this.props.faucetConfig}
           sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
         {this.renderClaim()}
@@ -237,16 +237,23 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     )
 	}
 
-  private renderStatusPill(): React.ReactElement {
-    if(!this.state.sessionStatus || this.state.isTimedOut)
-      return null;
-    switch(this.state.sessionStatus.status) {
-      case "claimable": return <span className='pf-pill pf-pill-warn'>Claimable</span>;
-      case "claiming": return <span className='pf-pill pf-pill-info'>Claiming</span>;
-      case "finished": return <span className='pf-pill pf-pill-live'>Confirmed</span>;
-      case "failed": return <span className='pf-pill pf-pill-crit'>Failed</span>;
-      default: return null;
+  /** the card's header while this page is on */
+  private updateHeader() {
+    let status = this.state.sessionStatus;
+    let pill: { text: string, kind: "live" | "info" | "warn" | "crit" } = null;
+    if(status && !this.state.isTimedOut) {
+      switch(status.status) {
+        case "claimable": pill = { text: "Claimable", kind: "warn" }; break;
+        case "claiming": pill = { text: "Claiming", kind: "info" }; break;
+        case "finished": pill = { text: "Confirmed", kind: "live" }; break;
+        case "failed": pill = { text: "Failed", kind: "crit" }; break;
+      }
     }
+    this.props.pageContext.setPageHeader({
+      title: status && status.status === "finished" ? "Rewards sent" : "Claim your rewards",
+      meta: this.props.faucetConfig.faucetTitle + " \u00b7 session " + this.props.sessionId.substring(0, 8) + "\u2026" + this.props.sessionId.substring(this.props.sessionId.length - 4),
+      pill: pill,
+    });
   }
 
   private renderClaim(): React.ReactElement {

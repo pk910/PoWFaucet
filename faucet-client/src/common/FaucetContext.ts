@@ -11,6 +11,19 @@ export interface IFaucetContextUrls {
   imagesUrl: string;
 }
 
+/**
+ * What a page puts into the card's one header: its own title instead of the faucet's, a meta
+ * line instead of the claim range, a status pill at the right. Unset fields keep the default.
+ */
+export interface IPageHeader {
+  title?: string;
+  meta?: string;
+  pill?: {
+    text: string;
+    kind?: "live" | "info" | "warn" | "crit" | "";
+  };
+}
+
 export interface IFaucetContext {
   faucetUrls: IFaucetContextUrls;
   faucetApi: FaucetApi;
@@ -27,5 +40,8 @@ export interface IFaucetContext {
   getContainer(): HTMLElement;
 
   refreshConfig(): void;
+
+  /** the page's header, or null to show the faucet's own again */
+  setPageHeader(header: IPageHeader | null): void;
 
 }

@@ -36,12 +36,14 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
   }
 
   public componentDidMount() {
+    this.props.pageContext.setPageHeader({ title: "Claim queue", meta: this.props.faucetConfig.faucetTitle });
     if(!this.state.refreshing) {
       this.refreshQueueStatus();
     }
   }
 
   public componentWillUnmount() {
+    this.props.pageContext.setPageHeader(null);
   }
 
   private refreshQueueStatus() {
@@ -63,12 +65,9 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
 
     return (
       <div className='container grid faucet-status'>
-        <div className='row'>
-          <div className='col-md-auto'>
-            <h5>Queue Status</h5>
-          </div>
-          <div className='col'>
-            <button type="button" className="btn btn-primary status-refresh" onClick={() => this.refreshQueueStatus()} disabled={this.state.refreshing}>Refresh</button>
+        <div className='status-head'>
+          <div className='status-key'>
+            <button type="button" className="btn btn-primary btn-sm status-refresh" onClick={() => this.refreshQueueStatus()} disabled={this.state.refreshing}>Refresh</button>
           </div>
         </div>
         <div className='row'>

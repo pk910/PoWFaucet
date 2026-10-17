@@ -56,11 +56,18 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
   }
 
   public componentDidMount() {
+    this.updateHeader();
     if(!this.state.sessionStatus)
       this.refreshSessionStatus();
   }
 
+  public componentDidUpdate(prevProps: IDetailsPageProps, prevState: IDetailsPageState) {
+    if(prevState.sessionStatus !== this.state.sessionStatus)
+      this.updateHeader();
+  }
+
   public componentWillUnmount() {
+    this.props.pageContext.setPageHeader(null);
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);
       this.updateTimer = null;
@@ -136,13 +143,6 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
 	public render(): React.ReactElement<IDetailsPageProps> {
     return (
       <div className='page-details'>
-        <div className='pf-head'>
-          <div>
-            <h2>Session Details</h2>
-            <p className='pf-head-meta pf-mono'>{this.props.sessionId}</p>
-          </div>
-          {this.renderStatusPill()}
-        </div>
         {this.renderSession()}
         <SlotOutlet slot="details.section" faucetConfig={this.props.faucetConfig}
           sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
@@ -154,17 +154,25 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
     return toReadableAmount(typeof amount === "string" ? BigInt(amount) : amount, this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol);
   }
 
-  private renderStatusPill(): React.ReactElement {
-    if(!this.state.sessionStatus)
-      return null;
-    switch(this.state.sessionStatus.status) {
-      case "running": return <span className="pf-pill pf-pill-info">Running</span>;
-      case "claimable": return <span className="pf-pill pf-pill-warn">Claimable</span>;
-      case "claiming": return <span className="pf-pill pf-pill-info">Claiming</span>;
-      case "finished": return <span className="pf-pill pf-pill-live">Finished</span>;
-      case "failed": return <span className="pf-pill pf-pill-crit">Failed</span>;
-      default: return <span className="pf-pill">{this.state.sessionStatus.status}</span>;
+  /** the card's header while this page is on */
+  private updateHeader() {
+    let status = this.state.sessionStatus;
+    let pill: { text: string, kind: "live" | "info" | "warn" | "crit" | "" } = null;
+    if(status) {
+      switch(status.status) {
+        case "running": pill = { text: "Running", kind: "info" }; break;
+        case "claimable": pill = { text: "Claimable", kind: "warn" }; break;
+        case "claiming": pill = { text: "Claiming", kind: "info" }; break;
+        case "finished": pill = { text: "Finished", kind: "live" }; break;
+        case "failed": pill = { text: "Failed", kind: "crit" }; break;
+        default: pill = { text: status.status, kind: "" };
+      }
     }
+    this.props.pageContext.setPageHeader({
+      title: "Session details",
+      meta: this.props.sessionId,
+      pill: pill,
+    });
   }
 
   private renderSession(): React.ReactElement {

@@ -65,7 +65,7 @@ describe("browser: status and details pages", function() {
     page = await browser.newPage();
     await openFaucet(page, fixture, "/details/" + session.sessionId);
 
-    await page.getByRole("heading", { name: "Session Details" }).waitFor();
+    await page.getByRole("heading", { name: "Session details" }).waitFor();
     let body = await page.locator("body").textContent();
     expect(body).to.contain(TEST_TARGET_ADDR, "wallet missing");
     expect(body).to.contain("0.25 TEST", "amount missing");
@@ -127,7 +127,7 @@ describe("browser: status and details pages", function() {
     page = await browser.newPage();
     await openFaucet(page, fixture, "/details/" + session.sessionId);
 
-    await page.getByRole("heading", { name: "Session Details" }).waitFor();
+    await page.getByRole("heading", { name: "Session details" }).waitFor();
     let body = await page.locator("body").textContent();
     expect(body).to.contain("Technical details");
     expect(body).to.contain("2.5.2", "client version missing");

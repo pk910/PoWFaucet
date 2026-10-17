@@ -55,12 +55,28 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
   }
 
   public componentDidMount() {
+    this.updateHeader();
     if(!this.state.refreshing) {
       this.refreshFaucetStatus();
     }
   }
 
+  public componentDidUpdate(prevProps: IFaucetStatusPageProps, prevState: IFaucetStatusPageState) {
+    if(prevState.unmasked !== this.state.unmasked || prevState.status !== this.state.status)
+      this.updateHeader();
+  }
+
   public componentWillUnmount() {
+    this.props.pageContext.setPageHeader(null);
+  }
+
+  /** the card's header while this page is on */
+  private updateHeader() {
+    this.props.pageContext.setPageHeader({
+      title: "Faucet status",
+      meta: this.props.faucetConfig.faucetTitle + " \u00b7 " + (this.state.unmasked ? "real session ids and ips, a session id opens its details" : "session ids and ips are hashed"),
+      pill: this.state.unmasked ? { text: "Unmasked", kind: "live" } : { text: "Masked", kind: "" },
+    });
   }
 
   /** the key field was submitted: keep what is in it for the tab and reload with it */
@@ -124,10 +140,6 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
     return (
       <div className='container grid faucet-status'>
         <div className='status-head'>
-          <div>
-            <h4>Faucet Status</h4>
-            <p className='status-head-meta'>{this.state.unmasked ? "Real session ids and ips; a session id opens its details." : "Session ids and ips are hashed."}</p>
-          </div>
           <form className='status-key' onSubmit={(evt) => this.onKeySubmit(evt)}>
             <label htmlFor="status-operator-key">Operator key</label>
             <input
@@ -139,7 +151,6 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
               placeholder="none"
               onChange={(evt) => this.setState({ keyInput: evt.target.value })}
             />
-            <span className={"pf-pill " + (this.state.unmasked ? "pf-pill-live" : "")}>{this.state.unmasked ? "Unmasked" : "Masked"}</span>
             <button type="submit" className="btn btn-primary btn-sm status-refresh" disabled={this.state.refreshing}>Refresh</button>
           </form>
         </div>

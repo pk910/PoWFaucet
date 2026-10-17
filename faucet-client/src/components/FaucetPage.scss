@@ -251,28 +251,6 @@ $enable-dark-mode: false;
 }
 .faucet-page .pf-kv > .pf-kv-value { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 
-// a sub-page heading with an optional pill at the right
-.faucet-page .pf-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.faucet-page .pf-head h2 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.15;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.faucet-page .pf-head .pf-head-meta {
-  margin: 4px 0 0 0;
-  font-size: 13px;
-  color: var(--pf-ink-3);
-}
-.faucet-page .pf-head .pf-pill { margin-top: 4px; flex: 0 0 auto; }
-
 // the big buttons
 .faucet-page .pf-btn-block,
 .faucet-page .faucet-actions button {
@@ -342,9 +320,21 @@ $enable-dark-mode: false;
   width: auto;
 }
 
+// the card's one header: title and meta at the left, the page's status pill at the right
 .faucet-page .faucet-title {
   position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 16px;
+}
+.faucet-page .faucet-title .faucet-title-text {
+  min-width: 0;
+}
+.faucet-page .faucet-title .pf-pill {
+  flex: 0 0 auto;
+  margin-top: 6px;
 }
 .faucet-page .faucet-title h1 {
   margin: 0;
@@ -675,16 +665,10 @@ $enable-dark-mode: false;
 }
 .faucet-page .faucet-status .status-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
-}
-.faucet-page .faucet-status .status-head-meta {
-  margin: 2px 0 0 0;
-  font-size: 12px;
-  color: var(--pf-ink-3);
 }
 .faucet-page .faucet-status .status-key {
   display: flex;
@@ -816,9 +800,4 @@ $enable-dark-mode: false;
   width: 100%;
   height: auto;
   border-radius: 6px;
-}
-.faucet-page .pow-animation-hint {
-  margin-top: -8px;
-  font-size: 12px;
-  color: var(--pf-ink-3);
 }
