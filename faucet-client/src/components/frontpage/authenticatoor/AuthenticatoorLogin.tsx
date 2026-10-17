@@ -164,7 +164,7 @@ export class AuthenticatoorLogin extends React.PureComponent<IAuthenticatoorLogi
     return (
       <OverlayTrigger
         placement="bottom"
-        container={this.props.faucetContext.getContainer()}
+        container={() => this.props.faucetContext.getContainer()}
         overlay={this.renderInfoTooltip() as OverlayChildren}
       >
         <span className="auth-info-icon">
