@@ -1,4 +1,4 @@
-import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, isTransportError, isTxAlreadyKnownError, looksLikeSecret, redactUrl, redactUrlsInText } from './rpc/index.js';
+import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, isTransportError, isTxAlreadyKnownError, looksLikeSecret, redactUrl, redactUrlsInText, rpcErrorString } from './rpc/index.js';
 
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { EthRpcHostConfig, IRpcEndpointConfig } from '../config/ConfigSchema.js';
@@ -418,10 +418,7 @@ export class RpcEndpointPool {
   }
 
   private errorString(ex: any): string {
-    if (!ex) return '';
-    let msg: string;
-    if (typeof ex === 'string') msg = ex;
-    else msg = ex.message || ex.toString();
-    return redactUrlsInText(msg);
+    // viem's short message plus the node's own words (a fee cap, a gas limit), URLs redacted
+    return rpcErrorString(ex);
   }
 }

@@ -123,6 +123,7 @@ export interface IConfigSchema {
   ethLegacyTx: boolean; // use legacy (non-eip1559) transaction type
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
+  ethTxFeeCap: number; // the most a transaction may cost (gas limit * ethTxMaxFee, wei): nodes refuse transactions above their own cap (geth: 1 ETH), so batches are sized to stay below this; 0 for no limit
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
   ethQueueNoFunds: boolean; // queue transactions when faucet is out of funds
   ethTxExplorerLink: string; // link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link

@@ -78,11 +78,37 @@ export class ClaimTxBuilder {
     return this.batchActive;
   }
 
-  /** How many claims one transaction may carry right now. */
+  /** How many claims one transaction may carry right now: `maxClaims`, or fewer when ethTxFeeCap says so. */
   public getBatchSize(): number {
     if(!this.batchActive || !this.isBatchConfigured())
       return 1;
-    return Math.floor(this.batchConfig.maxClaims);
+    return Math.max(1, Math.min(Math.floor(this.batchConfig.maxClaims), this.feeCapBatchSize()));
+  }
+
+  /**
+   * How many claims fit under ethTxFeeCap. A node checks gas limit times max fee against its own
+   * cap and refuses the transaction above it (geth: 1 ETH by default); a batch's gas limit is at
+   * least its worst case, so that is what has to fit. The template's call data is estimated here
+   * (ABI-encoded static arguments); the exact worst case is computed when the batch is built.
+   */
+  public feeCapBatchSize(): number {
+    if(!(faucetConfig.ethTxFeeCap > 0) || !(faucetConfig.ethTxMaxFee > 0))
+      return Infinity;
+    let affordableGas = Math.floor(faucetConfig.ethTxFeeCap / faucetConfig.ethTxMaxFee);
+    let bytes = 0;
+    let calls: ResolvedClaimCall[] = [];
+    for(let call of this.getClaimCalls()) {
+      switch(call.type) {
+        case "transfer": bytes += 33; break;
+        case "token": bytes += 53; break;
+        case "call": bytes += 35 + (typeof call.data === "string" ? Math.max(0, (call.data.length - 2) / 2) : 4 + 32 * (call.args?.length || 0)); break;
+      }
+      calls.push({ type: call.type, to: this.walletAddr, amount: 0n, gas: call.gas, data: "0x" });
+    }
+    // worstCaseBatchGas of n claims is linear in n: the base (and the ABI head of the stream) once, the rest per claim
+    let base = ClaimTxBuilder.worstCaseBatchGas([], 4 + 64);
+    let perClaim = ClaimTxBuilder.worstCaseBatchGas(calls, bytes) - ClaimTxBuilder.worstCaseBatchGas([], 0);
+    return Math.floor((affordableGas - base) / perClaim);
   }
 
   /** Seconds a partial batch waits for more claims before it is sent anyway. */

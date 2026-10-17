@@ -45,6 +45,7 @@ export function getDefaultConfig(): IConfigSchema {
     ethLegacyTx: false,
     ethTxMaxFee: 100000000000,
     ethTxPrioFee: 2000000000,
+    ethTxFeeCap: 1000000000000000000, // geth's default --rpc.txfeecap
     ethMaxPending: 20,
     ethQueueNoFunds: false,
     ethTxExplorerLink: null,

@@ -83,6 +83,14 @@ export class TransactionDroppedError extends Error {
   }
 }
 
+/** Every endpoint refused the broadcast outright: the bytes are nowhere, the nonce was reloaded. */
+export class TransactionRejectedError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "TransactionRejectedError";
+  }
+}
+
 export class EthWalletManager {
 
   private initialized: boolean;
@@ -612,7 +620,7 @@ export class EthWalletManager {
         // every endpoint said no, and nothing before this could have taken it: the bytes are nowhere
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txHash + " was rejected: " + errorText);
         await this.loadWalletState();
-        throw outcome.error;
+        throw new TransactionRejectedError(errorText);
       }
       // ambiguous (or rejected after an ambiguous attempt): the bytes may sit in a mempool
       hadAmbiguous = true;

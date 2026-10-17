@@ -133,6 +133,13 @@ Queue behaviour:
   (geth and reth among them) allow a delegated account a single in-flight transaction, and a
   second one is refused or trickles in a block at a time. Throughput is `maxClaims` per block, so
   raise `maxClaims` rather than `ethMaxPending` (50 plain transfers cost about 1.8M gas).
+- A batch is sized to stay under `ethTxFeeCap` (1 ETH by default, geth's own default): nodes
+  refuse a transaction whose gas limit times max fee is above their cap, and a batch's gas limit is
+  its worst case. With `ethTxMaxFee` at 250 gwei that is about 60 plain transfers per batch, with
+  20 gwei about 760; the faucet logs the limit it applies. Lower `ethTxMaxFee` for bigger batches.
+- A batch the network refuses outright (every endpoint answered no, nothing is in a pool) is not
+  failed: its claims are queued again and the next batches are half the size, growing back with
+  every confirmed one. A claim refused three times fails.
 - All claims of a batch share the transaction hash, nonce and block. The fee is split evenly
   (remainder on the first claim). The signed transaction hex is kept on the first claim only.
 - A single queued claim is paid through `fn` when the template has one, otherwise through the

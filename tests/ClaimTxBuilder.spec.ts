@@ -142,6 +142,26 @@ describe("Claim transaction builder", () => {
       return builder;
     }
 
+    it("sizes a batch so that its worst-case fee stays under ethTxFeeCap", () => {
+      faucetConfig.ethTxMaxFee = 250000000000; // 250 gwei
+      faucetConfig.ethTxFeeCap = 1000000000000000000; // 1 ETH: 4M gas affordable
+      let builder = activeBuilder(null, null, { maxClaims: 1000, maxWaitSeconds: 0 });
+      // (4M - the batch base) / (65k stipend + 15k + 16 * 33 bytes) per plain transfer
+      expect(builder.feeCapBatchSize()).to.equal(60);
+      expect(builder.getBatchSize()).to.equal(60, "the cap, not maxClaims");
+      expect(activeBuilder(null, null, { maxClaims: 50, maxWaitSeconds: 0 }).getBatchSize()).to.equal(50, "maxClaims when it is the smaller one");
+      faucetConfig.ethTxMaxFee = 20000000000; // 20 gwei: 50M gas affordable
+      expect(builder.feeCapBatchSize()).to.equal(762);
+      faucetConfig.ethTxFeeCap = 0;
+      expect(builder.getBatchSize()).to.equal(1000, "no cap, maxClaims");
+      // a token transfer reserves more gas per claim
+      faucetConfig.ethTxMaxFee = 250000000000;
+      faucetConfig.ethTxFeeCap = 1000000000000000000;
+      let tokenBuilder = new ClaimTxBuilder(fakeClient, WALLET, TOKEN, null, { maxClaims: 1000, maxWaitSeconds: 0 });
+      tokenBuilder.setBatchActive(true);
+      expect(tokenBuilder.feeCapBatchSize()).to.equal(34);
+    });
+
     it("calls execute on the wallet with a transfer per claim and nothing riding on the transaction", async () => {
       let builder = activeBuilder(null, null);
       expect(builder.getBatchSize()).to.equal(3);

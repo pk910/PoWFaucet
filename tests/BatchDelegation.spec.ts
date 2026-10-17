@@ -78,7 +78,7 @@ describe("ETH Claim Batching (EIP-7702)", () => {
   }
 
   /** a chain: code per address, mined raw transactions, receipts by hash; `batchLogs` are emitted by a batch transaction */
-  function fakeChain(opts: { deployerPresent: boolean; eip7702: boolean; batchLogs?: any[]; failFirstSend?: boolean }) {
+  function fakeChain(opts: { deployerPresent: boolean; eip7702: boolean; batchLogs?: any[]; failFirstSend?: boolean; refuseBatchesOver?: number }) {
     let code: {[addr: string]: string} = {};
     if(opts.deployerPresent)
       code[DETERMINISTIC_DEPLOYER.toLowerCase()] = "0x7fdeadbeef";
@@ -93,6 +93,12 @@ describe("ETH Claim Batching (EIP-7702)", () => {
         return { _throw: new FetchError("invalid json response", "invalid-json") }; // the node may or may not have taken it
       let tx: any = parseTransaction(raw);
       let hash = keccak256(raw); // what the faucet computes locally
+      if(opts.refuseBatchesOver && tx.type !== "eip7702" && tx.to?.toLowerCase() === WALLET.toLowerCase()) {
+        // the node's own limit on a batch (its fee cap, say): a definite no, not a transport error
+        let stream = decodeFunctionData({ abi: BATCHER_ABI, data: tx.data }).args[0] as string;
+        if((stream.length - 2) / 2 / 33 > opts.refuseBatchesOver)
+          throw new Error("tx fee (3.29 ether) exceeds the configured cap (1.00 ether)");
+      }
       sent.push({ raw, hash, tx });
       if(tx.type !== "eip7702" && tx.to?.toLowerCase() === WALLET.toLowerCase() && opts.batchLogs)
         logsByHash[hash] = opts.batchLogs;
@@ -200,6 +206,36 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     expect(chain.code[BATCHER.toLowerCase()]).to.equal(undefined, "no deployment either");
     expect(chain.sent.map((s) => s.tx.to.toLowerCase())).to.deep.equal(["0x0000000000000000000000000000000000001001", "0x0000000000000000000000000000000000001002"], "two plain transfers");
     expect(chain.code[WALLET.toLowerCase()]).to.equal(foreign, "the foreign delegation is untouched");
+  });
+
+  it("queues the claims of a refused batch again and halves the batch size", async () => {
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [executedLog(2)], refuseBatchesOver: 2 });
+    let { wallet, claims } = await start();
+    let list: any[] = [];
+    for(let i = 1; i <= 4; i++)
+      list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
+
+    await claims.processQueue(); // setup, then a batch of 4: refused
+    expect(chain.attempts.length).to.equal(3, "deploy, delegate, the refused batch");
+    expect(chain.sent.length).to.equal(2, "the refused batch is not on the chain");
+    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE], "queued again, not failed");
+    expect(list.map((c) => c.claim.txAttempts)).to.deep.equal([1, 1, 1, 1]);
+    expect(list[0].claim.txHash).to.equal(undefined, "the refused transaction is forgotten");
+    let row = await ServiceManager.GetService(FaucetDatabase).getSession(list[0].session);
+    expect(row.status).to.equal(FaucetSessionStatus.CLAIMING, "still ours to pay");
+    expect(row.claim.txHex).to.equal(undefined, "nothing to replay after a restart");
+
+    // half the size goes through, batch by batch
+    for(let i = 0; i < 6 && list.some((c) => c.claim.claimStatus !== ClaimTxStatus.CONFIRMED); i++) {
+      await claims.processQueue();
+      await awaitSleepPromise(1500, () => list.filter((c) => c.claim.claimStatus === ClaimTxStatus.CONFIRMED).length >= 2 * (i + 1));
+    }
+    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.CONFIRMED, ClaimTxStatus.CONFIRMED, ClaimTxStatus.CONFIRMED, ClaimTxStatus.CONFIRMED]);
+    let batches = chain.sent.slice(2).map((s) => (decodeFunctionData({ abi: BATCHER_ABI, data: s.tx.data }).args[0] as string).length / 2 / 33);
+    expect(batches.map(Math.floor)).to.deep.equal([2, 2], "two batches of two");
+    expect(list[0].claim.txHash).to.equal(list[1].claim.txHash);
+    expect(list[2].claim.txHash).to.equal(list[3].claim.txHash);
+    expect(list[0].claim.txHash).to.not.equal(list[2].claim.txHash);
   });
 
   it("deploys the batcher, delegates the wallet, then pays a batch through execute on itself", async () => {

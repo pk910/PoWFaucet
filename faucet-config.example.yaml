@@ -116,6 +116,11 @@ ethTxMaxFee: 100000000000  # 100 gwei
 # max transaction priority fee (in wei)
 ethTxPrioFee: 2000000000  # 2 gwei
 
+# the most a transaction may cost (gas limit * ethTxMaxFee, in wei). Nodes refuse transactions
+# above their own cap (geth: 1 ETH by default), so claim batches are sized to stay below this
+# with their worst-case gas; 0 for no limit
+ethTxFeeCap: 1000000000000000000  # 1 ETH
+
 # max number of unconfirmed transactions to create simultaneously
 ethMaxPending: 12
 

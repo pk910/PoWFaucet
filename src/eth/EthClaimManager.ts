@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
-import { EthWalletManager, PreparedClaimTx, TransactionDroppedError, WalletState } from "./EthWalletManager.js";
+import { EthWalletManager, PreparedClaimTx, TransactionDroppedError, TransactionRejectedError, WalletState } from "./EthWalletManager.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
 import { EthWalletRefill } from "./EthWalletRefill.js";
@@ -61,7 +61,12 @@ export interface EthClaimData {
   txBlock?: number;
   txFee?: string;
   txError?: string;
+  /** broadcasts the network refused outright; the claim is queued again a few times before it fails */
+  txAttempts?: number;
 }
+
+/** how often a claim is queued again after a refused broadcast */
+const REFUSED_BROADCAST_RETRIES = 3;
 
 export class EthClaimManager {
   private initialized: boolean;
@@ -73,6 +78,8 @@ export class EthClaimManager {
   private historyTxDict: {[nonce: number]: EthClaimInfo[]} = {};
   private queueProcessing: boolean = false;
   private delegationClearPending: boolean = false; // the startup attempt to clear a stale wallet delegation failed; the queue retries
+  private batchSizeLimit: number | null = null; // halved after a refused batch, doubled after a confirmed one, until it reaches the configured size again
+  private feeCapNoted: boolean = false;
   private lastClaimTxIdx: number = 1;
   private lastProcessedClaimTxIdx: number = 0;
   private lastConfirmedClaimTxIdx: number = 0;
@@ -299,6 +306,10 @@ export class EthClaimManager {
         let builder = ethWalletManager.getClaimTxBuilder();
         batchSize = builder.getBatchSize();
         batchMaxWait = builder.getBatchMaxWait();
+        if(batchSize < faucetConfig.ethClaimBatch.maxClaims && !this.feeCapNoted) {
+          this.feeCapNoted = true;
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "ethTxFeeCap limits claim batches to " + batchSize + " claims (worst-case gas * ethTxMaxFee); ethClaimBatch.maxClaims is " + faucetConfig.ethClaimBatch.maxClaims);
+        }
         // Transaction pools allow a delegated account one in-flight transaction (geth and reth since
         // EIP-7702; a second one is refused or trickles in a block at a time). So one batch transaction
         // is in flight at a time, and `maxClaims` is the throughput lever, not `ethMaxPending`.
@@ -315,12 +326,20 @@ export class EthClaimManager {
         )) {
           break; // skip processing (out of funds)
         }
-        if(batchSize > 1 && this.claimTxQueue.length < batchSize && now - this.claimTxQueue[0].claim.claimTime < batchMaxWait)
+        let size = batchSize;
+        if(this.batchSizeLimit !== null) {
+          if(this.batchSizeLimit >= batchSize)
+            this.batchSizeLimit = null; // back at the configured size
+          else
+            size = this.batchSizeLimit;
+        }
+        if(size > 1 && this.claimTxQueue.length < size && now - this.claimTxQueue[0].claim.claimTime < batchMaxWait)
           break; // a partial batch: give it until maxWaitSeconds to fill up
 
-        let claims = this.collectBatch(batchSize, walletState);
+        let claims = this.collectBatch(size, walletState);
         this.lastProcessedClaimTxIdx = Math.max(...claims.map((claimTx) => claimTx.claim.claimIdx));
-        await this.processQueueTxs(claims);
+        if(await this.processQueueTxs(claims) === "requeued")
+          break; // the next tick continues with the smaller batches
       }
 
       let walletRefreshTime = walletState.ready ? 600 : 10;
@@ -368,15 +387,17 @@ export class EthClaimManager {
     return claims;
   }
 
-  private async processQueueTxs(claims: EthClaimInfo[]) {
+  /** Pays these claims with one transaction: sent (awaiting its receipt), failed, or queued again after a refused broadcast. */
+  private async processQueueTxs(claims: EthClaimInfo[]): Promise<"sent" | "failed" | "requeued"> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let walletState = ethWalletManager.getWalletState();
-    let failAll = (error: string) => {
+    let failAll = (error: string): "failed" => {
       claims.forEach((claimTx) => {
         claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
         claimTx.claim.txError = error;
         this.updateClaimStatus(claimTx);
       });
+      return "failed";
     };
     if(!walletState.ready)
       return failAll("Network RPC is currently unreachable.");
@@ -414,9 +435,42 @@ export class EthClaimManager {
       });
 
       this.awaitTxReceipt(claims, txResult.txPromise, txHash);
+      return "sent";
     } catch(ex) {
-      failAll("Processing Exception: " + rpcErrorString(ex));
+      if(ex instanceof TransactionRejectedError && this.requeueRefused(claims, ex.message))
+        return "requeued";
+      return failAll("Processing Exception: " + rpcErrorString(ex));
     }
+  }
+
+  /**
+   * A broadcast every endpoint refused outright left nothing on the network, and the wallet nonce
+   * was reloaded: the claims can be sent again. A refused batch is usually one the node finds too
+   * expensive (its fee cap, the block gas limit), so the next batches are half the size, growing
+   * back with every confirmed one. Each claim gets REFUSED_BROADCAST_RETRIES such retries; false
+   * when one of them has used them up, and the claims fail as before.
+   */
+  private requeueRefused(claims: EthClaimInfo[], reason: string): boolean {
+    if(claims.some((claimTx) => (claimTx.claim.txAttempts || 0) >= REFUSED_BROADCAST_RETRIES))
+      return false;
+    let note = "";
+    if(claims.length > 1) {
+      this.batchSizeLimit = Math.max(1, Math.floor(claims.length / 2));
+      note = ", next batches carry " + this.batchSizeLimit + " claims";
+    }
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Broadcast of " + claims.length + " claim(s) refused, queued again" + note + ": " + reason);
+    for(let claimTx of claims) {
+      claimTx.claim.txAttempts = (claimTx.claim.txAttempts || 0) + 1;
+      claimTx.claim.claimStatus = ClaimTxStatus.QUEUE;
+      delete claimTx.claim.txHash;
+      delete claimTx.claim.txHex;
+      delete claimTx.claim.txNonce;
+      delete claimTx.claim.txCalls;
+      this.updateClaimStatus(claimTx);
+    }
+    this.claimTxQueue.unshift(...claims);
+    this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
+    return true;
   }
 
   /**
@@ -474,6 +528,8 @@ export class EthClaimManager {
         this.updateClaimStatus(claimTx);
       });
       this.lastConfirmedClaimTxIdx = confirmedIdx;
+      if(this.batchSizeLimit !== null && claims.length >= this.batchSizeLimit)
+        this.batchSizeLimit *= 2; // a batch of the reduced size went through: try bigger
     }).catch((error) => {
       if(error instanceof TransactionDroppedError) {
         // the nonce is spent and our hash has no receipt. Most likely another transaction took the
