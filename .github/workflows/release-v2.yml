@@ -4,21 +4,24 @@ name: Release latest v2 version
 on:
   workflow_dispatch:
 
+# every action is pinned to a commit sha (dependabot moves the sha and the version comment); the
+# GITHUB_TOKEN is read-only unless a job says otherwise
+permissions:
+  contents: read
 
 jobs:
   run_tests:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
-        node-version: 22
+        node-version: 24
+        cache: npm
 
-    - run: npm install
+    - run: npm ci
     - run: npm run test
 
   build_binaries:
@@ -29,25 +32,27 @@ jobs:
       contents: write
       id-token: write
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     # setup global dependencies
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
-        node-version: 22
+        node-version: 24
+        cache: npm
         registry-url: "https://registry.npmjs.org"
-    - run: npm install -g pkg
+    # @yao-pkg/pkg is the maintained fork of vercel/pkg (archived 2024, node 18 only)
+    - run: npm install -g @yao-pkg/pkg@6.23.0
 
     # build server project
     - run: |
-        npm install
+        npm ci
         npm run bundle
 
     # build client project
     - run: |
         cd faucet-client
-        npm install
-        node ./build-client.js 
+        npm ci
+        node ./build-client.js
 
     # publish npm packages: @powfaucet/server (the runnable faucet) and @powfaucet/sdk (what a
     # module builds against). A version that is already on the registry is skipped, so a re-run of
@@ -79,99 +84,53 @@ jobs:
         chmod +x ./run-faucet.sh
         tar cfz powfaucet-server-all.tar.gz bundle static faucet-config.example.yaml run-faucet.sh
         zip -r powfaucet-server-all.zip bundle static faucet-config.example.yaml run-faucet.bat
-    
+
     # package static folder
     - name: Package static folder
       run: |
         tar cfz powfaucet-static.tar.gz static
         zip -r powfaucet-static.zip static
 
-    # build binaries
-    - run: pkg --compress Brotli --options no-warnings .
+    # build binaries (the asset name is the file name, so rename pkg's output here)
+    - run: |
+        pkg --compress Brotli --options no-warnings .
+        mv bin/server-linux powfaucet-server-linux
+        mv bin/server-win.exe powfaucet-server-win.exe
 
     # collect metadata
     - name: Get project versions
       run: |
-        echo "server_version=$(cat package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
-        echo "client_version=$(cat faucet-client/package.json | jq ".version" | tr -d '"\r\n')" >> $GITHUB_OUTPUT
+        echo "server_version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+        echo "client_version=$(jq -r .version faucet-client/package.json)" >> "$GITHUB_OUTPUT"
       id: version
 
-    # create draft release
-    - name: Create latest release
-      uses: actions/create-release@v1
-      id: create_release
-      with:
-        draft: true
-        prerelease: false
-        release_name: "v${{ steps.version.outputs.server_version }}"
-        tag_name: "v${{ steps.version.outputs.server_version }}"
-        body: |
-          ### Major Changes
-          ...
+    # create draft release with the gh cli (the create-release / upload-release-asset actions this
+    # used before are archived)
+    - name: Create draft release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SERVER_VERSION: ${{ steps.version.outputs.server_version }}
+      run: |
+        cat > release-notes.md <<NOTES
+        ### Major Changes
+        ...
 
-          ### Release Artifacts
-          | Release File  | Description |
-          | ------------- | ------------- |
-          | powfaucet-server-all [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-all.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs (recommended) |
-          | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (NodeJS 18, 64bit) |
-          | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (NodeJS 18, 64bit) |
-          | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/v${{ steps.version.outputs.server_version }}/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-
-    # upload release artifacts
-    - name: "Upload artifact: powfaucet-server-linux"
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bin/server-linux
-        asset_name: powfaucet-server-linux
-        asset_content_type: application/octet-stream
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-    - name: "Upload artifact: powfaucet-server-win.exe"
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bin/server-win.exe
-        asset_name: powfaucet-server-win.exe
-        asset_content_type: application/octet-stream
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-    - name: "Upload artifact: powfaucet-server-all.tar.gz"
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./powfaucet-server-all.tar.gz
-        asset_name: powfaucet-server-all.tar.gz
-        asset_content_type: application/gzip
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-    - name: "Upload artifact: powfaucet-server-all.zip"
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./powfaucet-server-all.zip
-        asset_name: powfaucet-server-all.zip
-        asset_content_type: application/zip
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-    - name: "Upload artifact: powfaucet-static.tar.gz"
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./powfaucet-static.tar.gz
-        asset_name: powfaucet-static.tar.gz
-        asset_content_type: application/gzip
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-    - name: "Upload artifact: powfaucet-static.zip"
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./powfaucet-static.zip
-        asset_name: powfaucet-static.zip
-        asset_content_type: application/zip
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-  
+        ### Release Artifacts
+        | Release File  | Description |
+        | ------------- | ------------- |
+        | powfaucet-server-all [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/v${SERVER_VERSION}/powfaucet-server-all.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/v${SERVER_VERSION}/powfaucet-server-all.zip) | PoWFaucet server for execution with local nodejs (recommended) |
+        | [powfaucet-server-win.exe](https://github.com/pk910/PoWFaucet/releases/download/v${SERVER_VERSION}/powfaucet-server-win.exe) | PoWFaucet all-in-one executable for windows (NodeJS 24, 64bit) |
+        | [powfaucet-server-linux](https://github.com/pk910/PoWFaucet/releases/download/v${SERVER_VERSION}/powfaucet-server-linux) | PoWFaucet all-in-one executable for linux (NodeJS 24, 64bit) |
+        | powfaucet-static [.tar.gz](https://github.com/pk910/PoWFaucet/releases/download/v${SERVER_VERSION}/powfaucet-static.tar.gz) / [.zip](https://github.com/pk910/PoWFaucet/releases/download/v${SERVER_VERSION}/powfaucet-static.zip) | PoWFaucet static folder (optional, see [Operator Wiki](https://github.com/pk910/PoWFaucet/wiki/Operator-Wiki)) |
+        NOTES
+        gh release create "v${SERVER_VERSION}" \
+          --draft \
+          --target "${GITHUB_SHA}" \
+          --title "v${SERVER_VERSION}" \
+          --notes-file release-notes.md \
+          powfaucet-server-linux \
+          powfaucet-server-win.exe \
+          powfaucet-server-all.tar.gz \
+          powfaucet-server-all.zip \
+          powfaucet-static.tar.gz \
+          powfaucet-static.zip

@@ -6,21 +6,35 @@ on:
     branches: [ "master" ]
   workflow_dispatch:
 
+# every action is pinned to a commit sha (dependabot moves the sha and the version comment); the
+# GITHUB_TOKEN is read-only unless a job says otherwise
+permissions:
+  contents: read
+
 jobs:
 
   run_tests:
-    name: Run Tests
+    name: Run Tests (node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+        experimental: [false]
+        include:
+          # the next LTS line: an early warning, not a required check
+          - node: 26
+            experimental: true
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
-        node-version: 22
+        node-version: ${{ matrix.node }}
+        cache: npm
 
-    - run: npm install
+    - run: npm ci
     - run: npm run test
 
   build_binaries:
@@ -28,36 +42,41 @@ jobs:
     needs: [run_tests]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
-        node-version: 22
-    - run: npm install -g pkg
+        node-version: 24
+        cache: npm
+    # @yao-pkg/pkg is the maintained fork of vercel/pkg (archived 2024, node 18 only)
+    - run: npm install -g @yao-pkg/pkg@6.23.0
 
-    - run: npm install
+    - run: npm ci
     - run: npm run bundle
 
     # build client project
     - run: |
         cd faucet-client
-        npm install
-        node ./build-client.js 
+        npm ci
+        node ./build-client.js
 
-    - run: pkg --compress Brotli .
+    - run: pkg --compress Brotli --options no-warnings .
 
     - name: Upload powfaucet.js artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         path: ./bundle/powfaucet.cjs
         name: powfaucet.js
+        if-no-files-found: error
     - name: Upload linux binary artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        path: ./bin/pow-faucet-server-linux
+        path: ./bin/server-linux
         name: powfaucet-server-linux
+        if-no-files-found: error
     - name: Upload windows binary artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        path: ./bin/pow-faucet-server-win.exe
+        path: ./bin/server-win.exe
         name: powfaucet-server-win.exe
+        if-no-files-found: error

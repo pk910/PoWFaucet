@@ -93,6 +93,19 @@ describe("Faucet Web API", () => {
     expect(apiResponse.code).equal(404, "unexpected response code");
   });
 
+  it("check endpoint names that are Object.prototype members", async () => {
+    let webApi = new FaucetWebApi();
+    for(let name of ["constructor", "__proto__", "hasOwnProperty", "toString"]) {
+      let apiResponse = await webApi.onApiRequest(encodeApiRequest({
+        url: "/api/" + name,
+        remoteAddr: "8.8.8.8"
+      }));
+      expect(apiResponse instanceof FaucetHttpResponse).equal(true, "no api error response for /api/" + name);
+      expect(apiResponse.code).equal(404, "unexpected response code for /api/" + name);
+      expect(webApi.hasApiEndpoint(name)).equal(false, "hasApiEndpoint(" + name + ") is true");
+    }
+  });
+
   it("check /api/getVersion", async () => {
     let webApi = new FaucetWebApi();
     let apiResponse = await webApi.onApiRequest(encodeApiRequest({

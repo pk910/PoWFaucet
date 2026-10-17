@@ -27,8 +27,8 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
   private clientStatus: PoWClientStatus;
   private readyDfd: PromiseDfd<void>;
   private requestCounter: number = 1;
-  private reconnectTimer: NodeJS.Timeout;
-  private disconnectTimer: NodeJS.Timeout;
+  private reconnectTimer: ReturnType<typeof setTimeout>;
+  private disconnectTimer: ReturnType<typeof setTimeout>;
   private requestQueue: {[id: number]: PromiseDfd<any>} = {};
 
   public constructor(options: IPoWClientOptions) {

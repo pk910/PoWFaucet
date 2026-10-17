@@ -1,3 +1,5 @@
+import { strTrimEnd } from "./StringUtils.js";
+
 export interface IProcessLoadStats {
   timestamp: number;
   cpu: number;
@@ -42,7 +44,7 @@ export class ProcessLoadTracker {
     }
 
     let line = parts.join(" ");
-    return line.replace(/[, ]+$/, "");
+    return strTrimEnd(line, ", ");
   }
 
   public constructor(callback: (stats: IProcessLoadStats) => void, interval: number = 60000) {

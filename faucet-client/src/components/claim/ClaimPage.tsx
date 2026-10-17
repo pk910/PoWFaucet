@@ -57,7 +57,7 @@ export interface IClaimPageState {
 
 
 export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageState> {
-  private updateTimer: NodeJS.Timeout;
+  private updateTimer: ReturnType<typeof setTimeout>;
   private loadingStatus: boolean;
   private isTimedOut: boolean;
   private notificationClient: ClaimNotificationClient;

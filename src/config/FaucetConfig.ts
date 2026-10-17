@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import YAML from 'yaml'
-import randomBytes from 'randombytes'
+import { randomBytes } from 'crypto';
 
 import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';

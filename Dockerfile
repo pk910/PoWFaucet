@@ -1,5 +1,5 @@
 # build-server env
-FROM --platform=$BUILDPLATFORM node:22-slim AS build-server-env
+FROM --platform=$BUILDPLATFORM node:24-slim AS build-server-env
 WORKDIR /build
 COPY package*.json ./
 RUN npm install
@@ -12,7 +12,7 @@ COPY ./scripts scripts
 RUN npm run bundle
 
 # build-client env
-FROM --platform=$BUILDPLATFORM node:22-slim AS build-client-env
+FROM --platform=$BUILDPLATFORM node:24-slim AS build-client-env
 WORKDIR /build
 COPY faucet-client/package*.json ./faucet-client/
 COPY ./libs libs
@@ -22,12 +22,12 @@ COPY ./faucet-client faucet-client
 RUN cd faucet-client && node ./build-client.js
 
 # final stage
-FROM nginxinc/nginx-unprivileged:1.27
+FROM nginxinc/nginx-unprivileged:1.30
 
 USER root
 
 # Copy node binary from official image and install ca-certificates
-COPY --from=node:22-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:24-slim /usr/local/bin/node /usr/local/bin/node
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates

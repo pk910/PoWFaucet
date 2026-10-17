@@ -8,23 +8,29 @@
 		"moduleResolution": "bundler",
 		// Process & infer types from .js files.
 		"allowJs": true,
-		// Don't emit; allow Babel to transform files.
-		"noEmit": false,
+		// Don't emit; babel-loader transpiles, tsc only type-checks (TS 7 would otherwise
+		// need a rootDir covering ../libs and refuse to overwrite its .cjs inputs)
+		"noEmit": true,
+		// TS 7 defaults to strict and to rootDir = this directory; the client is not strict-clean and
+		// imports the wasm wrappers from ../libs
+		"strict": false,
+		"rootDir": "..",
 		// Import non-ES modules as default imports.
 		"esModuleInterop": true,
 		// use typescript to transpile jsx to js
 		"jsx": "react",
 		
 		"lib": [
-			"es2015",
-			"dom.iterable",
-			"es2016.array.include",
-			"es2017.object",
-			"dom"
+			"esnext",
+			"dom",
+			"dom.iterable"
 		],
 		"module": "ESNext",
 		"removeComments": true,
 		"alwaysStrict": true,
-		"importHelpers": true
+		"importHelpers": true,
+		"skipLibCheck": true
 	},
+	// only the client sources; the webpack config and build script are plain node scripts
+	"include": ["src"]
 }

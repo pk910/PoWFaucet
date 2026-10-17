@@ -37,7 +37,7 @@ export interface IPoWMinerStatusState {
 export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IPoWMinerStatusState> {
   private powMinerStatsListener: ((stats: IPoWMinerStats) => void);
   private powSessionUpdateListener: (() => void);
-  private updateTimer: NodeJS.Timer;
+  private updateTimer: ReturnType<typeof setInterval>;
   private stoppedMiner: boolean = false;
 
   constructor(props: IPoWMinerStatusProps) {
