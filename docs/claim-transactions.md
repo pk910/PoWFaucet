@@ -98,6 +98,14 @@ Both steps happen at most once. If either fails (no deployer on the chain, no EI
 rejected transaction) the faucet logs it, pays one claim per transaction, and tries again after a
 few minutes. `ethLegacyTx` must be off: the delegation needs EIP-1559 transactions.
 
+Turning batching off later leaves the delegation on the wallet, and a delegated account is treated
+differently by transaction pools (one in-flight transaction, see below) although nothing uses the
+code any more. So a faucet without `ethClaimBatch` clears a delegation it finds on its wallet at
+startup, with one set-code transaction whose authorization names the zero address. `ethIgnoreDelegate:
+true` switches both directions off: the faucet never sets a delegation (batching then only works
+when the wallet already carries the batcher's) and never clears one, for wallets whose code is
+managed elsewhere.
+
 ### The call stream
 
 Every claim's calls are packed into one byte stream for `execute`, in claim order:
@@ -121,7 +129,10 @@ Queue behaviour:
   batch on the next queue tick (every 2 seconds).
 - A batch only takes claims the wallet can cover together (`spareFundsAmount` respected); the rest
   waits for the next transaction.
-- `ethMaxPending` still counts transactions, so throughput grows with the batch size.
+- One batch transaction is in flight at a time, whatever `ethMaxPending` says: transaction pools
+  (geth and reth among them) allow a delegated account a single in-flight transaction, and a
+  second one is refused or trickles in a block at a time. Throughput is `maxClaims` per block, so
+  raise `maxClaims` rather than `ethMaxPending` (50 plain transfers cost about 1.8M gas).
 - All claims of a batch share the transaction hash, nonce and block. The fee is split evenly
   (remainder on the first claim). The signed transaction hex is kept on the first claim only.
 - A single queued claim is paid through `fn` when the template has one, otherwise through the
@@ -133,10 +144,11 @@ A claim transaction is signed once. Before it is broadcast, the signed bytes, th
 hash are written into the claim data of every session it pays, in one statement, so all of a
 batch's rows know the transaction or none does (the rows stay "processing"). The
 broadcast then sends exactly those bytes, and retries them on transport errors; a node answering
-"already known" or "nonce too low" counts as sent, and the receipt watch settles the claims (a
-nonce spent by another transaction without a receipt for ours fails them as dropped). A
-transaction is never rebuilt with another nonce after an ambiguous answer, so a lost response
-cannot pay a claim twice.
+"already known" or "nonce too low" counts as sent, and the receipt watch settles the claims. While
+the receipt is missing and the node does not know the transaction (a pool that evicted it, a
+restarted node), the watch sends the same bytes again on every poll: a node that has them ignores
+the repeat. A transaction is never rebuilt with another nonce after an ambiguous answer, so a lost
+response cannot pay a claim twice.
 
 After a restart a claiming session that holds signed bytes is broadcast again as they are
 (harmless for bytes the network has seen, and it sends a transaction the crash kept from going

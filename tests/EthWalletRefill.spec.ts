@@ -20,6 +20,7 @@ describe("ETH Wallet Refill", () => {
   beforeEach(async () => {
     globalStubs = bindTestStubs();
     fakeProvider = new FakeProvider();
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => ({ hash: payload.params[0] })); // the node knows what it was sent, unless a test says otherwise
     loadDefaultTestConfig();
     faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
     faucetConfig.ethRpcHost = fakeProvider;

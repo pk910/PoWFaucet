@@ -599,11 +599,36 @@ describe("ETH Claim Manager", () => {
 
       expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "one batch transaction expected");
       expect(globalStubs["EthWalletManager.sendClaimBatch"].firstCall.args[0].map((c: EthClaimInfo) => c.session)).to.deep.equal([claims[0].session, claims[1].session]);
-      expect(globalStubs["EthWalletManager.sendClaimTx"].callCount).to.equal(1, "the third claim goes alone");
-      expect(globalStubs["EthWalletManager.sendClaimTx"].firstCall.args[0].session).to.equal(claims[2].session);
-      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING, ClaimTxStatus.PENDING]);
+      expect(globalStubs["EthWalletManager.sendClaimTx"].callCount).to.equal(0, "the third claim waits for the batch's receipt: one transaction in flight");
+      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING, ClaimTxStatus.QUEUE]);
       expect(claimManager.getTransactionQueue().length).to.equal(3, "all claims listed in the queue status");
-      expect(claimManager.getLastProcessedClaimIdx()).to.equal(claims[2].claim.claimIdx);
+      expect(claimManager.getLastProcessedClaimIdx()).to.equal(claims[1].claim.claimIdx);
+    });
+
+    it("keeps one batch transaction in flight while the wallet is delegated, whatever ethMaxPending says", async () => {
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      faucetConfig.ethMaxPending = 12;
+      useBatchTemplate(2, 0);
+      let claims = await queueClaims(claimManager, 5);
+      let settleFirst: (result: any) => void;
+      globalStubs["EthWalletManager.sendClaimBatch"].returns(Promise.resolve({ txHash: TX_HASH, txPromise: new Promise((resolve) => { settleFirst = resolve; }), plan: null }));
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "the pool takes one in-flight transaction from a delegated account");
+      expect(claims.slice(0, 2).map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING]);
+      expect(claims.slice(2).map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE], "the rest waits for the receipt");
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "still one while the first is unmined");
+
+      // the first batch is mined: the next one goes out
+      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns({ executed: true, outcomes: new Map() });
+      settleFirst({ status: true, block: 1, fee: 0n, receipt: { status: true, logs: [] } });
+      await awaitSleepPromise(2000, () => claims[0].claim.claimStatus === ClaimTxStatus.CONFIRMED);
+      globalStubs["EthWalletManager.sendClaimBatch"].returns(Promise.resolve({ txHash: TX_HASH.replace(/a$/, "c"), txPromise: new Promise(() => {}), plan: null }));
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(2, "the second batch follows the first's receipt");
     });
 
     it("waits maxWaitSeconds for a partial batch, then sends it", async () => {

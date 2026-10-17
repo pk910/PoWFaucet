@@ -22,6 +22,7 @@ describe("ETH Wallet Manager", () => {
     globalStubs = bindTestStubs({
     });
     fakeProvider = new FakeProvider();
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => ({ hash: payload.params[0] })); // the node knows what it was sent, unless a test says otherwise
     loadDefaultTestConfig();
     faucetConfig.faucetStats = null;
     faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";

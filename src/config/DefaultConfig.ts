@@ -67,6 +67,7 @@ export function getDefaultConfig(): IConfigSchema {
     corsAllowOrigin: [],
     ethClaimTx: null,
     ethClaimBatch: null,
+    ethIgnoreDelegate: false,
     ethRefillContract: null,
     faucetStats: null,
     faucetStatus: {

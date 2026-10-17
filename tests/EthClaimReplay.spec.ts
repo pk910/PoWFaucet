@@ -24,6 +24,7 @@ describe("ETH Claim Replay", () => {
   beforeEach(async () => {
     globalStubs = bindTestStubs({});
     fakeProvider = new FakeProvider();
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => ({ hash: payload.params[0] })); // the node knows what it was sent, unless a test says otherwise
     loadDefaultTestConfig();
     faucetConfig.faucetStats = null;
     faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
@@ -186,6 +187,37 @@ describe("ETH Claim Replay", () => {
     answerLost = false;
     await awaitSleepPromise(1000, () => sends > sendsBefore);
     expect(sends).to.be.greaterThan(sendsBefore, "re-sent from the receipt watch");
+    receiptReady = true;
+    await awaitSleepPromise(2000, () => claim.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED);
+  }).timeout(15000);
+
+  it("re-sends the stored bytes while the node does not know the pending transaction", async () => {
+    let sends = 0;
+    let nodeKnowsIt = false;
+    let receiptReady = false;
+    fakeProvider.injectResponse("eth_sendRawTransaction", () => { sends++; return TX_HASH_RSP; }); // accepted every time
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => nodeKnowsIt ? { hash: payload.params[0] } : null);
+    fakeProvider.injectResponse("eth_getTransactionReceipt", () => receiptReady ? receipt() : null);
+    await startWallet();
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+
+    let claim = await claimManager.createSessionClaim(sessionData(), {});
+    await claimManager.processQueue();
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
+    expect(sends).to.equal(1, "accepted at once");
+
+    // the pool lost it (evicted, restarted, never gossiped): every poll puts the same bytes back
+    await awaitSleepPromise(2000, () => sends >= 3);
+    expect(sends).to.be.greaterThanOrEqual(3, "re-sent from the receipt watch");
+
+    // the node has it again: no more re-sends, the receipt settles the claim
+    nodeKnowsIt = true;
+    await awaitSleepPromise(300, () => false);
+    let sendsBefore = sends;
+    await awaitSleepPromise(400, () => false);
+    expect(sends).to.be.lessThanOrEqual(sendsBefore + 1, "a known transaction is not re-sent");
     receiptReady = true;
     await awaitSleepPromise(2000, () => claim.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED);

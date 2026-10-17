@@ -72,6 +72,7 @@ export class EthClaimManager {
   private pendingTxQueue: {[hash: string]: EthClaimInfo[]} = {};
   private historyTxDict: {[nonce: number]: EthClaimInfo[]} = {};
   private queueProcessing: boolean = false;
+  private delegationClearPending: boolean = false; // the startup attempt to clear a stale wallet delegation failed; the queue retries
   private lastClaimTxIdx: number = 1;
   private lastProcessedClaimTxIdx: number = 0;
   private lastConfirmedClaimTxIdx: number = 0;
@@ -147,6 +148,10 @@ export class EthClaimManager {
 
     this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
     this.lastClaimTxIdx = maxQueueIdx + 1;
+
+    // a delegation an earlier batching setup left on the wallet is cleared before the queue runs
+    // (after the replays: its transaction takes the next free nonces)
+    this.delegationClearPending = !(await ethWalletManager.ensureNoDelegation());
 
     // register claim ws endpoint
     ServiceManager.GetService(FaucetHttpServer).addWssEndpoint("claim", /^\/ws\/claim($|\?)/, (req, ws, ip) => this.processClaimNotificationWebSocket(req, ws, ip));
@@ -289,12 +294,20 @@ export class EthClaimManager {
       let now = Math.floor(new Date().getTime() / 1000);
       let batchSize = 1;
       let batchMaxWait = 0;
+      let maxPending = faucetConfig.ethMaxPending;
       if(faucetConfig.ethClaimBatch && this.claimTxQueue.length > 0 && await ethWalletManager.ensureClaimBatching()) {
         let builder = ethWalletManager.getClaimTxBuilder();
         batchSize = builder.getBatchSize();
         batchMaxWait = builder.getBatchMaxWait();
+        // Transaction pools allow a delegated account one in-flight transaction (geth and reth since
+        // EIP-7702; a second one is refused or trickles in a block at a time). So one batch transaction
+        // is in flight at a time, and `maxClaims` is the throughput lever, not `ethMaxPending`.
+        if(builder.isBatchActive())
+          maxPending = 1;
       }
-      while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
+      else if(this.delegationClearPending)
+        this.delegationClearPending = !(await ethWalletManager.ensureNoDelegation());
+      while(Object.keys(this.pendingTxQueue).length < maxPending && this.claimTxQueue.length > 0) {
         if(faucetConfig.ethQueueNoFunds && (
           !walletState.ready ||
           walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(this.claimTxQueue[0].amount) ||

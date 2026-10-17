@@ -1,5 +1,6 @@
 import { ServiceManager } from '../../common/ServiceManager.js';
 import { FaucetLogLevel, FaucetProcess } from '../../common/FaucetProcess.js';
+import { faucetConfig } from '../../config/FaucetConfig.js';
 import { getCreate2Address, Hex } from '../rpc/index.js';
 import { EthWalletManager } from '../EthWalletManager.js';
 import { BATCHER_BYTECODE, BATCHER_RUNTIME_BYTECODE } from './BatcherArtifact.js';
@@ -23,17 +24,26 @@ export function delegationCode(delegate: string): string {
 const RETRY_INTERVAL = 300; // seconds between setup attempts after a failure
 const DEPLOY_GAS_LIMIT = 1000000;
 const DELEGATE_GAS_LIMIT = 100000;
+/** an authorization for this address removes the account's delegation (EIP-7702) */
+const NO_DELEGATE = "0x0000000000000000000000000000000000000000";
 
 /**
- * Makes the faucet wallet able to batch: the batcher contract exists on the chain, and the wallet's
- * code is delegated to it (EIP-7702), so `execute` can be called on the wallet itself. Both steps
- * are transactions from the faucet wallet, sent at most once; afterwards only the code checks run.
- * A failure (no deployer on the chain, no EIP-7702 yet, a rejected transaction) disables batching
- * until the next attempt; single-claim transactions are unaffected.
+ * The faucet wallet's EIP-7702 delegation, in the state the configuration asks for.
+ *
+ * With batching on: the batcher contract exists on the chain, and the wallet's code is delegated to
+ * it, so `execute` can be called on the wallet itself. Both steps are transactions from the faucet
+ * wallet, sent at most once; afterwards only the code checks run. A failure (no deployer on the
+ * chain, no EIP-7702 yet, a rejected transaction) disables batching until the next attempt;
+ * single-claim transactions are unaffected.
+ *
+ * With batching off: a delegation left behind by an earlier setup is cleared, because transaction
+ * pools treat a delegated account differently (one in-flight transaction) and nothing uses it.
+ * `ethIgnoreDelegate` leaves the wallet's code alone either way.
  */
 export class BatchDelegation {
   private walletManager: EthWalletManager;
   private ready: boolean = false;
+  private cleared: boolean = false;
   private lastAttempt: number = 0;
   private pending: Promise<boolean> | null = null;
 
@@ -49,17 +59,31 @@ export class BatchDelegation {
   public ensureReady(): Promise<boolean> {
     if(this.ready)
       return Promise.resolve(true);
+    return this.attempt(() => this.setup(), () => { this.ready = true; },
+      "Claim batching unavailable, paying one claim per transaction: ");
+  }
+
+  /** True once the wallet carries no delegation; false while it still does (and not retried for a while). */
+  public ensureCleared(): Promise<boolean> {
+    if(this.cleared)
+      return Promise.resolve(true);
+    return this.attempt(() => this.clear(), () => { this.cleared = true; },
+      "The faucet wallet keeps its delegation: ");
+  }
+
+  /** One attempt at a time, and after a failure none for RETRY_INTERVAL. */
+  private attempt(step: () => Promise<void>, done: () => void, failurePrefix: string): Promise<boolean> {
     if(this.pending)
       return this.pending;
     let now = Math.floor(Date.now() / 1000);
     if(now - this.lastAttempt < RETRY_INTERVAL)
       return Promise.resolve(false);
     this.lastAttempt = now;
-    this.pending = this.setup().then(() => {
-      this.ready = true;
+    this.pending = step().then(() => {
+      done();
       return true;
     }, (err) => {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Claim batching unavailable, paying one claim per transaction: " + (err?.message || err));
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, failurePrefix + (err?.message || err));
       return false;
     }).finally(() => {
       this.pending = null;
@@ -72,6 +96,15 @@ export class BatchDelegation {
     let wallet = this.walletManager.getFaucetAddress();
     let batcher = getBatcherAddress();
     let log = (msg: string) => ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, msg);
+
+    // with ethIgnoreDelegate the wallet's code is whatever the operator left there: batching works
+    // when that happens to be the batcher, and nothing is deployed or delegated otherwise
+    let expected = delegationCode(batcher);
+    if(faucetConfig.ethIgnoreDelegate) {
+      let currentCode = (await client.getCode(wallet)).toLowerCase();
+      if(currentCode !== expected)
+        throw new Error("the faucet wallet " + wallet + " is not delegated to the claim batcher (code " + currentCode + ") and ethIgnoreDelegate leaves it so");
+    }
 
     // 1. the batcher contract, deployed once per chain through the deterministic deployer. The wallet
     // is about to run whatever sits at that address, so it has to be exactly the compiled batcher:
@@ -95,7 +128,6 @@ export class BatchDelegation {
       throw new Error("the code at " + batcher + " is not the compiled claim batcher, refusing to delegate the wallet to it");
 
     // 2. the wallet's code: a delegation to the batcher
-    let expected = delegationCode(batcher);
     let walletCode = (await client.getCode(wallet)).toLowerCase();
     if(walletCode !== expected) {
       if(walletCode !== "0x" && !walletCode.startsWith("0xef0100"))
@@ -111,5 +143,27 @@ export class BatchDelegation {
       log("Faucet wallet delegated to the claim batcher: " + delegateTx.txHash);
     }
     log("Claim batching active (batcher " + batcher + ")");
+  }
+
+  /** Removes a delegation the wallet still carries: one set-code transaction with an authorization for the zero address. */
+  private async clear(): Promise<void> {
+    let client = this.walletManager.getClient();
+    let wallet = this.walletManager.getFaucetAddress();
+    let log = (msg: string) => ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, msg);
+
+    let walletCode = ((await client.getCode(wallet)) || "0x").toLowerCase();
+    if(walletCode === "0x")
+      return;
+    if(!walletCode.startsWith("0xef0100"))
+      throw new Error("the faucet wallet " + wallet + " has contract code, not a delegation");
+    log("Clearing the faucet wallet's delegation to 0x" + walletCode.substring(8) + " (batching is off; ethIgnoreDelegate would keep it)");
+    let clearTx = await this.walletManager.sendSetCodeTx(NO_DELEGATE, DELEGATE_GAS_LIMIT);
+    let mined = await clearTx.txPromise;
+    if(!mined.status)
+      throw new Error("delegation clearing transaction " + clearTx.txHash + " reverted");
+    walletCode = (await client.getCode(wallet)).toLowerCase();
+    if(walletCode !== "0x")
+      throw new Error("delegation clearing transaction " + clearTx.txHash + " mined but the wallet code is " + walletCode);
+    log("Faucet wallet delegation cleared: " + clearTx.txHash);
   }
 }

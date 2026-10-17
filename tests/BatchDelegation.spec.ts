@@ -28,6 +28,7 @@ describe("ETH Claim Batching (EIP-7702)", () => {
   beforeEach(async () => {
     globalStubs = bindTestStubs({});
     fakeProvider = new FakeProvider();
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => ({ hash: payload.params[0] })); // the node knows what it was sent, unless a test says otherwise
     loadDefaultTestConfig();
     faucetConfig.faucetStats = null;
     faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
@@ -103,8 +104,12 @@ describe("ETH Claim Batching (EIP-7702)", () => {
         code[getCreate2Address({ from: DETERMINISTIC_DEPLOYER, salt: ("0x" + salt) as `0x${string}`, bytecode: initCode as `0x${string}` }).toLowerCase()] = initCode === BATCHER_BYTECODE ? BATCHER_RUNTIME_BYTECODE : "0x60806040";
       }
       if(tx.type === "eip7702" && opts.eip7702) {
-        for(let auth of tx.authorizationList)
-          code[WALLET.toLowerCase()] = delegationCode(auth.address);
+        for(let auth of tx.authorizationList) {
+          if(/^0x0{40}$/.test(auth.address))
+            delete code[WALLET.toLowerCase()]; // an authorization for the zero address clears the delegation
+          else
+            code[WALLET.toLowerCase()] = delegationCode(auth.address);
+        }
       }
       return hash;
     });
@@ -143,6 +148,58 @@ describe("ETH Claim Batching (EIP-7702)", () => {
   it("derives the batcher address from the bytecode alone", () => {
     expect(BATCHER).to.equal(getCreate2Address({ from: DETERMINISTIC_DEPLOYER, salt: BATCHER_SALT, bytecode: BATCHER_BYTECODE as `0x${string}` }));
     expect(delegationCode(BATCHER)).to.equal("0xef0100" + BATCHER.substring(2).toLowerCase());
+  });
+
+  it("clears a delegation left behind when batching is off, then pays plain transactions", async () => {
+    let chain = fakeChain({ deployerPresent: true, eip7702: true });
+    chain.code[WALLET.toLowerCase()] = delegationCode(BATCHER); // from an earlier run with batching on
+    faucetConfig.ethClaimBatch = null;
+    let { wallet, claims } = await start();
+
+    await claims.processQueue(); // nothing queued: the queue tick still puts the wallet in order
+    expect(chain.sent.length).to.equal(1, "one clearing transaction");
+    let clearTx = chain.sent[0].tx;
+    expect(clearTx.type).to.equal("eip7702");
+    expect(clearTx.to.toLowerCase()).to.equal(WALLET.toLowerCase());
+    expect(clearTx.nonce).to.equal(42);
+    expect(clearTx.authorizationList.length).to.equal(1);
+    expect(clearTx.authorizationList[0].address).to.equal("0x0000000000000000000000000000000000000000");
+    expect(clearTx.authorizationList[0].nonce).to.equal(43);
+    expect(chain.code[WALLET.toLowerCase()]).to.equal(undefined, "the wallet is a plain account again");
+    expect(wallet.getWalletState().nonce).to.equal(44, "two nonces spent");
+
+    let c1 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000001", "0x0000000000000000000000000000000000001001", "1000"), {});
+    await claims.processQueue();
+    await awaitSleepPromise(3000, () => c1.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    expect(chain.sent.length).to.equal(2, "the clearing happened once");
+    expect(chain.sent[1].tx.type).to.equal("eip1559");
+    expect(chain.sent[1].tx.to.toLowerCase()).to.equal("0x0000000000000000000000000000000000001001", "a plain transfer to the target");
+    expect(chain.sent[1].tx.nonce).to.equal(44);
+  });
+
+  it("leaves the wallet's code alone with ethIgnoreDelegate, batching off or on", async () => {
+    let foreign = delegationCode("0x00000000000000000000000000000000000000dd");
+    let chain = fakeChain({ deployerPresent: true, eip7702: true });
+    chain.code[WALLET.toLowerCase()] = foreign;
+    faucetConfig.ethIgnoreDelegate = true;
+
+    // batching off: no clearing
+    faucetConfig.ethClaimBatch = null;
+    let { claims } = await start();
+    await claims.processQueue();
+    expect(chain.sent.length).to.equal(0, "nothing sent");
+    expect(chain.code[WALLET.toLowerCase()]).to.equal(foreign);
+
+    // batching on: neither deployed nor delegated, claims are paid one per transaction
+    faucetConfig.ethClaimBatch = { maxClaims: 10, maxWaitSeconds: 0 };
+    let c1 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000001", "0x0000000000000000000000000000000000001001", "1000"), {});
+    let c2 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000002", "0x0000000000000000000000000000000000001002", "2000"), {});
+    await claims.processQueue();
+    await awaitSleepPromise(3000, () => c1.claim.claimStatus === ClaimTxStatus.CONFIRMED && c2.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    expect(chain.sent.filter((s) => s.tx.type === "eip7702").length).to.equal(0, "no set-code transaction");
+    expect(chain.code[BATCHER.toLowerCase()]).to.equal(undefined, "no deployment either");
+    expect(chain.sent.map((s) => s.tx.to.toLowerCase())).to.deep.equal(["0x0000000000000000000000000000000000001001", "0x0000000000000000000000000000000000001002"], "two plain transfers");
+    expect(chain.code[WALLET.toLowerCase()]).to.equal(foreign, "the foreign delegation is untouched");
   });
 
   it("deploys the batcher, delegates the wallet, then pays a batch through execute on itself", async () => {

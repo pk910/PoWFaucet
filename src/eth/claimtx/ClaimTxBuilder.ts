@@ -73,6 +73,11 @@ export class ClaimTxBuilder {
     this.batchActive = active;
   }
 
+  /** The wallet is delegated: it is a contract account to the network, with the pool rules that come with that. */
+  public isBatchActive(): boolean {
+    return this.batchActive;
+  }
+
   /** How many claims one transaction may carry right now. */
   public getBatchSize(): number {
     if(!this.batchActive || !this.isBatchConfigured())

@@ -228,6 +228,7 @@ export interface IEthRpcClient {
   estimateGas(tx: { from?: string; to: string; data?: string; value?: bigint }): Promise<bigint>;
   sendRawTransaction(signedTx: string): Promise<string>;
   getTransactionReceipt(txHash: string): Promise<EthTxReceipt | null>;
+  knowsTransaction(txHash: string): Promise<boolean>;
   getEnsAddress(name: string, universalResolverAddress: string): Promise<string | null>;
 }
 
@@ -257,6 +258,7 @@ export class RoutedRpcClient implements IEthRpcClient {
   public estimateGas(tx: { from?: string; to: string; data?: string; value?: bigint }): Promise<bigint> { return this.target().estimateGas(tx); }
   public sendRawTransaction(signedTx: string): Promise<string> { return this.target().sendRawTransaction(signedTx); }
   public getTransactionReceipt(txHash: string): Promise<EthTxReceipt | null> { return this.target().getTransactionReceipt(txHash); }
+  public knowsTransaction(txHash: string): Promise<boolean> { return this.target().knowsTransaction(txHash); }
   public getEnsAddress(name: string, universalResolverAddress: string): Promise<string | null> { return this.target().getEnsAddress(name, universalResolverAddress); }
 }
 
@@ -349,6 +351,12 @@ export class EthRpcClient implements IEthRpcClient {
     if (!raw)
       return null;
     return normalizeReceipt(raw);
+  }
+
+  /** Whether the node has the transaction, in its pool or in a block. */
+  public async knowsTransaction(txHash: string): Promise<boolean> {
+    const raw = await this.rawRequest<any>('eth_getTransactionByHash', [txHash]);
+    return !!raw;
   }
 
   /** ENS forward resolution through a Universal Resolver (wildcard and offchain names included). */

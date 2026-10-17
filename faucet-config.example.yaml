@@ -152,6 +152,11 @@ ethTxExplorerLink: "https://hoodi.etherscan.io/tx/{txid}"
 #  gasLimit: 40000        # base gas limit of a batch transaction ...
 #  gasLimitPerClaim: 40000  # ... plus this per claim ("estimate" instead of a number asks the node)
 
+# Without ethClaimBatch a delegation left behind by an earlier batching setup is cleared at startup
+# (transaction pools allow a delegated account one in-flight transaction). Set this to keep the
+# wallet's code whatever it is: no delegation is set for batching and none is cleared.
+#ethIgnoreDelegate: false
+
 
 # min/max drop amount (max is the default if no module lowers it)
 maxDropAmount: 1000000000000000000 # 1 ETH

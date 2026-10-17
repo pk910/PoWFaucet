@@ -149,6 +149,7 @@ export interface IConfigSchema {
 
   ethClaimTx: IClaimTxConfig | null; // what a claim pays (one or more calls), or null for the faucet coin's plain transfer
   ethClaimBatch: IClaimBatchConfig | null; // several claims per transaction via EIP-7702 self-delegation, or null for one transaction per claim
+  ethIgnoreDelegate: boolean; // leave the wallet's EIP-7702 delegation as it is: never set one for batching, never clear one left behind when batching is off
 
   ethRefillContract: null | { // refill from vault contract or null to disable automatic refilling
     contract: string; // vault contract address

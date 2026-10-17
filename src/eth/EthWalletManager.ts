@@ -357,6 +357,24 @@ export class EthWalletManager {
     return ready;
   }
 
+  /**
+   * Without batching the wallet should carry no delegation: pools allow a delegated account one
+   * in-flight transaction, and nothing here would use the code. Clears one left behind by an
+   * earlier setup, once (one transaction, see BatchDelegation); `ethIgnoreDelegate` keeps it.
+   * True when the wallet is in order (or none of this applies), false when the attempt failed
+   * and should be repeated. Called by the claim manager, so the transaction shares the queue's
+   * nonce sequence.
+   */
+  public async ensureNoDelegation(): Promise<boolean> {
+    if(faucetConfig.ethIgnoreDelegate || (faucetConfig.ethClaimBatch && faucetConfig.ethClaimBatch.maxClaims > 1) || !this.rpcPool)
+      return true;
+    if(!this.walletState?.ready)
+      return false;
+    if(!this.batchDelegation)
+      this.batchDelegation = new BatchDelegation(this);
+    return await this.batchDelegation.ensureCleared();
+  }
+
   /** Positions (in the transaction's claim list) a mined claim transaction reported as not paid; empty without a template that names a failed event. */
   public evaluateClaimReceipt(receipt: EthTxReceipt, claims: EthClaimInfo[]): ClaimReceiptEvaluation {
     let outcomes = new Map<number, { failed: number; total: number }>();
@@ -398,7 +416,7 @@ export class EthWalletManager {
     fee: bigint;
     receipt: EthTxReceipt;
   }> {
-    return this.awaitTransactionReceipt(claimInfo.claim.txHash, claimInfo.claim.txNonce).then((receipt) => this.txResultFromReceipt(receipt));
+    return this.awaitTransactionReceipt(claimInfo.claim.txHash, claimInfo.claim.txNonce, claimInfo.claim.txHex, false).then((receipt) => this.txResultFromReceipt(receipt));
   }
 
   public sendClaimTx(claimInfo: EthClaimInfo, beforeBroadcast?: BeforeBroadcastHook): Promise<ClaimTransactionResult> {
@@ -489,7 +507,7 @@ export class EthWalletManager {
     }
     return {
       txHash: prepared.txHash,
-      txPromise: this.awaitTransactionReceipt(prepared.txHash, prepared.txNonce, sent === "uncertain" ? prepared.txHex : undefined).then((receipt) => this.txResultFromReceipt(receipt)),
+      txPromise: this.awaitTransactionReceipt(prepared.txHash, prepared.txNonce, prepared.txHex, sent === "uncertain").then((receipt) => this.txResultFromReceipt(receipt)),
       plan: prepared.plan,
     };
   }
@@ -616,26 +634,27 @@ export class EthWalletManager {
     this.walletState.nonce += nonces;
     return {
       txHash: txHash,
-      txPromise: this.awaitTransactionReceipt(txHash, txNonce, sent === "uncertain" ? txHex : undefined).then((receipt) => this.txResultFromReceipt(receipt)),
+      txPromise: this.awaitTransactionReceipt(txHash, txNonce, txHex, sent === "uncertain").then((receipt) => this.txResultFromReceipt(receipt)),
     };
   }
 
   /**
-   * Poll for the receipt. `resendHex` is given when no node confirmed the broadcast: then the same
-   * bytes go out again on every poll until the receipt appears (a node that has them ignores the
-   * repeat, a node that never got them gets them). The transaction counts as dropped only when
+   * Poll for the receipt. On a poll without one the same bytes go out again when the node does not
+   * know the transaction (a pool that evicted or never got it) or, with `resendEveryPoll`, when no
+   * node confirmed the broadcast in the first place. A node that has the bytes ignores the repeat,
+   * so re-sending is always safe. The transaction counts as dropped only when
    * DROPPED_CONFIRMATION_POLLS polls in a row saw the nonce spent and no receipt: one poll may well
    * see a nonce from one endpoint ahead of a receipt from another.
    */
-  private async awaitTransactionReceipt(txhash: string, txnonce: number, resendHex?: string): Promise<EthTxReceipt> {
+  private async awaitTransactionReceipt(txhash: string, txnonce: number, txHex?: string, resendEveryPoll: boolean = false): Promise<EthTxReceipt> {
     let nonceSpentPolls = 0;
     while(true) {
       try {
         let receipt = await this.client.getTransactionReceipt(txhash);
         if(receipt)
           return receipt;
-        if(resendHex)
-          await this.rpcPool.broadcastSignedTransaction("0x" + resendHex); // outcome irrelevant here: the receipt decides
+        if(txHex && (resendEveryPoll || !(await this.client.knowsTransaction(txhash))))
+          await this.rpcPool.broadcastSignedTransaction("0x" + txHex); // outcome irrelevant here: the receipt decides
         // null: still pending, unless the nonce is spent: then another transaction took the slot
         // (a replacement, or a send whose answer was lost but whose bytes were not these)
         if(typeof txnonce === "number") {
