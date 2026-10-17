@@ -166,6 +166,12 @@ export class PoWClient extends TypedEmitter<PoWClientEvents> {
       return;
     }
 
+    if(message.action === "error" && this.listenerCount("error") === 0) {
+      // an EventEmitter throws on an "error" nobody listens to; the session that listens may be
+      // gone already when a late one arrives
+      console.log("[PoWClient] server error", message.data);
+      return;
+    }
     if(message.action) {
       this.emit(message.action, message);
     }
