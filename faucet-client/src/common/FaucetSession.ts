@@ -19,8 +19,10 @@ export interface IFaucetSessionStatus {
   failedCode?: string;
   failedReason?: string;
   details?: {
-    data: any;
+    data: {[key: string]: any};
     claim: any;
+    /** the session's address, only with the operator's key */
+    ip?: string;
   };
 }
 

@@ -1,3 +1,4 @@
+/* layout and sizing of the login tile come from FaucetPage.scss; this file keeps the logo and the tooltip */
 .faucet-page .logo.logo-zupass {
   background-size: contain;
   background-repeat: no-repeat;
@@ -5,28 +6,8 @@
   height: 100%;
 }
 
-.faucet-page .faucet-zupass-auth {
-  margin: 16px 0;
-  display: flex;
-}
-
-.faucet-page .faucet-zupass-auth .auth-icon {
-  height: 50px;
-  width: 50px;
-  padding: 0;
-}
-
-.faucet-page .faucet-zupass-auth .auth-field {
-  margin: 0 8px;
-  flex-grow: 1;
-}
-
 .faucet-page .faucet-zupass-auth .zupass-info-icon {
   margin-left: 8px;
-}
-
-.faucet-page .faucet-zupass-auth .auth-field .auth-info {
-  color: #343a40;
 }
 
 .faucet-page .faucet-zupass-auth .auth-ident-truncated {

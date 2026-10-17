@@ -1,3 +1,7 @@
+// The faucet's stylesheet. The page is embeddable, so nothing here reaches the host page: the
+// design tokens live on the faucet's own wrapper, every bootstrap rule is emitted under
+// `.faucet-bootstrap`, and bootstrap's variables are set on `.faucet-page[data-bs-theme=light]`
+// instead of `:root`.
 
 html.powfaucet, html.powfaucet body {
   margin: 0;
@@ -5,33 +9,130 @@ html.powfaucet, html.powfaucet body {
   height: 100%;
 }
 
+// ---------------------------------------------------------------------------------------------
+// tokens (the same values as the faucets.pk910.de landing page)
+
+.faucet-wrapper, .faucet-container {
+  --pf-bg: #f0f0f0;
+  --pf-surface: #ffffff;
+  --pf-surface-2: #f8f9fa;
+  --pf-border: rgba(0, 0, 0, 0.08);
+  --pf-border-strong: rgba(0, 0, 0, 0.18);
+  --pf-ink: #212529;
+  --pf-ink-2: #495057;
+  --pf-ink-3: #6c757d;
+  --pf-brand: #198754;
+  --pf-accent: #2a78d6;
+  --pf-warn: #e0a800;
+  --pf-crit: #dc3545;
+  --pf-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.18);
+  --pf-radius: 20px;
+  --pf-radius-sm: 10px;
+  --pf-radius-ctl: 12px;
+  --pf-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --pf-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .faucet-wrapper {
   min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f0f0f0;
+  background:
+    radial-gradient(900px 420px at 80% -10%, rgba(42, 120, 214, 0.10), transparent 60%),
+    radial-gradient(700px 380px at -10% 40%, rgba(25, 135, 84, 0.08), transparent 60%),
+    var(--pf-bg);
 }
 
+// the card
 .faucet-container {
-  padding: 8px;
-  margin: 8px;
-  background-color: white;
-  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
-  transition: 0.3s;
+  box-sizing: border-box;
+  margin: 24px 8px;
+  padding: 24px;
   max-width: 100vw;
+  background: var(--pf-surface);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius);
+  box-shadow: var(--pf-shadow);
+  color: var(--pf-ink);
+  font-family: var(--pf-font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+
+@media screen and (max-width: 480px) {
+  .faucet-container {
+    margin: 12px 8px;
+    padding: 16px;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// bootstrap 5.3, themed through its variables and emitted under the scope
 
 @import "bootstrap/scss/functions";
+
+$primary: #2a78d6;
+// bootstrap picks black text on a background whose contrast with white is below this; the
+// accent blue is just under its 4.5 default, and the landing page sets it in white
+$min-contrast-ratio: 3;
+$secondary: #6c757d;
+$success: #198754;
+$danger: #dc3545;
+$warning: #e0a800;
+$info: #2a78d6;
+$body-bg: #ffffff;
+$body-color: #212529;
+$body-secondary-color: #6c757d;
+$font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+$font-size-base: 0.9375rem; // 15px
+$headings-font-weight: 700;
+$border-color: rgba(0, 0, 0, 0.08);
+$border-radius: 0.75rem;      // 12px: controls
+$border-radius-sm: 0.625rem;  // 10px: tiles, alerts
+$border-radius-lg: 1.25rem;   // 20px: cards, dialogs
+$border-radius-xl: 1.25rem;
+$btn-font-weight: 600;
+$btn-padding-y: 0.7rem;
+$btn-padding-x: 1rem;
+$btn-border-radius: $border-radius;
+$btn-border-radius-sm: 999px;
+$input-padding-y: 0.7rem;
+$input-padding-x: 0.875rem;
+$input-border-color: rgba(0, 0, 0, 0.18);
+$input-border-radius: $border-radius;
+$card-border-radius: $border-radius-lg;
+$card-border-color: rgba(0, 0, 0, 0.08);
+$modal-content-border-radius: $border-radius-lg;
+$modal-content-border-color: rgba(0, 0, 0, 0.08);
+$alert-border-radius: $border-radius-sm;
+$alert-padding-y: 0.625rem;
+$alert-padding-x: 0.875rem;
+$badge-border-radius: 999px;
+$badge-font-weight: 600;
+$badge-padding-y: 0.3em;
+$badge-padding-x: 0.65em;
+$tooltip-border-radius: 0.5rem;
+$tooltip-max-width: 320px;
+$table-cell-padding-y: 0.125rem;
+$table-cell-padding-x: 0.5rem;
+$link-decoration: none;
+$link-hover-decoration: underline;
+$enable-shadows: false;
+$enable-dark-mode: false;
+
 @import "bootstrap/scss/variables";
 @import "bootstrap/scss/variables-dark";
 @import "bootstrap/scss/maps";
 @import "bootstrap/scss/mixins";
 @import "bootstrap/scss/utilities";
-@import "bootstrap/scss/root";
-@import "bootstrap/scss/reboot";
 
 .faucet-bootstrap {
+  // `:root` becomes `.faucet-bootstrap :root` (never matches) and `[data-bs-theme=light]`
+  // becomes `.faucet-bootstrap [data-bs-theme=light]`, which is the `.faucet-page` element
+  @import "bootstrap/scss/root";
+  @import "bootstrap/scss/reboot";
   @import "bootstrap/scss/type";
   @import "bootstrap/scss/images";
   @import "bootstrap/scss/containers";
@@ -52,151 +153,205 @@ html.powfaucet, html.powfaucet body {
   @import "bootstrap/scss/placeholders";
   @import "bootstrap/scss/helpers";
   @import "bootstrap/scss/utilities/api";
-  
 }
+
+// ---------------------------------------------------------------------------------------------
+// shared pieces
+
+.faucet-page {
+  color: var(--pf-ink);
+  font-family: var(--pf-font);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.faucet-page .pf-mono {
+  font-family: var(--pf-mono);
+  font-size: 13px;
+}
+
+// a status pill: `.pf-pill-live` green, `-info` blue, `-warn` yellow, `-crit` red
+.faucet-page .pf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--pf-border);
+  background: #f1f3f5;
+  color: var(--pf-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.faucet-page .pf-pill::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pf-ink-3);
+}
+.faucet-page .pf-pill-live { background: #e8f5ee; color: #146c43; border-color: rgba(25, 135, 84, 0.3); }
+.faucet-page .pf-pill-live::before { background: var(--pf-brand); }
+.faucet-page .pf-pill-info { background: #eaf2fc; color: #1b4f91; border-color: rgba(42, 120, 214, 0.3); }
+.faucet-page .pf-pill-info::before { background: var(--pf-accent); }
+.faucet-page .pf-pill-warn { background: #fff3cd; color: #856404; border-color: rgba(224, 168, 0, 0.35); }
+.faucet-page .pf-pill-warn::before { background: var(--pf-warn); }
+.faucet-page .pf-pill-crit { background: #fde2e4; color: #9f1c2a; border-color: rgba(220, 53, 69, 0.3); }
+.faucet-page .pf-pill-crit::before { background: var(--pf-crit); }
+
+// a stat tile: label over a large value
+.faucet-page .pf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--pf-radius-sm);
+  background: var(--pf-surface-2);
+  border: 1px solid var(--pf-border);
+}
+.faucet-page .pf-stat > span { font-size: 12px; color: var(--pf-ink-3); }
+.faucet-page .pf-stat > b {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.faucet-page .pf-stat-lg > b { font-size: 30px; font-weight: 650; letter-spacing: -0.01em; }
+.faucet-page .pf-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+// a key/value list
+.faucet-page .pf-kv-list {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+.faucet-page .pf-kv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--pf-border);
+}
+.faucet-page .pf-kv:last-child { border-bottom: 1px solid var(--pf-border); }
+.faucet-page .pf-kv > span:first-child { color: var(--pf-ink-3); flex: 0 0 auto; }
+.faucet-page .pf-kv > b, .faucet-page .pf-kv > .pf-kv-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.faucet-page .pf-kv > .pf-kv-value { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+
+// the big buttons
+.faucet-page .pf-btn-block,
+.faucet-page .faucet-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  border-radius: var(--pf-radius-ctl);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.faucet-page .faucet-actions button.btn-success { box-shadow: 0 6px 16px -8px rgba(25, 135, 84, 0.7); }
+.faucet-page .faucet-actions button.btn-danger { box-shadow: 0 6px 16px -8px rgba(220, 53, 69, 0.7); }
+.faucet-page .faucet-actions button:disabled { cursor: wait; box-shadow: none; }
+.faucet-page .btn-ghost,
+.faucet-page .btn-secondary.action-btn {
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: var(--pf-border-strong);
+  --bs-btn-color: var(--pf-ink);
+  --bs-btn-hover-bg: var(--pf-surface-2);
+  --bs-btn-hover-border-color: var(--pf-border-strong);
+  --bs-btn-hover-color: var(--pf-ink);
+  --bs-btn-active-bg: var(--pf-surface-2);
+  --bs-btn-active-border-color: var(--pf-border-strong);
+  --bs-btn-active-color: var(--pf-ink);
+}
+
+// ---------------------------------------------------------------------------------------------
+// page frame
 
 .faucet-loading .loading-spinner {
   padding: 16px 0;
 }
-
 .faucet-loading .loading-spinner .spinner {
   height: 30px;
   margin: 0 16px;
 }
-
 .faucet-page .inline-spinner .spinner {
   height: 20px;
   margin: 0 8px;
 }
 
-.faucet-page .faucet-notifications {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-}
-
-.faucet-page .faucet-notifications .faucet-notification .alert {
-  padding: 8px;
-  min-width: 300px;
-}
-
-.faucet-page .faucet-footer {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  padding: 4px;
-  font-size: 12px;
-  color: #343a40;
-  pointer-events: none;
-}
-
-
-
-.faucet-page .faucet-frontimage {
-  text-align: center;
-  padding: 0 8px;
-}
-
-.faucet-page .faucet-frontimage .image {
-  width: 100%;
-}
-
-.faucet-page .faucet-image {
-  margin: 8px 8px 8px 8px;
-}
- 
-@media screen and (max-height:700px) {
-  .faucet-page .faucet-image {
-    display:none;
-  }
-}
-
-
-// The card is 450 px wide on a desktop and never wider than the screen it is
-// on: a phone lays out at 390 css px, where a fixed 450 pushes the header link,
-// the footer and the right edge of every page off the side and scrolls the whole
-// document sideways under a thumb that meant to steer.
+// The card is 450 px wide on a desktop and never wider than the screen it is on: a phone lays out
+// at 390 css px, where a fixed 450 pushes the header link, the footer and the right edge of every
+// page off the side and scrolls the whole document sideways under a thumb that meant to steer.
 //
-// `width` and `max-width`, not `min(450px, 100%)`: a percentage makes the card's
-// width depend on its parent *and* on its content, and a module's panel inside it
-// deliberately breaks out to the window width (2545 px on this screen). The card
-// followed it out to 2020 px and the arena hung off the side of it - pk910:
-// "the general page layout looks broken in non-fullscreen mode". A definite
-// width does not move, and `max-width` still gives the phone what it needed.
+// `width` and `max-width`, not `min(450px, 100%)`: a percentage makes the card's width depend on
+// its parent *and* on its content, and a module's panel inside it deliberately breaks out to the
+// window width. The card followed it out and the panel hung off the side of it. A definite width
+// does not move, and `max-width` still gives the phone what it needed.
 .faucet-page {
   width: 450px;
   max-width: 100%;
 }
-
 .faucet-page:has(.page-mining), .faucet-page:has(.page-frontpage) {
   width: 450px;
   max-width: 100%;
 }
-
 .faucet-page:has(.page-claim), .faucet-page:has(.page-details) {
   width: 600px;
   max-width: 100%;
 }
-
 .faucet-page:has(.faucet-status) {
   width: auto;
 }
 
-
-.faucet-page .faucet-status-alerts {
-  position: relative
-}
-
-.faucet-page .faucet-inputs {
-  margin: 18px 8px 0 8px;
-}
-
-.faucet-page .faucet-actions {
-  margin: 8px 0;
-}
-
-.faucet-page .faucet-actions button {
-  width: 100%;
-  border: none;
-  color: white;
-  padding: 15px 32px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.faucet-page .faucet-actions button.start-action {
-  background-color: #4CAF50;
-}
-
-.faucet-page .faucet-actions button.stop-action {
-  background-color: #af4c4c;
-}
-
-.faucet-page .faucet-actions button:disabled {
-  background-color: gray;
-  color: #ccc;
-  cursor: wait;
-}
-
-.faucet-page .faucet-captcha {
-  margin-top: 8px;
-}
-
-.faucet-page .page-frontpage .faucet-captcha {
-  text-align: center;
-}
-
-.faucet-page .faucet-captcha > div {
-  display: inline-block;
-}
-
+// the card's one header: title and meta at the left, the page's status pill at the right
 .faucet-page .faucet-title {
   position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
-
+.faucet-page .faucet-title .faucet-title-text {
+  min-width: 0;
+}
+.faucet-page .faucet-title .pf-pill {
+  flex: 0 0 auto;
+  margin-top: 6px;
+}
+.faucet-page .faucet-title h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: left;
+}
+.faucet-page .faucet-title .faucet-meta {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: var(--pf-ink-3);
+}
 .faucet-page .faucet-title .faucet-status-link {
   position: absolute;
   right: 0;
@@ -205,104 +360,447 @@ html.powfaucet, html.powfaucet body {
   height: 50px;
 }
 
-.faucet-page .pow-header {
+.faucet-page .faucet-status-alerts {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.faucet-page .faucet-status-alerts:empty { display: none; }
+.faucet-page .faucet-status-alerts .alert {
+  margin: 0;
+  font-size: 14px;
 }
 
-
-.faucet-page .txhash {
-  font-size: 9pt;
-  margin: 0 4px;
+.faucet-page .faucet-notifications {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  z-index: 1060;
+}
+.faucet-page .faucet-notifications .faucet-notification .alert {
+  padding: 8px 12px;
+  min-width: 300px;
+  box-shadow: var(--pf-shadow);
 }
 
-.faucet-page .action-btn {
+// the footer line sits under the card, not in it: absolutely placed below the container, which
+// reserves the room with its bottom margin
+.faucet-container {
+  position: relative;
+  margin-bottom: 56px;
+}
+.faucet-page .faucet-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 0 0;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--pf-ink-3);
+}
+.faucet-page .faucet-footer a { color: var(--pf-ink-2); }
+
+// ---------------------------------------------------------------------------------------------
+// front page
+
+.faucet-page .faucet-frontimage {
+  text-align: center;
+}
+.faucet-page .faucet-frontimage .image {
+  display: block;
   width: 100%;
+  height: auto;
+  border-radius: var(--pf-radius-sm);
+}
+.faucet-page .faucet-frontimage:empty { display: none; }
+@media screen and (max-height: 700px) {
+  .faucet-page .faucet-frontimage { display: none; }
+}
+
+.faucet-page .faucet-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+.faucet-page .faucet-inputs > .form-control {
+  min-height: 48px;
+}
+
+// the login tiles: github, zupass, authenticatoor, ticket proof
+.faucet-page .faucet-auth,
+.faucet-page .faucet-zupass-auth,
+.faucet-page .faucet-authenticatoor-auth,
+.faucet-page .faucet-ticketproof-auth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--pf-radius-sm);
+  background: var(--pf-surface-2);
+  border: 1px solid var(--pf-border);
+  font-size: 14px;
+  color: var(--pf-ink-2);
+}
+.faucet-page .faucet-auth .auth-icon,
+.faucet-page .faucet-zupass-auth .auth-icon,
+.faucet-page .faucet-authenticatoor-auth .auth-icon,
+.faucet-page .faucet-ticketproof-auth .auth-icon {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  padding: 7px;
+  border-radius: 50%;
+  background: var(--pf-surface);
+  border: 1px solid var(--pf-border);
+  overflow: hidden;
+}
+.faucet-page .faucet-auth .auth-field,
+.faucet-page .faucet-zupass-auth .auth-field,
+.faucet-page .faucet-authenticatoor-auth .auth-field,
+.faucet-page .faucet-ticketproof-auth .auth-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+.faucet-page .faucet-auth .auth-field a,
+.faucet-page .faucet-zupass-auth .auth-field a,
+.faucet-page .faucet-authenticatoor-auth .auth-field a,
+.faucet-page .faucet-ticketproof-auth .auth-field a {
+  font-weight: 600;
+}
+.faucet-page .faucet-auth .auth-field .auth-info,
+.faucet-page .faucet-zupass-auth .auth-field .auth-info,
+.faucet-page .faucet-authenticatoor-auth .auth-field .auth-info,
+.faucet-page .faucet-ticketproof-auth .auth-field .auth-info {
+  color: var(--pf-ink-2);
+}
+.faucet-page .auth-noauth { cursor: pointer; }
+
+.faucet-page .voucher-input-container {
+  margin: 0 !important;
+  padding: 10px 12px;
+  border-radius: var(--pf-radius-sm);
+  background: var(--pf-surface-2);
+  border: 1px solid var(--pf-border);
+  font-size: 14px;
+  color: var(--pf-ink-2);
+}
+.faucet-page .voucher-input-container .form-control { background: var(--pf-surface); }
+
+.faucet-page .faucet-start-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.faucet-page .faucet-start-modes .start-modes-label {
+  font-size: 13px;
+  color: var(--pf-ink-3);
+}
+.faucet-page .faucet-start-modes .start-modes-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.faucet-page .faucet-captcha {
+  margin-top: 0;
+}
+.faucet-page .page-frontpage .faucet-captcha {
+  text-align: center;
+}
+.faucet-page .faucet-captcha > div {
+  display: inline-block;
+}
+
+.faucet-page .faucet-actions {
+  margin: 0;
+}
+
+.faucet-page .faucet-description {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pf-border);
+  font-size: 14px;
+  color: var(--pf-ink-2);
+}
+.faucet-page .faucet-description:empty { display: none; }
+.faucet-page .faucet-description h5 {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--pf-ink);
+}
+.faucet-page .faucet-description .pow-info {
+  margin-top: 0;
+}
+
+// ---------------------------------------------------------------------------------------------
+// mining page
+
+.faucet-page .page-mining {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .faucet-page .pow-status {
-  height: 100%;
-  background-color: white;
-  border: 1px solid darkgray;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.faucet-page .pow-status-image {
+  position: relative;
   padding: 8px;
+  border-radius: var(--pf-radius-sm);
+  background: var(--pf-surface-2);
+  border: 1px solid var(--pf-border);
 }
-
-.faucet-page .pow-status .pow-progress-actions {
-  float: right;
+.faucet-page .pow-status-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  image-rendering: pixelated;
 }
-
-.faucet-page .pow-status .pow-status-addr {
-  margin-bottom: 8px;
+.faucet-page .pow-progress-toggle {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--pf-ink-2);
+  cursor: pointer;
 }
-
-.faucet-page .pow-status .pow-status-addr .status-title {
-  margin-left: 24px;
+.faucet-page .pow-worker-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
-
-.faucet-page .pow-status .pow-status-addr .status-value {
+.faucet-page .pow-worker-controls b {
+  min-width: 44px;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-
-.faucet-page .pow-status .pow-status-top .status-title {
-  text-align: center;
+.faucet-page .pow-worker-controls button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--pf-border-strong);
+  background: var(--pf-surface);
+  color: var(--pf-ink);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
 }
-
-.faucet-page .pow-status .pow-status-top .status-value {
-  text-align: center;
-  font-size: 28px;
+.faucet-page .pow-worker-controls button:disabled { opacity: 0.4; cursor: default; }
+.faucet-page .pow-boost-button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(42, 120, 214, 0.45);
+  background: #eaf2fc;
+  color: #1b4f91;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }
+.faucet-page .pow-boost-none { color: var(--pf-ink-3); }
 
-.faucet-page .pow-status .pow-status-spacer {
-  height: 16px;
-}
-
-.faucet-page .pow-status .pow-status-other {
+.faucet-page .connection-status .reconnect-info {
   margin-top: 4px;
+  font-size: 13px;
 }
 
-.faucet-page .pow-status .pow-worker-controls button {
-  width: 27px;
-  margin-right: 6px;
-  border-radius: 15px;
-  height: 20px;
-  padding: 0;
-}
+// ---------------------------------------------------------------------------------------------
+// claim and details pages
 
-.faucet-page .pow-status .pow-passport-controls button {
-  width: 75px;
-  margin-right: 6px;
-  border-radius: 15px;
-  height: 20px;
-  padding: 0;
+.faucet-page .page-claim,
+.faucet-page .page-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-
-.spinner-alert .spinner-text {
+.faucet-page .page-claim .faucet-actions,
+.faucet-page .page-details .faucet-actions {
+  display: flex;
+  gap: 10px;
+}
+.faucet-page .page-claim .faucet-actions > *,
+.faucet-page .page-details .faucet-actions > * {
+  flex: 1 1 auto;
+}
+.faucet-page .txhash {
+  font-family: var(--pf-mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.faucet-page .claim-status .alert { margin: 0; }
+.faucet-page .claim-status .queue-info {
+  margin-top: 10px;
+  font-size: 14px;
+}
+.faucet-page .spinner-alert .spinner-text {
   vertical-align: top;
   margin-left: 12px;
 }
 
+// ---------------------------------------------------------------------------------------------
+// status pages: many rows, so the tables stay dense
+
 .faucet-page .faucet-status {
   max-width: none;
 }
-
+.faucet-page .faucet-status .status-head {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.faucet-page .faucet-status .status-key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.faucet-page .faucet-status .status-key label {
+  font-size: 12px;
+  color: var(--pf-ink-3);
+}
+.faucet-page .faucet-status .status-key input {
+  width: 180px;
+  height: 34px;
+  border-radius: var(--pf-radius-sm);
+  font-size: 13px;
+}
+.faucet-page .faucet-status .status-key .btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--pf-radius-sm);
+  font-size: 13px;
+}
+.faucet-page .faucet-status .status-key-error {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+}
+.faucet-page .faucet-status h4, .faucet-page .faucet-status h5 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.faucet-page .faucet-status .status-refresh {
+  padding: 0.35rem 0.9rem;
+  font-size: 14px;
+}
 .faucet-page .faucet-status .status-panel {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  padding: 0;
 }
-
+.faucet-page .faucet-status .status-panel .card-body {
+  padding: 16px 18px;
+  // the session table is wider than a laptop; it scrolls inside its card
+  overflow-x: auto;
+}
+.faucet-page .faucet-status .status-panel .card-title {
+  font-size: 15px;
+  font-weight: 650;
+  margin-bottom: 10px;
+}
+.faucet-page .faucet-status .status-general {
+  max-width: none;
+  padding: 0;
+}
+.faucet-page .faucet-status .status-general .status-block {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: var(--pf-radius-sm);
+  background: var(--pf-surface-2);
+  border: 1px solid var(--pf-border);
+  font-size: 13px;
+}
+.faucet-page .faucet-status .status-general .status-prop {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+}
+.faucet-page .faucet-status .status-general .status-title {
+  display: inline-block;
+  width: auto;
+  color: var(--pf-ink-3);
+}
+.faucet-page .faucet-status .status-general .status-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.faucet-page .faucet-status .status-sessions {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.faucet-page .faucet-status .status-sessions th {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pf-ink-3);
+  white-space: nowrap;
+}
+.faucet-page .faucet-status .status-sessions td,
+.faucet-page .faucet-status .status-sessions tbody th {
+  padding: 3px 8px;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  color: var(--pf-ink);
+}
+.faucet-page .faucet-status .status-sessions .badge {
+  font-size: 10.5px;
+  margin-right: 4px;
+}
 .faucet-page .faucet-status .ipaddr-icon {
-  margin-right: 8px;
+  margin-right: 6px;
 }
 
-.faucet-page .faucet-description {
-  font-size: 11pt;
-  color: #343a40;
-  margin-top: 16px;
-}
-
-.faucet-page .faucet-description .pow-info {
-  margin-top: 8px;
-}
+// ---------------------------------------------------------------------------------------------
+// dialogs
 
 .modal-dialog.modal-700px {
   max-width: 700px;
 }
+.faucet-page .modal-header .modal-title {
+  font-size: 18px;
+  font-weight: 650;
+}
 
+// ---------------------------------------------------------------------------------------------
+// the mining picture
+
+.faucet-page .pow-status-image .pow-progress-animation svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}

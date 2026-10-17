@@ -3,7 +3,7 @@ import { HashRouter as Router, Routes, Route, Link, useLocation } from "react-ro
 
 import { FaucetApi } from '../common/FaucetApi';
 import { IFaucetConfig, IFaucetStatus } from '../common/FaucetConfig';
-import { IFaucetContext, IFaucetContextUrls } from '../common/FaucetContext';
+import { IFaucetContext, IFaucetContextUrls, IPageHeader } from '../common/FaucetContext';
 import { FaucetNotification } from './shared/FaucetNotification';
 import { FaucetDialog, IFaucetDialogProps } from './shared/FaucetDialog';
 
@@ -21,6 +21,7 @@ import { SlotOutlet } from '../sdk/SlotOutlet';
 
 import './FaucetPage.scss'
 import { PoWMinerWorkerSrc, getPoWMinerDefaultSrc } from '../types/PoWMinerSrc';
+import { toReadableAmount } from '../utils/ConvertHelpers';
 import { joinUrl } from '../utils/QueryUtils';
 
 export interface IFaucetPageProps {
@@ -40,6 +41,7 @@ export interface IFaucetPageState {
   statusAlerts: IFaucetStatusAlert[];
   dialogs: IFaucetDialog[];
   notifications: IFaucetNotification[];
+  pageHeader: IPageHeader | null;
 }
 
 export interface IFaucetNotification {
@@ -139,6 +141,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       hideDialog: (dialogId: number) => this.hideDialog(dialogId),
       getContainer: () => this.faucetContainerElement,
       refreshConfig: () => this.loadFaucetConfig(),
+      setPageHeader: (header) => this.setState({ pageHeader: header }),
     };
     // the modules' `api` and `session` accessors read the page's context; published once, never by a module
     publishFaucetContext(this.pageContext);
@@ -150,6 +153,7 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       statusAlerts: [],
       dialogs: [],
       notifications: [],
+      pageHeader: null,
 		};
 
     if(props.ref) {
@@ -214,15 +218,12 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
       );
     }
     return (
-      <div className='faucet-page' ref={(ref) => {
+      <div className='faucet-page' data-bs-theme="light" ref={(ref) => {
         this.faucetContainerElement = ref;
       }}>
         <FaucetConfigContext.Provider value={this.state.faucetConfig}>
           <FaucetPageContext.Provider value={this.pageContext}>
-            <div className="faucet-title">
-              <h1 className="center">{this.state.faucetConfig.faucetTitle}</h1>
-              <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
-            </div>
+            {this.renderTitle()}
             <SlotOutlet slot="header" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
             {this.renderStatusAlerts()}
             <div className="faucet-body">
@@ -289,13 +290,42 @@ export class FaucetPage extends React.PureComponent<IFaucetPageProps, IFaucetPag
             {this.renderNotifications()}
             <SlotOutlet slot="footer" faucetConfig={this.state.faucetConfig} navigate={(path) => { location.hash = path; }} />
             <div className='faucet-footer'>
-              <div className="faucet-client-version">v{FAUCET_CLIENT_VERSION}</div>
+              <span className="faucet-client-version">PoWFaucet client v{FAUCET_CLIENT_VERSION}</span>
+              <a href="https://github.com/pk910/PoWFaucet" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
             </div>
           </FaucetPageContext.Provider>
         </FaucetConfigContext.Provider>
       </div>
     );
 	}
+
+  /**
+   * The card's one header: the faucet's title and claim range, or what the page put there
+   * (its own title, a meta line, a status pill at the right).
+   */
+  private renderTitle(): React.ReactElement {
+    let config = this.state.faucetConfig;
+    let header = this.state.pageHeader || {};
+    let meta = header.meta;
+    if(meta === undefined && config.maxClaim) {
+      let parts = ["Up to " + toReadableAmount(config.maxClaim, config.faucetCoinDecimals, config.faucetCoinSymbol) + " per session"];
+      if(config.minClaim)
+        parts.push("minimum claim " + toReadableAmount(config.minClaim, config.faucetCoinDecimals, config.faucetCoinSymbol));
+      meta = parts.join(" \u00b7 ");
+    }
+    return (
+      <div className="faucet-title">
+        <div className="faucet-title-text">
+          <h1>{header.title || config.faucetTitle}</h1>
+          {meta ? <p className="faucet-meta">{meta}</p> : null}
+        </div>
+        {header.pill ?
+          <span className={"pf-pill" + (header.pill.kind ? " pf-pill-" + header.pill.kind : "")}>{header.pill.text}</span>
+        : null}
+        <div className="faucet-status-link" onClick={() => this.onFaucetStatusClick()}></div>
+      </div>
+    );
+  }
 
   private renderStatusAlerts(): React.ReactElement {
     let faucetStatusEntries = [];

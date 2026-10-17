@@ -4,13 +4,14 @@ import { useNavigate, NavigateFunction } from "react-router";
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { renderDate } from '../../utils/DateUtils';
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Tooltip } from 'react-bootstrap';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { IClientClaimStatus } from '../../types/FaucetStatus';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 
 
 import "./FaucetStatus.css";
+import { FaucetOverlay } from '../shared/FaucetOverlay';
 
 export interface IQueueStatusPageProps {
   pageContext: IFaucetContext;
@@ -35,12 +36,14 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
   }
 
   public componentDidMount() {
+    this.props.pageContext.setPageHeader({ title: "Claim queue", meta: this.props.faucetConfig.faucetTitle });
     if(!this.state.refreshing) {
       this.refreshQueueStatus();
     }
   }
 
   public componentWillUnmount() {
+    this.props.pageContext.setPageHeader(null);
   }
 
   private refreshQueueStatus() {
@@ -62,12 +65,9 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
 
     return (
       <div className='container grid faucet-status'>
-        <div className='row'>
-          <div className='col-md-auto'>
-            <h5>Queue Status</h5>
-          </div>
-          <div className='col'>
-            <button type="button" className="btn btn-primary status-refresh" onClick={() => this.refreshQueueStatus()} disabled={this.state.refreshing}>Refresh</button>
+        <div className='status-head'>
+          <div className='status-key'>
+            <button type="button" className="btn btn-primary btn-sm status-refresh" onClick={() => this.refreshQueueStatus()} disabled={this.state.refreshing}>Refresh</button>
           </div>
         </div>
         <div className='row'>
@@ -122,14 +122,13 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
         claimStatus = <span className="badge bg-success">Confirmed</span>;
         break;
       case "failed":
-        claimStatus = <OverlayTrigger
+        claimStatus = <FaucetOverlay
           placement="left"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderClaimFailInfo(claim, props)}
         >
           <span className="badge bg-danger">Failed</span>
-        </OverlayTrigger>;
+        </FaucetOverlay>;
         break;
       case "unknown":
         claimStatus = <span className="badge bg-warning text-dark">Outcome unknown</span>;

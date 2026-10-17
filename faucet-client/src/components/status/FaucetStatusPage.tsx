@@ -6,11 +6,13 @@ import { useNavigate, NavigateFunction } from "react-router";
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { renderDate, renderTime, renderTimespan } from '../../utils/DateUtils';
 import getCountryIcon from 'country-flag-icons/unicode'
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Tooltip } from 'react-bootstrap';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { IClientClaimStatus, IClientSessionStatus, IFaucetRpcEndpointStatus, IFaucetStatusGeneralStatus, IFaucetStatusOutflowStatus, IFaucetStatusRefillStatus } from '../../types/FaucetStatus';
+import { getOperatorKey, setOperatorKey } from '../../common/OperatorKey';
 
 import "./FaucetStatus.css";
+import { FaucetOverlay } from '../shared/FaucetOverlay';
 
 export interface IFaucetStatusPageProps {
   pageContext: IFaucetContext;
@@ -20,6 +22,11 @@ export interface IFaucetStatusPageProps {
 
 export interface IFaucetStatusPageState {
   refreshing: boolean;
+  /** what is in the key field; sent and stored when the form is submitted */
+  keyInput: string;
+  /** the list on the page came unmasked */
+  unmasked: boolean;
+  keyError: string | null;
   status: IFaucetStatusGeneralStatus;
   refillStatus: IFaucetStatusRefillStatus;
   outflowStatus: IFaucetStatusOutflowStatus;
@@ -35,6 +42,9 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
 
     this.state = {
       refreshing: false,
+      keyInput: getOperatorKey() || "",
+      unmasked: false,
+      keyError: null,
       status: null,
       refillStatus: null,
       outflowStatus: null,
@@ -45,19 +55,53 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
   }
 
   public componentDidMount() {
+    this.updateHeader();
     if(!this.state.refreshing) {
       this.refreshFaucetStatus();
     }
   }
 
+  public componentDidUpdate(prevProps: IFaucetStatusPageProps, prevState: IFaucetStatusPageState) {
+    if(prevState.unmasked !== this.state.unmasked || prevState.status !== this.state.status)
+      this.updateHeader();
+  }
+
   public componentWillUnmount() {
+    this.props.pageContext.setPageHeader(null);
+  }
+
+  /** the card's header while this page is on */
+  private updateHeader() {
+    this.props.pageContext.setPageHeader({
+      title: "Faucet status",
+      meta: this.props.faucetConfig.faucetTitle + " \u00b7 " + (this.state.unmasked ? "real session ids and ips, a session id opens its details" : "session ids and ips are hashed"),
+      pill: this.state.unmasked ? { text: "Unmasked", kind: "live" } : { text: "Masked", kind: "" },
+    });
+  }
+
+  /** the key field was submitted: keep what is in it for the tab and reload with it */
+  private onKeySubmit(evt: React.FormEvent) {
+    evt.preventDefault();
+    setOperatorKey(this.state.keyInput.trim() || null);
+    this.refreshFaucetStatus();
   }
 
   private refreshFaucetStatus() {
+    let key = getOperatorKey();
     this.setState({
-      refreshing: true
+      refreshing: true,
+      keyError: null,
     });
-    this.props.pageContext.faucetApi.getFaucetStatus().then((faucetStatus) => {
+    this.props.pageContext.faucetApi.getFaucetStatus(key || undefined).catch((err) => {
+      // a refused key answers with a plain 403, which is no json: forget the key and show the
+      // public list instead of a page that never loads
+      if(!key)
+        throw err;
+      setOperatorKey(null);
+      this.setState({ keyInput: "", keyError: "The faucet did not accept that key." });
+      key = null;
+      return this.props.pageContext.faucetApi.getFaucetStatus();
+    }).then((faucetStatus) => {
       let activeClaims = (faucetStatus.claims || []).sort((a, b) => a.time - b.time);
       let activeClaimIds = {};
       activeClaims.forEach((claim) => {
@@ -77,6 +121,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
 
       this.setState({
         refreshing: false,
+        unmasked: !!key,
         status: faucetStatus.status,
         refillStatus: faucetStatus.refill,
         outflowStatus: faucetStatus.outflowRestriction,
@@ -84,24 +129,38 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         activeSessions: activeSessions,
         activeClaims: activeClaims,
       });
+    }).catch((err) => {
+      this.setState({
+        refreshing: false,
+      });
     });
   }
 
 	public render(): React.ReactElement<IFaucetStatusPageProps> {
     return (
       <div className='container grid faucet-status'>
-        <div className='row'>
-          <div className='col-md-auto'>
-            <h4>Faucet Status</h4>
-          </div>
-          <div className='col'>
-            <button type="button" className="btn btn-primary status-refresh" onClick={() => this.refreshFaucetStatus()} disabled={this.state.refreshing}>Refresh</button>
-          </div>
+        <div className='status-head'>
+          <form className='status-key' onSubmit={(evt) => this.onKeySubmit(evt)}>
+            <label htmlFor="status-operator-key">Operator key</label>
+            <input
+              id="status-operator-key"
+              type="password"
+              className="form-control form-control-sm"
+              autoComplete="off"
+              value={this.state.keyInput}
+              placeholder="none"
+              onChange={(evt) => this.setState({ keyInput: evt.target.value })}
+            />
+            <button type="submit" className="btn btn-primary btn-sm status-refresh" disabled={this.state.refreshing}>Refresh</button>
+          </form>
         </div>
+        {this.state.keyError ?
+          <div className='alert alert-warning status-key-error' role="alert">{this.state.keyError}</div>
+        : null}
         <div className='row'>
         <div className='col-12 card status-panel'>
             <div className="card-body">
-              <h5 className="card-title">Faucet Status</h5>
+              <h5 className="card-title">Overview</h5>
               {this.renderFaucetStatus()}
             </div>
           </div>
@@ -269,10 +328,9 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
     let urlNode: React.ReactElement = <span>{ep.url}</span>;
     if (ep.lastError) {
       urlNode = (
-        <OverlayTrigger
+        <FaucetOverlay
           placement="auto"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => (
             <Tooltip id={"rpc-err-" + idx} {...props}>
               <div className='ipaddr-info claim-error'>{ep.lastError}</div>
@@ -280,7 +338,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
           )}
         >
           <span>{ep.url}</span>
-        </OverlayTrigger>
+        </FaucetOverlay>
       );
     }
 
@@ -302,8 +360,8 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       <table className="table table-striped status-sessions">
         <thead>
           <tr>
-            <th scope="col">Session Hash</th>
-            <th scope="col">IP Hash</th>
+            <th scope="col">{this.state.unmasked ? "Session" : "Session Hash"}</th>
+            <th scope="col">{this.state.unmasked ? "IP" : "IP Hash"}</th>
             <th scope="col">Target Address</th>
             <th scope="col">Start Time</th>
             <th scope="col">Timeout</th>
@@ -361,14 +419,13 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         restrClass = "bg-info";
 
       sessionStatus.push(
-        <OverlayTrigger
+        <FaucetOverlay
           placement="auto"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderRestrictionInfo(session, props)}
         >
           <span key="limit" className={["badge", restrClass].join(" ")}>{session.restr.reward} %</span>
-        </OverlayTrigger>
+        </FaucetOverlay>
       );
     }
 
@@ -378,32 +435,30 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         totalFactor *= f.factor;
       });
       sessionStatus.push(
-        <OverlayTrigger
+        <FaucetOverlay
           placement="auto"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderFactorInfo(session, props)}
         >
           <span key="factor" className={["badge", "bg-info"].join(" ")}>x{Math.round(totalFactor * 100) / 100}</span>
-        </OverlayTrigger>
+        </FaucetOverlay>
       );
     }
 
     return (
       <tr key={session.id}>
-        <th scope="row">{session.id}</th>
+        <th scope="row">{this.state.unmasked ? <a href={"#/details/" + session.id}>{session.id}</a> : session.id}</th>
         <td>
-          <OverlayTrigger
+          <FaucetOverlay
             placement="right"
             delay={{ show: 250, hide: 400 }}
-            container={this.props.pageContext.getContainer()}
             overlay={(props) => this.renderSessionIpInfo(session, props)}
           >
             <span className='ipaddr'>
               {session.ipInfo && session.ipInfo.countryCode ? <span className='ipaddr-icon'>{getCountryIcon(session.ipInfo.countryCode)}</span> : null}
               {session.ip}
             </span>
-          </OverlayTrigger>
+          </FaucetOverlay>
         </td>
         <td>{session.target}</td>
         <td>{renderDate(new Date(session.start * 1000), true)}</td>
@@ -533,7 +588,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         <thead>
           <tr>
             <th scope="col">Time</th>
-            <th scope="col">Session Hash</th>
+            <th scope="col">{this.state.unmasked ? "Session" : "Session Hash"}</th>
             <th scope="col">To Address</th>
             <th scope="col">Amount</th>
             <th scope="col">Nonce</th>
@@ -566,14 +621,13 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         claimStatus = <span className="badge bg-success">Confirmed</span>;
         break;
       case "failed":
-        claimStatus = <OverlayTrigger
+        claimStatus = <FaucetOverlay
           placement="left"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderClaimFailInfo(claim, props)}
         >
           <span className="badge bg-danger">Failed</span>
-        </OverlayTrigger>;
+        </FaucetOverlay>;
         break;
       default:
         claimStatus = <span className="badge bg-light text-dark">{claim.status}</span>;
@@ -582,7 +636,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
     return (
       <tr key={(claim.time + "-" + claim.target)}>
         <th scope="row">{renderDate(new Date(claim.time * 1000), true, true)}</th>
-        <td>{claim.session}</td>
+        <td>{this.state.unmasked ? <a href={"#/details/" + claim.session}>{claim.session}</a> : claim.session}</td>
         <td>{claim.target}</td>
         <td>{toReadableAmount(BigInt(claim.amount), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</td>
         <td>{claim.nonce || ""}</td>

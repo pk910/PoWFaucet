@@ -1,10 +1,11 @@
 import React from 'react';
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Tooltip } from 'react-bootstrap';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { IPassportInfo, IPassportScoreInfo } from '../../types/PassportInfo';
 
 import "./PassportInfo.css";
+import { FaucetOverlay } from '../shared/FaucetOverlay';
 
 export interface IPassportInfoProps {
   targetAddr: string;
@@ -131,9 +132,8 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                 {this.props.faucetConfig.modules["passport"].boostFactor ?
                   <span className="passport-factor">
                     (Reward Factor: {this.state.passportInfo.score.factor || 1} 
-                    <OverlayTrigger
+                    <FaucetOverlay
                       placement="bottom"
-                      container={this.props.pageContext.getContainer()}
                       overlay={
                         <Tooltip>
                           {this.renderFactorInfo()}
@@ -146,7 +146,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                           <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
                         </svg>
                       </div>
-                    </OverlayTrigger>
+                    </FaucetOverlay>
                     )
                   </span>
                 : null}
@@ -249,9 +249,8 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                   <span>+ {this.props.faucetConfig.modules["passport"].stampScoring[stamp.provider]}</span>
                   : null}
                 {stamp.expiration <= now ?
-                  <OverlayTrigger
+                  <FaucetOverlay
                     placement="bottom"
-                    container={this.props.pageContext.getContainer()}
                     overlay={
                       <Tooltip>
                         This stamp has been expired. Please refresh it on app.passport.xyz
@@ -259,12 +258,11 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                     }
                   >
                     <span key="status" className="badge bg-danger">Expired</span>
-                  </OverlayTrigger>
+                  </FaucetOverlay>
                   : null}
                 {stamp.duplicate ?
-                  <OverlayTrigger
+                  <FaucetOverlay
                     placement="bottom"
-                    container={this.props.pageContext.getContainer()}
                     overlay={
                       <Tooltip>
                         This stamp has already been used in the passport for {stamp.duplicate}
@@ -272,7 +270,7 @@ export class PassportInfo extends React.PureComponent<IPassportInfoProps, IPassp
                     }
                   >
                     <span key="status" className="badge bg-danger">Reused</span>
-                  </OverlayTrigger>
+                  </FaucetOverlay>
                   : null}
               </div>
             </div>

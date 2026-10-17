@@ -14,6 +14,7 @@ import { PoWSession } from '../../pow/PoWSession';
 import { PoWMiner } from '../../pow/PoWMiner';
 import { PoWMinerStatus } from './PoWMinerStatus';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
+import { renderTime } from '../../utils/DateUtils';
 import { PassportInfo } from '../passport/PassportInfo';
 import { ConnectionAlert } from './ConnectionAlert';
 
@@ -179,6 +180,8 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
     this.setState({
       clientConnected: connected
     });
+    if(this.state.loadedSession || connected)
+      this.updateHeader(connected);
     if(connected && this.connectionAlertId !== null) {
       this.props.pageContext.hideStatusAlert(this.connectionAlertId);
       this.connectionAlertId = null;
@@ -242,7 +245,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
             loadedSession: true,
             clientConnected: this.powActive ? this.state.clientConnected : true,
             isClaimable: (this.getSessionBalance() >= BigInt(this.props.faucetConfig.minClaim)),
-          });
+          }, () => this.updateHeader());
           FaucetSession.persistSessionInfo(this.faucetSession);
         }
         else 
@@ -257,6 +260,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
   }
 
   public componentWillUnmount() {
+    this.props.pageContext.setPageHeader(null);
     publishSession(null);
     Object.keys(this.eventListeners).forEach((listenerKey) => {
       let eventListener = this.eventListeners[listenerKey];
@@ -421,6 +425,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
           <div className="pow-status-container">
             <PoWMinerStatus 
               pageContext={this.props.pageContext}
+              sessionId={this.props.sessionId}
               powClient={this.powClient}
               powMiner={this.powMiner} 
               powSession={this.powSession} 
@@ -445,6 +450,21 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       </div>
     );
 	}
+
+  /** the card's header while this page is on: the session's wallet and start, and whether the connection is up */
+  private updateHeader(connected?: boolean) {
+    let target = this.faucetSession.getTargetAddr() || "";
+    let shortTarget = target.length > 12 ? target.substring(0, 6) + "\u2026" + target.substring(target.length - 4) : target;
+    let startTime = this.powActive && this.powSession ? this.powSession.getStartTime() : 0;
+    let panelOnly = (!!this.panel || this.moduleTaskPresent) && !this.powTaskPresent;
+    let isConnected = connected === undefined ? this.state.clientConnected : connected;
+    this.props.pageContext.setPageHeader({
+      meta: (startTime ? "Session started " + renderTime(new Date(startTime * 1000)) + " \u00b7 " : "") + shortTarget,
+      pill: isConnected
+        ? { text: panelOnly ? this.panelCaptions().balance : "Mining", kind: "live" }
+        : { text: "Reconnecting", kind: "warn" },
+    });
+  }
 
   /**
    * Whatever a module put in the mining slot, where the first panel used to be
