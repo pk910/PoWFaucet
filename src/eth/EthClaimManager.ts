@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
-import { EthWalletManager, PreparedClaimTx, WalletState } from "./EthWalletManager.js";
+import { EthWalletManager, PreparedClaimTx, TransactionDroppedError, WalletState } from "./EthWalletManager.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
 import { EthWalletRefill } from "./EthWalletRefill.js";
@@ -22,6 +22,8 @@ export enum ClaimTxStatus {
   PENDING = "pending",
   CONFIRMED = "confirmed",
   FAILED = "failed",
+  /** the nonce was spent and no receipt for our hash was found: paid or not is not known. Terminal, counts as consumed, to be reconciled by hand. */
+  UNKNOWN = "unknown",
 }
 
 export interface ClaimTxEvents {
@@ -460,6 +462,20 @@ export class EthClaimManager {
       });
       this.lastConfirmedClaimTxIdx = confirmedIdx;
     }).catch((error) => {
+      if(error instanceof TransactionDroppedError) {
+        // the nonce is spent and our hash has no receipt. Most likely another transaction took the
+        // slot and nobody was paid, but "most likely" does not reopen a payout: the claims end in a
+        // terminal state that counts as consumed, for an operator to reconcile against the chain
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Transaction for " + targetLabel + " has an unknown outcome, reconcile by hand: " + error.message);
+        delete this.pendingTxQueue[txHash];
+        claims.forEach((claimTx) => {
+          delete this.claimTxDict[claimTx.session];
+          claimTx.claim.claimStatus = ClaimTxStatus.UNKNOWN;
+          claimTx.claim.txError = "Transaction outcome unknown: " + error.message;
+          this.updateClaimStatus(claimTx);
+        });
+        return;
+      }
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + targetLabel + " failed: " + rpcErrorString(error));
       delete this.pendingTxQueue[txHash];
       claims.forEach((claimTx) => {

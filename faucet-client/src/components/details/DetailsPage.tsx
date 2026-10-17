@@ -330,6 +330,8 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
         return (<span className="badge bg-success">Confirmed</span>);
       case "failed":
         return (<span className="badge bg-danger">Failed</span>);
+      case "unknown":
+        return (<span className="badge bg-warning text-dark">Outcome unknown</span>);
       default:
         return (<span className="badge bg-secondary">Unknown: {this.state.sessionStatus.claimStatus}</span>);
     }

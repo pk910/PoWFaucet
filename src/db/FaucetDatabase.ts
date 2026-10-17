@@ -402,6 +402,7 @@ export class FaucetDatabase {
     let status: FaucetSessionStatus;
     switch(claimData.claimStatus) {
       case ClaimTxStatus.CONFIRMED:
+      case ClaimTxStatus.UNKNOWN: // may have paid: consumed, like a confirmed claim
         status = FaucetSessionStatus.FINISHED;
         break;
       case ClaimTxStatus.FAILED:
@@ -419,23 +420,31 @@ export class FaucetDatabase {
   }
 
   /**
-   * The claim data of several claiming sessions in one statement, so a crash cannot leave a
-   * batch half written (a signed transaction known to some of its claims' rows and not to others).
-   * The sessions stay "claiming".
+   * The claim data of several claiming sessions in one statement, all or nothing: the update only
+   * applies when every one of the sessions is claiming, otherwise it changes no row at all. So a
+   * crash can never leave a signed transaction known to some of a batch's rows and not to others,
+   * and a short batch leaves nothing behind to clean up. The sessions stay "claiming".
+   * Returns the number of rows changed: all of them, or zero.
    */
   public async updateClaimDataBulk(updates: { sessionId: string; claimData: EthClaimData }[]): Promise<number> {
     if(updates.length === 0)
       return 0;
-    let values: (string)[] = [];
+    let values: (string | number)[] = [];
     let cases = updates.map((update) => {
       values.push(update.sessionId, JSON.stringify(update.claimData));
       return "WHEN ? THEN ?";
     }).join(" ");
-    let placeholders = updates.map((update) => {
-      values.push(update.sessionId);
-      return "?";
-    }).join(",");
-    let result = await this.db.run("UPDATE Sessions SET ClaimData = CASE SessionId " + cases + " END WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")", values);
+    let placeholders = updates.map(() => "?").join(",");
+    updates.forEach((update) => values.push(update.sessionId));
+    updates.forEach((update) => values.push(update.sessionId));
+    values.push(updates.length);
+    // the derived table keeps MySQL from refusing a subquery on the table being updated
+    let result = await this.db.run(
+      "UPDATE Sessions SET ClaimData = CASE SessionId " + cases + " END" +
+      " WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")" +
+      " AND (SELECT COUNT(*) FROM (SELECT SessionId FROM Sessions WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")) AS batch) = ?",
+      values,
+    );
     return result.changes;
   }
 

@@ -180,10 +180,17 @@ so the faucet fails all its claims rather than confirming them.
   node confirmed is not re-sent.
 - A transaction counts as *dropped* only when three polls in a row saw the wallet's mined nonce
   past the transaction's and no receipt; one poll may see a nonce from one endpoint ahead of a
-  receipt from another.
+  receipt from another. Even then it is not proof that nobody was paid, so the claims end in the
+  terminal status `unknown`: the session is finished and counts towards every limit, and the
+  operator reconciles it against the chain by hand (the error log names the transaction).
 - The claimable → claiming transition is a conditional update of exactly one row; two requests
   for the same session cannot both be admitted. The signed transaction is written to every row of
-  the batch in one statement, and the bytes only leave the faucet when every row took them.
+  the batch in one all-or-nothing statement: it applies only when every row of the batch is still
+  claiming, otherwise it changes nothing, and the bytes only leave the faucet when every row took
+  them.
+- A batch transaction's gas limit is at least the worst case, every sub-call burning its whole
+  stipend, whatever `gasLimit` and `gasLimitPerClaim` say. A recipient can waste its own gas,
+  never the batch's.
 - One faucet process per wallet. Nonces are allocated in the process; two faucets on one key
   would race for them.
 

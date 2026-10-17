@@ -3,7 +3,7 @@ import { IClaimBatchConfig, IClaimCall, IClaimTxConfig } from '../../config/Conf
 import { Erc20Abi } from '../../abi/ERC20.js';
 import { ContractCaller, EthLog, IEthRpcClient } from '../rpc/index.js';
 import { EthClaimInfo } from '../EthClaimManager.js';
-import { encodeBatchCalls, resolveClaimCall } from './BatchCalls.js';
+import { BATCHER_TRANSFER_GAS, DEFAULT_CALL_GAS, ResolvedClaimCall, encodeBatchCalls, resolveClaimCall } from './BatchCalls.js';
 import { BATCHER_ABI } from './BatcherArtifact.js';
 
 /** What one transaction pays out and how: the input to signing. */
@@ -120,12 +120,31 @@ export class ClaimTxBuilder {
     return plan;
   }
 
+  /**
+   * The gas a batch needs if every sub-call burns all it may: the transaction base, the calldata,
+   * the batcher's own work per sub-call and each sub-call's stipend. The plan's gas limit is at
+   * least this, whatever the configuration says, so no recipient can make the whole batch run out
+   * of gas by using up its own.
+   */
+  public static worstCaseBatchGas(calls: ResolvedClaimCall[], dataBytes: number): number {
+    let gas = 21000 + 16 * dataBytes + 30000; // base, calldata (worst case, no zero bytes), execute's own frame
+    for(let call of calls) {
+      switch(call.type) {
+        case "transfer": gas += BATCHER_TRANSFER_GAS + 15000; break;
+        case "token": gas += BATCHER_TRANSFER_GAS * 2 + 15000; break;
+        case "call": gas += (call.gas ?? DEFAULT_CALL_GAS) + 15000; break;
+      }
+    }
+    return gas;
+  }
+
   private async buildBatchPlan(claims: EthClaimInfo[]): Promise<ClaimTxPlan> {
     if(claims.length > this.getBatchSize())
       throw new Error("ethClaimBatch.maxClaims is " + this.getBatchSize() + ", got " + claims.length + " claims");
     let stream = encodeBatchCalls(this.getClaimCalls(), claims, { walletAddr: this.walletAddr, token: this.token });
     let data = this.batcher.encode("execute", [stream.calls]);
     let gasLimit = await this.resolveGasLimit(this.batchConfig.gasLimit, this.batchConfig.gasLimitPerClaim, claims.length, { to: this.walletAddr, value: 0n, data });
+    gasLimit = Math.max(gasLimit, ClaimTxBuilder.worstCaseBatchGas(stream.resolved, (data.length - 2) / 2));
     let callRanges = claims.map((claim, idx) => ({ offset: idx * stream.callsPerClaim, count: stream.callsPerClaim }));
     // the wallet pays the calls from its own balance inside execute: nothing rides on the transaction
     return { to: this.walletAddr, value: 0n, nativeSpend: stream.value, data, gasLimit, claims, callRanges };

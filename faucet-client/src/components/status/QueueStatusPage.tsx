@@ -131,6 +131,9 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
           <span className="badge bg-danger">Failed</span>
         </OverlayTrigger>;
         break;
+      case "unknown":
+        claimStatus = <span className="badge bg-warning text-dark">Outcome unknown</span>;
+        break;
       default:
         claimStatus = <span className="badge bg-light text-dark">{claim.status}</span>;
     }

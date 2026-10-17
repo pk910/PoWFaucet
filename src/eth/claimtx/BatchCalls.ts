@@ -16,6 +16,9 @@ export const CLAIM_CALL_KINDS = { transfer: 0, token: 1, call: 2 } as const;
 /** gas a `call` may use when the template does not say */
 export const DEFAULT_CALL_GAS = 200000;
 
+/** the batcher's stipend for a transfer (TRANSFER_GAS in the contract); a token transfer gets twice that */
+export const BATCHER_TRANSFER_GAS = 50000;
+
 const UINT96_MAX = (1n << 96n) - 1n;
 
 /** One call with its placeholders filled in. */
@@ -36,6 +39,8 @@ export interface ResolvedClaimCall {
 export interface EncodedBatchCalls {
   /** the stream, 0x-prefixed */
   calls: string;
+  /** every sub-call in stream order, as resolved */
+  resolved: ResolvedClaimCall[];
   /** native coin the stream moves out of the wallet, in wei */
   value: bigint;
   /** calls per claim: the position of a failed sub-call divided by this is the claim's position */
@@ -126,13 +131,15 @@ export function encodeBatchCalls(templates: IClaimCall[], claims: EthClaimInfo[]
     throw new Error("ethClaimTx.calls is empty");
   let hex = "";
   let value = 0n;
+  let resolved: ResolvedClaimCall[] = [];
   for(let claim of claims) {
     for(let template of templates) {
       let call = resolveClaimCall(template, { ...ctx, claims: [claim] });
+      resolved.push(call);
       hex += packClaimCall(call);
       if(call.type !== "token")
         value += call.amount;
     }
   }
-  return { calls: "0x" + hex, value, callsPerClaim: templates.length };
+  return { calls: "0x" + hex, value, resolved, callsPerClaim: templates.length };
 }

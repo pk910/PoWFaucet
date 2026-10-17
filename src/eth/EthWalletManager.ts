@@ -71,6 +71,18 @@ export interface ClaimReceiptEvaluation {
 /** polls in a row that must show the nonce spent and no receipt before a transaction counts as dropped */
 const DROPPED_CONFIRMATION_POLLS = 3;
 
+/**
+ * The nonce was spent and our hash has no receipt. Another transaction most likely took the slot,
+ * but a receipt lagging behind the nonce on some endpoint looks the same, so this is not proof of
+ * non-payment: callers treat it as an unknown outcome, never as a failure that frees the payout.
+ */
+export class TransactionDroppedError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "TransactionDroppedError";
+  }
+}
+
 export class EthWalletManager {
 
   private initialized: boolean;
@@ -633,7 +645,7 @@ export class EthWalletManager {
             receipt = await this.client.getTransactionReceipt(txhash); // it may have just been mined
             if(receipt)
               return receipt;
-            throw new Error("transaction " + txhash + " was dropped: nonce " + txnonce + " was spent by another transaction");
+            throw new TransactionDroppedError("transaction " + txhash + " was dropped: nonce " + txnonce + " was spent by another transaction");
           }
         }
       } catch(ex) {

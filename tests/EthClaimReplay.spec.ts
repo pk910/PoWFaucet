@@ -133,12 +133,22 @@ describe("ETH Claim Replay", () => {
       await database.updateSession(s);
     }
     c.claim = { claimIdx: 3, claimStatus: ClaimTxStatus.QUEUE, claimTime: c.startTime };
-    await database.updateSession(c); // still claimable, not part of the batch
-    await database.updateClaimDataBulk([
+    await database.updateSession(c); // still claimable: not ours to pay
+
+    // a batch with a member that is not claiming: nothing is written, not even for the members that are
+    let changed = await database.updateClaimDataBulk([
+      { sessionId: a.sessionId, claimData: { ...a.claim, txHash: "0xbad", txNonce: 6, txHex: "bad" } },
+      { sessionId: b.sessionId, claimData: { ...b.claim, txHash: "0xbad", txNonce: 6, txHex: "bad" } },
+      { sessionId: c.sessionId, claimData: { ...c.claim, txHash: "0xbad" } },
+    ]);
+    expect(changed).to.equal(0, "all or nothing");
+    expect((await database.getSession(a.sessionId)).claim.txHash).to.equal(undefined, "no row took the transaction");
+
+    changed = await database.updateClaimDataBulk([
       { sessionId: a.sessionId, claimData: { ...a.claim, txHash: "0xaa", txNonce: 7, txHex: "aa", txCalls: { offset: 0, count: 1 } } },
       { sessionId: b.sessionId, claimData: { ...b.claim, txHash: "0xaa", txNonce: 7, txHex: "aa", txCalls: { offset: 1, count: 1 } } },
-      { sessionId: c.sessionId, claimData: { ...c.claim, txHash: "0xaa" } },
     ]);
+    expect(changed).to.equal(2);
     let rowA = await database.getSession(a.sessionId);
     let rowB = await database.getSession(b.sessionId);
     let rowC = await database.getSession(c.sessionId);
@@ -253,7 +263,7 @@ describe("ETH Claim Replay", () => {
     expect(storedSession.status).to.equal(FaucetSessionStatus.FAILED, "a failed row is not replayed after a restart");
   });
 
-  it("fails a transaction whose nonce was spent by another one", async () => {
+  it("ends a transaction whose nonce was spent by another one as unknown, never as retryable", async () => {
     fakeProvider.injectResponse("eth_sendRawTransaction", TX_HASH_RSP);
     fakeProvider.injectResponse("eth_getTransactionReceipt", null);
     fakeProvider.injectResponse("eth_getTransactionCount", (payload) => payload.params[1] === "latest" ? 43 : 42);
@@ -264,9 +274,12 @@ describe("ETH Claim Replay", () => {
     let claim = await claimManager.createSessionClaim(sessionData(), {});
     await claimManager.processQueue();
     expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
-    await awaitSleepPromise(2000, () => claim.claim.claimStatus === ClaimTxStatus.FAILED);
-    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.FAILED);
-    expect(claim.claim.txError).to.match(/dropped: nonce 42 was spent/);
+    await awaitSleepPromise(2000, () => claim.claim.claimStatus === ClaimTxStatus.UNKNOWN);
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.UNKNOWN, "a spent nonce without our receipt is not proof of non-payment");
+    expect(claim.claim.txError).to.match(/outcome unknown.*nonce 42 was spent/);
+    await awaitSleepPromise(500, () => false);
+    let row = await ServiceManager.GetService(FaucetDatabase).getSession(claim.session);
+    expect(row.status).to.equal(FaucetSessionStatus.FINISHED, "consumed: counts towards the limits, cannot be claimed again");
   });
 
   it("refuses a template that sends more value than the claims amount to", async () => {

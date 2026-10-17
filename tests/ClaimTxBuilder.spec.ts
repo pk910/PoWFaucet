@@ -150,7 +150,16 @@ describe("Claim transaction builder", () => {
       expect(plan.to).to.equal(WALLET, "the wallet executes its own code");
       expect(plan.value).to.equal(0n, "the sub-calls pay from the wallet balance");
       expect(plan.nativeSpend).to.equal(750n, "what leaves the wallet in total");
-      expect(plan.gasLimit).to.equal(60000 + 3 * 45000);
+      // the configured 60000 + 3 * 45000 is below the worst case of three transfers burning their stipend
+      let worstCase = ClaimTxBuilder.worstCaseBatchGas([
+        { type: "transfer", to: c1.target, amount: 100n, data: "" },
+        { type: "transfer", to: c2.target, amount: 250n, data: "" },
+        { type: "transfer", to: c3.target, amount: 400n, data: "" },
+      ], (plan.data.length - 2) / 2);
+      expect(worstCase).to.be.greaterThan(60000 + 3 * 45000);
+      expect(plan.gasLimit).to.equal(worstCase, "the plan's gas limit is at least the worst case");
+      let generous = await activeBuilder(null, null, { ...batch, gasLimit: 1000000 }).buildPlan([c1, c2, c3]);
+      expect(generous.gasLimit).to.equal(1000000 + 3 * 45000, "a configured limit above the worst case stands");
       expect(executeStream(plan.data)).to.equal(
         "0x" +
         "00" + c1.target.substring(2) + "000000000000000000000064" +
