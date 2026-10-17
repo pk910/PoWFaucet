@@ -33,7 +33,12 @@ var webpackModuleConfigs = [
                 // don't emit a BOM/@charset in the sass output: it ends up
                 // mid-file after bundling and invalidates the first selector
                 sassOptions: {
-                  charset: false
+                  charset: false,
+                  // Bootstrap 5.3 still uses @import and the global built-ins; neither can change
+                  // before Bootstrap 6, so its warnings (quietDeps) and the warnings for our
+                  // own @import of it are muted. Everything else still reports.
+                  quietDeps: true,
+                  silenceDeprecations: ["import"]
                 }
               }
             }
@@ -82,6 +87,12 @@ var webpackModuleConfigs = [
 var webpackBaseConfig = {
   mode: debug ? "development" : "production",
   devtool: "source-map",
+  // the main bundle (react + bootstrap) and the wasm hasher workers are 400-550 KiB by nature;
+  // webpack's 244 KiB hint only adds noise. 1 MiB still flags a runaway bundle.
+  performance: {
+    maxAssetSize: 1024 * 1024,
+    maxEntrypointSize: 1024 * 1024,
+  },
 
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
