@@ -1,7 +1,8 @@
 import React, { useState, useImperativeHandle, forwardRef } from 'react';
 import { IFaucetConfig } from '../../../common/FaucetConfig';
 import { IFaucetContext } from '../../../common/FaucetContext';
-import { OverlayTrigger, Popover, Form, Row, Col } from 'react-bootstrap'; // Assuming react-bootstrap is available
+import { Popover, Form, Row, Col } from 'react-bootstrap'; // Assuming react-bootstrap is available
+import { FaucetOverlay } from '../../shared/FaucetOverlay';
 
 export interface IVoucherInputProps {
   faucetContext: IFaucetContext;
@@ -39,12 +40,11 @@ const VoucherInput = forwardRef<IVoucherInputRef, IVoucherInputProps>((props, re
           <Form.Label column sm="auto" className="mb-0">
             {voucherConfig.voucherLabel}
             {infoPopover && (
-              // into the faucet's own element: outside it the popover has none of the scoped styles and lands at the end of the document
-              <OverlayTrigger trigger={['hover', 'focus']} placement="right" container={() => props.faucetContext.getContainer()} overlay={infoPopover}>
+              <FaucetOverlay trigger={['hover', 'focus']} placement="right" overlay={infoPopover}>
                 <span className="info-icon ms-1" style={{ cursor: 'pointer' }}>
                   &#9432; {/* Unicode INFO symbol */}
                 </span>
-              </OverlayTrigger>
+              </FaucetOverlay>
             )}
           </Form.Label>
         )}

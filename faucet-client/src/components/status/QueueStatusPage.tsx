@@ -4,13 +4,14 @@ import { useNavigate, NavigateFunction } from "react-router";
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { IFaucetConfig } from '../../common/FaucetConfig';
 import { renderDate } from '../../utils/DateUtils';
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Tooltip } from 'react-bootstrap';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { IClientClaimStatus } from '../../types/FaucetStatus';
 import { FaucetConfigContext, FaucetPageContext } from '../FaucetPage';
 
 
 import "./FaucetStatus.css";
+import { FaucetOverlay } from '../shared/FaucetOverlay';
 
 export interface IQueueStatusPageProps {
   pageContext: IFaucetContext;
@@ -122,14 +123,13 @@ export class QueueStatusPage extends React.PureComponent<IQueueStatusPageProps, 
         claimStatus = <span className="badge bg-success">Confirmed</span>;
         break;
       case "failed":
-        claimStatus = <OverlayTrigger
+        claimStatus = <FaucetOverlay
           placement="left"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderClaimFailInfo(claim, props)}
         >
           <span className="badge bg-danger">Failed</span>
-        </OverlayTrigger>;
+        </FaucetOverlay>;
         break;
       default:
         claimStatus = <span className="badge bg-light text-dark">{claim.status}</span>;

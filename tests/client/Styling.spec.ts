@@ -176,39 +176,55 @@ describe("browser: styling and embedding", function() {
     expect(layout.footerBottom).to.be.at.most(layout.docHeight, "the footer hangs out of the page");
   });
 
-  it("an info callout opens inside the faucet and moves nothing", async function() {
+  it("every info callout opens inside the faucet and moves nothing, even when the page fits the window exactly", async function() {
     if(skipReason) return this.skip();
     fixture = await bootFaucet({
       configure: (config) => {
         config.modules["voucher"] = { enabled: true, voucherLabel: "Voucher code", infoHtml: "<b>Vouchers</b><br>Codes from the event desk." } as any;
+        config.modules["authenticatoor"] = { enabled: true, authUrl: "http://127.0.0.1:9/auth", audience: "x", infoHtml: "<b>Login</b><br>Optional, gives a boost." } as any;
+        config.modules["ticket-proof"] = { enabled: true, infoHtml: "<b>Ticket</b><br>Log in with your event ticket." } as any;
       },
     });
     page = await browser.newPage({ viewport: { width: 700, height: 900 } });
     await openFaucet(page, fixture);
-    await page.mouse.move(5, 5);
-    let before = await page.evaluate(() => ({
-      cardTop: document.querySelector(".faucet-container").getBoundingClientRect().top,
-      docHeight: document.documentElement.scrollHeight,
-    }));
+    // a window the page fits into exactly: any overflow an overlay adds would bring a scrollbar
+    let docHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+    await page.setViewportSize({ width: 700, height: docHeight });
+    await page.waitForTimeout(200);
 
-    await page.locator(".voucher-input-container .info-icon").hover();
-    let popover = page.locator(".faucet-page .popover");
-    await popover.waitFor({ timeout: 10000 });
-    let shown = await page.evaluate(() => {
-      let popover = document.querySelector(".faucet-page .popover");
-      return {
+    let icons = page.locator(".faucet-page .info-icon, .faucet-page .auth-info-icon, .faucet-page .ticketproof-info-icon, .faucet-page .zupass-info-icon");
+    let count = await icons.count();
+    expect(count).to.be.at.least(3, "the login area's info icons are missing");
+
+    for(let idx = 0; idx < count; idx++) {
+      await page.mouse.move(5, 5);
+      await page.waitForTimeout(300);
+      let before = await page.evaluate(() => ({
         cardTop: document.querySelector(".faucet-container").getBoundingClientRect().top,
         docHeight: document.documentElement.scrollHeight,
-        position: getComputedStyle(popover).position,
-        background: getComputedStyle(popover).backgroundColor,
-        text: popover.textContent,
-      };
-    });
-    expect(shown.text).to.contain("Codes from the event desk.");
-    expect(shown.position).to.equal("absolute", "the callout takes part in the layout");
-    expect(shown.background).to.equal("rgb(255, 255, 255)", "the callout is unstyled: it is outside the faucet's scope");
-    expect(shown.docHeight).to.equal(before.docHeight, "the callout made the document taller");
-    expect(shown.cardTop).to.equal(before.cardTop, "the card moved when the callout opened");
+        docWidth: document.documentElement.scrollWidth,
+      }));
+      await icons.nth(idx).hover();
+      let overlay = page.locator(".faucet-page .tooltip, .faucet-page .popover");
+      await overlay.first().waitFor({ timeout: 10000 });
+      let shown = await page.evaluate(() => {
+        let overlay = document.querySelector(".faucet-page .tooltip, .faucet-page .popover");
+        return {
+          cardTop: document.querySelector(".faucet-container").getBoundingClientRect().top,
+          docHeight: document.documentElement.scrollHeight,
+          docWidth: document.documentElement.scrollWidth,
+          position: getComputedStyle(overlay).position,
+          text: overlay.textContent,
+          outsideFaucet: document.body.querySelectorAll(":scope > .tooltip, :scope > .popover").length,
+        };
+      });
+      expect(shown.text.length, "callout " + idx + " is empty").to.be.greaterThan(0);
+      expect(shown.position).to.equal("fixed", "callout " + idx + " takes part in the layout");
+      expect(shown.outsideFaucet).to.equal(0, "callout " + idx + " landed outside the faucet");
+      expect(shown.docHeight).to.equal(before.docHeight, "callout " + idx + " made the document taller");
+      expect(shown.docWidth).to.equal(before.docWidth, "callout " + idx + " made the document wider");
+      expect(shown.cardTop).to.equal(before.cardTop, "callout " + idx + " moved the card");
+    }
   });
 
   it("the mining page shows the stat tiles, the key/value rows and the live pill", async function() {

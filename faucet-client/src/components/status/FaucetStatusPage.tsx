@@ -6,12 +6,13 @@ import { useNavigate, NavigateFunction } from "react-router";
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { renderDate, renderTime, renderTimespan } from '../../utils/DateUtils';
 import getCountryIcon from 'country-flag-icons/unicode'
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Tooltip } from 'react-bootstrap';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { IClientClaimStatus, IClientSessionStatus, IFaucetRpcEndpointStatus, IFaucetStatusGeneralStatus, IFaucetStatusOutflowStatus, IFaucetStatusRefillStatus } from '../../types/FaucetStatus';
 import { getOperatorKey, setOperatorKey } from '../../common/OperatorKey';
 
 import "./FaucetStatus.css";
+import { FaucetOverlay } from '../shared/FaucetOverlay';
 
 export interface IFaucetStatusPageProps {
   pageContext: IFaucetContext;
@@ -316,10 +317,9 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
     let urlNode: React.ReactElement = <span>{ep.url}</span>;
     if (ep.lastError) {
       urlNode = (
-        <OverlayTrigger
+        <FaucetOverlay
           placement="auto"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => (
             <Tooltip id={"rpc-err-" + idx} {...props}>
               <div className='ipaddr-info claim-error'>{ep.lastError}</div>
@@ -327,7 +327,7 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
           )}
         >
           <span>{ep.url}</span>
-        </OverlayTrigger>
+        </FaucetOverlay>
       );
     }
 
@@ -408,14 +408,13 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         restrClass = "bg-info";
 
       sessionStatus.push(
-        <OverlayTrigger
+        <FaucetOverlay
           placement="auto"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderRestrictionInfo(session, props)}
         >
           <span key="limit" className={["badge", restrClass].join(" ")}>{session.restr.reward} %</span>
-        </OverlayTrigger>
+        </FaucetOverlay>
       );
     }
 
@@ -425,14 +424,13 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         totalFactor *= f.factor;
       });
       sessionStatus.push(
-        <OverlayTrigger
+        <FaucetOverlay
           placement="auto"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderFactorInfo(session, props)}
         >
           <span key="factor" className={["badge", "bg-info"].join(" ")}>x{Math.round(totalFactor * 100) / 100}</span>
-        </OverlayTrigger>
+        </FaucetOverlay>
       );
     }
 
@@ -440,17 +438,16 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       <tr key={session.id}>
         <th scope="row">{this.state.unmasked ? <a href={"#/details/" + session.id}>{session.id}</a> : session.id}</th>
         <td>
-          <OverlayTrigger
+          <FaucetOverlay
             placement="right"
             delay={{ show: 250, hide: 400 }}
-            container={this.props.pageContext.getContainer()}
             overlay={(props) => this.renderSessionIpInfo(session, props)}
           >
             <span className='ipaddr'>
               {session.ipInfo && session.ipInfo.countryCode ? <span className='ipaddr-icon'>{getCountryIcon(session.ipInfo.countryCode)}</span> : null}
               {session.ip}
             </span>
-          </OverlayTrigger>
+          </FaucetOverlay>
         </td>
         <td>{session.target}</td>
         <td>{renderDate(new Date(session.start * 1000), true)}</td>
@@ -613,14 +610,13 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
         claimStatus = <span className="badge bg-success">Confirmed</span>;
         break;
       case "failed":
-        claimStatus = <OverlayTrigger
+        claimStatus = <FaucetOverlay
           placement="left"
           delay={{ show: 250, hide: 400 }}
-          container={this.props.pageContext.getContainer()}
           overlay={(props) => this.renderClaimFailInfo(claim, props)}
         >
           <span className="badge bg-danger">Failed</span>
-        </OverlayTrigger>;
+        </FaucetOverlay>;
         break;
       default:
         claimStatus = <span className="badge bg-light text-dark">{claim.status}</span>;

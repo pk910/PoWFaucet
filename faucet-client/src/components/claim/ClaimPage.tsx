@@ -9,10 +9,11 @@ import { renderDate, renderTimespan } from '../../utils/DateUtils';
 import { ClaimInput } from './ClaimInput';
 import { SlotOutlet } from '../../sdk/SlotOutlet';
 import { emitHook, emitHookSafe } from '../../sdk/hooks';
-import { OverlayTrigger, Spinner, Tooltip } from 'react-bootstrap';
+import { Spinner, Tooltip } from 'react-bootstrap';
 import { ClaimNotificationClient, IClaimNotificationUpdateData } from './ClaimNotificationClient';
 
 import './ClaimPage.css'
+import { FaucetOverlay } from '../shared/FaucetOverlay';
 
 // Component that preserves DOM elements by only setting innerHTML once
 class ResultSharingHtml extends React.Component<{ html: string }> {
@@ -360,9 +361,8 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
             <div className='pf-kv'>
               <span>Queue position</span>
               <b>
-                <OverlayTrigger
+                <FaucetOverlay
                   placement="auto"
-                  container={this.props.pageContext.getContainer()}
                   overlay={
                     <Tooltip>
                       {((this.state.sessionStatus.claimIdx || 0) - (this.state.claimNotification?.processedIdx || 0) - 1)} claims will be processed before yours.
@@ -375,7 +375,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
                       (this.state.sessionStatus.claimIdx || 0) - (this.state.claimNotification?.processedIdx || 0)
                     }
                   </span>
-                </OverlayTrigger>
+                </FaucetOverlay>
               </b>
             </div>
           </div>

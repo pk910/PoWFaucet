@@ -7,10 +7,11 @@ import { renderTimespan } from '../../utils/DateUtils';
 import { FaucetTime } from '../../common/FaucetTime';
 import { PoWClient } from '../../pow/PoWClient';
 import { IPassportScoreInfo } from '../../types/PassportInfo';
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Tooltip } from 'react-bootstrap';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { ProgressAnimation } from './ProgressAnimation';
 import { AnimationProbe, DEFAULT_PROBE_SCHEDULE, IProbeWindow, median, ProbeVerdict } from '../../pow/AnimationProbe';
+import { FaucetOverlay } from '../shared/FaucetOverlay';
 
 /** the user's standing choice: "true" keeps the still picture */
 const STILL_PICTURE_KEY = "powMinerDisableGif";
@@ -221,9 +222,8 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       <div className='pow-status'>
         <div className='pow-status-image'>
           <ProgressAnimation imagesUrl={imagesUrl} animated={!this.state.disableProgressGif && !this.state.probeStill} />
-          <OverlayTrigger
+          <FaucetOverlay
             placement="bottom"
-            container={this.props.pageContext.getContainer()}
             overlay={
               <Tooltip>
                 {this.state.disableProgressGif ? "Play the animation" : "Stop the animation for better performance"}
@@ -245,7 +245,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
                 </svg>
               }
             </button>
-          </OverlayTrigger>
+          </FaucetOverlay>
         </div>
         {this.state.probeLoss !== null && this.state.disableProgressGif ?
           <div className='pow-animation-hint'>
