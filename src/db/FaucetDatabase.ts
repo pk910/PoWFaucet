@@ -418,6 +418,26 @@ export class FaucetDatabase {
     ]);
   }
 
+  /**
+   * The claim data of several claiming sessions in one statement, so a crash cannot leave a
+   * batch half written (a signed transaction known to some of its claims' rows and not to others).
+   * The sessions stay "claiming".
+   */
+  public async updateClaimDataBulk(updates: { sessionId: string; claimData: EthClaimData }[]): Promise<void> {
+    if(updates.length === 0)
+      return;
+    let values: (string)[] = [];
+    let cases = updates.map((update) => {
+      values.push(update.sessionId, JSON.stringify(update.claimData));
+      return "WHEN ? THEN ?";
+    }).join(" ");
+    let placeholders = updates.map((update) => {
+      values.push(update.sessionId);
+      return "?";
+    }).join(",");
+    await this.db.run("UPDATE Sessions SET ClaimData = CASE SessionId " + cases + " END WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")", values);
+  }
+
   public async getClaimableAmount(): Promise<bigint> {
     let row = await this.db.get("SELECT SUM(CAST(DropAmount AS FLOAT)) AS TotalAmount FROM Sessions WHERE Status = 'claimable'") as {
       TotalAmount: string;

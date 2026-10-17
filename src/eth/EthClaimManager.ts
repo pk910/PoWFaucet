@@ -14,7 +14,7 @@ import { IncomingMessage } from 'http';
 import { EthClaimNotificationClient, IEthClaimNotificationData } from './EthClaimNotificationClient.js';
 import { FaucetOutflowModule } from '../modules/faucet-outflow/FaucetOutflowModule.js';
 import { clearInterval } from 'timers';
-import { EthTxReceipt } from "./rpc/index.js";
+import { EthTxReceipt, rpcErrorString } from "./rpc/index.js";
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -54,6 +54,8 @@ export interface EthClaimData {
   txHash?: string;
   txHex?: string;
   txNonce?: number;
+  /** this claim's sub-calls in a batch transaction's stream (offset and count), so its receipt can be read from the row alone */
+  txCalls?: { offset: number; count: number };
   txBlock?: number;
   txFee?: string;
   txError?: string;
@@ -368,8 +370,8 @@ export class EthClaimManager {
     // building a new transaction for the same claims
     let database = ServiceManager.GetService(FaucetDatabase);
     let persistBeforeBroadcast = async (prepared: PreparedClaimTx) => {
-      for(let claimTx of claims)
-        await database.updateClaimData(claimTx.session, claimTx.claim);
+      // one statement for the whole batch: all rows learn the transaction, or none does
+      await database.updateClaimDataBulk(claims.map((claimTx) => ({ sessionId: claimTx.session, claimData: claimTx.claim })));
     };
 
     try {
@@ -388,7 +390,7 @@ export class EthClaimManager {
 
       this.awaitTxReceipt(claims, txResult.txPromise, txHash);
     } catch(ex) {
-      failAll("Processing Exception: " + ex.toString());
+      failAll("Processing Exception: " + rpcErrorString(ex));
     }
   }
 
@@ -415,16 +417,27 @@ export class EthClaimManager {
         throw "transaction reverted";
       }
 
-      let failedIndexes = ServiceManager.GetService(EthWalletManager).evaluateClaimReceipt(txData.receipt);
+      // per claim: how many of its sub-calls the batcher could not make (read from the receipt and
+      // the row's own call range, independent of the current configuration)
+      let outcomes = ServiceManager.GetService(EthWalletManager).evaluateClaimReceipt(txData.receipt, claims);
       delete this.pendingTxQueue[txHash];
       let confirmedIdx = this.lastConfirmedClaimTxIdx;
       claims.forEach((claimTx, claimPos) => {
         delete this.claimTxDict[claimTx.session];
-        if(failedIndexes.has(claimPos)) {
-          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction " + txHash + " could not pay " + claimTx.target + " (position " + claimPos + "): the contract reported the payout as failed");
+        let outcome = outcomes.get(claimPos);
+        if(outcome && outcome.failed > 0 && outcome.failed >= outcome.total) {
+          // nothing reached the recipient: the claim failed, the session may try again
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction " + txHash + " could not pay " + claimTx.target + " (position " + claimPos + "): the batcher reported the payout as failed");
           claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-          claimTx.claim.txError = "Transaction Error: the contract could not pay this address";
+          claimTx.claim.txError = "Transaction Error: the payout to this address failed";
         } else {
+          // paid, in full or in part. A partial payout is still a payout: the claim is consumed and
+          // counts towards every limit, otherwise a recipient that refuses one of its calls could
+          // collect the others again and again
+          if(outcome && outcome.failed > 0) {
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction " + txHash + " paid " + claimTx.target + " (position " + claimPos + ") only in part: " + outcome.failed + " of " + outcome.total + " calls failed");
+            claimTx.claim.txError = "Partial payout: " + outcome.failed + " of " + outcome.total + " calls failed";
+          }
           claimTx.claim.txBlock = txData.block;
           claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
           if(claimTx.claim.claimIdx > confirmedIdx)
@@ -434,12 +447,12 @@ export class EthClaimManager {
       });
       this.lastConfirmedClaimTxIdx = confirmedIdx;
     }).catch((error) => {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + targetLabel + " failed: " + error.toString());
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + targetLabel + " failed: " + rpcErrorString(error));
       delete this.pendingTxQueue[txHash];
       claims.forEach((claimTx) => {
         delete this.claimTxDict[claimTx.session];
         claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-        claimTx.claim.txError = "Transaction Error: " + error.toString();
+        claimTx.claim.txError = "Transaction Error: " + rpcErrorString(error);
         this.updateClaimStatus(claimTx);
       });
     }).then(() => {

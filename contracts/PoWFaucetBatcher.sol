@@ -17,8 +17,9 @@ pragma solidity 0.8.30;
 //   0x02  call       address to (20) | uint96 value (12) | uint16 len (2) | bytes data    35 + len bytes
 //
 // A sub-call that fails (a recipient that reverts, a token transfer that returns false) does not
-// revert the batch: it is reported with `CallFailed`, carrying its position in the stream, and the
-// faucet marks the claim that produced it as failed.
+// revert the batch: it is reported with `CallFailed`, carrying its position in the stream; the
+// faucet knows which claim it belongs to. A token or call sub-call may not target the wallet
+// itself: a nested `execute` would pass the self-only gate with a stream of its own.
 //
 // Deployed by the faucet through the deterministic deployment proxy
 // (0x4e59b44847b379578588920cA78FbF26c0B4956C), so one compiler setting set gives one address on
@@ -67,6 +68,7 @@ contract PoWFaucetBatcher {
         address to = address(bytes20(calls[offset + 20:offset + 40]));
         uint256 amount = uint96(bytes12(calls[offset + 40:offset + 52]));
         offset += 52;
+        require(token != address(this), "self call");
         bool ok = false;
         try IERC20Minimal(token).transfer{gas: TRANSFER_GAS * 2}(to, amount) returns (bool result) {
           ok = result;
@@ -82,6 +84,7 @@ contract PoWFaucetBatcher {
         offset += 34;
         bytes calldata data = calls[offset:offset + length];
         offset += length;
+        require(to != address(this), "self call");
         (bool ok, ) = to.call{value: value}(data);
         if (!ok)
           emit CallFailed(index, kind, to, value);

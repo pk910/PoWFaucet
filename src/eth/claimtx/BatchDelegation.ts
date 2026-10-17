@@ -2,7 +2,7 @@ import { ServiceManager } from '../../common/ServiceManager.js';
 import { FaucetLogLevel, FaucetProcess } from '../../common/FaucetProcess.js';
 import { getCreate2Address, Hex } from '../rpc/index.js';
 import { EthWalletManager } from '../EthWalletManager.js';
-import { BATCHER_BYTECODE } from './BatcherArtifact.js';
+import { BATCHER_BYTECODE, BATCHER_RUNTIME_BYTECODE } from './BatcherArtifact.js';
 
 /** Arachnid's deterministic deployment proxy: the same address on every chain, deploys `salt ++ initcode` with CREATE2. */
 export const DETERMINISTIC_DEPLOYER = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
@@ -73,8 +73,12 @@ export class BatchDelegation {
     let batcher = getBatcherAddress();
     let log = (msg: string) => ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, msg);
 
-    // 1. the batcher contract, deployed once per chain through the deterministic deployer
-    if(await client.getCode(batcher) === "0x") {
+    // 1. the batcher contract, deployed once per chain through the deterministic deployer. The wallet
+    // is about to run whatever sits at that address, so it has to be exactly the compiled batcher:
+    // the deployer binds the address to the initcode, but a chain may hold something else there and
+    // the artifact may have been tampered with.
+    let batcherCode = (await client.getCode(batcher)).toLowerCase();
+    if(batcherCode === "0x") {
       if(await client.getCode(DETERMINISTIC_DEPLOYER) === "0x")
         throw new Error("the deterministic deployment proxy " + DETERMINISTIC_DEPLOYER + " is not deployed on this chain");
       log("Deploying claim batcher to " + batcher + " via the deterministic deployment proxy");
@@ -82,10 +86,13 @@ export class BatchDelegation {
       let deployed = await deployTx.txPromise;
       if(!deployed.status)
         throw new Error("batcher deployment transaction " + deployTx.txHash + " reverted");
-      if(await client.getCode(batcher) === "0x")
+      batcherCode = (await client.getCode(batcher)).toLowerCase();
+      if(batcherCode === "0x")
         throw new Error("batcher deployment transaction " + deployTx.txHash + " mined but no code at " + batcher);
       log("Claim batcher deployed: " + deployTx.txHash);
     }
+    if(batcherCode !== BATCHER_RUNTIME_BYTECODE.toLowerCase())
+      throw new Error("the code at " + batcher + " is not the compiled claim batcher, refusing to delegate the wallet to it");
 
     // 2. the wallet's code: a delegation to the batcher
     let expected = delegationCode(batcher);

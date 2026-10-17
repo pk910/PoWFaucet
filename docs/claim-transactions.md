@@ -88,7 +88,9 @@ The faucet sets this up by itself, from the claim queue, the first time it has c
    proxy (`0x4e59b44847b379578588920cA78FbF26c0B4956C`). The address is a function of the bytecode
    alone, so every faucet shares one batcher per chain. `contracts/compile.sh` produces the
    bytecode the faucet ships, with a pinned compiler in docker; changing the contract changes the
-   address.
+   address. Before the wallet delegates to it, the code at that address is compared byte for byte
+   with the compiled runtime bytecode: anything else there (a different contract on some chain, a
+   tampered artifact) stops the setup.
 2. If the wallet's code is not `0xef0100 || batcher`, it sends a type 4 transaction to itself with
    one authorization. That costs two nonces (the transaction's and the authorization's).
 
@@ -128,7 +130,8 @@ Queue behaviour:
 ## Durability
 
 A claim transaction is signed once. Before it is broadcast, the signed bytes, the nonce and the
-hash are written into the claim data of every session it pays (the row stays "processing"). The
+hash are written into the claim data of every session it pays, in one statement, so all of a
+batch's rows know the transaction or none does (the rows stay "processing"). The
 broadcast then sends exactly those bytes, and retries them on transport errors; a node answering
 "already known" or "nonce too low" counts as sent, and the receipt watch settles the claims (a
 nonce spent by another transaction without a receipt for ours fails them as dropped). A
@@ -144,11 +147,20 @@ sends anything new.
 
 A recipient that cannot receive (a contract that reverts, for example) does not revert the batch.
 The batcher pays with a plain `call` (a gas stipend of 50k for transfers) and emits
-`CallFailed(index, kind, to, amount)` from the wallet's address for every sub-call that failed. The
-faucet decodes the receipt and fails exactly the claims those positions belong to, the others
-confirm; a claim with several sub-calls fails when any of them does. The position is exact where an
-address would not be: two claims to one address in a batch are two positions. A reverted batch
-fails every claim.
+`CallFailed(index, kind, to, amount)` from the wallet's address for every sub-call that failed.
+Every claim's row records which positions of the stream are its own, so the faucet reads the
+receipt from the row alone, after a restart or a configuration change as well. The position is
+exact where an address would not be: two claims to one address in a batch are two positions.
+
+- A claim none of whose calls went through fails; the session may claim again.
+- A claim with some calls paid is confirmed with a note ("Partial payout: 1 of 2 calls failed").
+  It is consumed and counts towards every limit: a recipient that refuses one of its calls must
+  not be able to collect the others again.
+- A reverted batch fails every claim.
+
+A token or call sub-call may not target the faucet wallet itself. Inside `execute` the wallet is
+`msg.sender`, so a nested call into it would pass the self-only gate with a stream of its own; the
+batcher rejects such a sub-call and the faucet refuses to build one.
 
 ## The refill contract
 

@@ -634,8 +634,8 @@ describe("ETH Claim Manager", () => {
         txPromise: fusedSleep(claimFuse, 500).then(() => ({ status: true, block: 77, fee: 101n, receipt: getTestReceipt() })),
         plan: null,
       }));
-      // the contract reported position 1 of the batch as unpaid
-      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns(new Set([1]));
+      // the batcher reported the second claim's only call as unpaid
+      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns(new Map([[0, { failed: 0, total: 1 }], [1, { failed: 1, total: 1 }]]));
 
       await claimManager.processQueue();
       expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING]);
@@ -646,7 +646,7 @@ describe("ETH Claim Manager", () => {
       expect(claims[0].claim.txBlock).to.equal(77);
       expect(claims[0].claim.txFee).to.equal("51", "first claim carries the fee remainder");
       expect(claims[1].claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "claim the contract reported as failed should fail");
-      expect(claims[1].claim.txError).to.match(/could not pay this address/);
+      expect(claims[1].claim.txError).to.match(/payout to this address failed/);
       expect(claims[1].claim.txFee).to.equal("50");
       expect(claimManager.getTransactionQueue().length).to.equal(2, "both stay listed in the history");
       expect(claimManager.getTransactionQueue(true).length).to.equal(0, "nothing queued or pending");

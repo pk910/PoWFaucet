@@ -16,11 +16,8 @@ export interface ClaimTxPlan {
   data: string;
   gasLimit: number;
   claims: EthClaimInfo[];
-}
-
-/** Per-claim outcome read from a mined batch: the positions (in the claim list) the batcher reported as failed. */
-export interface ClaimTxOutcome {
-  failedIndexes: Set<number>;
+  /** batch plans: each claim's sub-call range in the stream, in claim order */
+  callRanges?: { offset: number; count: number }[];
 }
 
 /**
@@ -129,8 +126,9 @@ export class ClaimTxBuilder {
     let stream = encodeBatchCalls(this.getClaimCalls(), claims, { walletAddr: this.walletAddr, token: this.token });
     let data = this.batcher.encode("execute", [stream.calls]);
     let gasLimit = await this.resolveGasLimit(this.batchConfig.gasLimit, this.batchConfig.gasLimitPerClaim, claims.length, { to: this.walletAddr, value: 0n, data });
+    let callRanges = claims.map((claim, idx) => ({ offset: idx * stream.callsPerClaim, count: stream.callsPerClaim }));
     // the wallet pays the calls from its own balance inside execute: nothing rides on the transaction
-    return { to: this.walletAddr, value: 0n, nativeSpend: stream.value, data, gasLimit, claims };
+    return { to: this.walletAddr, value: 0n, nativeSpend: stream.value, data, gasLimit, claims, callRanges };
   }
 
   /**
@@ -154,24 +152,22 @@ export class ClaimTxBuilder {
   }
 
   /**
-   * Which claims of a mined batch the batcher reported as failed, read from the receipt logs: the
-   * wallet (running the batcher's code) emits `CallFailed(index, ...)` per sub-call it could not
-   * make, and the sub-call's position divided by the calls per claim is the claim's position.
-   * A claim with several calls fails when any of them does.
+   * The sub-call positions a mined batch reported as failed: the wallet (running the batcher's
+   * code) emits `CallFailed(index, ...)` per sub-call it could not make. Needs nothing but the
+   * wallet address and the batcher's abi, so a receipt can be read after a restart or a
+   * configuration change; each claim's row says which positions are its own (`txCalls`).
    */
-  public evaluateReceipt(logs: EthLog[]): ClaimTxOutcome {
-    let failedIndexes = new Set<number>();
-    if(!this.batchActive || !this.isBatchConfigured())
-      return { failedIndexes };
-    let callsPerClaim = this.getClaimCalls().length;
-    let wallet = this.walletAddr.toLowerCase();
-    for(let event of this.batcher.decodeLogs(logs.filter((log) => log.address?.toLowerCase() === wallet))) {
+  public static failedCallIndexes(walletAddr: string, logs: EthLog[]): Set<number> {
+    let failed = new Set<number>();
+    let wallet = walletAddr.toLowerCase();
+    let batcher = new ContractCaller(null, walletAddr, BATCHER_ABI);
+    for(let event of batcher.decodeLogs(logs.filter((log) => log.address?.toLowerCase() === wallet))) {
       if(event.eventName !== "CallFailed")
         continue;
       let index = event.args["index"];
       if(typeof index === "bigint" || typeof index === "number")
-        failedIndexes.add(Math.floor(Number(index) / callsPerClaim));
+        failed.add(Number(index));
     }
-    return { failedIndexes };
+    return failed;
   }
 }

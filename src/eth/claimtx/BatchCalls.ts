@@ -60,6 +60,15 @@ function calldata(value: unknown): string {
   return value.substring(2).toLowerCase();
 }
 
+/**
+ * A call into the wallet itself would run the batcher's code with a stream of its own, past the
+ * self-only gate and past the faucet's accounting. The contract refuses it; so does this, earlier.
+ */
+function notTheWallet(addr: string, ctx: CallArgContext, what: string): void {
+  if(ctx.walletAddr && addr === ctx.walletAddr.toLowerCase())
+    throw new Error("claim call " + what + " is the faucet wallet itself");
+}
+
 /** The call with its placeholders resolved against `ctx` (one claim). */
 export function resolveClaimCall(template: IClaimCall, ctx: CallArgContext): ResolvedClaimCall {
   if(CLAIM_CALL_KINDS[template.type] === undefined)
@@ -68,15 +77,20 @@ export function resolveClaimCall(template: IClaimCall, ctx: CallArgContext): Res
   switch(template.type) {
     case "transfer":
       return { type: "transfer", to: address(resolve(template.to), "to"), amount: uint(resolve(template.amount), "amount"), data: "" };
-    case "token":
-      return { type: "token", token: address(resolve(template.token), "token"), to: address(resolve(template.to), "to"), amount: uint(resolve(template.amount), "amount"), data: "" };
+    case "token": {
+      let token = address(resolve(template.token), "token");
+      notTheWallet(token, ctx, "token");
+      return { type: "token", token, to: address(resolve(template.to), "to"), amount: uint(resolve(template.amount), "amount"), data: "" };
+    }
     case "call": {
       let data: string;
       if(template.abi && template.fn)
         data = ContractCaller.encodeCall(template.abi, template.fn, resolveCallArgs(template.args || [], ctx)).substring(2);
       else
         data = calldata(resolve(template.data));
-      return { type: "call", to: address(resolve(template.to), "to"), amount: uint(resolve(template.value) ?? "0", "value"), data };
+      let to = address(resolve(template.to), "to");
+      notTheWallet(to, ctx, "to");
+      return { type: "call", to, amount: uint(resolve(template.value) ?? "0", "value"), data };
     }
   }
 }

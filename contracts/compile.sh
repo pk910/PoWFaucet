@@ -16,13 +16,14 @@ ARTIFACT="$SCRIPT_DIR/../src/eth/claimtx/BatcherArtifact.ts"
 # no metadata hash / CBOR trailer in the bytecode: the address must not move with a comment
 SOLC_ARGS="--optimize --optimize-runs 1000 --evm-version cancun --metadata-hash none --no-cbor-metadata"
 
-contract_json=$(docker run --rm -v "$SCRIPT_DIR":/contracts "ethereum/solc:$SOLC_VERSION" "/contracts/$CONTRACT.sol" --combined-json abi,bin $SOLC_ARGS)
+contract_json=$(docker run --rm -v "$SCRIPT_DIR":/contracts "ethereum/solc:$SOLC_VERSION" "/contracts/$CONTRACT.sol" --combined-json abi,bin,bin-runtime $SOLC_ARGS)
 
 # the key is "/contracts/X.sol:X" or "contracts/X.sol:X" depending on the solc build
 contract_key=$(echo "$contract_json" | jq -r '.contracts | keys[]' | grep -E "^/?contracts/$CONTRACT.sol:$CONTRACT$" | head -1)
 contract_abi=$(echo "$contract_json" | jq -c --arg k "$contract_key" '.contracts[$k].abi')
 contract_bin=$(echo "$contract_json" | jq -r --arg k "$contract_key" '.contracts[$k].bin')
-if [ -z "$contract_key" ] || [ "$contract_abi" == "null" ] || [ -z "$contract_bin" ] || [ "$contract_bin" == "null" ]; then
+contract_runtime=$(echo "$contract_json" | jq -r --arg k "$contract_key" '.contracts[$k]["bin-runtime"]')
+if [ -z "$contract_key" ] || [ "$contract_abi" == "null" ] || [ -z "$contract_bin" ] || [ "$contract_bin" == "null" ] || [ -z "$contract_runtime" ] || [ "$contract_runtime" == "null" ]; then
   echo "could not find $CONTRACT in the compiler output" >&2
   echo "$contract_json" | jq -r '.contracts | keys[]' >&2
   exit 1
@@ -34,6 +35,9 @@ cat > "$ARTIFACT" <<EOF
 
 /** creation bytecode of $CONTRACT (no constructor arguments) */
 export const BATCHER_BYTECODE = "0x$contract_bin";
+
+/** runtime bytecode: what eth_getCode must return at the batcher's address before the wallet delegates to it */
+export const BATCHER_RUNTIME_BYTECODE = "0x$contract_runtime";
 
 export const BATCHER_ABI = $contract_abi as const;
 

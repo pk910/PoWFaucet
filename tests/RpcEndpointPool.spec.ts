@@ -228,6 +228,11 @@ describe("RPC Endpoint Pool", () => {
       expect(err?.message).to.not.contain("hunter2");
     });
 
+    it("rpcErrorString redacts URLs in plain strings and ws URLs too", () => {
+      expect(rpcErrorString("failed: wss://alice:hunter2@rpc.example.com/ws")).to.not.contain("hunter2");
+      expect(rpcErrorString("failed: wss://alice:hunter2@rpc.example.com/ws")).to.contain("rpc.example.com");
+    });
+
     it("rpcErrorString redacts URLs quoted in error text", () => {
       const text = rpcErrorString(new Error("HTTP request failed.\n\nURL: https://alice:hunter2@rpc.example.com/v3/SomeApiKey1234567890\nRequest body: {}"));
       expect(text).to.not.contain("alice");

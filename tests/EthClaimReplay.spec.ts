@@ -122,6 +122,34 @@ describe("ETH Claim Replay", () => {
     expect(ServiceManager.GetService(EthWalletManager).getWalletState().nonce).to.equal(43);
   }).timeout(12000);
 
+  it("writes a batch's rows in one statement and leaves other sessions alone", async () => {
+    let database = ServiceManager.GetService(FaucetDatabase);
+    let a = sessionData("00000000-0000-0000-0000-00000000000a");
+    let b = sessionData("00000000-0000-0000-0000-00000000000b");
+    let c = sessionData("00000000-0000-0000-0000-00000000000c");
+    for(let s of [a, b]) {
+      s.status = FaucetSessionStatus.CLAIMING;
+      s.claim = { claimIdx: 1, claimStatus: ClaimTxStatus.PROCESSING, claimTime: s.startTime };
+      await database.updateSession(s);
+    }
+    c.claim = { claimIdx: 3, claimStatus: ClaimTxStatus.QUEUE, claimTime: c.startTime };
+    await database.updateSession(c); // still claimable, not part of the batch
+    await database.updateClaimDataBulk([
+      { sessionId: a.sessionId, claimData: { ...a.claim, txHash: "0xaa", txNonce: 7, txHex: "aa", txCalls: { offset: 0, count: 1 } } },
+      { sessionId: b.sessionId, claimData: { ...b.claim, txHash: "0xaa", txNonce: 7, txHex: "aa", txCalls: { offset: 1, count: 1 } } },
+      { sessionId: c.sessionId, claimData: { ...c.claim, txHash: "0xaa" } },
+    ]);
+    let rowA = await database.getSession(a.sessionId);
+    let rowB = await database.getSession(b.sessionId);
+    let rowC = await database.getSession(c.sessionId);
+    expect(rowA.claim.txHash).to.equal("0xaa");
+    expect(rowA.claim.txCalls).to.deep.equal({ offset: 0, count: 1 });
+    expect(rowB.claim.txHash).to.equal("0xaa");
+    expect(rowB.claim.txCalls).to.deep.equal({ offset: 1, count: 1 });
+    expect(rowA.status).to.equal(FaucetSessionStatus.CLAIMING, "still claiming until the broadcast is accepted");
+    expect(rowC.claim.txHash).to.equal(undefined, "a session that is not claiming is not touched");
+  });
+
   it("treats 'already known' as sent and settles by receipt", async () => {
     let sends = 0;
     fakeProvider.injectResponse("eth_sendRawTransaction", () => {

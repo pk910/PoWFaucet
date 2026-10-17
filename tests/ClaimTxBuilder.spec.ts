@@ -203,24 +203,21 @@ describe("Claim transaction builder", () => {
       };
     }
 
-    it("reads failed sub-calls from the wallet's logs and maps them to claims", () => {
-      let builder = activeBuilder(null, null);
-      let outcome = builder.evaluateReceipt([
+    it("records each claim's sub-call range on the plan", async () => {
+      let plan = await activeBuilder(null, twoCalls).buildPlan([c1, c2, c3]);
+      expect(plan.callRanges).to.deep.equal([{ offset: 0, count: 2 }, { offset: 2, count: 2 }, { offset: 4, count: 2 }]);
+      let single = await new ClaimTxBuilder(fakeClient, WALLET, null, null, null).buildPlan([c1]);
+      expect(single.callRanges).to.equal(undefined, "a plain transaction has no stream");
+    });
+
+    it("reads failed sub-call positions from the wallet's logs, nothing else", () => {
+      let failed = ClaimTxBuilder.failedCallIndexes(WALLET, [
         failedLog(WALLET, 1),
         failedLog(CONTRACT, 2), // some other contract's event
         { address: WALLET, topics: ["0x" + "12".repeat(32)], data: "0x", logIndex: 2 }, // unknown event
+        failedLog(WALLET, 3),
       ]);
-      expect(Array.from(outcome.failedIndexes)).to.deep.equal([1]);
-
-      // two calls per claim: sub-call 3 belongs to the second claim
-      let twoPerClaim = activeBuilder(null, twoCalls);
-      expect(Array.from(twoPerClaim.evaluateReceipt([failedLog(WALLET, 3)]).failedIndexes)).to.deep.equal([1]);
-      expect(Array.from(twoPerClaim.evaluateReceipt([failedLog(WALLET, 0), failedLog(WALLET, 1)]).failedIndexes)).to.deep.equal([0]);
-    });
-
-    it("reports nothing failed while batching is inactive", () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, null, batch);
-      expect(builder.evaluateReceipt([failedLog(WALLET, 0)]).failedIndexes.size).to.equal(0);
+      expect(Array.from(failed).sort()).to.deep.equal([1, 3]);
     });
   });
 });

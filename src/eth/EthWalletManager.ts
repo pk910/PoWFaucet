@@ -179,10 +179,23 @@ export class EthWalletManager {
   }
 
   /** Positions (in the transaction's claim list) a mined claim transaction reported as not paid; empty without a template that names a failed event. */
-  public evaluateClaimReceipt(receipt: EthTxReceipt): Set<number> {
-    if(!faucetConfig.ethClaimBatch || !this.rpcPool || !this.batchDelegation?.isReady())
-      return new Set<number>();
-    return this.getClaimTxBuilder().evaluateReceipt(receipt.logs).failedIndexes;
+  public evaluateClaimReceipt(receipt: EthTxReceipt, claims: EthClaimInfo[]): Map<number, { failed: number; total: number }> {
+    let outcomes = new Map<number, { failed: number; total: number }>();
+    if(!claims.some((claim) => !!claim.claim.txCalls) || !this.walletAddr)
+      return outcomes; // not a batch transaction: the receipt status says it all
+    let failedCalls = ClaimTxBuilder.failedCallIndexes(this.walletAddr, receipt.logs);
+    claims.forEach((claim, pos) => {
+      let range = claim.claim.txCalls;
+      if(!range)
+        return;
+      let failed = 0;
+      for(let i = range.offset; i < range.offset + range.count; i++) {
+        if(failedCalls.has(i))
+          failed++;
+      }
+      outcomes.set(pos, { failed, total: range.count });
+    });
+    return outcomes;
   }
 
   private initToken() {
@@ -399,10 +412,11 @@ export class EthWalletManager {
     let txHex = await this.buildEthTx(plan.to, plan.value, nonce, plan.data, plan.gasLimit);
     let txHash = keccak256(("0x" + txHex) as Hex);
     this.walletState.nonce++;
-    claims.forEach((claim) => {
+    claims.forEach((claim, idx) => {
       claim.claim.txNonce = nonce;
       claim.claim.txHash = txHash;
       claim.claim.txHex = txHex;
+      claim.claim.txCalls = plan.callRanges ? plan.callRanges[idx] : undefined;
     });
     return { txHash, txNonce: nonce, txHex, plan, claims };
   }
@@ -431,27 +445,7 @@ export class EthWalletManager {
    * again (wallet state reload) and throws.
    */
   public async broadcastClaimTx(prepared: PreparedClaimTx, accountForPayout: boolean): Promise<ClaimTransactionResult> {
-    let attempt = 0;
-    while(true) {
-      try {
-        await this.rpcPool.broadcastSendRawTransaction("0x" + prepared.txHex);
-        break;
-      } catch(ex) {
-        let errorText = rpcErrorString(ex);
-        if(TX_ALREADY_SENT_PATTERN.test(errorText)) {
-          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "TX " + prepared.txHash + " is already known to the network: " + errorText);
-          break;
-        }
-        if(isTransportError(ex) && attempt++ < 3) {
-          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Broadcasting TX " + prepared.txHash + " failed [try: " + attempt + "]: " + errorText);
-          await sleepPromise(2000); // wait 2 secs and try again with the same bytes - maybe EL client is busy...
-          continue;
-        }
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + prepared.txHash + " was rejected: " + errorText);
-        await this.loadWalletState(); // the nonce is free again (or was taken: the reload knows)
-        throw ex;
-      }
-    }
+    await this.broadcastSigned(prepared.txHex, prepared.txHash);
 
     if(accountForPayout) {
       let totalAmount = prepared.claims.reduce((sum, claim) => sum + BigInt(claim.amount), 0n);
@@ -498,22 +492,13 @@ export class EthWalletManager {
       value: 0n,
       data: "0x",
     }, [authorization]);
-    let txResult = await this.sendTransaction(signed.substring(2), nonce);
-    this.walletState.nonce += 2;
-    return {
-      txHash: txResult[0],
-      txPromise: txResult[1].then((receipt) => this.txResultFromReceipt(receipt)),
-    };
+    return this.sendSigned(signed.substring(2), nonce, 2);
   }
 
   public async sendCustomTx(target: string, amount: bigint, data?: string, gasLimit?: number): Promise<TransactionResult> {
-    let txHex = await this.buildEthTx(target, amount, this.walletState.nonce, data, gasLimit);
-    let txResult = await this.sendTransaction(txHex, this.walletState.nonce);
-    this.walletState.nonce++;
-    return {
-      txHash: txResult[0],
-      txPromise : txResult[1].then((receipt) => this.txResultFromReceipt(receipt)),
-    };
+    let nonce = this.walletState.nonce;
+    let txHex = await this.buildEthTx(target, amount, nonce, data, gasLimit);
+    return this.sendSigned(txHex, nonce, 1);
   }
 
   /** The signed transaction as hex without the 0x prefix (the form the claim data stores). */
@@ -557,10 +542,45 @@ export class EthWalletManager {
     return signed.substring(2);
   }
 
-  private async sendTransaction(txhex: string, txnonce: number): Promise<[string, Promise<EthTxReceipt>]> {
-    let txHash = await this.rpcPool.broadcastSendRawTransaction("0x" + txhex);
+  /**
+   * Every signed transaction leaves through here. Transport errors retry the identical bytes;
+   * "already known" and friends count as sent; a definite rejection reloads the wallet state (the
+   * nonce is free again, or was taken: the reload knows) and throws. The hash is the local one, so
+   * a lost answer never leads to a second transaction for the same payout.
+   */
+  private async broadcastSigned(txHex: string, txHash: string): Promise<void> {
+    let attempt = 0;
+    while(true) {
+      try {
+        await this.rpcPool.broadcastSendRawTransaction("0x" + txHex);
+        return;
+      } catch(ex) {
+        let errorText = rpcErrorString(ex);
+        if(TX_ALREADY_SENT_PATTERN.test(errorText)) {
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "TX " + txHash + " is already known to the network: " + errorText);
+          return;
+        }
+        if(isTransportError(ex) && attempt++ < 3) {
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Broadcasting TX " + txHash + " failed [try: " + attempt + "]: " + errorText);
+          await sleepPromise(2000); // wait 2 secs and try again with the same bytes - maybe EL client is busy...
+          continue;
+        }
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txHash + " was rejected: " + errorText);
+        await this.loadWalletState();
+        throw ex;
+      }
+    }
+  }
 
-    return [txHash, this.awaitTransactionReceipt(txHash, txnonce)];
+  /** Sign once, broadcast with the safe retry semantics, reserve `nonces` nonces, watch the receipt. */
+  private async sendSigned(txHex: string, txNonce: number, nonces: number): Promise<TransactionResult> {
+    let txHash = keccak256(("0x" + txHex) as Hex);
+    await this.broadcastSigned(txHex, txHash);
+    this.walletState.nonce += nonces;
+    return {
+      txHash: txHash,
+      txPromise: this.awaitTransactionReceipt(txHash, txNonce).then((receipt) => this.txResultFromReceipt(receipt)),
+    };
   }
 
   private async awaitTransactionReceipt(txhash: string, txnonce: number): Promise<EthTxReceipt> {
