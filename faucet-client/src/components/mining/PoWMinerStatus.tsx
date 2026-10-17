@@ -9,9 +9,17 @@ import { PoWClient } from '../../pow/PoWClient';
 import { IPassportScoreInfo } from '../../types/PassportInfo';
 import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { IFaucetContext } from '../../common/FaucetContext';
+import { ProgressAnimation } from './ProgressAnimation';
+import { AnimationProbe, DEFAULT_PROBE_SCHEDULE, IProbeWindow, median, ProbeVerdict } from '../../pow/AnimationProbe';
+
+/** the user's standing choice: "true" keeps the still picture */
+const STILL_PICTURE_KEY = "powMinerDisableGif";
+/** the probe's verdict for one session, so it runs once per session */
+const PROBE_VERDICT_KEY = "powfaucet.animationProbe.";
 
 export interface IPoWMinerStatusProps {
   pageContext: IFaucetContext;
+  sessionId: string;
   powClient: PoWClient;
   powMiner: PoWMiner;
   powSession: PoWSession;
@@ -31,7 +39,12 @@ export interface IPoWMinerStatusState {
   startTime: number;
   lastShareTime: number;
   showBoostInfoDialog: boolean;
+  /** the user, or the probe, chose the still picture */
   disableProgressGif: boolean;
+  /** the probe switched the animation off for one of its windows */
+  probeStill: boolean;
+  /** the probe paused the animation: the loss it measured, to say so under the picture */
+  probeLoss: number | null;
 }
 
 export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IPoWMinerStatusState> {
@@ -39,6 +52,8 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
   private powSessionUpdateListener: (() => void);
   private updateTimer: ReturnType<typeof setInterval>;
   private stoppedMiner: boolean = false;
+  private probe: AnimationProbe | null = null;
+  private unmounting = false;
 
   constructor(props: IPoWMinerStatusProps) {
     super(props);
@@ -54,6 +69,8 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       lastShareTime: 0,
       showBoostInfoDialog: false,
       disableProgressGif: false,
+      probeStill: false,
+      probeLoss: null,
 		};
   }
 
@@ -71,6 +88,8 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
           stateChange.workerCount = stats.workerCount;
         
         this.setState(stateChange);
+        if(this.probe)
+          this.probe.sample(stats.hashRate);
       };
       this.props.powMiner.on("stats", this.powMinerStatsListener);
     }
@@ -92,14 +111,60 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
       });
     });
 
-    if(localStorage.getItem("powMinerDisableGif")) {
-      this.setState({
-        disableProgressGif: true,
-      });
+    this.setupAnimation();
+  }
+
+  /**
+   * Which picture to start with, and whether to measure.
+   *
+   * The user's choice stands. Without one, a system that asked for reduced motion gets the still
+   * picture. Everyone else gets the animation, and once per session the probe checks whether it
+   * costs this machine mining speed; if it does, the still picture stays and the page says why.
+   */
+  private setupAnimation() {
+    if(localStorage.getItem(STILL_PICTURE_KEY)) {
+      this.setState({ disableProgressGif: true });
+      return;
     }
+    if(typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      this.setState({ disableProgressGif: true });
+      return;
+    }
+    if(sessionStorage.getItem(PROBE_VERDICT_KEY + this.props.sessionId))
+      return;
+    this.probe = new AnimationProbe(DEFAULT_PROBE_SCHEDULE,
+      (animated) => {
+        if(!this.unmounting)
+          this.setState({ probeStill: !animated });
+      },
+      (verdict, windows) => this.onProbeVerdict(verdict, windows)
+    );
+    this.probe.start();
+  }
+
+  private onProbeVerdict(verdict: ProbeVerdict, windows: IProbeWindow[]) {
+    this.probe = null;
+    try {
+      sessionStorage.setItem(PROBE_VERDICT_KEY + this.props.sessionId, verdict);
+    } catch(ex) { /* storage blocked: the probe runs again on the next page */ }
+    if(verdict !== "pause")
+      return;
+    let withAnimation = median(windows.filter((w) => w.animated).map((w) => median(w.hashrates)));
+    let without = median(windows.filter((w) => !w.animated).map((w) => median(w.hashrates)));
+    localStorage.setItem(STILL_PICTURE_KEY, "true");
+    this.setState({
+      disableProgressGif: true,
+      probeStill: false,
+      probeLoss: without > 0 ? Math.round((1 - withAnimation / without) * 100) : null,
+    });
   }
 
   public componentWillUnmount() {
+    this.unmounting = true;
+    if(this.probe) {
+      this.probe.cancel();
+      this.probe = null;
+    }
     if(this.powMinerStatsListener) {
       this.props.powMiner.off("stats", this.powMinerStatsListener);
       this.powMinerStatsListener = null;
@@ -155,7 +220,7 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
     return (
       <div className='pow-status'>
         <div className='pow-status-image'>
-          <img src={imagesUrl + (this.state.disableProgressGif ? "/progress.png" : "/progress.gif")} alt="" />
+          <ProgressAnimation imagesUrl={imagesUrl} animated={!this.state.disableProgressGif && !this.state.probeStill} />
           <OverlayTrigger
             placement="bottom"
             container={this.props.pageContext.getContainer()}
@@ -182,6 +247,11 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
             </button>
           </OverlayTrigger>
         </div>
+        {this.state.probeLoss !== null && this.state.disableProgressGif ?
+          <div className='pow-animation-hint'>
+            Animation paused: it was slowing your mining down by about {this.state.probeLoss}%.
+          </div>
+        : null}
 
         <div className='pf-stats'>
           <div className='pf-stat'>
@@ -251,16 +321,28 @@ export class PoWMinerStatus extends React.PureComponent<IPoWMinerStatusProps, IP
     this.props.powMiner.setWorkerCount(value);
   }
 
+  /** the user's choice; it ends a running probe, the choice is theirs now */
   private onProgressGifToggle() {
+    if(this.probe) {
+      this.probe.cancel();
+      this.probe = null;
+      try {
+        sessionStorage.setItem(PROBE_VERDICT_KEY + this.props.sessionId, "manual");
+      } catch(ex) { /* storage blocked */ }
+    }
     if(this.state.disableProgressGif) {
-      localStorage.removeItem("powMinerDisableGif")
+      localStorage.removeItem(STILL_PICTURE_KEY);
       this.setState({
         disableProgressGif: false,
+        probeStill: false,
+        probeLoss: null,
       });
     } else {
-      localStorage.setItem("powMinerDisableGif", "true")
+      localStorage.setItem(STILL_PICTURE_KEY, "true");
       this.setState({
         disableProgressGif: true,
+        probeStill: false,
+        probeLoss: null,
       });
     }
   }

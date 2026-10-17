@@ -329,7 +329,8 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
       rows.push(<div key="hashrate" className='pf-kv'><span>Average hashrate</span><b>{Math.round(data["pow.lastNonce"] / duration * 100) / 100} H/s</b></div>);
     if(data["passport.score"])
       rows.push(<div key="passport" className='pf-kv'><span>Passport score</span><b>{data["passport.score"].score || 0} (reward factor {data["passport.score"].factor || 1})</b></div>);
-    if(Array.isArray(data["reward.factors"]) && data["reward.factors"].length > 0)
+    // with the key the list is the complete one, and the operator block shows that
+    if(!this.state.unmasked && Array.isArray(data["reward.factors"]) && data["reward.factors"].length > 0)
       rows.push(<div key="factors" className='pf-kv'><span>Reward factors</span><span className='pf-kv-value'>{this.renderFactorPills(data["reward.factors"])}</span></div>);
     if(data["github.user"])
       rows.push(<div key="github" className='pf-kv'><span>Login</span><b>GitHub · {data["github.user"]}</b></div>);

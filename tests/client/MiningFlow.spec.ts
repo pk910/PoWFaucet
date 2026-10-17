@@ -72,7 +72,7 @@ describe("browser: mining flow", function() {
 
     // claim page
     await page.getByText("Claim Rewards").first().waitFor({ timeout: 30000 });
-    expect(await page.getByText(TEST_TARGET_ADDR).count()).to.be.greaterThan(0, "wallet not shown on the claim page");
+    await page.getByText(TEST_TARGET_ADDR).first().waitFor({ timeout: 30000 });
     await page.getByRole("button", { name: "Claim Rewards" }).click();
 
     // the stubbed chain confirms at once

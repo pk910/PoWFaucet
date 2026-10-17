@@ -717,6 +717,8 @@ $enable-dark-mode: false;
 }
 .faucet-page .faucet-status .status-panel .card-body {
   padding: 16px 18px;
+  // the session table is wider than a laptop; it scrolls inside its card
+  overflow-x: auto;
 }
 .faucet-page .faucet-status .status-panel .card-title {
   font-size: 15px;
@@ -793,4 +795,19 @@ $enable-dark-mode: false;
 .faucet-page .modal-header .modal-title {
   font-size: 18px;
   font-weight: 650;
+}
+
+// ---------------------------------------------------------------------------------------------
+// the mining picture
+
+.faucet-page .pow-status-image .pow-progress-animation svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+.faucet-page .pow-animation-hint {
+  margin-top: -8px;
+  font-size: 12px;
+  color: var(--pf-ink-3);
 }

@@ -423,6 +423,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
           <div className="pow-status-container">
             <PoWMinerStatus 
               pageContext={this.props.pageContext}
+              sessionId={this.props.sessionId}
               powClient={this.powClient}
               powMiner={this.powMiner} 
               powSession={this.powSession} 
