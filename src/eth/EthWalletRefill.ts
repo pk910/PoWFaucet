@@ -4,6 +4,7 @@ import { ServiceManager } from "../common/ServiceManager.js";
 import { EthClaimManager } from "./EthClaimManager.js";
 import { EthWalletManager, TransactionResult } from "./EthWalletManager.js";
 import { ContractCaller } from "./rpc/index.js";
+import { resolveCallArgs } from "./CallArgs.js";
 import { SessionManager } from "../session/SessionManager.js";
 
 export class EthWalletRefill {
@@ -72,22 +73,14 @@ export class EthWalletRefill {
     }
   }
 
-  private resolveCallArgs(args: string[], amount: string): string[] {
+  /** {walletAddr}, {amount} and {token} as the claim transaction templates resolve them (src/eth/CallArgs.ts) */
+  private resolveCallArgs(args: string[], amount: string): unknown[] {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    return args.map((arg) => {
-      switch(arg) {
-        case "{walletAddr}":
-          arg = ethWalletManager.getFaucetAddress();
-          break;
-        case "{amount}":
-          arg = amount;
-          break;
-        case "{token}":
-          arg = ethWalletManager.getTokenAddress();
-          break;
-      }
-      return arg;
-    })
+    return resolveCallArgs(args, {
+      walletAddr: ethWalletManager.getFaucetAddress(),
+      token: ethWalletManager.getTokenAddress(),
+      amount: amount,
+    });
   }
 
   private async refillWallet(): Promise<TransactionResult> {

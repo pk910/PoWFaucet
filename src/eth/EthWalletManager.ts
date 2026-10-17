@@ -8,6 +8,7 @@ import { EthClaimInfo } from './EthClaimManager.js';
 import { Erc20Abi } from '../abi/ERC20.js';
 import { RpcEndpointPool } from './RpcEndpointPool.js';
 import { ContractAbiInput, ContractCaller, EthSigner, EthTxReceipt, IEthRpcClient, isTransportError, rpcErrorString } from "./rpc/index.js";
+import { ClaimTxBuilder, ClaimTxPlan } from './claimtx/ClaimTxBuilder.js';
 
 export interface WalletState {
   ready: boolean;
@@ -38,6 +39,11 @@ export interface TransactionResult {
   }>;
 }
 
+export interface ClaimTransactionResult extends TransactionResult {
+  /** what the transaction pays (one claim, or a batch) */
+  plan: ClaimTxPlan;
+}
+
 export class EthWalletManager {
 
   private initialized: boolean;
@@ -47,6 +53,7 @@ export class EthWalletManager {
   private walletAddr: string;
   private walletState: WalletState;
   private tokenState: FaucetTokenState;
+  private claimTxBuilder: ClaimTxBuilder | null = null;
   private lastWalletRefresh: number;
   private txReceiptPollInterval = 12000;
 
@@ -114,6 +121,24 @@ export class EthWalletManager {
       this.initToken();
     else
       this.tokenState = null;
+    this.claimTxBuilder = null; // rebuilt on first use with the (possibly reloaded) template config
+  }
+
+  /** How claims become transactions: the plain transfer, or the operator's ethClaimTx template. */
+  public getClaimTxBuilder(): ClaimTxBuilder {
+    if(!this.claimTxBuilder) {
+      // the client is only needed for gas estimation; a manager that never initialized (tests stub the sends) has no pool
+      let client = this.rpcPool ? this.rpcPool.getClient() : null;
+      this.claimTxBuilder = new ClaimTxBuilder(client, this.walletAddr, this.tokenState ? this.tokenState.address : null, faucetConfig.ethClaimTx);
+    }
+    return this.claimTxBuilder;
+  }
+
+  /** Recipients a mined claim transaction reported as not paid (lower-cased); empty without a template that names a failed event. */
+  public evaluateClaimReceipt(receipt: EthTxReceipt): Set<string> {
+    if(!faucetConfig.ethClaimTx?.batch?.failedEvent || !this.rpcPool)
+      return new Set<string>();
+    return this.getClaimTxBuilder().evaluateReceipt(receipt.logs).failedTargets;
   }
 
   private initToken() {
@@ -299,28 +324,39 @@ export class EthWalletManager {
     return this.awaitTransactionReceipt(claimInfo.claim.txHash, claimInfo.claim.txNonce).then((receipt) => this.txResultFromReceipt(receipt));
   }
 
-  public async sendClaimTx(claimInfo: EthClaimInfo): Promise<TransactionResult> {
+  public sendClaimTx(claimInfo: EthClaimInfo): Promise<ClaimTransactionResult> {
+    return this.sendClaimBatch([claimInfo]);
+  }
+
+  /**
+   * Pay these claims with one transaction. One claim is the plain transfer (or the template's
+   * single-claim call); several need a template with a batch block. Every claim gets the nonce
+   * and hash; the signed transaction hex is kept on the first one only.
+   */
+  public async sendClaimBatch(claims: EthClaimInfo[]): Promise<ClaimTransactionResult> {
     let txPromise: Promise<EthTxReceipt>;
     let retryCount = 0;
     let txError: Error;
-    let buildTx = () => {
-      claimInfo.claim.txNonce = this.walletState.nonce;
-      if(this.tokenState)
-        return this.buildEthTx(this.tokenState.address, 0n, claimInfo.claim.txNonce, this.tokenState.getTransferData(claimInfo.target, BigInt(claimInfo.amount)));
-      else
-        return this.buildEthTx(claimInfo.target, BigInt(claimInfo.amount), claimInfo.claim.txNonce);
-    };
+    let plan: ClaimTxPlan;
+    let totalAmount = claims.reduce((sum, claim) => sum + BigInt(claim.amount), 0n);
+    let targetLabel = claims.length === 1 ? claims[0].target : claims.length + " claims";
 
     do {
       try {
-        claimInfo.claim.txHex = await buildTx();
-        let txResult = await this.sendTransaction(claimInfo.claim.txHex, claimInfo.claim.txNonce);
-        claimInfo.claim.txHash = txResult[0];
+        plan = await this.getClaimTxBuilder().buildPlan(claims);
+        let nonce = this.walletState.nonce;
+        let txHex = await this.buildEthTx(plan.to, plan.value, nonce, plan.data, plan.gasLimit);
+        claims.forEach((claim, idx) => {
+          claim.claim.txNonce = nonce;
+          claim.claim.txHex = idx === 0 ? txHex : undefined;
+        });
+        let txResult = await this.sendTransaction(txHex, nonce);
+        claims.forEach((claim) => claim.claim.txHash = txResult[0]);
         txPromise = txResult[1];
       } catch(ex) {
         if(!txError)
           txError = ex;
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Sending TX for " + claimInfo.target + " failed [try: " + retryCount + "]: " + rpcErrorString(ex));
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Sending TX for " + targetLabel + " failed [try: " + retryCount + "]: " + rpcErrorString(ex));
         await sleepPromise(2000); // wait 2 secs and try again - maybe EL client is busy...
         await this.loadWalletState();
       }
@@ -329,13 +365,14 @@ export class EthWalletManager {
       throw txError;
 
     this.walletState.nonce++;
-    this.walletState.balance -= BigInt(claimInfo.amount);
+    this.walletState.balance -= totalAmount;
     if(!this.tokenState)
-      this.walletState.nativeBalance -= BigInt(claimInfo.amount);
+      this.walletState.nativeBalance -= plan.value;
     this.updateFaucetStatus();
     return {
-      txHash: claimInfo.claim.txHash,
+      txHash: claims[0].claim.txHash,
       txPromise : txPromise.then((receipt) => this.txResultFromReceipt(receipt)),
+      plan: plan,
     };
   }
 

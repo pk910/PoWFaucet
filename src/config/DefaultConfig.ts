@@ -65,6 +65,7 @@ export function getDefaultConfig(): IConfigSchema {
     rpcConnectionError: true,
     denyNewSessions: false,
     corsAllowOrigin: [],
+    ethClaimTx: null,
     ethRefillContract: null,
     faucetStats: null,
     faucetStatus: {

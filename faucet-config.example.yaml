@@ -124,6 +124,32 @@ ethQueueNoFunds: true
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 ethTxExplorerLink: "https://hoodi.etherscan.io/tx/{txid}"
 
+# claim transaction template (optional): pay claims through a contract call instead of a plain transfer,
+# and optionally several claims per transaction. docs/claim-transactions.md explains the placeholders;
+# docs/PoWFaucetDispenser.sol is a contract that fits the batch example below.
+# Without this block a claim is one native transfer (or one ERC20 transfer for faucetCoinType erc20).
+#ethClaimTx:
+#  contract: "0x0000000000000000000000000000000000000000"
+#  abi:
+#    - "function dispense(address[] to, uint256[] amounts) payable"
+#    - "event DispenseFailed(address indexed to, uint256 amount, address token)"
+#  # one claim per transaction: fn / args / value / gasLimit (placeholders: {target} {amount} {token} {walletAddr} {sessionId} {sessionHash} {session.<key>})
+#  #fn: "claim"
+#  #args: ["{target}", "{amount}", "{session.tokenAmount}"]
+#  #value: "{amount}"
+#  #gasLimit: "estimate"
+#  # several claims per transaction (list placeholders: {targets[]} {amounts[]} {sessionIds[]} {sessionHashes[]} {session.<key>[]}, and {sum})
+#  batch:
+#    maxClaims: 20          # claims per transaction
+#    maxWaitSeconds: 10     # a partial batch is sent once its oldest claim waited this long
+#    fn: "dispense"
+#    args: ["{targets[]}", "{amounts[]}"]
+#    value: "{sum}"
+#    gasLimit: 60000        # base gas limit of a batch transaction ...
+#    gasLimitPerClaim: 45000  # ... plus this per claim ("estimate" instead of a number asks the node)
+#    failedEvent: "DispenseFailed"  # recipients named by this event fail individually, the rest confirm
+#    #failedEventArg: "to"
+
 
 # min/max drop amount (max is the default if no module lowers it)
 maxDropAmount: 1000000000000000000 # 1 ETH

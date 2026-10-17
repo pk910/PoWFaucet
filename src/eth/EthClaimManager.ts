@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
-import { EthWalletManager } from "./EthWalletManager.js";
+import { EthWalletManager, WalletState } from "./EthWalletManager.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
 import { EthWalletRefill } from "./EthWalletRefill.js";
@@ -43,6 +43,8 @@ export interface EthClaimInfo {
   target: string;
   amount: string;
   claim: EthClaimData;
+  /** the session's data at claim time, for {session.<key>} placeholders in a transaction template */
+  data?: {[key: string]: any};
 }
 
 export interface EthClaimData {
@@ -62,8 +64,9 @@ export class EthClaimManager {
   private queueInterval: NodeJS.Timeout;
   private claimTxDict: {[session: string]: EthClaimInfo} = {};
   private claimTxQueue: EthClaimInfo[] = [];
-  private pendingTxQueue: {[hash: string]: EthClaimInfo} = {};
-  private historyTxDict: {[nonce: number]: EthClaimInfo} = {};
+  // one transaction pays one claim, or a batch of them (ethClaimTx.batch): both maps hold the claims per transaction
+  private pendingTxQueue: {[hash: string]: EthClaimInfo[]} = {};
+  private historyTxDict: {[nonce: number]: EthClaimInfo[]} = {};
   private queueProcessing: boolean = false;
   private lastClaimTxIdx: number = 1;
   private lastProcessedClaimTxIdx: number = 0;
@@ -86,6 +89,7 @@ export class EthClaimManager {
         target: sessionData.targetAddr,
         amount: sessionData.dropAmount,
         claim: sessionData.claim,
+        data: sessionData.data,
       };
       switch(claimInfo.claim.claimStatus) {
         case ClaimTxStatus.QUEUE:
@@ -94,9 +98,11 @@ export class EthClaimManager {
           this.claimTxDict[claimInfo.session] = claimInfo;
           break;
         case ClaimTxStatus.PENDING:
-          this.pendingTxQueue[claimInfo.claim.txHash] = claimInfo;
+          // claims of one batch share the hash: watched once, below
+          if(!this.pendingTxQueue[claimInfo.claim.txHash])
+            this.pendingTxQueue[claimInfo.claim.txHash] = [];
+          this.pendingTxQueue[claimInfo.claim.txHash].push(claimInfo);
           this.claimTxDict[claimInfo.session] = claimInfo;
-          this.awaitTxReceipt(claimInfo, ServiceManager.GetService(EthWalletManager).watchClaimTx(claimInfo));
           break;
         default:
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Cannot restore claimTx: unexpected claim status '" + claimInfo.claim.claimStatus + "'");
@@ -104,6 +110,11 @@ export class EthClaimManager {
       }
       if(claimInfo.claim.claimIdx > maxQueueIdx)
         maxQueueIdx = claimInfo.claim.claimIdx;
+    });
+
+    Object.keys(this.pendingTxQueue).forEach((txHash) => {
+      let claims = this.pendingTxQueue[txHash];
+      this.awaitTxReceipt(claims, ServiceManager.GetService(EthWalletManager).watchClaimTx(claims[0]), txHash);
     });
 
     this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
@@ -156,8 +167,8 @@ export class EthClaimManager {
     let txlist: EthClaimInfo[] = [];
     Array.prototype.push.apply(txlist, this.claimTxQueue);
     if(!queueOnly) {
-      Array.prototype.push.apply(txlist, Object.values(this.pendingTxQueue));
-      Array.prototype.push.apply(txlist, Object.values(this.historyTxDict));
+      Object.values(this.pendingTxQueue).forEach((claims) => Array.prototype.push.apply(txlist, claims));
+      Object.values(this.historyTxDict).forEach((claims) => Array.prototype.push.apply(txlist, claims));
     }
     return txlist;
   }
@@ -201,6 +212,7 @@ export class EthClaimManager {
       target: sessionData.targetAddr,
       amount: sessionData.dropAmount,
       claim: sessionData.claim,
+      data: sessionData.data,
     };
     
     try {
@@ -237,22 +249,32 @@ export class EthClaimManager {
     this.queueProcessing = true;
 
     try {
-      let walletState = ServiceManager.GetService(EthWalletManager).getWalletState();
+      let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+      let walletState = ethWalletManager.getWalletState();
+      let now = Math.floor(new Date().getTime() / 1000);
+      let batchSize = 1;
+      let batchMaxWait = 0;
+      if(faucetConfig.ethClaimTx?.batch) {
+        let builder = ethWalletManager.getClaimTxBuilder();
+        batchSize = builder.getBatchSize();
+        batchMaxWait = builder.getBatchMaxWait();
+      }
       while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
         if(faucetConfig.ethQueueNoFunds && (
-          !walletState.ready || 
+          !walletState.ready ||
           walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(this.claimTxQueue[0].amount) ||
           walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
         )) {
           break; // skip processing (out of funds)
         }
+        if(batchSize > 1 && this.claimTxQueue.length < batchSize && now - this.claimTxQueue[0].claim.claimTime < batchMaxWait)
+          break; // a partial batch: give it until maxWaitSeconds to fill up
 
-        let claimTx = this.claimTxQueue.splice(0, 1)[0];
-        this.lastProcessedClaimTxIdx = claimTx.claim.claimIdx;
-        await this.processQueueTx(claimTx);
+        let claims = this.collectBatch(batchSize, walletState);
+        this.lastProcessedClaimTxIdx = Math.max(...claims.map((claimTx) => claimTx.claim.claimIdx));
+        await this.processQueueTxs(claims);
       }
 
-      let now = Math.floor(new Date().getTime() / 1000);
       let walletRefreshTime = walletState.ready ? 600 : 10;
       if(Object.keys(this.pendingTxQueue).length === 0 && now - ServiceManager.GetService(EthWalletManager).getLastWalletRefresh() > walletRefreshTime) {
         await ServiceManager.GetService(EthWalletManager).loadWalletState();
@@ -280,76 +302,118 @@ export class EthClaimManager {
     this.queueProcessing = false;
   }
 
-  private async processQueueTx(claimTx: EthClaimInfo) {
+  /**
+   * The claims for the next transaction: the first queued one, then more up to `batchSize` as long as
+   * the wallet can cover their sum. What does not fit waits for the next transaction.
+   */
+  private collectBatch(batchSize: number, walletState: WalletState): EthClaimInfo[] {
+    let claims: EthClaimInfo[] = [this.claimTxQueue.shift()];
+    let total = BigInt(claims[0].amount);
+    while(claims.length < batchSize && this.claimTxQueue.length > 0) {
+      let next = this.claimTxQueue[0];
+      let nextTotal = total + BigInt(next.amount);
+      if(walletState.ready && walletState.balance - BigInt(faucetConfig.spareFundsAmount) < nextTotal)
+        break;
+      claims.push(this.claimTxQueue.shift());
+      total = nextTotal;
+    }
+    return claims;
+  }
+
+  private async processQueueTxs(claims: EthClaimInfo[]) {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let walletState = ethWalletManager.getWalletState();
-    if(!walletState.ready) {
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Network RPC is currently unreachable.";
-      this.updateClaimStatus(claimTx);
-      return;
-    }
+    let failAll = (error: string) => {
+      claims.forEach((claimTx) => {
+        claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
+        claimTx.claim.txError = error;
+        this.updateClaimStatus(claimTx);
+      });
+    };
+    if(!walletState.ready)
+      return failAll("Network RPC is currently unreachable.");
+    let totalAmount = claims.reduce((sum, claimTx) => sum + BigInt(claimTx.amount), 0n);
     if(
-      walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(claimTx.amount) ||
+      walletState.balance - BigInt(faucetConfig.spareFundsAmount) < totalAmount ||
       walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
-    ) {
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Faucet wallet is out of funds.";
-      this.updateClaimStatus(claimTx);
-      return;
-    }
+    )
+      return failAll("Faucet wallet is out of funds.");
 
     try {
-      claimTx.claim.claimStatus = ClaimTxStatus.PROCESSING;
+      claims.forEach((claimTx) => claimTx.claim.claimStatus = ClaimTxStatus.PROCESSING);
 
       // send transaction
-      let { txPromise } = await ethWalletManager.sendClaimTx(claimTx);
-      this.pendingTxQueue[claimTx.claim.txHash] = claimTx;
-      
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount)) + "] to: " + claimTx.target + ": " + claimTx.claim.txHash);
-      claimTx.claim.claimStatus = ClaimTxStatus.PENDING;
-      this.updateClaimStatus(claimTx);
+      let txResult = claims.length === 1 ? await ethWalletManager.sendClaimTx(claims[0]) : await ethWalletManager.sendClaimBatch(claims);
+      let txHash = txResult.txHash || claims[0].claim.txHash;
+      this.pendingTxQueue[txHash] = claims;
 
-      this.awaitTxReceipt(claimTx, txPromise);
+      claims.forEach((claimTx) => {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount)) + "] to: " + claimTx.target + ": " + txHash + (claims.length > 1 ? " (batch of " + claims.length + ")" : ""));
+        claimTx.claim.claimStatus = ClaimTxStatus.PENDING;
+        this.updateClaimStatus(claimTx);
+      });
+
+      this.awaitTxReceipt(claims, txResult.txPromise, txHash);
     } catch(ex) {
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Processing Exception: " + ex.toString();
-      this.updateClaimStatus(claimTx);
+      failAll("Processing Exception: " + ex.toString());
     }
   }
 
-  private awaitTxReceipt(claimTx: EthClaimInfo, txPromise: Promise<{
+  /**
+   * Settle the claims of one transaction from its receipt. A reverted transaction fails all of
+   * them; a mined one confirms them, except recipients the contract reported as failed
+   * (ethClaimTx.batch.failedEvent). The fee is split evenly, the remainder goes to the first claim.
+   */
+  private awaitTxReceipt(claims: EthClaimInfo[], txPromise: Promise<{
     status: boolean;
     block: number;
     fee: bigint;
     receipt: EthTxReceipt;
-  }>) {
-    // await transaction receipt
+  }>, txHash: string) {
+    let targetLabel = claims.length === 1 ? claims[0].target : claims.length + " claims";
     txPromise.then((txData) => {
-      claimTx.claim.txFee = txData.fee.toString();
+      let count = BigInt(claims.length);
+      let feeShare = txData.fee / count;
+      let feeRemainder = txData.fee - feeShare * count;
+      claims.forEach((claimTx, idx) => {
+        claimTx.claim.txFee = (feeShare + (idx === 0 ? feeRemainder : 0n)).toString();
+      });
       if(!txData.status) {
         throw "transaction reverted";
       }
 
-      delete this.pendingTxQueue[claimTx.claim.txHash];
-      delete this.claimTxDict[claimTx.session];
-      claimTx.claim.txBlock = txData.block;
-
-      this.lastConfirmedClaimTxIdx = claimTx.claim.claimIdx;
-
-      claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
-      this.updateClaimStatus(claimTx);
+      let failedTargets = ServiceManager.GetService(EthWalletManager).evaluateClaimReceipt(txData.receipt);
+      delete this.pendingTxQueue[txHash];
+      let confirmedIdx = this.lastConfirmedClaimTxIdx;
+      claims.forEach((claimTx) => {
+        delete this.claimTxDict[claimTx.session];
+        if(failedTargets.has(claimTx.target.toLowerCase())) {
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction " + txHash + " could not pay " + claimTx.target + ": the contract reported the payout as failed");
+          claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
+          claimTx.claim.txError = "Transaction Error: the contract could not pay this address";
+        } else {
+          claimTx.claim.txBlock = txData.block;
+          claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
+          if(claimTx.claim.claimIdx > confirmedIdx)
+            confirmedIdx = claimTx.claim.claimIdx;
+        }
+        this.updateClaimStatus(claimTx);
+      });
+      this.lastConfirmedClaimTxIdx = confirmedIdx;
     }).catch((error) => {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
-      delete this.pendingTxQueue[claimTx.claim.txHash];
-      delete this.claimTxDict[claimTx.session];
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Transaction Error: " + error.toString();
-      this.updateClaimStatus(claimTx);
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + targetLabel + " failed: " + error.toString());
+      delete this.pendingTxQueue[txHash];
+      claims.forEach((claimTx) => {
+        delete this.claimTxDict[claimTx.session];
+        claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
+        claimTx.claim.txError = "Transaction Error: " + error.toString();
+        this.updateClaimStatus(claimTx);
+      });
     }).then(() => {
-      this.historyTxDict[claimTx.claim.txNonce] = claimTx;
+      let txNonce = claims[0].claim.txNonce;
+      this.historyTxDict[txNonce] = claims;
       setTimeout(() => {
-        delete this.historyTxDict[claimTx.claim.txNonce];
+        delete this.historyTxDict[txNonce];
       }, 30 * 60 * 1000);
     });
   }

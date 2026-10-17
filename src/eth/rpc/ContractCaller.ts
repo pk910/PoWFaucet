@@ -1,5 +1,11 @@
-import { Abi, AbiFunction, encodeFunctionData, decodeFunctionResult, parseAbi, Hex } from 'viem';
-import { IEthRpcClient } from "./EthRpcClient.js";
+import { Abi, AbiFunction, encodeFunctionData, decodeFunctionResult, decodeEventLog, parseAbi, Hex } from 'viem';
+import { EthLog, IEthRpcClient } from "./EthRpcClient.js";
+
+export interface DecodedEventLog {
+  eventName: string;
+  args: { [name: string]: unknown };
+  log: EthLog;
+}
 
 /** A JSON ABI (parsed or as the string the config carries) or human-readable signatures. */
 export type ContractAbiInput = Abi | readonly unknown[] | string | string[];
@@ -68,6 +74,20 @@ export class ContractCaller {
     const fn = this.getFunction(fnName, args.length);
     const coerced = fn.inputs.map((input, idx) => coerceAbiValue(input.type, args[idx]));
     return encodeFunctionData({ abi: [fn], functionName: fnName, args: coerced } as any);
+  }
+
+  /** The receipt logs this contract's abi can name; logs of other events (or other contracts) are skipped. */
+  public decodeLogs(logs: EthLog[]): DecodedEventLog[] {
+    let decoded: DecodedEventLog[] = [];
+    for (const log of logs) {
+      try {
+        const event = decodeEventLog({ abi: this.abi, data: log.data as Hex, topics: log.topics as [Hex, ...Hex[]] });
+        decoded.push({ eventName: event.eventName, args: (event.args || {}) as { [name: string]: unknown }, log });
+      } catch (ex) {
+        // not one of ours
+      }
+    }
+    return decoded;
   }
 
   /** eth_call `fn(args)` and decode: the single output value, or an array for several outputs. */
