@@ -6,7 +6,7 @@ import webpackConfig from './webpack.config.js';
 
 let distDir = path.join(import.meta.dirname, 'dist');
 if(fs.existsSync(distDir))
-  fs.rmdirSync(distDir, { recursive: true });
+  fs.rmSync(distDir, { recursive: true });
 fs.mkdirSync(distDir);
 
 function copyIfFound(filename, dstpath, dstname) {
