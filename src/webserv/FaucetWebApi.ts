@@ -11,8 +11,7 @@ import { IFaucetResultSharingConfig } from "../config/ConfigShared.js";
 import { FaucetError } from "../common/FaucetError.js";
 import { EthClaimInfo, EthClaimManager } from "../eth/EthClaimManager.js";
 import { ModuleLoader, moduleAssetUrl } from "../loader/ModuleLoader.js";
-import { buildFaucetStatus, buildQueueStatus, buildSessionStatus } from "./api/faucetStatus.js";
-import { sha256 } from "../utils/CryptoUtils.js";
+import { buildFaucetStatus, buildQueueStatus, buildSessionDetails, buildSessionStatus, IClientSessionDetails, isOperatorKey } from "./api/faucetStatus.js";
 
 export interface IFaucetApiUrl {
   path: string[];
@@ -71,10 +70,7 @@ export interface IClientSessionStatus {
   claimMessage?: string;
   failedCode?: string;
   failedReason?: string;
-  details?: {
-    data: any;
-    claim: any;
-  };
+  details?: IClientSessionDetails;
 }
 
 
@@ -111,7 +107,7 @@ export class FaucetWebApi {
       case "claimReward".toLowerCase():
         return this.onClaimReward(req, body);
       case "getSessionStatus".toLowerCase():
-        return this.onGetSessionStatus(apiUrl.query['session'] as string, !!apiUrl.query['details']);
+        return this.onGetSessionStatus(apiUrl.query['session'] as string, !!apiUrl.query['details'], apiUrl.query['key'] as string);
       case "getQueueStatus".toLowerCase():
         return this.onGetQueueStatus();
       case "getFaucetStatus".toLowerCase():
@@ -335,7 +331,7 @@ export class FaucetWebApi {
     return this.getSessionStatus(sessionData, false);
   }
 
-  private getSessionStatus(sessionData: FaucetSessionStoreData, details: boolean): IClientSessionStatus {
+  private getSessionStatus(sessionData: FaucetSessionStoreData, details: boolean, unmasked?: boolean): IClientSessionStatus {
     let sessionStatus: IClientSessionStatus = {
       session: sessionData.sessionId,
       status: sessionData.status,
@@ -355,22 +351,26 @@ export class FaucetWebApi {
       sessionStatus.claimHash = sessionData.claim.txHash;
       sessionStatus.claimMessage = sessionData.claim.txError;
     }
-    if(details) {
-      sessionStatus.details = {
-        data: sessionData.data,
-        claim: sessionData.claim,
-      };
-    }
+    if(details)
+      sessionStatus.details = buildSessionDetails(sessionData, !!unmasked);
 
     return sessionStatus;
   }
 
-  public async onGetSessionStatus(sessionId: string, details: boolean): Promise<any> {
+  public async onGetSessionStatus(sessionId: string, details: boolean, key?: string): Promise<any> {
+    // the same key as getFaucetStatus: with it the details come unmasked, a wrong one is refused
+    // rather than quietly answered with the public set
+    let unmasked = false;
+    if(key) {
+      if(!isOperatorKey(key))
+        return new FaucetHttpResponse(403, "Access denied");
+      unmasked = true;
+    }
     let sessionData: FaucetSessionStoreData;
     if(!sessionId || !(sessionData = await ServiceManager.GetService(SessionManager).getSessionData(sessionId)))
       return new FaucetHttpResponse(404, "Session not found");
-    
-    return this.getSessionStatus(sessionData, details);
+
+    return this.getSessionStatus(sessionData, details, unmasked);
   }
 
   public async onGetQueueStatus(): Promise<any> {
@@ -387,7 +387,7 @@ export class FaucetWebApi {
 
   public async onGetFaucetStatus(key: string): Promise<any> {
     if(key) {
-      if(key !== sha256(faucetConfig.faucetSecret + "-unmasked"))
+      if(!isOperatorKey(key))
         return new FaucetHttpResponse(403, "Access denied");
       return Object.assign(
         await buildFaucetStatus(),

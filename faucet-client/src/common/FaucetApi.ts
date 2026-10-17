@@ -119,10 +119,12 @@ export class FaucetApi {
     });
   }
 
-  public getSessionStatus(sessionId: string, details?: boolean): Promise<IFaucetSessionStatus> {
+  /** `key` is the operator's: with it the details come unmasked, a wrong one is refused */
+  public getSessionStatus(sessionId: string, details?: boolean, key?: string): Promise<IFaucetSessionStatus> {
     return this.apiGet("/getSessionStatus", {
       session: sessionId,
       details: details ? 1 : undefined,
+      key: key || undefined,
     });
   }
 
@@ -140,8 +142,11 @@ export class FaucetApi {
     return this.apiGet("/getQueueStatus");
   }
 
-  public getFaucetStatus(): Promise<IClientFaucetStatusRsp> {
-    return this.apiGet("/getFaucetStatus");
+  /** `key` is the operator's: with it the session list carries real ids and ips */
+  public getFaucetStatus(key?: string): Promise<IClientFaucetStatusRsp> {
+    return this.apiGet("/getFaucetStatus", {
+      key: key || undefined,
+    });
   }
 
   public getPassportInfo(sessionId: string, address: string): Promise<IPassportInfo> {

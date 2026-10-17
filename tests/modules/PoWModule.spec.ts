@@ -222,9 +222,11 @@ describe("Faucet module: pow", () => {
       expect(fakeSocket.isReady).to.equal(true, "client not ready");
       expect(globalStubs["FakeWebSocket.ping"].called).to.equal(true, "ping not called");
       expect(fakeSocket.isReady).to.equal(true, "unexpected close call");
-      await awaitSleepPromise(3000, () => !fakeSocket.isReady);
+      // the timeout fires 2 s after the last pong on the server's own timer; a loaded machine
+      // gets a wide margin, the wait ends as soon as the socket closed
+      await awaitSleepPromise(6000, () => !fakeSocket.isReady);
       expect(fakeSocket.isReady).to.equal(false, "client is still ready");
-    }).timeout(5000);
+    }).timeout(10000);
 
     it("check invalid message handling", async () => {
       faucetConfig.modules["pow"] = {

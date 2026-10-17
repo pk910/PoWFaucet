@@ -116,6 +116,14 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
       return;
     }
 
+    if(message.action === "error") {
+      // the server ends the socket with an error message once the claim is confirmed; nobody has
+      // to listen for that, and an EventEmitter throws on an "error" nobody listens to
+      console.log("[ClaimNotificationClient] server error", message.data);
+      if(this.listenerCount("error") > 0)
+        this.emit("error", message);
+      return;
+    }
     if(message.action) {
       this.emit(message.action, message);
     }

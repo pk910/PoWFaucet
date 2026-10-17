@@ -26,34 +26,25 @@ export class ClaimInput extends React.PureComponent<IClaimInputProps, IClaimInpu
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForClaim;
 
     return (
-      <div>
-        {requestCaptcha ? 
-        <div className="row">
-          <div className='col-3'>
-            Captcha:
+      <React.Fragment>
+        {requestCaptcha ?
+          <div className='faucet-captcha'>
+            <FaucetCaptcha
+              faucetConfig={this.props.faucetConfig}
+              ref={this.faucetCaptcha}
+              variant='claim'
+            />
           </div>
-          <div className="col">
-            <div className='faucet-captcha'>
-              <FaucetCaptcha 
-                faucetConfig={this.props.faucetConfig} 
-                ref={this.faucetCaptcha} 
-                variant='claim'
-              />
-            </div>
-          </div>
-        </div>
         : null}
-        <div className="row">
-          <div className="col-12 faucet-actions center">
-            <button 
-              className="btn btn-success start-action" 
-              onClick={(evt) => this.onSubmitBtnClick()} 
-              disabled={this.state.submitting}>
-                Claim Rewards
-            </button>
-          </div>
+        <div className="faucet-actions">
+          <button
+            className="btn btn-success start-action"
+            onClick={(evt) => this.onSubmitBtnClick()}
+            disabled={this.state.submitting}>
+              Claim Rewards
+          </button>
         </div>
-      </div>
+      </React.Fragment>
     );
 	}
 

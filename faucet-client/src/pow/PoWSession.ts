@@ -38,6 +38,8 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   private shareQueue: IPoWMinerShare[];
   private shareQueueProcessing: boolean;
   private verifyResultQueue: IPoWMinerVerificationResult[];
+  /** set once we asked the server to close; the kill that follows is expected */
+  private closing: boolean = false;
 
   public constructor(options: IPoWSessionOptions) {
     super();
@@ -61,8 +63,15 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     this.options.client.on("verify", (message) => this.processVerification(message.data));
     this.options.client.on("updateBalance", (message) => this.updateBalance(message.data));
     this.options.client.on("error", (message) => {
+      // the server answers our own closeSession with a CLIENT_KILLED before it drops the socket:
+      // that is the close we asked for, not an error to show
+      if(this.closing && message.data?.code === "CLIENT_KILLED")
+        return;
       this.options.showNotification("error", "WS Error: [" + message.data.code + "] " + message.data.message, true, 20 * 1000);
-      this.emit("error", message);
+      // an EventEmitter throws on an "error" nobody listens to; the mining page unbinds on its
+      // way to the claim page, and a late error must not take the page down with it
+      if(this.listenerCount("error") > 0)
+        this.emit("error", message);
     });
 
     this.emit("resume");
@@ -73,6 +82,7 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   }
 
   public closeSession() {
+    this.closing = true;
     return this.options.client.sendRequest("closeSession").then((data) => {
       this.emit("close", data);
     });

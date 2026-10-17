@@ -1,10 +1,11 @@
 import React from 'react';
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Tooltip } from 'react-bootstrap';
 import { IFaucetConfig, ITicketProofModuleConfig } from '../../../common/FaucetConfig';
 import { IFaucetContext } from '../../../common/FaucetContext';
 import { OverlayChildren } from 'react-bootstrap/esm/Overlay';
 
 import './TicketProofLogin.css';
+import { FaucetOverlay } from '../../shared/FaucetOverlay';
 
 export interface ITicketProofLoginProps {
   faucetContext: IFaucetContext;
@@ -89,19 +90,13 @@ export class TicketProofLogin extends React.PureComponent<ITicketProofLoginProps
     );
   }
 
-  /*
-   * The overlay container is handed over as a function: this component first renders
-   * while the page's container ref is still null, and an OverlayTrigger that got
-   * `undefined` then falls back to document.body, outside the `.faucet-bootstrap`
-   * scope that carries the tooltip styles (bare text floating over the page).
-   */
+  /** the info icon with the module's infoHtml in a tooltip */
   private renderInfoIcon(): React.ReactElement | null {
     if(!this.moduleConfig.infoHtml)
       return null;
     return (
-      <OverlayTrigger
+      <FaucetOverlay
         placement="bottom"
-        container={() => this.props.faucetContext.getContainer()}
         overlay={this.renderInfoHtml() as OverlayChildren}
       >
         <span className="ticketproof-info-icon">
@@ -110,7 +105,7 @@ export class TicketProofLogin extends React.PureComponent<ITicketProofLoginProps
             <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
           </svg>
         </span>
-      </OverlayTrigger>
+      </FaucetOverlay>
     );
   }
 
@@ -162,14 +157,13 @@ export class TicketProofLogin extends React.PureComponent<ITicketProofLoginProps
         </div>
         <div className='auth-info'>
           Ticket:
-          <OverlayTrigger
+          <FaucetOverlay
             placement="bottom"
             delay={{ show: 250, hide: 400 }}
-            container={() => this.props.faucetContext.getContainer()}
             overlay={(props) => this.renderTicketInfo(authInfo, props)}
           >
             <span className="auth-ident-truncated">{authInfo.identifier}</span>
-          </OverlayTrigger>
+          </FaucetOverlay>
           <span className='auth-tier'>({authInfo.tier})</span>
         </div>
       </div>

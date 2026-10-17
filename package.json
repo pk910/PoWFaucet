@@ -41,6 +41,7 @@
     "bundle": "tsc && webpack --mode production && node scripts/copy-modules.mjs bundle/modules",
     "test": "rm -rf dist-test && tsc -p tsconfig.test.json && cp -r libs dist-test/ && cp -r static dist-test/ && NODE_OPTIONS='--experimental-vm-modules' NODE_NO_WARNINGS=1 npx mocha --exit 'dist-test/tests/**/*.js'",
     "test-coverage": "rm -rf dist-test && tsc -p tsconfig.test.json && cp -r libs dist-test/ && cp -r static dist-test/ && NODE_OPTIONS='--experimental-vm-modules' NODE_NO_WARNINGS=1 npx c8 --reporter=text --reporter=lcov npx mocha --exit 'dist-test/tests/**/*.js'",
+    "test-browser": "rm -rf dist-test && tsc -p tsconfig.test.json && cp -r libs dist-test/ && cp -r static dist-test/ && FAUCET_E2E_BROWSER=1 NODE_OPTIONS='--experimental-vm-modules' NODE_NO_WARNINGS=1 npx mocha --exit 'dist-test/tests/client/**/*.js' 'dist-test/tests/loader/ModuleClient.spec.js'",
     "modules": "node scripts/copy-modules.mjs dist/modules"
   },
   "author": "pk910 (https://pk910.de)",

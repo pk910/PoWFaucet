@@ -9,10 +9,11 @@ import { renderDate, renderTimespan } from '../../utils/DateUtils';
 import { ClaimInput } from './ClaimInput';
 import { SlotOutlet } from '../../sdk/SlotOutlet';
 import { emitHook, emitHookSafe } from '../../sdk/hooks';
-import { OverlayTrigger, Spinner, Tooltip } from 'react-bootstrap';
+import { Spinner, Tooltip } from 'react-bootstrap';
 import { ClaimNotificationClient, IClaimNotificationUpdateData } from './ClaimNotificationClient';
 
 import './ClaimPage.css'
+import { FaucetOverlay } from '../shared/FaucetOverlay';
 
 // Component that preserves DOM elements by only setting innerHTML once
 class ResultSharingHtml extends React.Component<{ html: string }> {
@@ -108,10 +109,17 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   }
 
   public componentDidMount() {
+    this.updateHeader();
     this.refreshSessionStatus();
   }
 
+  public componentDidUpdate(prevProps: IClaimPageProps, prevState: IClaimPageState) {
+    if(prevState.sessionStatus !== this.state.sessionStatus || prevState.isTimedOut !== this.state.isTimedOut)
+      this.updateHeader();
+  }
+
   public componentWillUnmount() {
+    this.props.pageContext.setPageHeader(null);
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);
       this.updateTimer = null;
@@ -220,21 +228,33 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
 
     return (
       <div className='page-claim'>
-        <div className='container'>
-          <div className='row'>
-            <div className='col'>
-              <h5>Claim Rewards</h5>
-            </div>
-          </div>
-          <SlotOutlet slot="claim.before" faucetConfig={this.props.faucetConfig}
-            sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
-          {this.renderClaim()}
-          <SlotOutlet slot="claim.after" faucetConfig={this.props.faucetConfig}
-            sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
-        </div>
+        <SlotOutlet slot="claim.before" faucetConfig={this.props.faucetConfig}
+          sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
+        {this.renderClaim()}
+        <SlotOutlet slot="claim.after" faucetConfig={this.props.faucetConfig}
+          sessionId={this.props.sessionId} navigate={(path) => this.props.navigateFn(path)} />
       </div>
     )
 	}
+
+  /** the card's header while this page is on */
+  private updateHeader() {
+    let status = this.state.sessionStatus;
+    let pill: { text: string, kind: "live" | "info" | "warn" | "crit" } = null;
+    if(status && !this.state.isTimedOut) {
+      switch(status.status) {
+        case "claimable": pill = { text: "Claimable", kind: "warn" }; break;
+        case "claiming": pill = { text: "Claiming", kind: "info" }; break;
+        case "finished": pill = { text: "Confirmed", kind: "live" }; break;
+        case "failed": pill = { text: "Failed", kind: "crit" }; break;
+      }
+    }
+    this.props.pageContext.setPageHeader({
+      title: status && status.status === "finished" ? "Rewards sent" : "Claim your rewards",
+      meta: this.props.faucetConfig.faucetTitle + " \u00b7 session " + this.props.sessionId.substring(0, 8) + "\u2026" + this.props.sessionId.substring(this.props.sessionId.length - 4),
+      pill: pill,
+    });
+  }
 
   private renderClaim(): React.ReactElement {
     if(this.state.loadingError) {
@@ -264,60 +284,45 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
     
     let now = this.props.pageContext.faucetApi.getFaucetTime().getSyncedTime();
     let claimTimeout = (this.state.sessionStatus.start + this.props.faucetConfig.sessionTimeout) - now;
+    let status = this.state.sessionStatus.status;
 
     return (
-      <div>
-        <div className='row'>
-          <div className='col-3'>
-            Wallet:
-          </div>
-          <div className='col'>
-            {this.state.sessionStatus.target}
-          </div>
+      <React.Fragment>
+        <div className='pf-stat pf-stat-lg'>
+          <span>Reward</span>
+          <b>{toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}</b>
         </div>
-        <div className='row'>
-          <div className='col-3'>
-            Amount:
+        <div className='pf-kv-list'>
+          <div className='pf-kv'>
+            <span>Wallet</span>
+            <b className='pf-mono'>{this.state.sessionStatus.target}</b>
           </div>
-          <div className='col'>
-            {toReadableAmount(BigInt(this.state.sessionStatus.balance), this.props.faucetConfig.faucetCoinDecimals, this.props.faucetConfig.faucetCoinSymbol)}
-          </div>
-        </div>
-        <div className='row'>
-          <div className='col-3'>
-            Timeout:
-          </div>
-          <div className='col'>
-            {this.state.sessionStatus.status === "claimable" ?
-              <span className='claim-timeout'>
-                {renderDate(new Date((this.state.sessionStatus.start + this.props.faucetConfig.sessionTimeout) * 1000), true)}  ({renderTimespan(claimTimeout)})
-              </span> :
-              <span className='claim-timeout'>
-                -
-              </span>
+          <div className='pf-kv'>
+            <span>Claim before</span>
+            {status === "claimable" ?
+              <b className='claim-timeout'>
+                {renderDate(new Date((this.state.sessionStatus.start + this.props.faucetConfig.sessionTimeout) * 1000), true)} <span className='claim-timeout-rel'>(in {renderTimespan(claimTimeout)})</span>
+              </b> :
+              <b className='claim-timeout'>-</b>
             }
           </div>
         </div>
-        {this.state.sessionStatus.status === "claimable" ? this.renderClaimForm() : null}
-        {this.state.sessionStatus.status === "claiming" ? this.renderClaimStatus() : null}
-        {this.state.sessionStatus.status === "failed" ? this.renderSessionFailed() : null}
-        {this.state.sessionStatus.status === "finished" ? this.renderSessionFinished() : null}
-        {this.state.sessionStatus.status !== "claimable" ?
-          <div className='row'>
-            <div className='col'>
-            </div>
-            <div className='col-4'>
-              <button 
-                className="btn btn-secondary action-btn"
-                onClick={() => {
-                  this.props.navigateFn("/");
-                }}>
-                  Return to startpage
-                </button>
-            </div>
+        {status === "claimable" ? this.renderClaimForm() : null}
+        {status === "claiming" ? this.renderClaimStatus() : null}
+        {status === "failed" ? this.renderSessionFailed() : null}
+        {status === "finished" ? this.renderSessionFinished() : null}
+        {status !== "claimable" ?
+          <div className='faucet-actions'>
+            <button
+              className="btn btn-secondary action-btn"
+              onClick={() => {
+                this.props.navigateFn("/");
+              }}>
+                Return to startpage
+            </button>
           </div>
         : null}
-      </div>
+      </React.Fragment>
     );
   }
 
@@ -339,41 +344,32 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
           </Spinner>
           <span className="spinner-text">The faucet is now processing your claim...</span>
           <span className="spinner-text"><br />You can close this page now. Your claim is queued and will be processed as soon as possible.</span>
-          <div className="queue-info container">
-            <div className='row'>
-              <div className='col-3'>
-                TX-Status:
-              </div>
-              <div className='col'>
-                {(this.state.sessionStatus.claimHash || this.state.sessionStatus.claimIdx <= this.state.claimNotification?.processedIdx) ? 
+          <div className="queue-info pf-kv-list">
+            <div className='pf-kv'>
+              <span>TX status</span>
+              <b>
+                {(this.state.sessionStatus.claimHash || this.state.sessionStatus.claimIdx <= this.state.claimNotification?.processedIdx) ?
                   "Sending" :
                   "Queued"
                 }
-              </div>
+              </b>
             </div>
-            {this.state.sessionStatus.claimHash ? 
-              <div className='row'>
-                <div className='col-3'>
-                  TX-Hash:
-                </div>
-                <div className='col'>
-                  <span className='txhash'>
-                    {this.props.faucetConfig.ethTxExplorerLink ? 
-                      <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.sessionStatus.claimHash)} target='_blank' rel='noopener noreferrer'>{this.state.sessionStatus.claimHash}</a> :
-                      <span>{this.state.sessionStatus.claimHash}</span>}
-                  </span>
-                </div>
+            {this.state.sessionStatus.claimHash ?
+              <div className='pf-kv'>
+                <span>TX hash</span>
+                <b className='txhash'>
+                  {this.props.faucetConfig.ethTxExplorerLink ?
+                    <a href={this.props.faucetConfig.ethTxExplorerLink.replace("{txid}", this.state.sessionStatus.claimHash)} target='_blank' rel='noopener noreferrer'>{this.state.sessionStatus.claimHash}</a> :
+                    <span>{this.state.sessionStatus.claimHash}</span>}
+                </b>
               </div>
               : null
             }
-            <div className='row'>
-              <div className='col-3'>
-                Queue Position:
-              </div>
-              <div className='col'>
-                <OverlayTrigger
+            <div className='pf-kv'>
+              <span>Queue position</span>
+              <b>
+                <FaucetOverlay
                   placement="auto"
-                  container={this.props.pageContext.getContainer()}
                   overlay={
                     <Tooltip>
                       {((this.state.sessionStatus.claimIdx || 0) - (this.state.claimNotification?.processedIdx || 0) - 1)} claims will be processed before yours.
@@ -381,13 +377,13 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
                   }
                 >
                   <span>
-                    #{(this.state.sessionStatus.claimHash || (this.state.sessionStatus.claimIdx || 0) <= (this.state.claimNotification?.processedIdx || 0)) ? 
-                      "0" : 
+                    #{(this.state.sessionStatus.claimHash || (this.state.sessionStatus.claimIdx || 0) <= (this.state.claimNotification?.processedIdx || 0)) ?
+                      "0" :
                       (this.state.sessionStatus.claimIdx || 0) - (this.state.claimNotification?.processedIdx || 0)
                     }
                   </span>
-                </OverlayTrigger>
-              </div>
+                </FaucetOverlay>
+              </b>
             </div>
           </div>
         </div>

@@ -1,11 +1,12 @@
 import React from 'react';
-import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Tooltip } from 'react-bootstrap';
 import { IFaucetConfig } from '../../../common/FaucetConfig';
 import { IFaucetContext } from '../../../common/FaucetContext';
 import { ArgumentTypeName, PCDGetRequest, PCDRequestType, PCDTypeName } from "./ZupassTypes";
 
 import './ZupassLogin.css';
 import { OverlayChildren } from 'react-bootstrap/esm/Overlay';
+import { FaucetOverlay } from '../../shared/FaucetOverlay';
 
 export interface IZupassLoginProps {
   faucetContext: IFaucetContext;
@@ -87,9 +88,8 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
         <div>
           {this.props.faucetConfig.modules.zupass.loginLabel || "Event attendee? Login with your Ticket."}
           {this.props.faucetConfig.modules.zupass.infoHtml ?
-            <OverlayTrigger
+            <FaucetOverlay
               placement="bottom"
-              container={() => this.props.faucetContext.getContainer()}
               overlay={this.renderInfoHtml() as OverlayChildren}
             >
               <span className="zupass-info-icon">
@@ -98,7 +98,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
                   <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
                 </svg>
               </span>
-            </OverlayTrigger>
+            </FaucetOverlay>
           : null}
         </div>
         <div>
@@ -121,9 +121,8 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
         <div className='auth-info'>
           {this.props.faucetConfig.modules.zupass.userLabel || "Authenticated with Zupass Ticket."}
           {this.props.faucetConfig.modules.zupass.infoHtml ?
-            <OverlayTrigger
+            <FaucetOverlay
               placement="bottom"
-              container={() => this.props.faucetContext.getContainer()}
               overlay={this.renderInfoHtml() as OverlayChildren}
             >
               <span className="zupass-info-icon">
@@ -132,7 +131,7 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
                   <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
                 </svg>
               </span>
-            </OverlayTrigger>
+            </FaucetOverlay>
           : null}
         </div>
         <div className="auth-logout">
@@ -142,14 +141,13 @@ export class ZupassLogin extends React.PureComponent<IZupassLoginProps, IZupassL
         </div>
         <div className='auth-info'>
           Attendee ID: 
-          <OverlayTrigger
+          <FaucetOverlay
             placement="bottom"
             delay={{ show: 250, hide: 400 }}
-            container={() => this.props.faucetContext.getContainer()}
             overlay={(props) => this.renderZupassTicketInfo(this.state.authInfo, props)}
           >
             <span className="auth-ident-truncated">{this.state.authInfo.attendeeId}</span>
-          </OverlayTrigger>
+          </FaucetOverlay>
         </div>
       </div>
     );
