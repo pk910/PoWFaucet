@@ -102,8 +102,6 @@
   },
   "dependencies": {
     "@brettz9/node-static": "^0.1.1",
-    "@ethereumjs/common": "^10.0.0",
-    "@ethereumjs/tx": "^10.0.0",
     "@types/node": "^26.0.0",
     "bignumber.js": "^11.0.0",
     "commander": "^15.0.0",
@@ -115,9 +113,7 @@
     "node-fetch": "^3.3.2",
     "tiny-typed-emitter": "^2.1.0",
     "uuid": "^14.0.0",
-    "web3": "^4.11.1",
-    "web3-eth-ens": "^4.4.0",
-    "web3-providers-ipc": "^4.0.7",
+    "viem": "^2.57.7",
     "ws": "^8.18.0",
     "yaml": "^2.5.0"
   }

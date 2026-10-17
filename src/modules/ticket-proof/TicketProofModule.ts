@@ -216,7 +216,7 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
     if(!proof)
       return { errorCode: "PROOF_INVALID", errorMessage: "Missing or malformed ticket proof." };
 
-    let verdict = verifyTicketProof(proof, {
+    let verdict = await verifyTicketProof(proof, {
       signerAddress: this.moduleConfig.signerAddress,
       domain: this.moduleConfig.domain,
       version: this.moduleConfig.version,

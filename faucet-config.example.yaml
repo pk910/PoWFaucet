@@ -177,6 +177,8 @@ modules:
     rpcHost: "https://rpc.flashbots.net/"
     # Custom ENS Resolver contract address
     #ensAddr: "0x"
+    # ENS Universal Resolver address (resolves wildcard / offchain names too; mainnet: 0xeeeeeeee14d718c2b47d9923deab1335e144eeee)
+    #universalResolver: null
     
     # require ENS name
     required: false

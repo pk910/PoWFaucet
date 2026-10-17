@@ -14,7 +14,7 @@ import { IncomingMessage } from 'http';
 import { EthClaimNotificationClient, IEthClaimNotificationData } from './EthClaimNotificationClient.js';
 import { FaucetOutflowModule } from '../modules/faucet-outflow/FaucetOutflowModule.js';
 import { clearInterval } from 'timers';
-import { TransactionReceipt } from 'web3';
+import { EthTxReceipt } from "./rpc/index.js";
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -322,7 +322,7 @@ export class EthClaimManager {
     status: boolean;
     block: number;
     fee: bigint;
-    receipt: TransactionReceipt;
+    receipt: EthTxReceipt;
   }>) {
     // await transaction receipt
     txPromise.then((txData) => {

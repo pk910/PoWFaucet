@@ -55,8 +55,10 @@ describe("Faucet module: ensname", () => {
     fakeProvider.injectResponse("eth_blockNumber", "0x1206917");
     fakeProvider.injectResponse("eth_call", (payload) => {
       switch(payload.params[0].data.substring(0, 10)) {
-        case "0x0178b8bf":
+        case "0x0178b8bf": // registry.resolver(node)
           return "0x0000000000000000000000004976fb03c32e5b8cfe2b6ccb31c09ba78ebaba41";
+        case "0x3b3b57de": // resolver.addr(node)
+          return "0x000000000000000000000000332e43696a505ef45b9319973785f837ce5267b9";
         case "0x01ffc9a7":
           return "0x0000000000000000000000000000000000000000000000000000000000000001";
         case "0xf1cb7e06":

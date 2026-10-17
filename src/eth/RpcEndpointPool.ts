@@ -1,6 +1,4 @@
-import Web3, { HttpProvider, WebSocketProvider } from 'web3';
-import { ethRpcMethods } from 'web3-rpc-methods';
-import IpcProvider from 'web3-providers-ipc';
+import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider } from './rpc/index.js';
 
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { EthRpcHostConfig, IRpcEndpointConfig } from '../config/ConfigSchema.js';
@@ -10,8 +8,8 @@ import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
 export interface RpcEndpointState {
   config: IRpcEndpointConfig;
   label: string;
-  web3: Web3;
-  provider: any;
+  client: EthRpcClient;
+  provider: IRpcProvider;
   online: boolean;
   blockHeight: number;
   lastCheck: number;
@@ -42,6 +40,8 @@ interface NormalizedEndpoint {
 
 export class RpcEndpointPool {
   private endpoints: RpcEndpointState[] = [];
+  // one client for the lifetime of the pool: every call lands on the endpoint that is active right then
+  private routedClient: RoutedRpcClient = new RoutedRpcClient(() => this.getActiveClient());
   private monitorInterval: NodeJS.Timeout = null;
   private disposed: boolean = false;
 
@@ -105,13 +105,18 @@ export class RpcEndpointPool {
     }));
   }
 
-  // Returns the highest-priority ready Web3, or the first endpoint as a fallback
+  // Returns the highest-priority ready client, or the first endpoint as a fallback
   // (so callers always get a usable instance and surface natural errors on failure).
-  public getActiveWeb3(): Web3 {
+  /** The client to keep: it follows failover, unlike the endpoint clients behind getActiveClient(). */
+  public getClient(): IEthRpcClient {
+    return this.routedClient;
+  }
+
+  public getActiveClient(): EthRpcClient {
     const ready = this.getReadyEndpoints();
     if (ready.length > 0)
-      return ready[0].web3;
-    return this.endpoints[0]?.web3 || null;
+      return ready[0].client;
+    return this.endpoints[0]?.client || null;
   }
 
   public hasReadyEndpoint(): boolean {
@@ -132,7 +137,7 @@ export class RpcEndpointPool {
       throw new Error('no RPC endpoints configured');
 
     const results = await Promise.allSettled(
-      targets.map((ep) => ethRpcMethods.sendRawTransaction(ep.web3.eth.requestManager, rawTxHex))
+      targets.map((ep) => ep.client.sendRawTransaction(rawTxHex))
     );
 
     let firstHash: string = null;
@@ -193,12 +198,12 @@ export class RpcEndpointPool {
   }
 
   private createEndpoint(cfg: NormalizedEndpoint): RpcEndpointState {
-    const provider = this.makeProvider(cfg.url);
+    const provider = this.createProvider(cfg.url);
     const label = cfg.name || (typeof cfg.url === 'string' ? this.sanitizeUrl(cfg.url) : '<provider>');
     const ep: RpcEndpointState = {
       config: { url: cfg.url, name: cfg.name, priority: cfg.priority, metered: cfg.metered },
       label,
-      web3: null,
+      client: null,
       provider,
       online: false,
       blockHeight: 0,
@@ -207,9 +212,14 @@ export class RpcEndpointPool {
       requestCount: 0,
     };
     this.instrumentProvider(ep);
-    ep.web3 = new Web3(ep.provider);
+    ep.client = new EthRpcClient(ep.provider);
     this.attachProviderHandlers(ep);
     return ep;
+  }
+
+  // The seam for tests; the real work is in src/eth/rpc.
+  protected createProvider(url: string | object): IRpcProvider {
+    return createRpcProvider(url);
   }
 
   // Wrap the provider's `request` method so we can count outgoing JSON-RPC calls.
@@ -256,9 +266,9 @@ export class RpcEndpointPool {
     if (this.disposed)
       return;
     try {
-      ep.provider = this.makeProvider(ep.config.url);
+      ep.provider = this.createProvider(ep.config.url);
       this.instrumentProvider(ep);
-      ep.web3 = new Web3(ep.provider);
+      ep.client = new EthRpcClient(ep.provider);
       this.attachProviderHandlers(ep);
     } catch (ex) {
       ServiceManager.GetService(FaucetProcess).emitLog(
@@ -266,40 +276,6 @@ export class RpcEndpointPool {
         `RPC endpoint ${ep.label} reconnect failed: ${this.errorString(ex)}`
       );
     }
-  }
-
-  private makeProvider(url: any): any {
-    if (typeof url !== 'string')
-      return url; // pre-built provider object
-    if (/^wss?:\/\//.test(url)) {
-      const { cleanUrl, headers } = this.extractAuth(url);
-      const wsOptions = Object.keys(headers).length > 0 ? { headers } : undefined;
-      return new WebSocketProvider(cleanUrl, wsOptions);
-    }
-    if (url.startsWith('/'))
-      return new IpcProvider(url);
-    const { cleanUrl, headers } = this.extractAuth(url);
-    const httpOptions = Object.keys(headers).length > 0 ? { providerOptions: { headers } } : undefined;
-    return new HttpProvider(cleanUrl, httpOptions);
-  }
-
-  private extractAuth(url: string): { cleanUrl: string; headers: Record<string, string> } {
-    try {
-      const u = new URL(url);
-      if (u.username || u.password) {
-        const user = decodeURIComponent(u.username);
-        const pass = decodeURIComponent(u.password);
-        u.username = '';
-        u.password = '';
-        return {
-          cleanUrl: u.toString(),
-          headers: { Authorization: 'Basic ' + Buffer.from(user + ':' + pass).toString('base64') },
-        };
-      }
-    } catch (ex) {
-      // not a parseable URL, return as-is
-    }
-    return { cleanUrl: url, headers: {} };
   }
 
   // Returns a display-safe version of the URL: strips userinfo, redacts long path segments
@@ -393,7 +369,7 @@ export class RpcEndpointPool {
   private async checkEndpoint(ep: RpcEndpointState): Promise<void> {
     ep.lastCheck = Math.floor(Date.now() / 1000);
     try {
-      const blockNumber = Number(await ep.web3.eth.getBlockNumber());
+      const blockNumber = await ep.client.getBlockNumber();
       const wasOffline = !ep.online;
       ep.blockHeight = blockNumber;
       ep.online = true;
@@ -447,7 +423,7 @@ export class RpcEndpointPool {
   private disposeEndpoints(): void {
     for (const ep of this.endpoints) {
       try {
-        (ep.provider as any)?.disconnect?.();
+        ep.client?.dispose();
       } catch (ex) {
         // some providers don't support disconnect
       }

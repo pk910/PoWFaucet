@@ -1,6 +1,7 @@
 import 'mocha';
 import { expect } from 'chai';
-import Web3 from 'web3';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { Hex } from 'viem';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig } from '../common.js';
 import { ServiceManager } from '../../src/common/ServiceManager.js';
 import { FaucetDatabase } from '../../src/db/FaucetDatabase.js';
@@ -19,9 +20,12 @@ import { ITicketProof, parseTicketProof, ticketProofPayloadHash, verifyTicketPro
 
 describe("Faucet module: ticket-proof", () => {
   let globalStubs;
-  let web3 = new Web3();
-  let signer = web3.eth.accounts.create();
-  let otherSigner = web3.eth.accounts.create();
+  function createSigner() {
+    let privateKey = generatePrivateKey();
+    return { privateKey: privateKey as string, address: privateKeyToAccount(privateKey).address as string };
+  }
+  let signer = createSigner();
+  let otherSigner = createSigner();
   const DOMAIN = "devcon-ticket-proof-v1";
   const IDENTIFIER = "0x" + "ab".repeat(32);
 
@@ -57,7 +61,7 @@ describe("Faucet module: ticket-proof", () => {
   });
 
   /** mint a proof the way the event app does: abi.encode, keccak256, EIP-191 sign */
-  function mintProof(overrides?: Partial<ITicketProof>, privateKey?: string): ITicketProof {
+  async function mintProof(overrides?: Partial<ITicketProof>, privateKey?: string): Promise<ITicketProof> {
     let proof: ITicketProof = Object.assign({
       version: 1,
       identifier: IDENTIFIER,
@@ -68,7 +72,7 @@ describe("Faucet module: ticket-proof", () => {
       signature: "",
     }, overrides || {});
     let hash = ticketProofPayloadHash(DOMAIN, proof);
-    proof.signature = web3.eth.accounts.sign(hash, privateKey || signer.privateKey).signature;
+    proof.signature = await privateKeyToAccount((privateKey || signer.privateKey) as Hex).signMessage({ message: { raw: hash as Hex } });
     return proof;
   }
 
@@ -119,7 +123,7 @@ describe("Faucet module: ticket-proof", () => {
     await ServiceManager.GetService(ModuleManager).initialize();
     let module: TicketProofModule = ServiceManager.GetService(ModuleManager).getModule<any>("ticket-proof");
     expect(module.isEnabled()).to.equal(true, "module not enabled");
-    let rsp = await loginWithProof(mintProof());
+    let rsp = await loginWithProof(await mintProof());
     expect(rsp.errorCode).to.equal("PROOF_NOT_CONFIGURED", "unexpected response: " + JSON.stringify(rsp));
   });
 
@@ -133,50 +137,50 @@ describe("Faucet module: ticket-proof", () => {
       tiers: [],
     });
 
-    it("accepts a proof from the pinned signer", () => {
-      let verdict = verifyTicketProof(mintProof(), options());
+    it("accepts a proof from the pinned signer", async () => {
+      let verdict = await verifyTicketProof(await mintProof(), options());
       expect(verdict.valid).to.equal(true, "proof not accepted: " + JSON.stringify(verdict));
     });
 
-    it("accepts the signer address regardless of case", () => {
-      let verdict = verifyTicketProof(mintProof(), Object.assign(options(), { signerAddress: signer.address.toLowerCase() }));
+    it("accepts the signer address regardless of case", async () => {
+      let verdict = await verifyTicketProof(await mintProof(), Object.assign(options(), { signerAddress: signer.address.toLowerCase() }));
       expect(verdict.valid).to.equal(true, "proof not accepted: " + JSON.stringify(verdict));
     });
 
-    it("rejects a proof from another signer", () => {
-      let verdict = verifyTicketProof(mintProof({}, otherSigner.privateKey), options());
+    it("rejects a proof from another signer", async () => {
+      let verdict = await verifyTicketProof(await mintProof({}, otherSigner.privateKey), options());
       expect(verdict.valid).to.equal(false, "proof accepted");
       expect((verdict as any).code).to.equal("PROOF_SIGNATURE", "unexpected code");
     });
 
-    it("rejects a tampered field", () => {
-      let proof = mintProof();
+    it("rejects a tampered field", async () => {
+      let proof = await mintProof();
       proof.tier = "india";
-      let verdict = verifyTicketProof(proof, options());
+      let verdict = await verifyTicketProof(proof, options());
       expect(verdict.valid).to.equal(false, "proof accepted");
       expect((verdict as any).code).to.equal("PROOF_SIGNATURE", "unexpected code");
     });
 
-    it("rejects an expired proof", () => {
-      let verdict = verifyTicketProof(mintProof({ exp: Math.floor(Date.now() / 1000) - 10 }), options());
+    it("rejects an expired proof", async () => {
+      let verdict = await verifyTicketProof(await mintProof({ exp: Math.floor(Date.now() / 1000) - 10 }), options());
       expect(verdict.valid).to.equal(false, "proof accepted");
       expect((verdict as any).code).to.equal("PROOF_EXPIRED", "unexpected code");
     });
 
-    it("rejects another partner, event, tier or version", () => {
-      expect((verifyTicketProof(mintProof({ partner: "ens" }), options()) as any).code).to.equal("PROOF_PARTNER");
-      expect((verifyTicketProof(mintProof({ event: "devconnect-arg" }), options()) as any).code).to.equal("PROOF_EVENT");
-      expect((verifyTicketProof(mintProof({ tier: "india" }), Object.assign(options(), { tiers: ["standard"] })) as any).code).to.equal("PROOF_TIER");
-      expect((verifyTicketProof(mintProof({ version: 2 }), options()) as any).code).to.equal("PROOF_VERSION");
+    it("rejects another partner, event, tier or version", async () => {
+      expect((await verifyTicketProof(await mintProof({ partner: "ens" }), options()) as any).code).to.equal("PROOF_PARTNER");
+      expect((await verifyTicketProof(await mintProof({ event: "devconnect-arg" }), options()) as any).code).to.equal("PROOF_EVENT");
+      expect((await verifyTicketProof(await mintProof({ tier: "india" }), Object.assign(options(), { tiers: ["standard"] })) as any).code).to.equal("PROOF_TIER");
+      expect((await verifyTicketProof(await mintProof({ version: 2 }), options()) as any).code).to.equal("PROOF_VERSION");
     });
 
-    it("accepts any event when none is configured", () => {
-      let verdict = verifyTicketProof(mintProof({ event: "devconnect-arg" }), Object.assign(options(), { events: [] }));
+    it("accepts any event when none is configured", async () => {
+      let verdict = await verifyTicketProof(await mintProof({ event: "devconnect-arg" }), Object.assign(options(), { events: [] }));
       expect(verdict.valid).to.equal(true, "proof not accepted: " + JSON.stringify(verdict));
     });
 
-    it("parses the query string shape and rejects malformed fields", () => {
-      let proof = mintProof();
+    it("parses the query string shape and rejects malformed fields", async () => {
+      let proof = await mintProof();
       let parsed = parseTicketProof(proofParams(proof));
       expect(parsed).to.deep.equal(proof, "round trip mismatch");
       expect(parseTicketProof(Object.assign(proofParams(proof), { id: "0x1234" }))).to.equal(null, "short identifier accepted");
@@ -191,7 +195,7 @@ describe("Faucet module: ticket-proof", () => {
   describe("Login endpoint", () => {
     it("swaps a valid proof for a login token", async () => {
       await ServiceManager.GetService(ModuleManager).initialize();
-      let rsp = await loginWithProof(mintProof());
+      let rsp = await loginWithProof(await mintProof());
       expect(!!rsp.data).to.equal(true, "no data in response: " + JSON.stringify(rsp));
       expect(rsp.data.identifier).to.equal(IDENTIFIER, "unexpected identifier");
       expect(rsp.data.tier).to.equal("standard", "unexpected tier");
@@ -205,7 +209,7 @@ describe("Faucet module: ticket-proof", () => {
 
     it("accepts the proof as query parameters", async () => {
       await ServiceManager.GetService(ModuleManager).initialize();
-      let params = proofParams(mintProof());
+      let params = proofParams(await mintProof());
       let query = Object.keys(params).map((key) => key + "=" + encodeURIComponent(params[key])).join("&");
       let rsp = await ServiceManager.GetService(FaucetWebApi).onApiRequest({
         method: "GET",
@@ -216,13 +220,13 @@ describe("Faucet module: ticket-proof", () => {
 
     it("rejects a proof from another signer", async () => {
       await ServiceManager.GetService(ModuleManager).initialize();
-      let rsp = await loginWithProof(mintProof({}, otherSigner.privateKey));
+      let rsp = await loginWithProof(await mintProof({}, otherSigner.privateKey));
       expect(rsp.errorCode).to.equal("PROOF_SIGNATURE", "unexpected response: " + JSON.stringify(rsp));
     });
 
     it("rejects an expired proof", async () => {
       await ServiceManager.GetService(ModuleManager).initialize();
-      let rsp = await loginWithProof(mintProof({ exp: Math.floor(Date.now() / 1000) - 10 }));
+      let rsp = await loginWithProof(await mintProof({ exp: Math.floor(Date.now() / 1000) - 10 }));
       expect(rsp.errorCode).to.equal("PROOF_EXPIRED", "unexpected response: " + JSON.stringify(rsp));
     });
 

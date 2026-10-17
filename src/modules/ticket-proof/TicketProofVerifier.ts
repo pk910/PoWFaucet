@@ -1,4 +1,4 @@
-import Web3 from 'web3';
+import { encodeAbiParameters, parseAbiParameters, keccak256, recoverMessageAddress, Hex } from "../../eth/rpc/index.js";
 
 /**
  * A partner ticket proof as the event app puts it into the claim url.
@@ -35,7 +35,7 @@ export type TicketProofVerdict =
   | { valid: true }
   | { valid: false; code: string; reason: string };
 
-const PROOF_ABI_TYPES = ["string", "bytes32", "string", "string", "string", "uint64"];
+const PROOF_ABI_PARAMS = parseAbiParameters("string, bytes32, string, string, string, uint64");
 
 /**
  * Read a proof out of the query parameters. Returns null when a field is missing or
@@ -85,24 +85,25 @@ export function parseTicketProof(params: {[key: string]: unknown}): ITicketProof
  * the same one a contract would rebuild with `abi.encode` and `ecrecover`.
  */
 export function ticketProofPayloadHash(domain: string, proof: ITicketProof): string {
-  let web3 = new Web3();
-  let encoded = web3.eth.abi.encodeParameters(PROOF_ABI_TYPES, [
+  let encoded = encodeAbiParameters(PROOF_ABI_PARAMS, [
     domain,
-    proof.identifier,
+    proof.identifier as Hex,
     proof.tier,
     proof.partner,
     proof.event,
     BigInt(proof.exp),
   ]);
-  return web3.utils.keccak256(encoded);
+  return keccak256(encoded);
 }
 
-/** Recover the EIP-191 signer of a proof; null when the signature does not parse. */
-export function recoverTicketProofSigner(domain: string, proof: ITicketProof): string | null {
+/**
+ * Recover the EIP-191 signer of a proof; null when the signature does not parse.
+ * The signed message is the 32 hash bytes themselves (prefix "\x19Ethereum Signed Message:\n32").
+ */
+export async function recoverTicketProofSigner(domain: string, proof: ITicketProof): Promise<string | null> {
   try {
-    let web3 = new Web3();
     let hash = ticketProofPayloadHash(domain, proof);
-    return web3.eth.accounts.recover(hash, proof.signature);
+    return await recoverMessageAddress({ message: { raw: hash as Hex }, signature: proof.signature as Hex });
   } catch(ex) {
     return null;
   }
@@ -116,7 +117,7 @@ export function recoverTicketProofSigner(domain: string, proof: ITicketProof): s
  * identifier is scoped to them by the issuer, so a proof minted for another partner
  * is a different pseudonym for the same ticket.
  */
-export function verifyTicketProof(proof: ITicketProof, options: ITicketProofVerifyOptions): TicketProofVerdict {
+export async function verifyTicketProof(proof: ITicketProof, options: ITicketProofVerifyOptions): Promise<TicketProofVerdict> {
   if(proof.version !== options.version)
     return { valid: false, code: "PROOF_VERSION", reason: "Unsupported proof version " + proof.version };
   if(proof.partner.toLowerCase() !== options.partner.toLowerCase())
@@ -130,7 +131,7 @@ export function verifyTicketProof(proof: ITicketProof, options: ITicketProofVeri
   if(proof.exp < now)
     return { valid: false, code: "PROOF_EXPIRED", reason: "This proof has expired, please request a new one in the event app" };
 
-  let signer = recoverTicketProofSigner(options.domain, proof);
+  let signer = await recoverTicketProofSigner(options.domain, proof);
   if(!signer)
     return { valid: false, code: "PROOF_SIGNATURE", reason: "Malformed proof signature" };
   if(signer.toLowerCase() !== options.signerAddress.toLowerCase())

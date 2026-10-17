@@ -325,7 +325,7 @@ describe("ETH Wallet Manager", () => {
     };
     let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    await sleepPromise(3000); // wait for timeout from web3js lib
+    await sleepPromise(3000); // wait for the receipt poll to time out
     receiptResponseMode = "receipt"; // now return the receipt
     await awaitSleepPromise(1000, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");

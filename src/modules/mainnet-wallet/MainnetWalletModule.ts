@@ -1,4 +1,3 @@
-import Web3 from 'web3';
 import { ServiceManager } from "../../common/ServiceManager.js";
 import { EthWalletManager } from "../../eth/EthWalletManager.js";
 import { FaucetSession } from "../../session/FaucetSession.js";
@@ -7,24 +6,26 @@ import { ModuleHookAction } from "../ModuleManager.js";
 import { defaultConfig, IMainnetWalletConfig } from './MainnetWalletConfig.js';
 import { FaucetError } from '../../common/FaucetError.js';
 import { Erc20Abi } from '../../abi/ERC20.js';
+import { ContractCaller, EthRpcClient } from '../../eth/rpc/index.js';
 
 export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
-  private web3: Web3;
+  private client: EthRpcClient;
 
   protected override startModule(): Promise<void> {
-    this.startWeb3();
+    this.startRpcClient();
     this.moduleManager.addActionHook(this, ModuleHookAction.SessionStart, 7, "Mainnet Wallet check", (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput));
     return Promise.resolve();
   }
 
   protected override stopModule(): Promise<void> {
+    this.client?.dispose();
+    this.client = null;
     return Promise.resolve();
   }
 
-  private startWeb3() {
-    let provider = EthWalletManager.getWeb3Provider(this.moduleConfig.rpcHost);
-    this.web3 = new Web3(provider);
+  private startRpcClient() {
+    this.client = EthRpcClient.fromRpcHost(this.moduleConfig.rpcHost);
   }
 
   private async processSessionStart(session: FaucetSession, userInput: any): Promise<void> {
@@ -36,7 +37,7 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
       let minBalance = BigInt(this.moduleConfig.minBalance);
       let walletBalance: bigint;
       try {
-        walletBalance = BigInt(await this.web3.eth.getBalance(targetAddr));
+        walletBalance = await this.client.getBalance(targetAddr);
       } catch(ex) {
         throw new FaucetError("MAINNET_BALANCE_CHECK", "Could not get balance of mainnet wallet " + targetAddr + ": " + ex.toString());
       }
@@ -45,9 +46,9 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
     }
 
     if(this.moduleConfig.minTxCount > 0) {
-      let walletTxCount: bigint;
+      let walletTxCount: number;
       try {
-        walletTxCount = await this.web3.eth.getTransactionCount(targetAddr);
+        walletTxCount = await this.client.getTransactionCount(targetAddr);
       } catch(ex) {
         throw new FaucetError("MAINNET_TXCOUNT_CHECK", "Could not get tx-count of mainnet wallet " + targetAddr + ": " + ex.toString());
       }
@@ -56,18 +57,14 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
     }
 
     if(this.moduleConfig.minErc20Balances.length > 0) {
-      let faucetAddress = ServiceManager.GetService(EthWalletManager).getFaucetAddress();
       for(let i = 0; i < this.moduleConfig.minErc20Balances.length; i++) {
         let erc20Token = this.moduleConfig.minErc20Balances[i];
         let minBalance = BigInt(erc20Token.minBalance);
 
         let walletBalance: bigint;
         try {
-          let tokenContract = new this.web3.eth.Contract(Erc20Abi, erc20Token.address, {
-            from: faucetAddress,
-          });
-
-          walletBalance = BigInt(await tokenContract.methods.balanceOf(targetAddr).call());
+          let tokenContract = new ContractCaller(this.client, erc20Token.address, Erc20Abi);
+          walletBalance = BigInt(await tokenContract.call("balanceOf", [targetAddr]) as bigint);
         } catch(ex) {
           throw new FaucetError("MAINNET_BALANCE_CHECK", "Could not get token balance of mainnet wallet " + targetAddr + ": " + ex.toString());
         }
