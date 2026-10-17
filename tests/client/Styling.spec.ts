@@ -161,6 +161,18 @@ describe("browser: styling and embedding", function() {
     expect(styles.iconSize).to.equal(36);
   });
 
+  it("primary buttons are white on the accent blue", async function() {
+    if(skipReason) return this.skip();
+    fixture = await bootFaucet();
+    page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    await openFaucet(page, fixture, "/status");
+    let refresh = page.getByRole("button", { name: "Refresh" });
+    await refresh.waitFor();
+    let colors = await refresh.evaluate((el) => ({ color: getComputedStyle(el).color, background: getComputedStyle(el).backgroundColor }));
+    expect(colors.background).to.equal("rgb(42, 120, 214)");
+    expect(colors.color).to.equal("rgb(255, 255, 255)", "black text on the primary button");
+  });
+
   it("places the footer line under the card", async function() {
     if(skipReason) return this.skip();
     fixture = await bootFaucet();

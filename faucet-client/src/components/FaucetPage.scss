@@ -74,6 +74,9 @@ html.powfaucet, html.powfaucet body {
 @import "bootstrap/scss/functions";
 
 $primary: #2a78d6;
+// bootstrap picks black text on a background whose contrast with white is below this; the
+// accent blue is just under its 4.5 default, and the landing page sets it in white
+$min-contrast-ratio: 3;
 $secondary: #6c757d;
 $success: #198754;
 $danger: #dc3545;
