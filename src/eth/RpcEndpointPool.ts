@@ -1,9 +1,15 @@
-import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, looksLikeSecret, redactUrl, redactUrlsInText } from './rpc/index.js';
+import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, isTransportError, isTxAlreadyKnownError, looksLikeSecret, redactUrl, redactUrlsInText } from './rpc/index.js';
 
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { EthRpcHostConfig, IRpcEndpointConfig } from '../config/ConfigSchema.js';
 import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
+
+/** What a broadcast attempt established, see RpcEndpointPool.broadcastSignedTransaction. */
+export type BroadcastOutcome =
+  | { status: "accepted"; hash: string }
+  | { status: "ambiguous"; error: any }
+  | { status: "rejected"; error: any };
 
 export interface RpcEndpointState {
   config: IRpcEndpointConfig;
@@ -127,6 +133,21 @@ export class RpcEndpointPool {
   // Returns the first successful tx hash. Errors are ignored as long as at least
   // one submission succeeded (other endpoints commonly return "already known").
   public async broadcastSendRawTransaction(rawTxHex: string): Promise<string> {
+    const outcome = await this.broadcastSignedTransaction(rawTxHex);
+    if (outcome.status === 'accepted')
+      return outcome.hash;
+    throw outcome.error;
+  }
+
+  /**
+   * Broadcast to the top-N priority ready endpoints and say what that means:
+   *  - accepted:  an endpoint took it, or already had it ("already known", "nonce too low")
+   *  - rejected:  every endpoint answered, and every answer was a definite no
+   *  - ambiguous: no endpoint confirmed it, and at least one did not answer (a transport error):
+   *               the bytes may be in a mempool, nothing may be concluded from this attempt
+   * A claim is only ever failed on `rejected`; `ambiguous` keeps it pending.
+   */
+  public async broadcastSignedTransaction(rawTxHex: string): Promise<BroadcastOutcome> {
     const broadcastCount = Math.max(1, faucetConfig.ethTxBroadcastCount || 1);
     let targets = this.getReadyEndpoints();
     if (targets.length === 0)
@@ -134,33 +155,43 @@ export class RpcEndpointPool {
 
     targets = targets.slice(0, broadcastCount);
     if (targets.length === 0)
-      throw new Error('no RPC endpoints configured');
+      return { status: 'rejected', error: new Error('no RPC endpoints configured') };
 
     const results = await Promise.allSettled(
       targets.map((ep) => ep.client.sendRawTransaction(rawTxHex))
     );
 
-    let firstHash: string = null;
-    let firstError: any = null;
+    let hash: string = null;
+    let ambiguous = false;
+    let firstRejection: any = null;
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       const ep = targets[i];
       if (r.status === 'fulfilled') {
-        if (!firstHash)
-          firstHash = r.value as string;
-      } else {
-        if (!firstError)
-          firstError = r.reason;
-        ServiceManager.GetService(FaucetProcess).emitLog(
-          FaucetLogLevel.WARNING,
-          `Tx broadcast to ${ep.label} failed: ${this.errorString(r.reason)}`
-        );
+        if (!hash)
+          hash = r.value as string;
+        continue;
       }
+      if (isTxAlreadyKnownError(r.reason)) {
+        if (!hash)
+          hash = '';
+        continue;
+      }
+      if (isTransportError(r.reason))
+        ambiguous = true;
+      else if (!firstRejection)
+        firstRejection = r.reason;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.WARNING,
+        `Tx broadcast to ${ep.label} failed: ${this.errorString(r.reason)}`
+      );
     }
 
-    if (firstHash)
-      return firstHash;
-    throw firstError || new Error('all tx broadcasts failed');
+    if (hash !== null)
+      return { status: 'accepted', hash };
+    if (ambiguous)
+      return { status: 'ambiguous', error: firstRejection || new Error('no RPC endpoint answered the broadcast') };
+    return { status: 'rejected', error: firstRejection || new Error('all tx broadcasts failed') };
   }
 
   private normalizeConfig(raw: EthRpcHostConfig): NormalizedEndpoint[] {

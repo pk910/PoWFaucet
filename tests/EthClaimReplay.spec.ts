@@ -150,6 +150,70 @@ describe("ETH Claim Replay", () => {
     expect(rowC.claim.txHash).to.equal(undefined, "a session that is not claiming is not touched");
   });
 
+  it("keeps a claim pending while every broadcast answer is lost, and settles it by receipt", async () => {
+    let sends = 0;
+    let answerLost = true;
+    let receiptReady = false;
+    fakeProvider.injectResponse("eth_sendRawTransaction", () => {
+      sends++;
+      if(answerLost)
+        return { _throw: new FetchError("socket hang up", "system") };
+      return TX_HASH_RSP;
+    });
+    fakeProvider.injectResponse("eth_getTransactionReceipt", () => receiptReady ? receipt() : null);
+    await startWallet();
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+
+    let claim = await claimManager.createSessionClaim(sessionData(), {});
+    await claimManager.processQueue(); // four attempts without an answer (~6 s)
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING, "an unanswered broadcast is not a failure");
+    expect(sends).to.be.greaterThanOrEqual(4);
+    expect(ServiceManager.GetService(EthWalletManager).getWalletState().nonce).to.equal(43, "the nonce stays reserved");
+
+    // the network comes back: the receipt watch has kept re-sending the same bytes
+    let sendsBefore = sends;
+    answerLost = false;
+    await awaitSleepPromise(1000, () => sends > sendsBefore);
+    expect(sends).to.be.greaterThan(sendsBefore, "re-sent from the receipt watch");
+    receiptReady = true;
+    await awaitSleepPromise(2000, () => claim.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED);
+  }).timeout(15000);
+
+  it("admits a claim exactly once: the row is the arbiter", async () => {
+    fakeProvider.injectResponse("eth_sendRawTransaction", TX_HASH_RSP);
+    fakeProvider.injectResponse("eth_getTransactionReceipt", receipt());
+    await startWallet();
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+    let session = sessionData();
+    await ServiceManager.GetService(FaucetDatabase).updateSession(session);
+    let first = await claimManager.createSessionClaim({ ...session }, {});
+    expect(first.claim.claimStatus).to.equal(ClaimTxStatus.QUEUE);
+    let err: any;
+    try { await claimManager.createSessionClaim({ ...session, claim: null }, {}); } catch(ex) { err = ex; }
+    expect(err?.getCode?.()).to.equal("RACE_CLAIMING", "the second request finds the row claiming already");
+  });
+
+  it("does not broadcast when a claim row did not take the signed transaction, and frees the nonce", async () => {
+    let sends = 0;
+    fakeProvider.injectResponse("eth_sendRawTransaction", () => { sends++; return TX_HASH_RSP; });
+    await startWallet();
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+    let database = ServiceManager.GetService(FaucetDatabase);
+    let claim = await claimManager.createSessionClaim(sessionData(), {});
+    // the row leaves "claiming" behind the queue's back (an operator, another process)
+    await database.updateClaimData(claim.session, { ...claim.claim, claimStatus: ClaimTxStatus.FAILED });
+    await claimManager.processQueue();
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.FAILED);
+    expect(claim.claim.txError).to.match(/0 of 1 claim rows accepted/);
+    expect(sends).to.equal(0, "nothing left the faucet");
+    expect(claim.claim.txHash).to.equal(undefined, "the claim carries no transaction");
+    expect(ServiceManager.GetService(EthWalletManager).getWalletState().nonce).to.equal(42, "the nonce was rolled back");
+  });
+
   it("treats 'already known' as sent and settles by receipt", async () => {
     let sends = 0;
     fakeProvider.injectResponse("eth_sendRawTransaction", () => {

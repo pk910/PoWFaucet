@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import YAML from 'yaml';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from './common.js';
 import { ServiceManager } from '../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
 import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager.js';
 import { SessionManager } from '../src/session/SessionManager.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
@@ -103,6 +104,7 @@ describe("Faucet Services", () => {
       };
       let statsLog = ServiceManager.GetService(FaucetStatsLog);
       statsLog.initialize();
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // admitting a claim is a row update now
       await ServiceManager.GetService(ModuleManager).initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
       expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");

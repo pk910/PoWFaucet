@@ -31,6 +31,7 @@ export interface IClaimCall {
   amount?: string; // transfer / token: wei or token base units
   token?: string; // token: the ERC20 contract
   value?: string; // call: native coin sent along (default 0)
+  gas?: number; // call: gas the call may use (default 200000); a recipient burning it fails its own call, not the batch
   data?: string; // call: calldata, 0x hex ...
   abi?: string | string[]; // ... or the calldata built from an abi (JSON string or human-readable signatures), a function and its arguments
   fn?: string;

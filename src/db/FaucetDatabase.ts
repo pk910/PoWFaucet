@@ -423,9 +423,9 @@ export class FaucetDatabase {
    * batch half written (a signed transaction known to some of its claims' rows and not to others).
    * The sessions stay "claiming".
    */
-  public async updateClaimDataBulk(updates: { sessionId: string; claimData: EthClaimData }[]): Promise<void> {
+  public async updateClaimDataBulk(updates: { sessionId: string; claimData: EthClaimData }[]): Promise<number> {
     if(updates.length === 0)
-      return;
+      return 0;
     let values: (string)[] = [];
     let cases = updates.map((update) => {
       values.push(update.sessionId, JSON.stringify(update.claimData));
@@ -435,7 +435,26 @@ export class FaucetDatabase {
       values.push(update.sessionId);
       return "?";
     }).join(",");
-    await this.db.run("UPDATE Sessions SET ClaimData = CASE SessionId " + cases + " END WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")", values);
+    let result = await this.db.run("UPDATE Sessions SET ClaimData = CASE SessionId " + cases + " END WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")", values);
+    return result.changes;
+  }
+
+  /**
+   * claimable -> claiming for exactly this session: the compare-and-swap that admits a claim.
+   * "conflict" when the row exists but is not claimable any more (claimed already, by this process
+   * or another); "missing" when there is no row yet (a session handed in without being stored,
+   * the caller writes it whole).
+   */
+  public async startClaim(sessionId: string, dropAmount: string, claimData: EthClaimData): Promise<"claimed" | "conflict" | "missing"> {
+    let result = await this.db.run("UPDATE Sessions SET Status = 'claiming', DropAmount = ?, ClaimData = ? WHERE SessionId = ? AND Status = 'claimable'", [
+      dropAmount,
+      JSON.stringify(claimData),
+      sessionId,
+    ]);
+    if(result.changes === 1)
+      return "claimed";
+    let row = await this.db.get("SELECT Status FROM Sessions WHERE SessionId = ?", [sessionId]);
+    return row ? "conflict" : "missing";
   }
 
   public async getClaimableAmount(): Promise<bigint> {

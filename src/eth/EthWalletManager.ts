@@ -62,8 +62,14 @@ export interface PreparedClaimTx {
  */
 export type BeforeBroadcastHook = (prepared: PreparedClaimTx) => Promise<void>;
 
-/** The node has these bytes (or the nonce is spent): not a failure, the receipt watch decides. */
-const TX_ALREADY_SENT_PATTERN = /already known|known transaction|alreadyknown|nonce too low|replacement transaction underpriced|same hash was already imported|already imported/i;
+/** What a mined claim transaction's receipt says per claim; `executed` is null for a plain (non-batch) transaction. */
+export interface ClaimReceiptEvaluation {
+  executed: boolean | null;
+  outcomes: Map<number, { failed: number; total: number }>;
+}
+
+/** polls in a row that must show the nonce spent and no receipt before a transaction counts as dropped */
+const DROPPED_CONFIRMATION_POLLS = 3;
 
 export class EthWalletManager {
 
@@ -150,52 +156,6 @@ export class EthWalletManager {
       this.tokenState = null;
     this.claimTxBuilder = null; // rebuilt on first use with the (possibly reloaded) template config
     this.batchDelegation = null; // the chain is checked again on the next batch
-  }
-
-  /** How claims become transactions: the plain transfer, or the operator's ethClaimTx template. */
-  public getClaimTxBuilder(): ClaimTxBuilder {
-    if(!this.claimTxBuilder) {
-      // the client is only needed for gas estimation; a manager that never initialized (tests stub the sends) has no pool
-      let client = this.rpcPool ? this.rpcPool.getClient() : null;
-      this.claimTxBuilder = new ClaimTxBuilder(client, this.walletAddr, this.tokenState ? this.tokenState.address : null, faucetConfig.ethClaimTx, faucetConfig.ethClaimBatch);
-      this.claimTxBuilder.setBatchActive(!!this.batchDelegation?.isReady());
-    }
-    return this.claimTxBuilder;
-  }
-
-  /**
-   * Batching needs the wallet to run the batcher's code (EIP-7702). Sets that up on first use
-   * (two transactions at most, see BatchDelegation) and says whether batches may be built now.
-   * Called from the claim queue, so the setup transactions share the queue's nonce sequence.
-   */
-  public async ensureClaimBatching(): Promise<boolean> {
-    if(!faucetConfig.ethClaimBatch || !(faucetConfig.ethClaimBatch.maxClaims > 1) || !this.rpcPool || !this.walletState?.ready)
-      return false;
-    if(!this.batchDelegation)
-      this.batchDelegation = new BatchDelegation(this);
-    let ready = await this.batchDelegation.ensureReady();
-    this.getClaimTxBuilder().setBatchActive(ready);
-    return ready;
-  }
-
-  /** Positions (in the transaction's claim list) a mined claim transaction reported as not paid; empty without a template that names a failed event. */
-  public evaluateClaimReceipt(receipt: EthTxReceipt, claims: EthClaimInfo[]): Map<number, { failed: number; total: number }> {
-    let outcomes = new Map<number, { failed: number; total: number }>();
-    if(!claims.some((claim) => !!claim.claim.txCalls) || !this.walletAddr)
-      return outcomes; // not a batch transaction: the receipt status says it all
-    let failedCalls = ClaimTxBuilder.failedCallIndexes(this.walletAddr, receipt.logs);
-    claims.forEach((claim, pos) => {
-      let range = claim.claim.txCalls;
-      if(!range)
-        return;
-      let failed = 0;
-      for(let i = range.offset; i < range.offset + range.count; i++) {
-        if(failedCalls.has(i))
-          failed++;
-      }
-      outcomes.set(pos, { failed, total: range.count });
-    });
-    return outcomes;
   }
 
   private initToken() {
@@ -359,6 +319,54 @@ export class EthWalletManager {
     return new ContractCaller(this.client, addr, abi);
   }
 
+  /** How claims become transactions: the plain transfer, or the operator's ethClaimTx template. */
+  public getClaimTxBuilder(): ClaimTxBuilder {
+    if(!this.claimTxBuilder) {
+      // the client is only needed for gas estimation; a manager that never initialized (tests stub the sends) has no pool
+      let client = this.rpcPool ? this.rpcPool.getClient() : null;
+      this.claimTxBuilder = new ClaimTxBuilder(client, this.walletAddr, this.tokenState ? this.tokenState.address : null, faucetConfig.ethClaimTx, faucetConfig.ethClaimBatch);
+      this.claimTxBuilder.setBatchActive(!!this.batchDelegation?.isReady());
+    }
+    return this.claimTxBuilder;
+  }
+
+  /**
+   * Batching needs the wallet to run the batcher's code (EIP-7702). Sets that up on first use
+   * (two transactions at most, see BatchDelegation) and says whether batches may be built now.
+   * Called from the claim queue, so the setup transactions share the queue's nonce sequence.
+   */
+  public async ensureClaimBatching(): Promise<boolean> {
+    if(!faucetConfig.ethClaimBatch || !(faucetConfig.ethClaimBatch.maxClaims > 1) || !this.rpcPool || !this.walletState?.ready)
+      return false;
+    if(!this.batchDelegation)
+      this.batchDelegation = new BatchDelegation(this);
+    let ready = await this.batchDelegation.ensureReady();
+    this.getClaimTxBuilder().setBatchActive(ready);
+    return ready;
+  }
+
+  /** Positions (in the transaction's claim list) a mined claim transaction reported as not paid; empty without a template that names a failed event. */
+  public evaluateClaimReceipt(receipt: EthTxReceipt, claims: EthClaimInfo[]): ClaimReceiptEvaluation {
+    let outcomes = new Map<number, { failed: number; total: number }>();
+    if(!claims.some((claim) => !!claim.claim.txCalls) || !this.walletAddr)
+      return { executed: null, outcomes }; // not a batch transaction: the receipt status says it all
+    if(!ClaimTxBuilder.batchExecuted(this.walletAddr, receipt.logs))
+      return { executed: false, outcomes }; // mined, but the wallet did not run the batcher: nobody was paid
+    let failedCalls = ClaimTxBuilder.failedCallIndexes(this.walletAddr, receipt.logs);
+    claims.forEach((claim, pos) => {
+      let range = claim.claim.txCalls;
+      if(!range)
+        return;
+      let failed = 0;
+      for(let i = range.offset; i < range.offset + range.count; i++) {
+        if(failedCalls.has(i))
+          failed++;
+      }
+      outcomes.set(pos, { failed, total: range.count });
+    });
+    return { executed: true, outcomes };
+  }
+
   private txResultFromReceipt(receipt: EthTxReceipt): { status: boolean; block: number; fee: bigint; receipt: EthTxReceipt } {
     let txfee = receipt.effectiveGasPrice * receipt.gasUsed;
     this.walletState.nativeBalance -= txfee;
@@ -395,8 +403,22 @@ export class EthWalletManager {
    */
   public async sendClaimBatch(claims: EthClaimInfo[], beforeBroadcast?: BeforeBroadcastHook): Promise<ClaimTransactionResult> {
     let prepared = await this.prepareClaimTx(claims);
-    if(beforeBroadcast)
-      await beforeBroadcast(prepared);
+    if(beforeBroadcast) {
+      try {
+        await beforeBroadcast(prepared);
+      } catch(ex) {
+        // nothing was sent: the nonce is free again, and the claims carry no transaction
+        if(this.walletState.nonce === prepared.txNonce + 1)
+          this.walletState.nonce = prepared.txNonce;
+        claims.forEach((claim) => {
+          delete claim.claim.txHash;
+          delete claim.claim.txHex;
+          delete claim.claim.txNonce;
+          delete claim.claim.txCalls;
+        });
+        throw ex;
+      }
+    }
     return this.broadcastClaimTx(prepared, true);
   }
 
@@ -445,7 +467,7 @@ export class EthWalletManager {
    * again (wallet state reload) and throws.
    */
   public async broadcastClaimTx(prepared: PreparedClaimTx, accountForPayout: boolean): Promise<ClaimTransactionResult> {
-    await this.broadcastSigned(prepared.txHex, prepared.txHash);
+    let sent = await this.broadcastSigned(prepared.txHex, prepared.txHash);
 
     if(accountForPayout) {
       let totalAmount = prepared.claims.reduce((sum, claim) => sum + BigInt(claim.amount), 0n);
@@ -455,7 +477,7 @@ export class EthWalletManager {
     }
     return {
       txHash: prepared.txHash,
-      txPromise: this.awaitTransactionReceipt(prepared.txHash, prepared.txNonce).then((receipt) => this.txResultFromReceipt(receipt)),
+      txPromise: this.awaitTransactionReceipt(prepared.txHash, prepared.txNonce, sent === "uncertain" ? prepared.txHex : undefined).then((receipt) => this.txResultFromReceipt(receipt)),
       plan: prepared.plan,
     };
   }
@@ -468,6 +490,12 @@ export class EthWalletManager {
   public rebroadcastClaimTx(stored: { txHash: string; txNonce: number; txHex: string }, claims: EthClaimInfo[]): Promise<ClaimTransactionResult> {
     let plan: ClaimTxPlan = { to: "", value: 0n, nativeSpend: 0n, data: "0x", gasLimit: 0, claims };
     return this.broadcastClaimTx({ txHash: stored.txHash, txNonce: stored.txNonce, txHex: stored.txHex, plan, claims }, false);
+  }
+
+  public async sendCustomTx(target: string, amount: bigint, data?: string, gasLimit?: number): Promise<TransactionResult> {
+    let nonce = this.walletState.nonce;
+    let txHex = await this.buildEthTx(target, amount, nonce, data, gasLimit);
+    return this.sendSigned(txHex, nonce, 1);
   }
 
   /**
@@ -493,12 +521,6 @@ export class EthWalletManager {
       data: "0x",
     }, [authorization]);
     return this.sendSigned(signed.substring(2), nonce, 2);
-  }
-
-  public async sendCustomTx(target: string, amount: bigint, data?: string, gasLimit?: number): Promise<TransactionResult> {
-    let nonce = this.walletState.nonce;
-    let txHex = await this.buildEthTx(target, amount, nonce, data, gasLimit);
-    return this.sendSigned(txHex, nonce, 1);
   }
 
   /** The signed transaction as hex without the 0x prefix (the form the claim data stores). */
@@ -548,52 +570,66 @@ export class EthWalletManager {
    * nonce is free again, or was taken: the reload knows) and throws. The hash is the local one, so
    * a lost answer never leads to a second transaction for the same payout.
    */
-  private async broadcastSigned(txHex: string, txHash: string): Promise<void> {
+  private async broadcastSigned(txHex: string, txHash: string): Promise<"accepted" | "uncertain"> {
     let attempt = 0;
+    let hadAmbiguous = false;
     while(true) {
-      try {
-        await this.rpcPool.broadcastSendRawTransaction("0x" + txHex);
-        return;
-      } catch(ex) {
-        let errorText = rpcErrorString(ex);
-        if(TX_ALREADY_SENT_PATTERN.test(errorText)) {
-          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "TX " + txHash + " is already known to the network: " + errorText);
-          return;
-        }
-        if(isTransportError(ex) && attempt++ < 3) {
-          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Broadcasting TX " + txHash + " failed [try: " + attempt + "]: " + errorText);
-          await sleepPromise(2000); // wait 2 secs and try again with the same bytes - maybe EL client is busy...
-          continue;
-        }
+      let outcome = await this.rpcPool.broadcastSignedTransaction("0x" + txHex);
+      if(outcome.status === "accepted")
+        return "accepted";
+      let errorText = rpcErrorString(outcome.error);
+      if(outcome.status === "rejected" && !hadAmbiguous) {
+        // every endpoint said no, and nothing before this could have taken it: the bytes are nowhere
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txHash + " was rejected: " + errorText);
         await this.loadWalletState();
-        throw ex;
+        throw outcome.error;
       }
+      // ambiguous (or rejected after an ambiguous attempt): the bytes may sit in a mempool
+      hadAmbiguous = true;
+      if(attempt++ < 3) {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Broadcasting TX " + txHash + " got no answer [try: " + attempt + "]: " + errorText);
+        await sleepPromise(2000); // wait 2 secs and try again with the same bytes - maybe EL client is busy...
+        continue;
+      }
+      // not confirmed, not refused: it stays pending, the receipt watch keeps sending these bytes
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "TX " + txHash + " got no answer from the network " + attempt + " times, keeping it pending: " + errorText);
+      return "uncertain";
     }
   }
 
   /** Sign once, broadcast with the safe retry semantics, reserve `nonces` nonces, watch the receipt. */
   private async sendSigned(txHex: string, txNonce: number, nonces: number): Promise<TransactionResult> {
     let txHash = keccak256(("0x" + txHex) as Hex);
-    await this.broadcastSigned(txHex, txHash);
+    let sent = await this.broadcastSigned(txHex, txHash);
     this.walletState.nonce += nonces;
     return {
       txHash: txHash,
-      txPromise: this.awaitTransactionReceipt(txHash, txNonce).then((receipt) => this.txResultFromReceipt(receipt)),
+      txPromise: this.awaitTransactionReceipt(txHash, txNonce, sent === "uncertain" ? txHex : undefined).then((receipt) => this.txResultFromReceipt(receipt)),
     };
   }
 
-  private async awaitTransactionReceipt(txhash: string, txnonce: number): Promise<EthTxReceipt> {
+  /**
+   * Poll for the receipt. `resendHex` is given when no node confirmed the broadcast: then the same
+   * bytes go out again on every poll until the receipt appears (a node that has them ignores the
+   * repeat, a node that never got them gets them). The transaction counts as dropped only when
+   * DROPPED_CONFIRMATION_POLLS polls in a row saw the nonce spent and no receipt: one poll may well
+   * see a nonce from one endpoint ahead of a receipt from another.
+   */
+  private async awaitTransactionReceipt(txhash: string, txnonce: number, resendHex?: string): Promise<EthTxReceipt> {
+    let nonceSpentPolls = 0;
     while(true) {
       try {
         let receipt = await this.client.getTransactionReceipt(txhash);
         if(receipt)
           return receipt;
+        if(resendHex)
+          await this.rpcPool.broadcastSignedTransaction("0x" + resendHex); // outcome irrelevant here: the receipt decides
         // null: still pending, unless the nonce is spent: then another transaction took the slot
         // (a replacement, or a send whose answer was lost but whose bytes were not these)
         if(typeof txnonce === "number") {
           let minedNonce = await this.client.getTransactionCount(this.walletAddr, "latest");
-          if(minedNonce > txnonce) {
+          nonceSpentPolls = minedNonce > txnonce ? nonceSpentPolls + 1 : 0;
+          if(nonceSpentPolls >= DROPPED_CONFIRMATION_POLLS) {
             receipt = await this.client.getTransactionReceipt(txhash); // it may have just been mined
             if(receipt)
               return receipt;

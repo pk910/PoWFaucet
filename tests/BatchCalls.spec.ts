@@ -35,11 +35,13 @@ describe("Claim calls and the batch stream", () => {
       { type: "token", token: "{token}", to: "{target}", amount: "{session.tokenAmount}" },
       { type: "call", to: CONTRACT, value: "0", data: "0xdeadbeef" },
     ], [c1], { walletAddr: WALLET, token: TOKEN });
+    let capped = encodeBatchCalls([{ type: "call", to: CONTRACT, gas: 50000, data: "0x" }], [c1], { walletAddr: WALLET, token: null });
+    expect(capped.calls).to.equal("0x02" + CONTRACT.substring(2) + "000000000000000000000000" + "0000c350" + "0000", "configured gas cap");
     expect(stream.calls).to.equal(
       "0x" +
       "00" + "0000000000000000000000000000000000001001" + "000000000000000000000064" +
       "01" + "00000000000000000000000000000000000000bb" + "0000000000000000000000000000000000001001" + "000000000000000000000005" +
-      "02" + "00000000000000000000000000000000000000cc" + "000000000000000000000000" + "0004" + "deadbeef"
+      "02" + "00000000000000000000000000000000000000cc" + "000000000000000000000000" + "00030d40" + "0004" + "deadbeef"
     );
     expect(stream.value).to.equal(100n, "only native coin counts");
     expect(stream.callsPerClaim).to.equal(3);

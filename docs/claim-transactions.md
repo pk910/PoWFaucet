@@ -162,6 +162,31 @@ A token or call sub-call may not target the faucet wallet itself. Inside `execut
 `msg.sender`, so a nested call into it would pass the self-only gate with a stream of its own; the
 batcher rejects such a sub-call and the faucet refuses to build one.
 
+Every sub-call runs with bounded gas: 50k for a transfer, 100k for a token transfer, and for a
+`call` whatever its `gas` field says (200k by default). A recipient that burns its gas fails its
+own sub-call, never the batch.
+
+A batch that ran emits `BatchExecuted` at the end. A mined `execute` transaction without that
+event did not run the batcher (the wallet's code was something else at the time) and paid nobody,
+so the faucet fails all its claims rather than confirming them.
+
+## Broadcast and settlement rules
+
+- A broadcast is *rejected* only when every endpoint it was sent to answered with a definite no.
+  If any endpoint did not answer (a transport error), the attempt is *ambiguous*: the bytes may be
+  in a mempool. Ambiguous attempts are retried a few times with the identical bytes; if they stay
+  ambiguous the claim stays pending, and the receipt watch keeps re-sending the same bytes on
+  every poll until the receipt appears or the nonce is spent by something else. A broadcast some
+  node confirmed is not re-sent.
+- A transaction counts as *dropped* only when three polls in a row saw the wallet's mined nonce
+  past the transaction's and no receipt; one poll may see a nonce from one endpoint ahead of a
+  receipt from another.
+- The claimable → claiming transition is a conditional update of exactly one row; two requests
+  for the same session cannot both be admitted. The signed transaction is written to every row of
+  the batch in one statement, and the bytes only leave the faucet when every row took them.
+- One faucet process per wallet. Nonces are allocated in the process; two faucets on one key
+  would race for them.
+
 ## The refill contract
 
 `ethRefillContract` uses the same placeholder syntax for `allowanceFnArgs`, `withdrawFnArgs` and

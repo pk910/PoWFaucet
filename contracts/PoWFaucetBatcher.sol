@@ -14,12 +14,17 @@ pragma solidity 0.8.30;
 // Stream format (no padding, big endian):
 //   0x00  transfer   address to (20) | uint96 amount (12)                                 33 bytes
 //   0x01  token      address token (20) | address to (20) | uint96 amount (12)            53 bytes
-//   0x02  call       address to (20) | uint96 value (12) | uint16 len (2) | bytes data    35 + len bytes
+//   0x02  call       address to (20) | uint96 value (12) | uint32 gas (4) | uint16 len (2) | bytes data    39 + len bytes
 //
 // A sub-call that fails (a recipient that reverts, a token transfer that returns false) does not
 // revert the batch: it is reported with `CallFailed`, carrying its position in the stream; the
-// faucet knows which claim it belongs to. A token or call sub-call may not target the wallet
-// itself: a nested `execute` would pass the self-only gate with a stream of its own.
+// faucet knows which claim it belongs to. Every sub-call runs with bounded gas, so one recipient
+// cannot burn the batch. A token or call sub-call may not target the wallet itself: a nested
+// `execute` would pass the self-only gate with a stream of its own.
+//
+// A batch that ran emits `BatchExecuted` at the end. Without it the faucet knows the transaction
+// did not run this code (the wallet's code was something else when it mined) and pays nobody twice
+// by assuming it did.
 //
 // Deployed by the faucet through the deterministic deployment proxy
 // (0x4e59b44847b379578588920cA78FbF26c0B4956C), so one compiler setting set gives one address on
@@ -40,6 +45,8 @@ contract PoWFaucetBatcher {
 
   // `index` is the sub-call's position in the stream: the faucet matches outcomes by it
   event CallFailed(uint256 indexed index, uint8 kind, address to, uint256 amount);
+  // the batch ran to the end; `calls` sub-calls were attempted
+  event BatchExecuted(uint256 calls);
 
   receive() external payable {
   }
@@ -80,12 +87,13 @@ contract PoWFaucetBatcher {
       } else if (kind == KIND_CALL) {
         address to = address(bytes20(calls[offset:offset + 20]));
         uint256 value = uint96(bytes12(calls[offset + 20:offset + 32]));
-        uint256 length = uint16(bytes2(calls[offset + 32:offset + 34]));
-        offset += 34;
+        uint256 gasLimit = uint32(bytes4(calls[offset + 32:offset + 36]));
+        uint256 length = uint16(bytes2(calls[offset + 36:offset + 38]));
+        offset += 38;
         bytes calldata data = calls[offset:offset + length];
         offset += length;
         require(to != address(this), "self call");
-        (bool ok, ) = to.call{value: value}(data);
+        (bool ok, ) = to.call{value: value, gas: gasLimit}(data);
         if (!ok)
           emit CallFailed(index, kind, to, value);
       } else {
@@ -94,6 +102,7 @@ contract PoWFaucetBatcher {
       index++;
     }
     require(offset == calls.length, "malformed stream");
+    emit BatchExecuted(index);
   }
 
 }

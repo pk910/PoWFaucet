@@ -191,6 +191,13 @@ export function isTransportError(ex: any): boolean {
   return texts.some((text) => typeof text === "string" && TRANSPORT_ERROR_PATTERN.test(text));
 }
 
+const TX_ALREADY_KNOWN_PATTERN = /already known|known transaction|alreadyknown|nonce too low|replacement transaction underpriced|same hash was already imported|already imported/i;
+
+/** The node has these bytes already (or the nonce is spent): a broadcast that says so has succeeded. */
+export function isTxAlreadyKnownError(ex: any): boolean {
+  return TX_ALREADY_KNOWN_PATTERN.test(rpcErrorString(ex));
+}
+
 /**
  * The text of an error as the faucet logs or shows it: viem's short message plus the node's own
  * message (`details`), with every URL in it redacted (viem quotes the endpoint URL in transport errors).

@@ -259,10 +259,17 @@ export class EthClaimManager {
       claimStatus: ClaimTxStatus.QUEUE,
       claimTime: Math.floor(new Date().getTime() / 1000),
     };
+    // the row is the arbiter: claimable -> claiming for exactly this session, or someone else
+    // (another request, another process) got there first
+    let database = ServiceManager.GetService(FaucetDatabase);
+    let admitted = await database.startClaim(sessionData.sessionId, claimInfo.amount, claimInfo.claim);
+    if(admitted === "conflict")
+      throw new FaucetError("RACE_CLAIMING", "cannot claim session: not claimable anymore");
     sessionData.status = FaucetSessionStatus.CLAIMING;
     sessionData.dropAmount = claimInfo.amount;
     sessionData.claim = claimInfo.claim;
-    ServiceManager.GetService(FaucetDatabase).updateSession(sessionData);
+    if(admitted === "missing")
+      await database.updateSession(sessionData); // a session that was never stored: write it whole
 
     this.claimTxQueue.push(claimInfo);
     this.claimTxDict[claimInfo.session] = claimInfo;
@@ -370,8 +377,11 @@ export class EthClaimManager {
     // building a new transaction for the same claims
     let database = ServiceManager.GetService(FaucetDatabase);
     let persistBeforeBroadcast = async (prepared: PreparedClaimTx) => {
-      // one statement for the whole batch: all rows learn the transaction, or none does
-      await database.updateClaimDataBulk(claims.map((claimTx) => ({ sessionId: claimTx.session, claimData: claimTx.claim })));
+      // one statement for the whole batch: all rows learn the transaction, or none does; and every
+      // row must have, or the bytes do not leave (a row that is not "claiming" any more is not ours to pay)
+      let written = await database.updateClaimDataBulk(claims.map((claimTx) => ({ sessionId: claimTx.session, claimData: claimTx.claim })));
+      if(written !== claims.length)
+        throw new Error("only " + written + " of " + claims.length + " claim rows accepted the signed transaction");
     };
 
     try {
@@ -419,7 +429,10 @@ export class EthClaimManager {
 
       // per claim: how many of its sub-calls the batcher could not make (read from the receipt and
       // the row's own call range, independent of the current configuration)
-      let outcomes = ServiceManager.GetService(EthWalletManager).evaluateClaimReceipt(txData.receipt, claims);
+      let evaluation = ServiceManager.GetService(EthWalletManager).evaluateClaimReceipt(txData.receipt, claims);
+      if(evaluation.executed === false)
+        throw "the batch transaction mined without running the payout code (the wallet's code was not the batcher)";
+      let outcomes = evaluation.outcomes;
       delete this.pendingTxQueue[txHash];
       let confirmedIdx = this.lastConfirmedClaimTxIdx;
       claims.forEach((claimTx, claimPos) => {

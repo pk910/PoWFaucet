@@ -635,7 +635,7 @@ describe("ETH Claim Manager", () => {
         plan: null,
       }));
       // the batcher reported the second claim's only call as unpaid
-      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns(new Map([[0, { failed: 0, total: 1 }], [1, { failed: 1, total: 1 }]]));
+      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns({ executed: true, outcomes: new Map([[0, { failed: 0, total: 1 }], [1, { failed: 1, total: 1 }]]) });
 
       await claimManager.processQueue();
       expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING]);

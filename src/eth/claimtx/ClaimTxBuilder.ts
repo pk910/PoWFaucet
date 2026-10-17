@@ -152,6 +152,17 @@ export class ClaimTxBuilder {
   }
 
   /**
+   * Whether a batch transaction ran the batcher at all: it emits `BatchExecuted` at the end. A
+   * mined transaction without it did not run this code (the wallet's code was something else),
+   * and paid nobody.
+   */
+  public static batchExecuted(walletAddr: string, logs: EthLog[]): boolean {
+    let wallet = walletAddr.toLowerCase();
+    let batcher = new ContractCaller(null, walletAddr, BATCHER_ABI);
+    return batcher.decodeLogs(logs.filter((log) => log.address?.toLowerCase() === wallet)).some((event) => event.eventName === "BatchExecuted");
+  }
+
+  /**
    * The sub-call positions a mined batch reported as failed: the wallet (running the batcher's
    * code) emits `CallFailed(index, ...)` per sub-call it could not make. Needs nothing but the
    * wallet address and the batcher's abi, so a receipt can be read after a restart or a

@@ -170,11 +170,12 @@ describe("Claim transaction builder", () => {
       let plan = await activeBuilder(null, template).buildPlan([c1, c2]);
       expect(plan.nativeSpend).to.equal(350n, "the call's value per claim, paid from the wallet");
       let stream = executeStream(plan.data);
-      // 0x02 to(20) value(12) len(2) data(4 + 3*32 = 100 bytes) per claim
-      expect(stream.length).to.equal(2 + 2 * (35 + 100) * 2);
+      // 0x02 to(20) value(12) gas(4) len(2) data(4 + 3*32 = 100 bytes) per claim
+      expect(stream.length).to.equal(2 + 2 * (39 + 100) * 2);
       expect(stream.substring(2, 4)).to.equal("02");
       expect(stream.substring(4, 44)).to.equal(CONTRACT.substring(2));
-      let data = "0x" + stream.substring(2 + 35 * 2, 2 + 35 * 2 + 200);
+      expect(stream.substring(2 + 33 * 2, 2 + 37 * 2)).to.equal("00030d40", "default gas of 200000 per call");
+      let data = "0x" + stream.substring(2 + 39 * 2, 2 + 39 * 2 + 200);
       let call = decodeFunctionData({ abi: parseAbi(CLAIM_ABI), data: data as `0x${string}` });
       expect(call.functionName).to.equal("claim");
       expect(call.args[1]).to.equal(100n);

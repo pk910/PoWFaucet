@@ -112,6 +112,15 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     return { code, sent, logsByHash, attempts };
   }
 
+  function executedLog(calls: number): any {
+    return {
+      address: WALLET,
+      topics: encodeEventTopics({ abi: BATCHER_ABI, eventName: "BatchExecuted" }),
+      data: encodeAbiParameters([{ type: "uint256" }], [BigInt(calls)]),
+      logIndex: "0xff",
+    };
+  }
+
   function failedLog(index: number, to: string, amount: bigint): any {
     return {
       address: WALLET,
@@ -137,13 +146,11 @@ describe("ETH Claim Batching (EIP-7702)", () => {
   });
 
   it("deploys the batcher, delegates the wallet, then pays a batch through execute on itself", async () => {
-    // the batcher reports the second sub-call as failed
-    let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [{
-      address: WALLET,
-      topics: encodeEventTopics({ abi: BATCHER_ABI, eventName: "CallFailed", args: { index: 1n } }),
-      data: encodeAbiParameters([{ type: "uint8" }, { type: "address" }, { type: "uint256" }], [0, "0x0000000000000000000000000000000000001002", 2000n]),
-      logIndex: "0x0",
-    }] });
+    // the batcher ran and reports the second sub-call as failed
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [
+      failedLog(1, "0x0000000000000000000000000000000000001002", 2000n),
+      executedLog(2),
+    ] });
     let { wallet, claims } = await start();
     let c1 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000001", "0x0000000000000000000000000000000000001001", "1000"), {});
     let c2 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000002", "0x0000000000000000000000000000000000001002", "2000"), {});
@@ -204,6 +211,7 @@ describe("ETH Claim Batching (EIP-7702)", () => {
       failedLog(1, "0x0000000000000000000000000000000000001001", 1000n),
       failedLog(2, "0x0000000000000000000000000000000000001002", 2000n),
       failedLog(3, "0x0000000000000000000000000000000000001002", 2000n),
+      executedLog(4),
     ] });
     chain.code[BATCHER.toLowerCase()] = BATCHER_RUNTIME_BYTECODE;
     chain.code[WALLET.toLowerCase()] = delegationCode(BATCHER);
@@ -234,7 +242,7 @@ describe("ETH Claim Batching (EIP-7702)", () => {
       await database.updateSession(session);
     }
     let chain = fakeChain({ deployerPresent: true, eip7702: true });
-    chain.logsByHash[storedHash] = [failedLog(1, unpaid.targetAddr, 2000n)];
+    chain.logsByHash[storedHash] = [failedLog(1, unpaid.targetAddr, 2000n), executedLog(2)];
     let { claims } = await start();
     let restored = claims.getTransactionQueue();
     expect(restored.length).to.equal(2);
@@ -245,7 +253,7 @@ describe("ETH Claim Batching (EIP-7702)", () => {
   });
 
   it("retries a setup transaction with the identical bytes after a lost answer", async () => {
-    let chain = fakeChain({ deployerPresent: true, eip7702: true, failFirstSend: true });
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, failFirstSend: true, batchLogs: [executedLog(1)] });
     let { claims } = await start();
     let c1 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000001", "0x0000000000000000000000000000000000001001", "1000"), {});
     await claims.processQueue();
@@ -256,8 +264,22 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     expect(c1.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED);
   }).timeout(12000);
 
+  it("fails every claim of a batch that mined without running the batcher", async () => {
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [] }); // no BatchExecuted
+    chain.code[BATCHER.toLowerCase()] = BATCHER_RUNTIME_BYTECODE;
+    chain.code[WALLET.toLowerCase()] = delegationCode(BATCHER);
+    let { claims } = await start();
+    let c1 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000001", "0x0000000000000000000000000000000000001001", "1000"), {});
+    let c2 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000002", "0x0000000000000000000000000000000000001002", "2000"), {});
+    await claims.processQueue();
+    await awaitSleepPromise(3000, () => c1.claim.claimStatus === ClaimTxStatus.FAILED && c2.claim.claimStatus === ClaimTxStatus.FAILED);
+    expect(c1.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "a success receipt without BatchExecuted paid nobody");
+    expect(c1.claim.txError).to.match(/without running the payout code/);
+    expect(c2.claim.claimStatus).to.equal(ClaimTxStatus.FAILED);
+  });
+
   it("skips deployment and delegation when both are already in place", async () => {
-    let chain = fakeChain({ deployerPresent: true, eip7702: true });
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [executedLog(1)] });
     chain.code[BATCHER.toLowerCase()] = BATCHER_RUNTIME_BYTECODE;
     chain.code[WALLET.toLowerCase()] = delegationCode(BATCHER);
     let { claims } = await start();
