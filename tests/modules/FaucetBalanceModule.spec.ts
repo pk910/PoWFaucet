@@ -59,6 +59,27 @@ describe("Faucet module: faucet-balance", () => {
     expect(moduleManager.getModule<FaucetBalanceModule>("faucet-balance").getBalanceRestriction()).to.equal(100, "unexpected balance restriction");
   });
 
+  it("sessions starting together share one restriction refresh", async () => {
+    faucetConfig.maxDropAmount = 1000;
+    faucetConfig.minDropAmount = 10;
+    faucetConfig.modules["faucet-balance"] = {
+      enabled: true,
+      fixedRestriction: {
+        200000: 50,
+      },
+    } as IFaucetBalanceConfig;
+    let moduleManager = ServiceManager.GetService(ModuleManager);
+    await moduleManager.initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    // the first refresh is under way (it awaits the unclaimed balance) while the others arrive: they
+    // used to read a restriction that was not computed yet and fail with "NaN cannot be converted to a BigInt"
+    let sessions = await Promise.all(Array.from({ length: 20 }, (_, i) => sessionManager.createSession("::ffff:8.8.8." + (i + 1), {
+      addr: "0x00000000000000000000000000000000000013" + (10 + i).toString(),
+    })));
+    expect(sessions.map((s) => s.getSessionStatus())).to.deep.equal(Array(20).fill("claimable"), "every session claimable");
+    expect(sessions.map((s) => s.getDropAmount())).to.deep.equal(Array(20).fill(500n), "every session at the restricted amount");
+  });
+
   it("Start session with static restriction (50%)", async () => {
     faucetConfig.maxDropAmount = 1000;
     faucetConfig.minDropAmount = 10;
