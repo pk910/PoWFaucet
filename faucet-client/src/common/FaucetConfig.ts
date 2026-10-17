@@ -32,6 +32,7 @@ export interface IFaucetModules {
   passport?: IPassportModuleConfig;
   voucher?: IVoucherModuleConfig;
   zupass?: IZupassModuleConfig;
+  "ticket-proof"?: ITicketProofModuleConfig;
   // A module's own config block is published under its module name, and the core
   // does not know what is in it - the module's client is what reads its shape
   // Only the core's own modules can be named here.
@@ -96,6 +97,17 @@ export interface IZupassModuleConfig {
   loginLabel: string;
   userLabel: string;
   infoHtml: string;
+}
+
+export interface ITicketProofModuleConfig {
+  partner: string;
+  events: string[];
+  appUrl: string | null;
+  appLabel: string | null;
+  loginLogo: string | null;
+  loginLabel: string | null;
+  userLabel: string | null;
+  infoHtml: string | null;
 }
 
 export interface IPoWModuleConfig {

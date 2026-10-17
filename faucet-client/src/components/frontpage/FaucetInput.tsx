@@ -6,6 +6,7 @@ import { FaucetCaptcha } from '../shared/FaucetCaptcha';
 import { AuthenticatoorLogin } from './authenticatoor/AuthenticatoorLogin';
 import { GithubLogin } from './github/GithubLogin';
 import { ZupassLogin } from './zupass/ZupassLogin';
+import { TicketProofLogin } from './ticket-proof/TicketProofLogin';
 import VoucherInput, { IVoucherInputRef } from './voucher/VoucherInput';
 
 export interface IFaucetInputProps {
@@ -30,6 +31,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
   private authenticatoorLogin = React.createRef<AuthenticatoorLogin>();
   private githubLogin = React.createRef<GithubLogin>();
   private zupassLogin = React.createRef<ZupassLogin>();
+  private ticketProofLogin = React.createRef<TicketProofLogin>();
   private voucherInput = React.createRef<IVoucherInputRef>();
 
   constructor(props: IFaucetInputProps) {
@@ -47,6 +49,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
     let needAuthenticatoor = !!this.props.faucetConfig.modules.authenticatoor;
     let needGithubAuth = !!this.props.faucetConfig.modules.github;
     let needZupassAuth = !!this.props.faucetConfig.modules.zupass && !!this.props.faucetConfig.modules.zupass.event;
+    let needTicketProofAuth = !!this.props.faucetConfig.modules["ticket-proof"];
     let needVoucher = !!this.props.faucetConfig.modules.voucher;
     let requestCaptcha = !!this.props.faucetConfig.modules.captcha?.requiredForStart;
     let inputTypes: string[] = [];
@@ -111,6 +114,13 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
               ref={this.zupassLogin}
             />
           </React.Suspense>
+        : null}
+        {needTicketProofAuth ?
+          <TicketProofLogin
+            faucetConfig={this.props.faucetConfig}
+            faucetContext={this.props.faucetContext}
+            ref={this.ticketProofLogin}
+          />
         : null}
         {needVoucher ?
           <VoucherInput
@@ -240,6 +250,9 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       }
       if(this.props.faucetConfig.modules.zupass && this.props.faucetConfig.modules.zupass.event) {
         inputData.zupassToken = await this.zupassLogin.current?.getToken();
+      }
+      if(this.props.faucetConfig.modules["ticket-proof"]) {
+        inputData.ticketProofToken = this.ticketProofLogin.current?.getToken() || undefined;
       }
       if (this.props.faucetConfig.modules.voucher) {
         inputData.voucherCode = this.voucherInput.current?.getCode();
