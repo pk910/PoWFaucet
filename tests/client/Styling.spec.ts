@@ -161,6 +161,56 @@ describe("browser: styling and embedding", function() {
     expect(styles.iconSize).to.equal(36);
   });
 
+  it("places the footer line under the card", async function() {
+    if(skipReason) return this.skip();
+    fixture = await bootFaucet();
+    page = await browser.newPage();
+    await openFaucet(page, fixture);
+
+    let layout = await page.evaluate(() => {
+      let card = document.querySelector(".faucet-container").getBoundingClientRect();
+      let footer = document.querySelector(".faucet-page .faucet-footer").getBoundingClientRect();
+      return { cardBottom: card.bottom, footerTop: footer.top, footerBottom: footer.bottom, docHeight: document.documentElement.scrollHeight };
+    });
+    expect(layout.footerTop).to.be.at.least(layout.cardBottom, "the footer is inside the card");
+    expect(layout.footerBottom).to.be.at.most(layout.docHeight, "the footer hangs out of the page");
+  });
+
+  it("an info callout opens inside the faucet and moves nothing", async function() {
+    if(skipReason) return this.skip();
+    fixture = await bootFaucet({
+      configure: (config) => {
+        config.modules["voucher"] = { enabled: true, voucherLabel: "Voucher code", infoHtml: "<b>Vouchers</b><br>Codes from the event desk." } as any;
+      },
+    });
+    page = await browser.newPage({ viewport: { width: 700, height: 900 } });
+    await openFaucet(page, fixture);
+    await page.mouse.move(5, 5);
+    let before = await page.evaluate(() => ({
+      cardTop: document.querySelector(".faucet-container").getBoundingClientRect().top,
+      docHeight: document.documentElement.scrollHeight,
+    }));
+
+    await page.locator(".voucher-input-container .info-icon").hover();
+    let popover = page.locator(".faucet-page .popover");
+    await popover.waitFor({ timeout: 10000 });
+    let shown = await page.evaluate(() => {
+      let popover = document.querySelector(".faucet-page .popover");
+      return {
+        cardTop: document.querySelector(".faucet-container").getBoundingClientRect().top,
+        docHeight: document.documentElement.scrollHeight,
+        position: getComputedStyle(popover).position,
+        background: getComputedStyle(popover).backgroundColor,
+        text: popover.textContent,
+      };
+    });
+    expect(shown.text).to.contain("Codes from the event desk.");
+    expect(shown.position).to.equal("absolute", "the callout takes part in the layout");
+    expect(shown.background).to.equal("rgb(255, 255, 255)", "the callout is unstyled: it is outside the faucet's scope");
+    expect(shown.docHeight).to.equal(before.docHeight, "the callout made the document taller");
+    expect(shown.cardTop).to.equal(before.cardTop, "the card moved when the callout opened");
+  });
+
   it("the mining page shows the stat tiles, the key/value rows and the live pill", async function() {
     if(skipReason) return this.skip();
     fixture = await bootFaucet();

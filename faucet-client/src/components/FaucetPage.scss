@@ -392,11 +392,22 @@ $enable-dark-mode: false;
   box-shadow: var(--pf-shadow);
 }
 
+// the footer line sits under the card, not in it: absolutely placed below the container, which
+// reserves the room with its bottom margin
+.faucet-container {
+  position: relative;
+  margin-bottom: 56px;
+}
 .faucet-page .faucet-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 20px;
+  margin: 10px 0 0 0;
+  padding: 0 4px;
   font-size: 12px;
   color: var(--pf-ink-3);
 }
