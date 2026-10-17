@@ -201,6 +201,9 @@ so the faucet fails all its claims rather than confirming them.
   ambiguous the claim stays pending, and the receipt watch keeps re-sending the same bytes on
   every poll until the receipt appears or the nonce is spent by something else. A broadcast some
   node confirmed is not re-sent.
+- An error from the receipt lookup itself is not a verdict on the transaction (geth answers
+  "transaction indexing is in progress" while its index lags): the watch logs it and keeps
+  polling. Only a receipt or a spent nonce settles a claim.
 - A transaction counts as *dropped* only when three polls in a row saw the wallet's mined nonce
   past the transaction's and no receipt; one poll may see a nonce from one endpoint ahead of a
   receipt from another. Even then it is not proof that nobody was paid, so the claims end in the

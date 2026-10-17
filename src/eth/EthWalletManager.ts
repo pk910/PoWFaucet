@@ -670,6 +670,7 @@ export class EthWalletManager {
    */
   private async awaitTransactionReceipt(txhash: string, txnonce: number, txHex?: string, resendEveryPoll: boolean = false): Promise<EthTxReceipt> {
     let nonceSpentPolls = 0;
+    let pollErrors = 0;
     while(true) {
       try {
         let receipt = await this.client.getTransactionReceipt(txhash);
@@ -690,12 +691,15 @@ export class EthWalletManager {
           }
         }
       } catch(ex) {
-        if(isTransportError(ex)) {
-          // just retry when RPC connection issue (the tx is already broadcast, a transport error on one poll says nothing about it)
-        } else {
-          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Error while polling transaction receipt for " + txhash + ": " + rpcErrorString(ex));
-          throw ex;
-        }
+        if(ex instanceof TransactionDroppedError)
+          throw ex; // the one verdict this loop reaches on its own
+        // No answer about the receipt is not an answer about the transaction: it is broadcast, and
+        // it may well be mined (geth answers "transaction indexing is in progress" while its index
+        // lags, a 200-claim batch was once marked failed on that although it had paid). Only a
+        // receipt or a spent nonce settles the claims; the error is logged and the poll goes on.
+        pollErrors++;
+        if(!isTransportError(ex) && (pollErrors === 1 || pollErrors % 20 === 0))
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Error while polling transaction receipt for " + txhash + " (" + pollErrors + "x, keeps polling): " + rpcErrorString(ex));
       }
 
       await sleepPromise(this.receiptPollInterval());

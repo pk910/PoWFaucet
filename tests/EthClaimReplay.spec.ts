@@ -223,6 +223,27 @@ describe("ETH Claim Replay", () => {
     expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED);
   }).timeout(15000);
 
+  it("keeps polling through receipt lookup errors and settles by the receipt", async () => {
+    let receiptCalls = 0;
+    fakeProvider.injectResponse("eth_sendRawTransaction", TX_HASH_RSP);
+    fakeProvider.injectResponse("eth_getTransactionReceipt", () => {
+      receiptCalls++;
+      if(receiptCalls <= 3)
+        throw "transaction indexing is in progress"; // geth, while its transaction index lags: a JSON-RPC error, not a transport error
+      return receipt();
+    });
+    await startWallet();
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+
+    let claim = await claimManager.createSessionClaim(sessionData(), {});
+    await claimManager.processQueue();
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
+    await awaitSleepPromise(3000, () => claim.claim.claimStatus !== ClaimTxStatus.PENDING);
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "a lookup error is not a verdict on the transaction");
+    expect(receiptCalls).to.be.greaterThanOrEqual(4);
+  });
+
   it("admits a claim exactly once: the row is the arbiter", async () => {
     fakeProvider.injectResponse("eth_sendRawTransaction", TX_HASH_RSP);
     fakeProvider.injectResponse("eth_getTransactionReceipt", receipt());
