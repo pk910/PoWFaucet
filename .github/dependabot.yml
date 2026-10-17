@@ -31,3 +31,8 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    ignore:
+      # the Node major is a coordinated change: Dockerfile, workflow node-version, pkg targets
+      # and engines move together to the next LTS line, not to every odd release
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
