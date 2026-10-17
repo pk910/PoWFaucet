@@ -562,11 +562,12 @@ describe("ETH Claim Manager", () => {
     const TX_HASH = "0xdb5950d44ceed2a5eb77970104b974b8c4234d7110fd8d0008edb2cfff835f0a";
 
     function useBatchTemplate(maxClaims: number, maxWaitSeconds: number) {
-      faucetConfig.ethClaimTx = {
-        contract: "0x00000000000000000000000000000000000000cc",
-        abi: ["function dispense(address[] to, uint256[] amounts) payable"],
-        batch: { maxClaims, maxWaitSeconds, fn: "dispense", args: ["{targets[]}", "{amounts[]}"], value: "{sum}" },
-      };
+      faucetConfig.ethClaimBatch = { maxClaims, maxWaitSeconds };
+      // the delegation setup is the wallet manager's business (its own spec); here it is in place
+      globalStubs["ensureClaimBatching"] = sinon.stub(EthWalletManager.prototype, "ensureClaimBatching").callsFake(function(this: EthWalletManager) {
+        this.getClaimTxBuilder().setBatchActive(true);
+        return Promise.resolve(true);
+      });
       globalStubs["getWalletState"] = sinon.stub(EthWalletManager.prototype, "getWalletState").returns({
         ready: true,
         nonce: 0,
@@ -633,7 +634,8 @@ describe("ETH Claim Manager", () => {
         txPromise: fusedSleep(claimFuse, 500).then(() => ({ status: true, block: 77, fee: 101n, receipt: getTestReceipt() })),
         plan: null,
       }));
-      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns(new Set([claims[1].target.toLowerCase()]));
+      // the contract reported position 1 of the batch as unpaid
+      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns(new Set([1]));
 
       await claimManager.processQueue();
       expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING]);

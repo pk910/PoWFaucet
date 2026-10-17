@@ -3,7 +3,7 @@ import { BaseModule } from "../BaseModule.js";
 import { ModuleHookAction } from "../ModuleManager.js";
 import { defaultConfig, IEnsNameConfig } from './EnsNameConfig.js';
 import { FaucetError } from '../../common/FaucetError.js';
-import { ContractCaller, EthRpcClient, namehash, normalize } from '../../eth/rpc/index.js';
+import { ContractCaller, EthRpcClient, namehash, normalize, rpcErrorString } from '../../eth/rpc/index.js';
 
 const ENS_MAINNET_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e";
 const ENS_REGISTRY_ABI = ["function resolver(bytes32 node) view returns (address)"];
@@ -73,7 +73,7 @@ export class EnsNameModule extends BaseModule<IEnsNameConfig> {
       try {
         resolved = await this.resolveName(targetAddr);
       } catch(ex) {
-        throw new FaucetError("INVALID_ENSNAME", "Could not resolve ENS Name '" + targetAddr + "': " + ex.toString());
+        throw new FaucetError("INVALID_ENSNAME", "Could not resolve ENS Name '" + targetAddr + "': " + rpcErrorString(ex));
       }
       if(!resolved)
         throw new FaucetError("INVALID_ENSNAME", "Could not resolve ENS Name '" + targetAddr + "': name has no address");

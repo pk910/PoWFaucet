@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
-import { EthWalletManager, WalletState } from "./EthWalletManager.js";
+import { EthWalletManager, PreparedClaimTx, WalletState } from "./EthWalletManager.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
 import { EthWalletRefill } from "./EthWalletRefill.js";
@@ -80,7 +80,8 @@ export class EthClaimManager {
 
     // restore saved claimTx queue
     let maxQueueIdx = 0;
-    let storedSession = await  ServiceManager.GetService(FaucetDatabase).getSessions([
+    let database = ServiceManager.GetService(FaucetDatabase);
+    let storedSession = await database.getSessions([
       FaucetSessionStatus.CLAIMING,
     ]);
     storedSession.forEach((sessionData) => {
@@ -91,6 +92,11 @@ export class EthClaimManager {
         claim: sessionData.claim,
         data: sessionData.data,
       };
+      // a "processing" row with the signed transaction in it was written right before the
+      // broadcast; the process died in between and the bytes may or may not be out: treat it as
+      // pending and send the same bytes again, never a new transaction
+      if(claimInfo.claim.claimStatus === ClaimTxStatus.PROCESSING && claimInfo.claim.txHex && claimInfo.claim.txHash)
+        claimInfo.claim.claimStatus = ClaimTxStatus.PENDING;
       switch(claimInfo.claim.claimStatus) {
         case ClaimTxStatus.QUEUE:
         case ClaimTxStatus.PROCESSING:
@@ -112,10 +118,28 @@ export class EthClaimManager {
         maxQueueIdx = claimInfo.claim.claimIdx;
     });
 
+    // pending transactions: the ones with their signed bytes stored go out again (the network
+    // ignores bytes it has seen; a transaction the crash kept from being sent gets sent), the
+    // others (from before the bytes were kept) are watched by hash
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    let rebroadcasts: Promise<unknown>[] = [];
     Object.keys(this.pendingTxQueue).forEach((txHash) => {
       let claims = this.pendingTxQueue[txHash];
-      this.awaitTxReceipt(claims, ServiceManager.GetService(EthWalletManager).watchClaimTx(claims[0]), txHash);
+      let signed = claims.find((claimInfo) => !!claimInfo.claim.txHex);
+      if(signed) {
+        claims.forEach((claimInfo) => this.updateClaimStatus(claimInfo)); // "processing" rows become "pending"
+        let rebroadcast = ethWalletManager.rebroadcastClaimTx({ txHash: txHash, txNonce: signed.claim.txNonce, txHex: signed.claim.txHex }, claims);
+        rebroadcasts.push(rebroadcast.catch(() => {}));
+        this.awaitTxReceipt(claims, rebroadcast.then((res) => res.txPromise), txHash);
+      } else {
+        this.awaitTxReceipt(claims, ethWalletManager.watchClaimTx(claims[0]), txHash);
+      }
     });
+    if(rebroadcasts.length > 0) {
+      // the queue must not hand out a nonce a replayed transaction just took
+      await Promise.all(rebroadcasts);
+      await ethWalletManager.loadWalletState();
+    }
 
     this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
     this.lastClaimTxIdx = maxQueueIdx + 1;
@@ -254,7 +278,7 @@ export class EthClaimManager {
       let now = Math.floor(new Date().getTime() / 1000);
       let batchSize = 1;
       let batchMaxWait = 0;
-      if(faucetConfig.ethClaimTx?.batch) {
+      if(faucetConfig.ethClaimBatch && this.claimTxQueue.length > 0 && await ethWalletManager.ensureClaimBatching()) {
         let builder = ethWalletManager.getClaimTxBuilder();
         batchSize = builder.getBatchSize();
         batchMaxWait = builder.getBatchMaxWait();
@@ -339,11 +363,20 @@ export class EthClaimManager {
     )
       return failAll("Faucet wallet is out of funds.");
 
+    // between signing and broadcasting: the signed transaction goes into every claim's session row
+    // first (still "processing"), so a crash in between replays these bytes on restart instead of
+    // building a new transaction for the same claims
+    let database = ServiceManager.GetService(FaucetDatabase);
+    let persistBeforeBroadcast = async (prepared: PreparedClaimTx) => {
+      for(let claimTx of claims)
+        await database.updateClaimData(claimTx.session, claimTx.claim);
+    };
+
     try {
       claims.forEach((claimTx) => claimTx.claim.claimStatus = ClaimTxStatus.PROCESSING);
 
       // send transaction
-      let txResult = claims.length === 1 ? await ethWalletManager.sendClaimTx(claims[0]) : await ethWalletManager.sendClaimBatch(claims);
+      let txResult = claims.length === 1 ? await ethWalletManager.sendClaimTx(claims[0], persistBeforeBroadcast) : await ethWalletManager.sendClaimBatch(claims, persistBeforeBroadcast);
       let txHash = txResult.txHash || claims[0].claim.txHash;
       this.pendingTxQueue[txHash] = claims;
 
@@ -382,13 +415,13 @@ export class EthClaimManager {
         throw "transaction reverted";
       }
 
-      let failedTargets = ServiceManager.GetService(EthWalletManager).evaluateClaimReceipt(txData.receipt);
+      let failedIndexes = ServiceManager.GetService(EthWalletManager).evaluateClaimReceipt(txData.receipt);
       delete this.pendingTxQueue[txHash];
       let confirmedIdx = this.lastConfirmedClaimTxIdx;
-      claims.forEach((claimTx) => {
+      claims.forEach((claimTx, claimPos) => {
         delete this.claimTxDict[claimTx.session];
-        if(failedTargets.has(claimTx.target.toLowerCase())) {
-          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction " + txHash + " could not pay " + claimTx.target + ": the contract reported the payout as failed");
+        if(failedIndexes.has(claimPos)) {
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction " + txHash + " could not pay " + claimTx.target + " (position " + claimPos + "): the contract reported the payout as failed");
           claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
           claimTx.claim.txError = "Transaction Error: the contract could not pay this address";
         } else {

@@ -6,7 +6,7 @@ import { ModuleHookAction } from "../ModuleManager.js";
 import { defaultConfig, IMainnetWalletConfig } from './MainnetWalletConfig.js';
 import { FaucetError } from '../../common/FaucetError.js';
 import { Erc20Abi } from '../../abi/ERC20.js';
-import { ContractCaller, EthRpcClient } from '../../eth/rpc/index.js';
+import { ContractCaller, EthRpcClient, rpcErrorString } from '../../eth/rpc/index.js';
 
 export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
@@ -39,7 +39,7 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
       try {
         walletBalance = await this.client.getBalance(targetAddr);
       } catch(ex) {
-        throw new FaucetError("MAINNET_BALANCE_CHECK", "Could not get balance of mainnet wallet " + targetAddr + ": " + ex.toString());
+        throw new FaucetError("MAINNET_BALANCE_CHECK", "Could not get balance of mainnet wallet " + targetAddr + ": " + rpcErrorString(ex));
       }
       if(walletBalance < minBalance)
         throw new FaucetError("MAINNET_BALANCE_LIMIT", "You need to hold at least " + ServiceManager.GetService(EthWalletManager).readableAmount(minBalance, true) + " in your wallet on mainnet to use this faucet.");
@@ -50,7 +50,7 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
       try {
         walletTxCount = await this.client.getTransactionCount(targetAddr);
       } catch(ex) {
-        throw new FaucetError("MAINNET_TXCOUNT_CHECK", "Could not get tx-count of mainnet wallet " + targetAddr + ": " + ex.toString());
+        throw new FaucetError("MAINNET_TXCOUNT_CHECK", "Could not get tx-count of mainnet wallet " + targetAddr + ": " + rpcErrorString(ex));
       }
       if(walletTxCount < this.moduleConfig.minTxCount)
         throw new FaucetError("MAINNET_TXCOUNT_LIMIT", "You need to submit at least " + this.moduleConfig.minTxCount + " transactions from your wallet on mainnet to use this faucet.");
@@ -66,7 +66,7 @@ export class MainnetWalletModule extends BaseModule<IMainnetWalletConfig> {
           let tokenContract = new ContractCaller(this.client, erc20Token.address, Erc20Abi);
           walletBalance = BigInt(await tokenContract.call("balanceOf", [targetAddr]) as bigint);
         } catch(ex) {
-          throw new FaucetError("MAINNET_BALANCE_CHECK", "Could not get token balance of mainnet wallet " + targetAddr + ": " + ex.toString());
+          throw new FaucetError("MAINNET_BALANCE_CHECK", "Could not get token balance of mainnet wallet " + targetAddr + ": " + rpcErrorString(ex));
         }
         if(walletBalance < minBalance) {
           let factor = Math.pow(10, erc20Token.decimals || 18);

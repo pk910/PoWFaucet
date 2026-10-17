@@ -68,6 +68,7 @@ faucetSecret: "RandomStringThatShouldBeVerySecret!"
 #    name: "fallback-provider"
 #    priority: 5
 #    metered: true
+# http(s) URLs may carry basic auth (https://user:pass@host/), it is sent as a header; ws(s) URLs may not
 ethRpcHost: "https://rpc.hoodi.ethpandaops.io"
 
 # Mark RPC endpoints offline if their block height falls behind the highest known head by more than this many blocks.
@@ -124,31 +125,32 @@ ethQueueNoFunds: true
 # link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
 ethTxExplorerLink: "https://hoodi.etherscan.io/tx/{txid}"
 
-# claim transaction template (optional): pay claims through a contract call instead of a plain transfer,
-# and optionally several claims per transaction. docs/claim-transactions.md explains the placeholders;
-# docs/PoWFaucetDispenser.sol is a contract that fits the batch example below.
-# Without this block a claim is one native transfer (or one ERC20 transfer for faucetCoinType erc20).
+# what paying a claim means (optional): one or more calls instead of the faucet coin's plain transfer.
+# docs/claim-transactions.md explains the call types and placeholders
+# ({target} {amount} {token} {walletAddr} {sessionId} {sessionHash} {session.<key>}).
+# One call is sent as a plain transaction; a claim of several calls needs ethClaimBatch below.
 #ethClaimTx:
-#  contract: "0x0000000000000000000000000000000000000000"
-#  abi:
-#    - "function dispense(address[] to, uint256[] amounts) payable"
-#    - "event DispenseFailed(address indexed to, uint256 amount, address token)"
-#  # one claim per transaction: fn / args / value / gasLimit (placeholders: {target} {amount} {token} {walletAddr} {sessionId} {sessionHash} {session.<key>})
-#  #fn: "claim"
-#  #args: ["{target}", "{amount}", "{session.tokenAmount}"]
-#  #value: "{amount}"
-#  #gasLimit: "estimate"
-#  # several claims per transaction (list placeholders: {targets[]} {amounts[]} {sessionIds[]} {sessionHashes[]} {session.<key>[]}, and {sum})
-#  batch:
-#    maxClaims: 20          # claims per transaction
-#    maxWaitSeconds: 10     # a partial batch is sent once its oldest claim waited this long
-#    fn: "dispense"
-#    args: ["{targets[]}", "{amounts[]}"]
-#    value: "{sum}"
-#    gasLimit: 60000        # base gas limit of a batch transaction ...
-#    gasLimitPerClaim: 45000  # ... plus this per claim ("estimate" instead of a number asks the node)
-#    failedEvent: "DispenseFailed"  # recipients named by this event fail individually, the rest confirm
-#    #failedEventArg: "to"
+#  gasLimit: "estimate"   # of a single-claim transaction (number, "estimate", or ethTxGasLimit)
+#  calls:
+#    - type: "call"
+#      to: "0x0000000000000000000000000000000000000000"
+#      abi: ["function claim(address to, uint256 ethAmount, uint256 tokenAmount) payable"]
+#      fn: "claim"
+#      args: ["{target}", "{amount}", "{session.tokenAmount}"]
+#      value: "{amount}"
+#    #- { type: "transfer", to: "{target}", amount: "{amount}" }
+#    #- { type: "token", token: "0x...", to: "{target}", amount: "{session.tokenAmount}" }
+
+# several claims per transaction (optional, transparent to what a claim is): the faucet wallet
+# delegates its code to the batcher contract (EIP-7702) and calls execute() on itself with every
+# claim's calls. The faucet sets that up on its own (deploys the batcher through the deterministic
+# deployment proxy if the chain lacks it, then sends the delegation; two transactions at most) and
+# falls back to one transaction per claim when the chain cannot do it. Needs ethLegacyTx: false.
+#ethClaimBatch:
+#  maxClaims: 50          # claims per transaction
+#  maxWaitSeconds: 10     # a partial batch is sent once its oldest claim waited this long
+#  gasLimit: 40000        # base gas limit of a batch transaction ...
+#  gasLimitPerClaim: 40000  # ... plus this per claim ("estimate" instead of a number asks the node)
 
 
 # min/max drop amount (max is the default if no module lowers it)

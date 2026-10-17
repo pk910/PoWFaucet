@@ -3,8 +3,9 @@ import { expect } from 'chai';
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, parseAbi } from 'viem';
 import { loadDefaultTestConfig } from './common.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
-import { IClaimTxConfig } from '../src/config/ConfigSchema.js';
+import { IClaimBatchConfig, IClaimCall, IClaimTxConfig } from '../src/config/ConfigSchema.js';
 import { ClaimTxBuilder } from '../src/eth/claimtx/ClaimTxBuilder.js';
+import { BATCHER_ABI } from '../src/eth/claimtx/BatcherArtifact.js';
 import { ClaimTxStatus, EthClaimInfo } from '../src/eth/EthClaimManager.js';
 import { EthLog, IEthRpcClient } from '../src/eth/rpc/index.js';
 
@@ -12,11 +13,7 @@ describe("Claim transaction builder", () => {
   const WALLET = "0x00000000000000000000000000000000000000aa";
   const TOKEN = "0x00000000000000000000000000000000000000bb";
   const CONTRACT = "0x00000000000000000000000000000000000000cc";
-  const DISPENSER_ABI = [
-    "function claim(address to, uint256 ethAmount, uint256 tokenAmount) payable",
-    "function dispense(address[] to, uint256[] amounts) payable",
-    "event DispenseFailed(address indexed to, uint256 amount, address token)",
-  ];
+  const CLAIM_ABI = ["function claim(address to, uint256 ethAmount, uint256 tokenAmount) payable"];
 
   let estimateCalls: any[];
   let estimateResult: bigint | Error;
@@ -46,19 +43,35 @@ describe("Claim transaction builder", () => {
   const c2 = claim("s2", "0x0000000000000000000000000000000000001002", "250", { tokenAmount: "7" });
   const c3 = claim("s3", "0x0000000000000000000000000000000000001003", "400", { tokenAmount: "9" });
 
-  describe("without a template", () => {
-    it("plans a native transfer per claim", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, null);
+  const templateCall: IClaimCall = { type: "call", to: CONTRACT, abi: CLAIM_ABI, fn: "claim", args: ["{target}", "{amount}", "{session.tokenAmount}"], value: "{amount}" };
+  const template: IClaimTxConfig = { calls: [templateCall] };
+  const twoCalls: IClaimTxConfig = { calls: [
+    { type: "transfer", to: "{target}", amount: "{amount}" },
+    { type: "token", token: TOKEN, to: "{target}", amount: "{session.tokenAmount}" },
+  ] };
+  const batch: IClaimBatchConfig = { maxClaims: 3, maxWaitSeconds: 10, gasLimit: 60000, gasLimitPerClaim: 45000 };
+
+  /** the stream `execute` was called with */
+  function executeStream(data: string): string {
+    let call = decodeFunctionData({ abi: BATCHER_ABI, data: data as `0x${string}` });
+    expect(call.functionName).to.equal("execute");
+    return call.args[0] as string;
+  }
+
+  describe("one claim per transaction", () => {
+    it("plans a native transfer", async () => {
+      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, null, null);
       expect(builder.getBatchSize()).to.equal(1);
       let plan = await builder.buildPlan([c1]);
-      expect(plan).to.deep.equal({ to: c1.target, value: 100n, data: "0x", gasLimit: 250000, claims: [c1] });
+      expect(plan).to.deep.equal({ to: c1.target, value: 100n, nativeSpend: 100n, data: "0x", gasLimit: 250000, claims: [c1] });
     });
 
-    it("plans an erc20 transfer per claim", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, TOKEN, null);
+    it("plans an erc20 transfer", async () => {
+      let builder = new ClaimTxBuilder(fakeClient, WALLET, TOKEN, null, null);
       let plan = await builder.buildPlan([c1]);
       expect(plan.to).to.equal(TOKEN);
       expect(plan.value).to.equal(0n);
+      expect(plan.nativeSpend).to.equal(0n);
       expect(plan.gasLimit).to.equal(250000);
       let call = decodeFunctionData({ abi: parseAbi(["function transfer(address to, uint256 value)"]), data: plan.data as `0x${string}` });
       expect(call.functionName).to.equal("transfer");
@@ -66,67 +79,40 @@ describe("Claim transaction builder", () => {
       expect(call.args[1]).to.equal(100n);
     });
 
-    it("refuses several claims", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, null);
-      let err: any;
-      try { await builder.buildPlan([c1, c2]); } catch(ex) { err = ex; }
-      expect(err?.message).to.match(/batching needs an ethClaimTx template/);
-    });
-  });
-
-  describe("with a template", () => {
-    const single: IClaimTxConfig = {
-      contract: CONTRACT,
-      abi: DISPENSER_ABI,
-      fn: "claim",
-      args: ["{target}", "{amount}", "{session.tokenAmount}"],
-      value: "{amount}",
-    };
-    const batched: IClaimTxConfig = {
-      contract: CONTRACT,
-      abi: DISPENSER_ABI,
-      batch: {
-        maxClaims: 3,
-        maxWaitSeconds: 10,
-        fn: "dispense",
-        args: ["{targets[]}", "{amounts[]}"],
-        value: "{sum}",
-        gasLimit: 60000,
-        gasLimitPerClaim: 45000,
-        failedEvent: "DispenseFailed",
-      },
-    };
-
-    it("validates the template against the abi", () => {
-      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { contract: CONTRACT, abi: DISPENSER_ABI } as IClaimTxConfig)).to.throw(/fn/);
-      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { ...single, fn: "nope" })).to.throw(/'nope' is not in the abi/);
-      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { ...batched, batch: { ...batched.batch, fn: "nope" } })).to.throw(/batch.fn 'nope'/);
-    });
-
-    it("plans a contract call per claim with session data and native value", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, single);
-      expect(builder.getBatchSize()).to.equal(1);
-      expect(builder.getBatchMaxWait()).to.equal(0);
+    it("plans the template's contract call with session data and native value", async () => {
+      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, template, null);
       let plan = await builder.buildPlan([c1]);
       expect(plan.to).to.equal(CONTRACT);
       expect(plan.value).to.equal(100n);
+      expect(plan.nativeSpend).to.equal(100n);
       expect(plan.gasLimit).to.equal(250000, "default gas limit is ethTxGasLimit");
-      let call = decodeFunctionData({ abi: parseAbi(DISPENSER_ABI), data: plan.data as `0x${string}` });
+      let call = decodeFunctionData({ abi: parseAbi(CLAIM_ABI), data: plan.data as `0x${string}` });
       expect(call.functionName).to.equal("claim");
       expect((call.args[0] as string).toLowerCase()).to.equal(c1.target);
       expect(call.args[1]).to.equal(100n);
       expect(call.args[2]).to.equal(5n);
     });
 
+    it("validates the calls against their abi", () => {
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [] }, null)).to.throw(/at least one call/);
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ ...templateCall, fn: "nope" }] }, null)).to.throw(/'nope' is not in its abi/);
+    });
+
+    it("refuses a claim of several calls without batching", async () => {
+      let err: any;
+      try { await new ClaimTxBuilder(fakeClient, WALLET, null, twoCalls, null).buildPlan([c1]); } catch(ex) { err = ex; }
+      expect(err?.message).to.match(/a claim of 2 calls needs ethClaimBatch/);
+    });
+
     it("fails a claim whose session lacks a referenced key", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, single);
+      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, template, null);
       let err: any;
       try { await builder.buildPlan([claim("s9", c1.target, "1", {})]); } catch(ex) { err = ex; }
       expect(err?.message).to.match(/s9 has no session data 'tokenAmount'/);
     });
 
     it("asks the node for gas when configured, with a 20 % margin and a fallback", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, { ...single, gasLimit: "estimate" });
+      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, { ...template, gasLimit: "estimate" }, null);
       let plan = await builder.buildPlan([c1]);
       expect(plan.gasLimit).to.equal(120000);
       expect(estimateCalls[0]).to.deep.equal({ from: WALLET, to: CONTRACT, data: plan.data, value: 100n });
@@ -135,71 +121,106 @@ describe("Claim transaction builder", () => {
       expect(plan.gasLimit).to.equal(250000, "fallback to ethTxGasLimit");
     });
 
-    it("plans a batch with list placeholders, sum value and per-claim gas", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, batched);
+    it("refuses several claims without active batching", async () => {
+      let err: any;
+      try { await new ClaimTxBuilder(fakeClient, WALLET, null, null, null).buildPlan([c1, c2]); } catch(ex) { err = ex; }
+      expect(err?.message).to.match(/batching is not active/);
+      // configured but the delegation is not in place yet
+      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, null, batch);
+      expect(builder.isBatchConfigured()).to.equal(true);
+      expect(builder.getBatchSize()).to.equal(1);
+      err = null;
+      try { await builder.buildPlan([c1, c2]); } catch(ex) { err = ex; }
+      expect(err?.message).to.match(/batching is not active/);
+    });
+  });
+
+  describe("batched through the wallet's own code", () => {
+    function activeBuilder(token: string | null, config: IClaimTxConfig | null, batchConfig: IClaimBatchConfig = batch): ClaimTxBuilder {
+      let builder = new ClaimTxBuilder(fakeClient, WALLET, token, config, batchConfig);
+      builder.setBatchActive(true);
+      return builder;
+    }
+
+    it("calls execute on the wallet with a transfer per claim and nothing riding on the transaction", async () => {
+      let builder = activeBuilder(null, null);
       expect(builder.getBatchSize()).to.equal(3);
       expect(builder.getBatchMaxWait()).to.equal(10);
       let plan = await builder.buildPlan([c1, c2, c3]);
-      expect(plan.to).to.equal(CONTRACT);
-      expect(plan.value).to.equal(750n);
+      expect(plan.to).to.equal(WALLET, "the wallet executes its own code");
+      expect(plan.value).to.equal(0n, "the sub-calls pay from the wallet balance");
+      expect(plan.nativeSpend).to.equal(750n, "what leaves the wallet in total");
       expect(plan.gasLimit).to.equal(60000 + 3 * 45000);
-      let call = decodeFunctionData({ abi: parseAbi(DISPENSER_ABI), data: plan.data as `0x${string}` });
-      expect(call.functionName).to.equal("dispense");
-      expect((call.args[0] as string[]).map((a) => a.toLowerCase())).to.deep.equal([c1.target, c2.target, c3.target]);
-      expect(call.args[1]).to.deep.equal([100n, 250n, 400n]);
+      expect(executeStream(plan.data)).to.equal(
+        "0x" +
+        "00" + c1.target.substring(2) + "000000000000000000000064" +
+        "00" + c2.target.substring(2) + "0000000000000000000000fa" +
+        "00" + c3.target.substring(2) + "000000000000000000000190"
+      );
     });
 
-    it("pays a single claim through the batch function when the template has no single-claim fn", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, batched);
-      let plan = await builder.buildPlan([c2]);
-      let call = decodeFunctionData({ abi: parseAbi(DISPENSER_ABI), data: plan.data as `0x${string}` });
-      expect(call.functionName).to.equal("dispense");
-      expect(call.args[1]).to.deep.equal([250n]);
-      expect(plan.value).to.equal(250n);
-      expect(plan.gasLimit).to.equal(60000 + 45000);
+    it("pays an erc20 faucet's claims with the wallet's own token transfers", async () => {
+      let plan = await activeBuilder(TOKEN, null).buildPlan([c1]);
+      expect(plan.to).to.equal(WALLET);
+      expect(plan.nativeSpend).to.equal(0n);
+      expect(executeStream(plan.data)).to.equal("0x" + "01" + TOKEN.substring(2) + c1.target.substring(2) + "000000000000000000000064");
     });
 
-    it("prefers fn for a single claim when both are configured", async () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, { ...batched, fn: single.fn, args: single.args, value: single.value });
-      let plan = await builder.buildPlan([c1]);
-      expect(decodeFunctionData({ abi: parseAbi(DISPENSER_ABI), data: plan.data as `0x${string}` }).functionName).to.equal("claim");
-      plan = await builder.buildPlan([c1, c2]);
-      expect(decodeFunctionData({ abi: parseAbi(DISPENSER_ABI), data: plan.data as `0x${string}` }).functionName).to.equal("dispense");
+    it("streams the configured contract call per claim", async () => {
+      let plan = await activeBuilder(null, template).buildPlan([c1, c2]);
+      expect(plan.nativeSpend).to.equal(350n, "the call's value per claim, paid from the wallet");
+      let stream = executeStream(plan.data);
+      // 0x02 to(20) value(12) len(2) data(4 + 3*32 = 100 bytes) per claim
+      expect(stream.length).to.equal(2 + 2 * (35 + 100) * 2);
+      expect(stream.substring(2, 4)).to.equal("02");
+      expect(stream.substring(4, 44)).to.equal(CONTRACT.substring(2));
+      let data = "0x" + stream.substring(2 + 35 * 2, 2 + 35 * 2 + 200);
+      let call = decodeFunctionData({ abi: parseAbi(CLAIM_ABI), data: data as `0x${string}` });
+      expect(call.functionName).to.equal("claim");
+      expect(call.args[1]).to.equal(100n);
+      expect(call.args[2]).to.equal(5n);
     });
 
-    it("refuses more claims than maxClaims and batches without a batch block", async () => {
+    it("streams several calls per claim", async () => {
+      let builder = activeBuilder(null, twoCalls);
+      let plan = await builder.buildPlan([c1, c2]);
+      expect(plan.nativeSpend).to.equal(350n, "only native coin counts");
+      expect(executeStream(plan.data).length).to.equal(2 + 2 * (33 + 53) * 2);
+    });
+
+    it("refuses more claims than maxClaims", async () => {
       let err: any;
-      try { await new ClaimTxBuilder(fakeClient, WALLET, null, batched).buildPlan([c1, c2, c3, c1]); } catch(ex) { err = ex; }
+      try { await activeBuilder(null, null).buildPlan([c1, c2, c3, c1]); } catch(ex) { err = ex; }
       expect(err?.message).to.match(/maxClaims is 3, got 4/);
-      err = null;
-      try { await new ClaimTxBuilder(fakeClient, WALLET, null, single).buildPlan([c1, c2]); } catch(ex) { err = ex; }
-      expect(err?.message).to.match(/no batch function/);
     });
 
-    function failedLog(address: string, to: string, amount: bigint): EthLog {
-      let topics = encodeEventTopics({ abi: parseAbi(DISPENSER_ABI), eventName: "DispenseFailed", args: { to: to as `0x${string}` } });
+    function failedLog(address: string, index: number): EthLog {
       return {
         address,
-        topics: topics as string[],
-        data: encodeAbiParameters([{ type: "uint256" }, { type: "address" }], [amount, "0x0000000000000000000000000000000000000000"]),
+        topics: encodeEventTopics({ abi: BATCHER_ABI, eventName: "CallFailed", args: { index: BigInt(index) } }) as string[],
+        data: encodeAbiParameters([{ type: "uint8" }, { type: "address" }, { type: "uint256" }], [0, c2.target as `0x${string}`, 250n]),
         logIndex: 0,
       };
     }
 
-    it("reads failed recipients from the receipt logs", () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, batched);
+    it("reads failed sub-calls from the wallet's logs and maps them to claims", () => {
+      let builder = activeBuilder(null, null);
       let outcome = builder.evaluateReceipt([
-        failedLog(CONTRACT, "0x0000000000000000000000000000000000001002", 250n),
-        failedLog("0x00000000000000000000000000000000000000dd", "0x0000000000000000000000000000000000001003", 400n), // another contract
-        { address: CONTRACT, topics: ["0x" + "12".repeat(32)], data: "0x", logIndex: 2 }, // unknown event
+        failedLog(WALLET, 1),
+        failedLog(CONTRACT, 2), // some other contract's event
+        { address: WALLET, topics: ["0x" + "12".repeat(32)], data: "0x", logIndex: 2 }, // unknown event
       ]);
-      expect(Array.from(outcome.failedTargets)).to.deep.equal(["0x0000000000000000000000000000000000001002"]);
+      expect(Array.from(outcome.failedIndexes)).to.deep.equal([1]);
+
+      // two calls per claim: sub-call 3 belongs to the second claim
+      let twoPerClaim = activeBuilder(null, twoCalls);
+      expect(Array.from(twoPerClaim.evaluateReceipt([failedLog(WALLET, 3)]).failedIndexes)).to.deep.equal([1]);
+      expect(Array.from(twoPerClaim.evaluateReceipt([failedLog(WALLET, 0), failedLog(WALLET, 1)]).failedIndexes)).to.deep.equal([0]);
     });
 
-    it("reports nothing failed without a failedEvent", () => {
-      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, { ...batched, batch: { ...batched.batch, failedEvent: undefined } });
-      expect(builder.evaluateReceipt([failedLog(CONTRACT, c1.target, 100n)]).failedTargets.size).to.equal(0);
-      expect(new ClaimTxBuilder(fakeClient, WALLET, null, null).evaluateReceipt([failedLog(CONTRACT, c1.target, 100n)]).failedTargets.size).to.equal(0);
+    it("reports nothing failed while batching is inactive", () => {
+      let builder = new ClaimTxBuilder(fakeClient, WALLET, null, null, batch);
+      expect(builder.evaluateReceipt([failedLog(WALLET, 0)]).failedIndexes.size).to.equal(0);
     });
   });
 });

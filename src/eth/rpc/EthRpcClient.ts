@@ -4,6 +4,7 @@ import {
 } from 'viem';
 import { ipc } from 'viem/node';
 import { normalize } from 'viem/ens';
+import { redactUrl, redactUrlsInText } from './redact.js';
 
 /**
  * The provider contract the faucet speaks internally: EIP-1193 style `request({ method, params })`.
@@ -113,8 +114,9 @@ export class IpcProvider extends TransportProvider {
 
 /**
  * Build a provider for an `ethRpcHost` entry: http(s) URL (user:pass@ becomes a basic auth header),
- * ws(s) URL (credentials stay in the URL; the WebSocket transport has no header option), an
- * absolute IPC socket path, or a pre-built provider object (anything with a `request` function).
+ * ws(s) URL (no credentials: the WebSocket transport has no header option and a URL with userinfo
+ * would end up in error messages), an absolute IPC socket path, or a pre-built provider object
+ * (anything with a `request` function).
  */
 export function createRpcProvider(rpcHost: string | object): IRpcProvider {
   if (typeof rpcHost !== 'string') {
@@ -122,8 +124,12 @@ export function createRpcProvider(rpcHost: string | object): IRpcProvider {
       return rpcHost as IRpcProvider;
     throw new Error("invalid rpc provider: expected a URL or an object with a request() function");
   }
-  if (/^wss?:\/\//.test(rpcHost))
+  if (/^wss?:\/\//.test(rpcHost)) {
+    const { headers } = extractAuth(rpcHost);
+    if (Object.keys(headers).length > 0)
+      throw new Error("WebSocket RPC URLs cannot carry credentials (" + redactUrl(rpcHost) + "): use an http(s) URL with user:pass@, or a reverse proxy");
     return new WebSocketProvider(rpcHost);
+  }
   if (rpcHost.startsWith('/'))
     return new IpcProvider(rpcHost);
   const { cleanUrl, headers } = extractAuth(rpcHost);
@@ -185,14 +191,17 @@ export function isTransportError(ex: any): boolean {
   return texts.some((text) => typeof text === "string" && TRANSPORT_ERROR_PATTERN.test(text));
 }
 
-/** The full text of an error as the faucet logs it; viem puts the node's message into `details`. */
+/**
+ * The text of an error as the faucet logs or shows it: viem's short message plus the node's own
+ * message (`details`), with every URL in it redacted (viem quotes the endpoint URL in transport errors).
+ */
 export function rpcErrorString(ex: any): string {
   if (!ex)
     return "";
   if (typeof ex === "string")
-    return ex;
+    return redactUrlsInText(ex);
   const parts = [ex.shortMessage || ex.message, ex.details].filter((p) => typeof p === "string" && p.length > 0);
-  return parts.length > 0 ? parts.join(": ") : ex.toString();
+  return redactUrlsInText(parts.length > 0 ? parts.join(": ") : ex.toString());
 }
 
 /**

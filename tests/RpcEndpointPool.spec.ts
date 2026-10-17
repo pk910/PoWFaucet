@@ -5,7 +5,7 @@ import { ServiceManager } from '../src/common/ServiceManager.js';
 import { FaucetProcess } from '../src/common/FaucetProcess.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
 import { FakeProvider } from './stubs/FakeProvider.js';
-import { extractAuth } from '../src/eth/rpc/index.js';
+import { extractAuth, rpcErrorString } from '../src/eth/rpc/index.js';
 import { RpcEndpointPool, RpcEndpointState, IRpcEndpointStatus } from '../src/eth/RpcEndpointPool.js';
 
 // Internal access shim — these tests intentionally exercise private methods to
@@ -217,6 +217,23 @@ describe("RPC Endpoint Pool", () => {
       const provider = pool.createProvider("http://u:p@localhost:8545");
       expect((provider as any).headers?.Authorization).to.contain("Basic");
       expect((provider as any).url).to.equal("http://localhost:8545/");
+    });
+
+    it("rejects ws:// URLs that carry credentials, without echoing them", () => {
+      const pool = new RpcEndpointPool() as AnyPool;
+      let err: any;
+      try { pool.createProvider("ws://alice:hunter2@localhost:8546/"); } catch (ex) { err = ex; }
+      expect(err?.message).to.match(/cannot carry credentials/);
+      expect(err?.message).to.not.contain("alice");
+      expect(err?.message).to.not.contain("hunter2");
+    });
+
+    it("rpcErrorString redacts URLs quoted in error text", () => {
+      const text = rpcErrorString(new Error("HTTP request failed.\n\nURL: https://alice:hunter2@rpc.example.com/v3/SomeApiKey1234567890\nRequest body: {}"));
+      expect(text).to.not.contain("alice");
+      expect(text).to.not.contain("hunter2");
+      expect(text).to.not.contain("SomeApiKey1234567890");
+      expect(text).to.contain("rpc.example.com");
     });
 
     it("creates a WebSocketProvider for ws:// URLs", () => {

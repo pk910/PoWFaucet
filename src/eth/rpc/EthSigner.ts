@@ -1,5 +1,7 @@
 import { Hex } from 'viem';
-import { privateKeyToAccount, PrivateKeyAccount } from 'viem/accounts';
+import { privateKeyToAccount, PrivateKeyAccount, SignAuthorizationReturnType } from 'viem/accounts';
+
+export type SignedAuthorization = SignAuthorizationReturnType;
 
 export interface EthTxFields {
   chainId: number;
@@ -44,6 +46,30 @@ export class EthSigner {
       to: tx.to.toLowerCase() as Hex,
       value: tx.value,
       data: (tx.data || "0x") as Hex,
+    });
+  }
+
+  /**
+   * An EIP-7702 authorization: "this account's code is the one at `delegate`". With `nonce` the
+   * account's nonce after the transaction that carries it (the account sends that transaction itself).
+   */
+  public signAuthorization(delegate: string, chainId: number, nonce: number): Promise<SignedAuthorization> {
+    return this.account.signAuthorization({ address: delegate as Hex, chainId, nonce });
+  }
+
+  /** The signed, serialized type 4 (set code) transaction carrying `authorizations`, 0x-prefixed. */
+  public signSetCodeTransaction(tx: EthFeeMarketTxFields, authorizations: SignedAuthorization[]): Promise<Hex> {
+    return this.account.signTransaction({
+      type: 'eip7702',
+      chainId: tx.chainId,
+      nonce: tx.nonce,
+      gas: tx.gasLimit,
+      maxFeePerGas: tx.maxFeePerGas,
+      maxPriorityFeePerGas: tx.maxPriorityFeePerGas,
+      to: tx.to.toLowerCase() as Hex,
+      value: tx.value,
+      data: (tx.data || "0x") as Hex,
+      authorizationList: authorizations,
     });
   }
 

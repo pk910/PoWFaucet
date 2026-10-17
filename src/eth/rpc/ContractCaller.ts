@@ -57,6 +57,11 @@ export class ContractCaller {
     return this.abi.some((item) => item.type === 'function' && item.name === name);
   }
 
+  /** The call data for `fn(args)` of any abi, without a client or an address. */
+  public static encodeCall(abi: ContractAbiInput, fnName: string, args: unknown[] = []): Hex {
+    return new ContractCaller(null, "0x0000000000000000000000000000000000000000", abi).encode(fnName, args);
+  }
+
   private getFunction(name: string, argCount?: number): AbiFunction {
     const candidates = this.abi.filter((item): item is AbiFunction => item.type === 'function' && item.name === name);
     if (candidates.length === 0)

@@ -1,4 +1,4 @@
-import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider } from './rpc/index.js';
+import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, looksLikeSecret, redactUrl, redactUrlsInText } from './rpc/index.js';
 
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { EthRpcHostConfig, IRpcEndpointConfig } from '../config/ConfigSchema.js';
@@ -278,33 +278,10 @@ export class RpcEndpointPool {
     }
   }
 
-  // Returns a display-safe version of the URL: strips userinfo, redacts long path segments
-  // that look like API keys, and redacts known secret-bearing query parameters.
+  // Display-safe URL and error text: the redaction lives in src/eth/rpc/redact.ts, shared with
+  // every other place that logs or shows RPC errors.
   private sanitizeUrl(url: string): string {
-    try {
-      const u = new URL(url);
-      let dirty = false;
-      if (u.username || u.password) {
-        u.username = '';
-        u.password = '';
-        dirty = true;
-      }
-      const sanitizedPath = this.sanitizePath(u.pathname);
-      if (sanitizedPath !== u.pathname) {
-        u.pathname = sanitizedPath;
-        dirty = true;
-      }
-      if (u.search) {
-        const sanitizedSearch = this.sanitizeQuery(u.searchParams);
-        if (sanitizedSearch !== null) {
-          u.search = sanitizedSearch;
-          dirty = true;
-        }
-      }
-      return dirty ? u.toString() : url;
-    } catch (ex) {
-      return url;
-    }
+    return redactUrl(url);
   }
 
   private sanitizePath(pathname: string): string {
@@ -312,38 +289,16 @@ export class RpcEndpointPool {
       return pathname;
     return pathname
       .split('/')
-      .map((seg) => this.looksLikeSecret(seg) ? '<redacted>' : seg)
+      .map((seg) => looksLikeSecret(seg) ? '<redacted>' : seg)
       .join('/');
   }
 
-  private sanitizeQuery(params: URLSearchParams): string | null {
-    const SECRET_KEYS = /^(api[_-]?key|key|token|auth|secret|password|pw|access[_-]?token|x[_-]?api[_-]?key)$/i;
-    let changed = false;
-    const out = new URLSearchParams();
-    for (const [k, v] of params.entries()) {
-      if (SECRET_KEYS.test(k) || this.looksLikeSecret(v)) {
-        out.append(k, '<redacted>');
-        changed = true;
-      } else {
-        out.append(k, v);
-      }
-    }
-    return changed ? '?' + out.toString() : null;
-  }
-
   private looksLikeSecret(value: string): boolean {
-    if (!value || value.length < 16)
-      return false;
-    // long opaque strings: hex / base64url / UUID — typical API key shapes
-    return /^[A-Za-z0-9_\-]{16,}$/.test(value);
+    return looksLikeSecret(value);
   }
 
-  // Strip URLs from arbitrary error text and replace each with its sanitized form,
-  // so things like fetch errors don't leak credentials in lastError fields.
   private sanitizeErrorMessage(message: string): string {
-    if (!message)
-      return message;
-    return message.replace(/https?:\/\/[^\s"'`<>]+/gi, (match) => this.sanitizeUrl(match));
+    return redactUrlsInText(message);
   }
 
   private async runMonitorTick(): Promise<void> {
@@ -436,6 +391,6 @@ export class RpcEndpointPool {
     let msg: string;
     if (typeof ex === 'string') msg = ex;
     else msg = ex.message || ex.toString();
-    return this.sanitizeErrorMessage(msg);
+    return redactUrlsInText(msg);
   }
 }
