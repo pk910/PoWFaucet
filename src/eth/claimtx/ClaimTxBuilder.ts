@@ -20,6 +20,21 @@ export interface ClaimTxPlan {
   callRanges?: { offset: number; count: number }[];
 }
 
+/** A batch whose gas limit times ethTxMaxFee is above ethTxFeeCap; `fit` claims of it would be under it. Nothing was signed. */
+export class BatchTooExpensiveError extends Error {
+  public readonly claims: number;
+  public readonly gasLimit: number;
+  public readonly fit: number;
+
+  public constructor(claims: number, gasLimit: number, fit: number) {
+    super("a batch of " + claims + " claims needs " + gasLimit + " gas, more than ethTxFeeCap allows at ethTxMaxFee; " + fit + " claims fit");
+    this.name = "BatchTooExpensiveError";
+    this.claims = claims;
+    this.gasLimit = gasLimit;
+    this.fit = fit;
+  }
+}
+
 /**
  * Turns queued claims into a transaction plan.
  *
@@ -101,7 +116,7 @@ export class ClaimTxBuilder {
       switch(call.type) {
         case "transfer": bytes += 33; break;
         case "token": bytes += 53; break;
-        case "call": bytes += 35 + (typeof call.data === "string" ? Math.max(0, (call.data.length - 2) / 2) : 4 + 32 * (call.args?.length || 0)); break;
+        case "call": bytes += 39 + (typeof call.data === "string" ? Math.max(0, (call.data.length - 2) / 2) : 4 + 32 * (call.args?.length || 0)); break; // kind, to, value, gas, length
       }
       calls.push({ type: call.type, to: this.walletAddr, amount: 0n, gas: call.gas, data: "0x" });
     }
@@ -176,6 +191,13 @@ export class ClaimTxBuilder {
     let data = this.batcher.encode("execute", [stream.calls]);
     let gasLimit = await this.resolveGasLimit(this.batchConfig.gasLimit, this.batchConfig.gasLimitPerClaim, claims.length, { to: this.walletAddr, value: 0n, data });
     gasLimit = Math.max(gasLimit, ClaimTxBuilder.worstCaseBatchGas(stream.resolved, (data.length - 2) / 2));
+    // the exact check behind feeCapBatchSize's estimate: the limit the node sees times the max fee
+    if(claims.length > 1 && faucetConfig.ethTxFeeCap > 0 && faucetConfig.ethTxMaxFee > 0 && BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee) > BigInt(faucetConfig.ethTxFeeCap)) {
+      let base = ClaimTxBuilder.worstCaseBatchGas([], 4 + 64);
+      let perClaim = (gasLimit - base) / claims.length;
+      let fit = Math.floor((Math.floor(faucetConfig.ethTxFeeCap / faucetConfig.ethTxMaxFee) - base) / perClaim);
+      throw new BatchTooExpensiveError(claims.length, gasLimit, Math.max(1, Math.min(claims.length - 1, fit)));
+    }
     let callRanges = claims.map((claim, idx) => ({ offset: idx * stream.callsPerClaim, count: stream.callsPerClaim }));
     // the wallet pays the calls from its own balance inside execute: nothing rides on the transaction
     return { to: this.walletAddr, value: 0n, nativeSpend: stream.value, data, gasLimit, claims, callRanges };

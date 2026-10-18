@@ -3,6 +3,7 @@ import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
 import { EthWalletManager, PreparedClaimTx, TransactionDroppedError, TransactionRejectedError, WalletState } from "./EthWalletManager.js";
+import { BatchTooExpensiveError } from "./claimtx/ClaimTxBuilder.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
 import { EthWalletRefill } from "./EthWalletRefill.js";
@@ -141,8 +142,15 @@ export class EthClaimManager {
       if(signed) {
         claims.forEach((claimInfo) => this.updateClaimStatus(claimInfo)); // "processing" rows become "pending"
         let rebroadcast = ethWalletManager.rebroadcastClaimTx({ txHash: txHash, txNonce: signed.claim.txNonce, txHex: signed.claim.txHex }, claims);
-        rebroadcasts.push(rebroadcast.catch(() => {}));
-        this.awaitTxReceipt(claims, rebroadcast.then((res) => res.txPromise), txHash);
+        rebroadcasts.push(rebroadcast.then((res) => {
+          this.awaitTxReceipt(claims, res.txPromise, txHash);
+        }, async (err) => {
+          // refused by every endpoint: queued again the way a fresh batch is, or failed; never left half-cleared
+          delete this.pendingTxQueue[txHash];
+          if(err instanceof TransactionRejectedError && await this.requeueRefused(claims, err.message))
+            return;
+          this.failClaims(claims, "Processing Exception: " + rpcErrorString(err));
+        }));
       } else {
         this.awaitTxReceipt(claims, ethWalletManager.watchClaimTx(claims[0]), txHash);
       }
@@ -387,18 +395,21 @@ export class EthClaimManager {
     return claims;
   }
 
+  /** These claims end failed, with the error for the client; their rows are written one by one (each row's status is its own). */
+  private failClaims(claims: EthClaimInfo[], error: string): "failed" {
+    claims.forEach((claimTx) => {
+      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
+      claimTx.claim.txError = error;
+      this.updateClaimStatus(claimTx);
+    });
+    return "failed";
+  }
+
   /** Pays these claims with one transaction: sent (awaiting its receipt), failed, or queued again after a refused broadcast. */
   private async processQueueTxs(claims: EthClaimInfo[]): Promise<"sent" | "failed" | "requeued"> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let walletState = ethWalletManager.getWalletState();
-    let failAll = (error: string): "failed" => {
-      claims.forEach((claimTx) => {
-        claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-        claimTx.claim.txError = error;
-        this.updateClaimStatus(claimTx);
-      });
-      return "failed";
-    };
+    let failAll = (error: string): "failed" => this.failClaims(claims, error);
     if(!walletState.ready)
       return failAll("Network RPC is currently unreachable.");
     let totalAmount = claims.reduce((sum, claimTx) => sum + BigInt(claimTx.amount), 0n);
@@ -437,7 +448,16 @@ export class EthClaimManager {
       this.awaitTxReceipt(claims, txResult.txPromise, txHash);
       return "sent";
     } catch(ex) {
-      if(ex instanceof TransactionRejectedError && this.requeueRefused(claims, ex.message))
+      if(ex instanceof BatchTooExpensiveError) {
+        // nothing was signed or stored: the batch goes back as it is, the next ones are the size that fits
+        this.batchSizeLimit = ex.fit;
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "A batch of " + claims.length + " claims would cost more than ethTxFeeCap, " + ex.fit + " fit: queued again in smaller batches");
+        claims.forEach((claimTx) => claimTx.claim.claimStatus = ClaimTxStatus.QUEUE);
+        this.claimTxQueue.unshift(...claims);
+        this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
+        return "requeued";
+      }
+      if(ex instanceof TransactionRejectedError && await this.requeueRefused(claims, ex.message))
         return "requeued";
       return failAll("Processing Exception: " + rpcErrorString(ex));
     }
@@ -449,25 +469,55 @@ export class EthClaimManager {
    * expensive (its fee cap, the block gas limit), so the next batches are half the size, growing
    * back with every confirmed one. Each claim gets REFUSED_BROADCAST_RETRIES such retries; false
    * when one of them has used them up, and the claims fail as before.
+   *
+   * Two things guard the "nothing on the network" part. Every endpoint is asked whether it has the
+   * transaction after all (a node that answers an error and keeps the bytes would be lying, but the
+   * question is cheap): if one has, the claims stay pending and that receipt decides. And the rows
+   * give up the signed bytes in one statement, all or none, before the queue takes the claims
+   * back: a crash in between leaves a batch a restart replays whole, or none, never rows that
+   * replay the old batch beside rows that ride a new one, which is how a claim gets paid twice.
    */
-  private requeueRefused(claims: EthClaimInfo[], reason: string): boolean {
+  private async requeueRefused(claims: EthClaimInfo[], reason: string): Promise<boolean> {
     if(claims.some((claimTx) => (claimTx.claim.txAttempts || 0) >= REFUSED_BROADCAST_RETRIES))
       return false;
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    let txHash = claims[0].claim.txHash;
+    let knownBy = txHash ? await ethWalletManager.endpointKnowingTransaction(txHash) : null;
+    if(knownBy) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Broadcast of TX " + txHash + " was refused, but " + knownBy + " has it: watching its receipt (" + reason + ")");
+      this.pendingTxQueue[txHash] = claims;
+      claims.forEach((claimTx) => {
+        claimTx.claim.claimStatus = ClaimTxStatus.PENDING;
+        this.updateClaimStatus(claimTx);
+      });
+      this.awaitTxReceipt(claims, ethWalletManager.watchClaimTx(claims[0]), txHash);
+      return true;
+    }
+
+    let requeued: EthClaimData[] = claims.map((claimTx) => {
+      let claim: EthClaimData = { ...claimTx.claim, claimStatus: ClaimTxStatus.QUEUE, txAttempts: (claimTx.claim.txAttempts || 0) + 1 };
+      delete claim.txHash;
+      delete claim.txHex;
+      delete claim.txNonce;
+      delete claim.txCalls;
+      return claim;
+    });
+    let written = await ServiceManager.GetService(FaucetDatabase).updateClaimDataBulk(claims.map((claimTx, idx) => ({ sessionId: claimTx.session, claimData: requeued[idx] })));
+    if(written !== claims.length) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Broadcast of " + claims.length + " claim(s) refused and only " + written + " rows gave up the transaction: the claims fail (" + reason + ")");
+      return false;
+    }
     let note = "";
     if(claims.length > 1) {
       this.batchSizeLimit = Math.max(1, Math.floor(claims.length / 2));
       note = ", next batches carry " + this.batchSizeLimit + " claims";
     }
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Broadcast of " + claims.length + " claim(s) refused, queued again" + note + ": " + reason);
-    for(let claimTx of claims) {
-      claimTx.claim.txAttempts = (claimTx.claim.txAttempts || 0) + 1;
-      claimTx.claim.claimStatus = ClaimTxStatus.QUEUE;
-      delete claimTx.claim.txHash;
-      delete claimTx.claim.txHex;
-      delete claimTx.claim.txNonce;
-      delete claimTx.claim.txCalls;
-      this.updateClaimStatus(claimTx);
-    }
+    claims.forEach((claimTx, idx) => {
+      for(let key of Object.keys(claimTx.claim))
+        delete claimTx.claim[key];
+      Object.assign(claimTx.claim, requeued[idx]);
+    });
     this.claimTxQueue.unshift(...claims);
     this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
     return true;

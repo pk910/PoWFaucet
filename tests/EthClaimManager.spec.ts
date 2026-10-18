@@ -9,6 +9,7 @@ import { SessionManager } from '../src/session/SessionManager.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
 import { FaucetError } from '../src/common/FaucetError.js';
 import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession.js';
+import { BatchTooExpensiveError } from '../src/eth/claimtx/ClaimTxBuilder.js';
 import { ClaimTxStatus, EthClaimInfo, EthClaimManager } from '../src/eth/EthClaimManager.js';
 import { getNewGuid } from '../src/utils/GuidUtils.js';
 import { EthWalletManager, TransactionResult } from '../src/eth/EthWalletManager.js';
@@ -629,6 +630,25 @@ describe("ETH Claim Manager", () => {
       globalStubs["EthWalletManager.sendClaimBatch"].returns(Promise.resolve({ txHash: TX_HASH.replace(/a$/, "c"), txPromise: new Promise(() => {}), plan: null }));
       await claimManager.processQueue();
       expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(2, "the second batch follows the first's receipt");
+    });
+
+    it("queues a batch the fee cap refuses in the planning stage again, in the size that fits", async () => {
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      useBatchTemplate(3, 0);
+      let claims = await queueClaims(claimManager, 3);
+      globalStubs["EthWalletManager.sendClaimBatch"].onFirstCall().returns(Promise.reject(new BatchTooExpensiveError(3, 300000, 1)));
+      globalStubs["EthWalletManager.sendClaimTx"].returns(Promise.resolve({ txHash: TX_HASH, txPromise: new Promise(() => {}), plan: null }));
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "the plan of three was refused");
+      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE], "nothing failed, nothing signed");
+      expect(claims.map((c) => c.claim.txAttempts)).to.deep.equal([undefined, undefined, undefined], "not a refused broadcast");
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimTx"].callCount).to.equal(1, "one claim fits: the first goes alone");
+      expect(globalStubs["EthWalletManager.sendClaimTx"].firstCall.args[0].session).to.equal(claims[0].session);
+      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE]);
     });
 
     it("waits maxWaitSeconds for a partial batch, then sends it", async () => {

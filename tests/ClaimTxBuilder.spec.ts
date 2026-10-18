@@ -4,7 +4,7 @@ import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, parseAbi } 
 import { loadDefaultTestConfig } from './common.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
 import { IClaimBatchConfig, IClaimCall, IClaimTxConfig } from '../src/config/ConfigSchema.js';
-import { ClaimTxBuilder } from '../src/eth/claimtx/ClaimTxBuilder.js';
+import { BatchTooExpensiveError, ClaimTxBuilder } from '../src/eth/claimtx/ClaimTxBuilder.js';
 import { BATCHER_ABI } from '../src/eth/claimtx/BatcherArtifact.js';
 import { ClaimTxStatus, EthClaimInfo } from '../src/eth/EthClaimManager.js';
 import { EthLog, IEthRpcClient } from '../src/eth/rpc/index.js';
@@ -160,6 +160,26 @@ describe("Claim transaction builder", () => {
       let tokenBuilder = new ClaimTxBuilder(fakeClient, WALLET, TOKEN, null, { maxClaims: 1000, maxWaitSeconds: 0 });
       tokenBuilder.setBatchActive(true);
       expect(tokenBuilder.feeCapBatchSize()).to.equal(34);
+    });
+
+    it("refuses to plan a batch whose gas limit times the max fee is above ethTxFeeCap, saying how many claims fit", async () => {
+      faucetConfig.ethTxFeeCap = 1000000000000000000; // 1 ETH
+      faucetConfig.ethTxMaxFee = 1000000000000; // 1000 gwei: 1M gas affordable
+      // the estimate (worst case per transfer) says 14 claims fit; the node's estimate for the real batch is far above it
+      estimateResult = 1000000n;
+      let builder = activeBuilder(null, null, { maxClaims: 3, maxWaitSeconds: 10, gasLimit: "estimate" });
+      expect(builder.getBatchSize()).to.equal(3);
+      let err: any = null;
+      try { await builder.buildPlan([c1, c2, c3]); } catch(ex) { err = ex; }
+      expect(err).to.be.instanceOf(BatchTooExpensiveError);
+      expect(err.gasLimit).to.equal(1200000, "the node's estimate plus 20 %");
+      expect(err.fit).to.equal(2, "(1M - the batch base) / the per-claim share of the limit");
+      // a single claim is never refused here: the node has the last word on it
+      let plan = await builder.buildPlan([c1]);
+      expect(plan.gasLimit).to.equal(1200000);
+      // and no cap, no refusal
+      faucetConfig.ethTxFeeCap = 0;
+      expect((await builder.buildPlan([c1, c2, c3])).gasLimit).to.equal(1200000);
     });
 
     it("calls execute on the wallet with a transfer per claim and nothing riding on the transaction", async () => {

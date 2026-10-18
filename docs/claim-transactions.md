@@ -141,7 +141,12 @@ Queue behaviour:
   20 gwei about 760; the faucet logs the limit it applies. Lower `ethTxMaxFee` for bigger batches.
 - A batch the network refuses outright (every endpoint answered no, nothing is in a pool) is not
   failed: its claims are queued again and the next batches are half the size, growing back with
-  every confirmed one. A claim refused three times fails.
+  every confirmed one. A claim refused three times fails. Before the claims go back, every
+  endpoint is asked whether it has the transaction after all (then it stays pending and its
+  receipt decides), and all rows of the batch give up the signed bytes in one all-or-nothing
+  statement, so a crash cannot leave rows that replay the old batch beside rows that ride a new
+  one. A batch that turns out too expensive for `ethTxFeeCap` while it is planned is not signed at
+  all; it goes back in the size that fits.
 - All claims of a batch share the transaction hash, nonce and block. The fee is split evenly
   (remainder on the first claim). The signed transaction hex is kept on the first claim only.
 - A single queued claim is paid through `fn` when the template has one, otherwise through the

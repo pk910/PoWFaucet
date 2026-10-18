@@ -56,10 +56,11 @@ export class FaucetApi {
     return apiUrl;
   }
 
-  public apiGet(endpoint: string, args?: {[arg: string]: string|number|undefined}): Promise<any> {
+  /** `headers` carry what must not be in the url (the operator's key); a request with headers is not cached */
+  public apiGet(endpoint: string, args?: {[arg: string]: string|number|undefined}, headers?: {[name: string]: string}): Promise<any> {
     if(!endpoint.match(/^\//))
       endpoint = "/" + endpoint;
-    
+
     let argsStr = "";
     if(args) {
       let argParts: string[] = [];
@@ -72,9 +73,14 @@ export class FaucetApi {
         argsStr = "?" + argParts.join("&");
       }
     }
-    
-    return fetch(this.apiBaseUrl + endpoint + argsStr)
+
+    return fetch(this.apiBaseUrl + endpoint + argsStr, headers ? { headers: headers, cache: "no-store" } : undefined)
       .then((rsp) => rsp.json());
+  }
+
+  /** the operator's key as a bearer token, never as a query parameter (urls end up in logs) */
+  private operatorHeaders(key?: string): {[name: string]: string} | undefined {
+    return key ? { "Authorization": "Bearer " + key } : undefined;
   }
 
   public apiPost(endpoint: string, args?: {[arg: string]: string|number|undefined}, data?: any): Promise<any> {
@@ -124,8 +130,7 @@ export class FaucetApi {
     return this.apiGet("/getSessionStatus", {
       session: sessionId,
       details: details ? 1 : undefined,
-      key: key || undefined,
-    });
+    }, this.operatorHeaders(key));
   }
 
   public startSession(inputData: IStartSessionInput): Promise<IFaucetSessionInfo> {
@@ -144,9 +149,7 @@ export class FaucetApi {
 
   /** `key` is the operator's: with it the session list carries real ids and ips */
   public getFaucetStatus(key?: string): Promise<IClientFaucetStatusRsp> {
-    return this.apiGet("/getFaucetStatus", {
-      key: key || undefined,
-    });
+    return this.apiGet("/getFaucetStatus", {}, this.operatorHeaders(key));
   }
 
   public getPassportInfo(sessionId: string, address: string): Promise<IPassportInfo> {

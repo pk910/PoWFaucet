@@ -390,6 +390,13 @@ export class EthWalletManager {
     return await this.batchDelegation.ensureCleared();
   }
 
+  /** The label of an RPC endpoint that has this transaction after all, null when none does. */
+  public endpointKnowingTransaction(txHash: string): Promise<string | null> {
+    if(!this.rpcPool)
+      return Promise.resolve(null);
+    return this.rpcPool.endpointKnowingTransaction(txHash);
+  }
+
   /** Positions (in the transaction's claim list) a mined claim transaction reported as not paid; empty without a template that names a failed event. */
   public evaluateClaimReceipt(receipt: EthTxReceipt, claims: EthClaimInfo[]): ClaimReceiptEvaluation {
     let outcomes = new Map<number, { failed: number; total: number }>();

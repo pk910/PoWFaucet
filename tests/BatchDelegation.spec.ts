@@ -1,5 +1,6 @@
 import 'mocha';
 import { expect } from 'chai';
+import sinon from 'sinon';
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, getCreate2Address, keccak256, parseTransaction } from 'viem';
 import { FetchError } from 'node-fetch';
 import { unbindTestStubs, awaitSleepPromise, bindTestStubs, loadDefaultTestConfig } from './common.js';
@@ -78,12 +79,15 @@ describe("ETH Claim Batching (EIP-7702)", () => {
   }
 
   /** a chain: code per address, mined raw transactions, receipts by hash; `batchLogs` are emitted by a batch transaction */
-  function fakeChain(opts: { deployerPresent: boolean; eip7702: boolean; batchLogs?: any[]; failFirstSend?: boolean; refuseBatchesOver?: number }) {
+  function fakeChain(opts: { deployerPresent: boolean; eip7702: boolean; batchLogs?: any[]; failFirstSend?: boolean; refuseBatchesOver?: number; refusedStillKnown?: boolean }) {
     let code: {[addr: string]: string} = {};
     if(opts.deployerPresent)
       code[DETERMINISTIC_DEPLOYER.toLowerCase()] = "0x7fdeadbeef";
     let sent: { raw: string; hash: string; tx: any }[] = [];
     let logsByHash: {[hash: string]: any[]} = {};
+    let refused: string[] = [];
+    // a node that answered an error and kept the bytes anyway (refusedStillKnown): it knows the hash, and mines it
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => (sent.some((s) => s.hash === payload.params[0]) || (opts.refusedStillKnown && refused.includes(payload.params[0]))) ? { hash: payload.params[0] } : null);
     fakeProvider.injectResponse("eth_getCode", (payload) => code[payload.params[0].toLowerCase()] || "0x");
     let attempts: string[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
@@ -96,8 +100,12 @@ describe("ETH Claim Batching (EIP-7702)", () => {
       if(opts.refuseBatchesOver && tx.type !== "eip7702" && tx.to?.toLowerCase() === WALLET.toLowerCase()) {
         // the node's own limit on a batch (its fee cap, say): a definite no, not a transport error
         let stream = decodeFunctionData({ abi: BATCHER_ABI, data: tx.data }).args[0] as string;
-        if((stream.length - 2) / 2 / 33 > opts.refuseBatchesOver)
+        if((stream.length - 2) / 2 / 33 > opts.refuseBatchesOver) {
+          refused.push(hash);
+          if(opts.refusedStillKnown && opts.batchLogs)
+            logsByHash[hash] = opts.batchLogs;
           throw new Error("tx fee (3.29 ether) exceeds the configured cap (1.00 ether)");
+        }
       }
       sent.push({ raw, hash, tx });
       if(tx.type !== "eip7702" && tx.to?.toLowerCase() === WALLET.toLowerCase() && opts.batchLogs)
@@ -236,6 +244,44 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     expect(list[0].claim.txHash).to.equal(list[1].claim.txHash);
     expect(list[2].claim.txHash).to.equal(list[3].claim.txHash);
     expect(list[0].claim.txHash).to.not.equal(list[2].claim.txHash);
+  });
+
+  it("keeps a refused batch pending when an endpoint has it after all, and settles it by that receipt", async () => {
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [executedLog(4)], refuseBatchesOver: 2, refusedStillKnown: true });
+    let { claims } = await start();
+    let list: any[] = [];
+    for(let i = 1; i <= 4; i++)
+      list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
+
+    await claims.processQueue();
+    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.PENDING), "refused by the answer, known by the node: pending, not queued again");
+    expect(list.map((c) => c.claim.txAttempts)).to.deep.equal([undefined, undefined, undefined, undefined]);
+    expect(list[0].claim.txHash).to.not.equal(undefined, "the transaction is kept");
+    await awaitSleepPromise(3000, () => list.every((c) => c.claim.claimStatus === ClaimTxStatus.CONFIRMED));
+    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.CONFIRMED));
+    expect(new Set(list.map((c) => c.claim.txHash)).size).to.equal(1, "paid by the one transaction the node had");
+    expect(chain.attempts.length).to.equal(3, "deploy, delegate, the batch: nothing else was sent");
+  });
+
+  it("fails a refused batch whose rows do not all give up the transaction, instead of queueing part of it", async () => {
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, refuseBatchesOver: 2 });
+    let { claims } = await start();
+    let list: any[] = [];
+    for(let i = 1; i <= 4; i++)
+      list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
+    // the rows take the signed transaction (first bulk write), but not the requeue (second): one row changed hands meanwhile
+    let realBulk = FaucetDatabase.prototype.updateClaimDataBulk;
+    let bulk = sinon.stub(FaucetDatabase.prototype, "updateClaimDataBulk").callsFake(function(this: FaucetDatabase, updates) {
+      return bulk.callCount === 1 ? realBulk.call(this, updates) : Promise.resolve(3);
+    });
+    globalStubs["updateClaimDataBulk"] = bulk;
+
+    await claims.processQueue();
+    expect(bulk.callCount).to.equal(2, "persist, then the all-or-nothing requeue");
+    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.FAILED), "no half-requeued batch");
+    expect(list[0].claim.txError).to.match(/tx fee .* exceeds/);
+    expect(claims.getTransactionQueue().filter((c) => c.claim.claimStatus === ClaimTxStatus.QUEUE).length).to.equal(0, "nothing queued");
+    expect(chain.sent.length).to.equal(2, "deploy and delegate only");
   });
 
   it("deploys the batcher, delegates the wallet, then pays a batch through execute on itself", async () => {

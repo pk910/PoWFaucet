@@ -301,6 +301,7 @@ describe("ETH Claim Replay", () => {
       sends++;
       throw "insufficient funds for gas * price + value";
     });
+    fakeProvider.injectResponse("eth_getTransactionByHash", () => null); // a node that refused has nothing
     await startWallet();
     let claimManager = ServiceManager.GetService(EthClaimManager);
     await claimManager.initialize();

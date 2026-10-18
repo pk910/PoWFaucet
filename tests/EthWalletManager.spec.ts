@@ -435,6 +435,7 @@ describe("ETH Wallet Manager", () => {
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       throw "test error 57572x";
     });
+    fakeProvider.injectResponse("eth_getTransactionByHash", () => null); // a node that refused has nothing
     await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
     let testSessionData: FaucetSessionStoreData = {

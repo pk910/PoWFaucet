@@ -194,6 +194,18 @@ export class RpcEndpointPool {
     return { status: 'rejected', error: firstRejection || new Error('all tx broadcasts failed') };
   }
 
+  /** The label of an endpoint that has this transaction (pool or chain), null when none does; endpoints that do not answer count as not having it. */
+  public async endpointKnowingTransaction(txHash: string): Promise<string | null> {
+    const endpoints = this.endpoints.filter((ep) => !!ep.client);
+    const results = await Promise.allSettled(endpoints.map((ep) => ep.client.knowsTransaction(txHash)));
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.status === 'fulfilled' && r.value)
+        return endpoints[i].label;
+    }
+    return null;
+  }
+
   private normalizeConfig(raw: EthRpcHostConfig): NormalizedEndpoint[] {
     if (!raw)
       return [];
