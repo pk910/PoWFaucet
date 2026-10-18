@@ -16,6 +16,7 @@ import { SessionManager } from "./session/SessionManager.js";
 import { FaucetStatus } from "./services/FaucetStatus.js";
 import { createVoucher } from "./tools/createVoucher.js";
 import { checkModules } from "./tools/checkModules.js";
+import { getOperatorKey } from "./webserv/api/faucetStatus.js";
 
 (async () => {
   let srcfile: string;
@@ -70,6 +71,8 @@ import { checkModules } from "./tools/checkModules.js";
     await ServiceManager.GetService(EthClaimManager).initialize();
     ServiceManager.GetService(FaucetHttpServer).initialize();
 
+    // the key that unmasks the status endpoints, for the operator reading this log (sent as "Authorization: Bearer <key>")
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Operator key for the unmasked faucet status (Authorization: Bearer): " + getOperatorKey());
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Faucet initialization complete.");
   } catch(ex) {
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Faucet initialization failed: " + ex.toString() + " " + ex.stack);
