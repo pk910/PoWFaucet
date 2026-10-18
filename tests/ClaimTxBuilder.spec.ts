@@ -115,6 +115,9 @@ describe("Claim transaction builder", () => {
       expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, abi: router, fn: "execute", args: ["{session.target}", "0x"] }] }, null)).to.throw(/arg 0 of execute takes \{session.target\} for a address parameter/);
       expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, abi: router, fn: "execute", args: [CONTRACT, "{session.data}"] }] }, null)).to.throw(/arg 1 of execute takes \{session.data\} for a bytes parameter/);
       expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, abi: router, fn: "pay", args: ["{target}", "{session.tokenAmount}", "{session.boosted}"] }] }, null)).to.not.throw();
+      // an overloaded name would let the check read one signature and the encoding use another
+      let overloaded = ["function route(uint256 amount)", "function route(address to, uint256 amount)"];
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, abi: overloaded, fn: "route", args: ["{session.destination}", "1"] }] }, null)).to.throw(/'route' is overloaded/);
     });
 
     it("counts the faucet token's units a template moves, for the wallet's spend check", async () => {

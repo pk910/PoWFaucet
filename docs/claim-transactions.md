@@ -167,7 +167,10 @@ Queue behaviour:
   a throttling node, a delegated account's in-flight slot) does not fail anything: the claims stay
   pending and the receipt watch sends the same bytes again until they are taken. When those
   re-sends get a definite no three times in a row and no endpoint has the bytes, the transaction
-  will never mine: it fails as a whole, the error is logged, and the nonce it held is free again.
+  is given up as *unknown* (the claims are consumed), never as failed: an earlier send was
+  accepted or unanswered, so the bytes may sit with a peer none of the endpoints is, and absence
+  here proves nothing. The error is logged, and the queue reloads the wallet nonce before it
+  allocates the next one.
 - A batch that turns out too expensive for `ethTxFeeCap` while it is planned is not signed at
   all (no transaction exists yet); its claims go back and the queue continues in the size that
   fits. The same check fails a single claim whose transaction would be above the cap.

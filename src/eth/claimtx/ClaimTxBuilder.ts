@@ -100,6 +100,9 @@ export class ClaimTxBuilder {
           let caller = new ContractCaller(null, "0x0000000000000000000000000000000000000000", call.abi);
           if(!caller.hasFunction(call.fn))
             throw new Error("ethClaimTx call fn '" + call.fn + "' is not in its abi");
+          // one function of that name: the check below reads one signature, the encoding must use the same one
+          if(caller.abi.filter((item) => item.type === "function" && item.name === call.fn).length > 1)
+            throw new Error("ethClaimTx call fn '" + call.fn + "' is overloaded in its abi; give the abi with the one signature the template means");
           // a session's values go into numbers only: an address or bytes argument from the session
           // would let it choose where a router sends the wallet's call, and what it says there
           let inputs = (getAbiItem({ abi: caller.abi, name: call.fn }) as any)?.inputs || [];

@@ -301,11 +301,16 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     await claims.processQueue(); // the broadcast's own retries end "uncertain": pending, the receipt watch re-sends
     expect(c1.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
     await awaitSleepPromise(10000, () => c1.claim.claimStatus !== ClaimTxStatus.PENDING);
-    expect(c1.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "refused on three re-sends in a row, held by nobody: it will never mine");
-    expect(c2.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "the batch as a whole");
-    expect(c1.claim.txError).to.match(/refused on 3 re-sends/);
+    // the first sends were unanswered: the bytes may sit with a peer we do not ask, so this is not a "failed"
+    expect(c1.claim.claimStatus).to.equal(ClaimTxStatus.UNKNOWN, "refused on three re-sends in a row, held by nobody we ask: given up, consumed");
+    expect(c2.claim.claimStatus).to.equal(ClaimTxStatus.UNKNOWN, "the batch as a whole");
+    expect(c1.claim.txError).to.match(/outcome unknown.*refused on 3 re-sends/);
     expect(claims.getTransactionQueue().filter((c) => c.claim.claimStatus === ClaimTxStatus.PENDING).length).to.equal(0, "nothing holds the queue");
-    expect(wallet.getWalletState().nonce).to.equal(42, "the nonce was reloaded from the node");
+    let row = await ServiceManager.GetService(FaucetDatabase).getSession(c1.session);
+    expect(row.status).to.equal(FaucetSessionStatus.FINISHED, "consumed: not claimable again");
+    expect(wallet.getWalletState().nonce).to.equal(46, "the watch does not touch the nonce (deploy 42, delegation 43 and 44, the batch 45)");
+    await claims.processQueue();
+    expect(wallet.getWalletState().nonce).to.equal(42, "the queue tick reloaded it before allocating anything");
     expect(chain.sent.length).to.equal(2, "deploy and delegate only");
   });
 

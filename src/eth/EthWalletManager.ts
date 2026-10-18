@@ -106,6 +106,7 @@ export class EthWalletManager {
   private batchDelegation: BatchDelegation | null = null;
   private lastWalletRefresh: number;
   private txReceiptPollInterval = 12000;
+  private walletStateReloadRequested = false; // set by a receipt watch that gave a transaction up; the queue tick reloads before it allocates a nonce
   /**
    * While the wallet is delegated one claim transaction is in flight at a time, and the time between
    * its receipt and the poll that sees it is the queue's throughput: a batch mined in one slot
@@ -390,6 +391,13 @@ export class EthWalletManager {
     if(!this.batchDelegation)
       this.batchDelegation = new BatchDelegation(this);
     return await this.batchDelegation.ensureCleared();
+  }
+
+  /** True once, when a receipt watch asked for the wallet state to be reloaded before the next nonce is handed out. */
+  public takeWalletStateReloadRequest(): boolean {
+    let requested = this.walletStateReloadRequested;
+    this.walletStateReloadRequested = false;
+    return requested;
   }
 
   /** The label of an RPC endpoint that has this transaction after all, null when none does. */
@@ -699,10 +707,14 @@ export class EthWalletManager {
           let outcome = await this.rpcPool.broadcastSignedTransaction("0x" + txHex);
           refusedResends = outcome.status === "rejected" ? refusedResends + 1 : 0;
           if(refusedResends >= REFUSED_RESENDS_LIMIT && !(await this.rpcPool.endpointKnowingTransaction(txhash))) {
+            // Given up, as unknown: an earlier send was accepted or unanswered, so the bytes may sit
+            // with a peer none of our endpoints is, and absence here proves nothing. The claims are
+            // consumed, never failed. The nonce it held is reloaded by the queue tick, where every
+            // nonce decision is made, not from this detached watch.
             let reason = outcome.status === "accepted" ? "" : rpcErrorString(outcome.error);
-            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txhash + " was refused on " + refusedResends + " re-sends in a row and no endpoint has it: " + reason);
-            await this.loadWalletState(); // the nonce it held is free again
-            throw new TransactionRejectedError("refused on " + refusedResends + " re-sends: " + reason);
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txhash + " was refused on " + refusedResends + " re-sends in a row and no endpoint has it, giving it up: " + reason);
+            this.walletStateReloadRequested = true;
+            throw new TransactionDroppedError("transaction " + txhash + " was refused on " + refusedResends + " re-sends and no endpoint has it: " + reason);
           }
         }
         // null: still pending, unless the nonce is spent: then another transaction took the slot
@@ -718,8 +730,8 @@ export class EthWalletManager {
           }
         }
       } catch(ex) {
-        if(ex instanceof TransactionDroppedError || ex instanceof TransactionRejectedError)
-          throw ex; // the verdicts this loop reaches on its own
+        if(ex instanceof TransactionDroppedError)
+          throw ex; // the one verdict this loop reaches on its own
         // No answer about the receipt is not an answer about the transaction: it is broadcast, and
         // it may well be mined (geth answers "transaction indexing is in progress" while its index
         // lags, a 200-claim batch was once marked failed on that although it had paid). Only a
