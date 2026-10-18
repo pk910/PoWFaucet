@@ -183,7 +183,12 @@ export function isTransportError(ex: any): boolean {
     return false;
   if (ex instanceof RpcRequestError)
     return false;
-  if (ex instanceof HttpRequestError || ex instanceof TimeoutError || ex instanceof WebSocketRequestError || ex instanceof UnknownRpcError)
+  // viem wraps every error it has no class for in UnknownRpcError: a JSON-RPC error with a code it
+  // does not know (a definite answer, a node's own rejection code among them) as well as a failed
+  // request. Its cause tells which.
+  if (ex instanceof UnknownRpcError)
+    return isTransportError(ex.cause);
+  if (ex instanceof HttpRequestError || ex instanceof TimeoutError || ex instanceof WebSocketRequestError)
     return true;
   if (ex.name === "FetchError" || ex.name === "AbortError" || ex.name === "RpcTransportError")
     return true;
