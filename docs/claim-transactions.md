@@ -58,11 +58,19 @@ call and the amounts may be placeholders; the contract a `call` targets, the `to
 (a fixed address or `{token}`) and raw `data` are fixed at startup, so a claimant can never pick
 the code the wallet runs and a session can never write the wallet's calldata (values from the
 claim go through `abi`, `fn` and `args`). A `call` may not target the faucet token contract: the
-faucet's own token moves through `token` calls only, where its amount is counted. Before signing, a native faucet's transaction may move
+faucet's own token moves through `token` calls only, where its amount is counted. A
+`{session.<key>}` value may only fill a number (`uint`, `int`, `bool`) of a `call`'s arguments,
+never an address or bytes: a router-style contract would otherwise send the wallet's call wherever
+a session says. Before signing, a native faucet's transaction may move
 no more native coin than the claims are worth, and an erc20 faucet's may move no native coin and
-no more of the faucet token than the claims are worth. Other tokens a template moves are bounded
-only by the template and the `{session.<key>}` values modules set: keep user input out of those
-keys, they are what the wallet signs.
+no more of the faucet token than the claims are worth.
+
+What these rules do not do: bound what a fixed contract does with the numbers it is given, or
+count tokens it moves on the wallet's behalf. A `call` template is the operator extending the
+wallet's behaviour with a contract of their choosing, and the `{session.<key>}` values modules
+set are part of what the wallet signs; keep user input out of those keys. A faucet that needs a
+hard guarantee on its assets uses `transfer` and `token` calls only, or runs generic calls from a
+separately funded wallet.
 
 A claim with one call is a plain transaction. A claim with several calls (ETH plus a token, say)
 needs `ethClaimBatch`: the wallet's own code executes the calls, see below.
@@ -157,7 +165,9 @@ Queue behaviour:
   after its upstream took the bytes), and if one has, the claims stay pending under it and its
   receipt decides. A refusal that is about the moment rather than the transaction (a full pool,
   a throttling node, a delegated account's in-flight slot) does not fail anything: the claims stay
-  pending and the receipt watch sends the same bytes again until they are taken.
+  pending and the receipt watch sends the same bytes again until they are taken. When those
+  re-sends get a definite no three times in a row and no endpoint has the bytes, the transaction
+  will never mine: it fails as a whole, the error is logged, and the nonce it held is free again.
 - A batch that turns out too expensive for `ethTxFeeCap` while it is planned is not signed at
   all (no transaction exists yet); its claims go back and the queue continues in the size that
   fits. The same check fails a single claim whose transaction would be above the cap.

@@ -70,6 +70,8 @@ export interface ClaimReceiptEvaluation {
 
 /** polls in a row that must show the nonce spent and no receipt before a transaction counts as dropped */
 const DROPPED_CONFIRMATION_POLLS = 3;
+/** definite refusals of a re-sent transaction in a row, with no endpoint holding it, after which it is given up */
+const REFUSED_RESENDS_LIMIT = 3;
 
 /**
  * The nonce was spent and our hash has no receipt. Another transaction most likely took the slot,
@@ -683,13 +685,26 @@ export class EthWalletManager {
   private async awaitTransactionReceipt(txhash: string, txnonce: number, txHex?: string, resendEveryPoll: boolean = false): Promise<EthTxReceipt> {
     let nonceSpentPolls = 0;
     let pollErrors = 0;
+    let refusedResends = 0;
     while(true) {
       try {
         let receipt = await this.client.getTransactionReceipt(txhash);
         if(receipt)
           return receipt;
-        if(txHex && (resendEveryPoll || !(await this.client.knowsTransaction(txhash))))
-          await this.rpcPool.broadcastSignedTransaction("0x" + txHex); // outcome irrelevant here: the receipt decides
+        if(txHex && (resendEveryPoll || !(await this.client.knowsTransaction(txhash)))) {
+          // the receipt decides, not the answer to a re-send; except when the answer is a definite
+          // no, poll after poll, and no endpoint has the bytes: the transaction will never mine (a
+          // pool-full refusal that turned into "insufficient funds" once the wallet drained, say),
+          // and left pending it would hold the queue for good
+          let outcome = await this.rpcPool.broadcastSignedTransaction("0x" + txHex);
+          refusedResends = outcome.status === "rejected" ? refusedResends + 1 : 0;
+          if(refusedResends >= REFUSED_RESENDS_LIMIT && !(await this.rpcPool.endpointKnowingTransaction(txhash))) {
+            let reason = outcome.status === "accepted" ? "" : rpcErrorString(outcome.error);
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txhash + " was refused on " + refusedResends + " re-sends in a row and no endpoint has it: " + reason);
+            await this.loadWalletState(); // the nonce it held is free again
+            throw new TransactionRejectedError("refused on " + refusedResends + " re-sends: " + reason);
+          }
+        }
         // null: still pending, unless the nonce is spent: then another transaction took the slot
         // (a replacement, or a send whose answer was lost but whose bytes were not these)
         if(typeof txnonce === "number") {
@@ -703,8 +718,8 @@ export class EthWalletManager {
           }
         }
       } catch(ex) {
-        if(ex instanceof TransactionDroppedError)
-          throw ex; // the one verdict this loop reaches on its own
+        if(ex instanceof TransactionDroppedError || ex instanceof TransactionRejectedError)
+          throw ex; // the verdicts this loop reaches on its own
         // No answer about the receipt is not an answer about the transaction: it is broadcast, and
         // it may well be mined (geth answers "transaction indexing is in progress" while its index
         // lags, a 200-claim batch was once marked failed on that although it had paid). Only a

@@ -110,6 +110,11 @@ describe("Claim transaction builder", () => {
       expect(() => new ClaimTxBuilder(fakeClient, WALLET, TOKEN, { calls: [{ type: "token", token: "{token}", to: "{target}", amount: "{amount}" }] }, null)).to.not.throw();
       // the recipient of a transfer is the claim's: that is the payout
       expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "transfer", to: "{target}", amount: "{amount}" }] }, null)).to.not.throw();
+      // a session's values fill numbers, never an address or bytes a router would act on
+      let router = ["function execute(address to, bytes data) payable", "function pay(address to, uint256 amount, bool boosted)"];
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, abi: router, fn: "execute", args: ["{session.target}", "0x"] }] }, null)).to.throw(/arg 0 of execute takes \{session.target\} for a address parameter/);
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, abi: router, fn: "execute", args: [CONTRACT, "{session.data}"] }] }, null)).to.throw(/arg 1 of execute takes \{session.data\} for a bytes parameter/);
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, abi: router, fn: "pay", args: ["{target}", "{session.tokenAmount}", "{session.boosted}"] }] }, null)).to.not.throw();
     });
 
     it("counts the faucet token's units a template moves, for the wallet's spend check", async () => {

@@ -1,7 +1,7 @@
 import { faucetConfig } from '../../config/FaucetConfig.js';
 import { IClaimBatchConfig, IClaimCall, IClaimTxConfig } from '../../config/ConfigSchema.js';
 import { Erc20Abi } from '../../abi/ERC20.js';
-import { ContractCaller, EthLog, IEthRpcClient } from '../rpc/index.js';
+import { ContractCaller, EthLog, IEthRpcClient, getAbiItem } from '../rpc/index.js';
 import { EthClaimInfo } from '../EthClaimManager.js';
 import { BATCHER_TRANSFER_GAS, DEFAULT_CALL_GAS, ResolvedClaimCall, encodeBatchCalls, resolveClaimCall } from './BatchCalls.js';
 import { BATCHER_ABI } from './BatcherArtifact.js';
@@ -96,8 +96,18 @@ export class ClaimTxBuilder {
           throw new Error("ethClaimTx call to must not be the faucet token contract (use a token call, whose amount is bounded by the claim)");
         if(call.data !== undefined && !/^0[xX]([0-9a-fA-F]{2})*$/.test(String(call.data)))
           throw new Error("ethClaimTx call data must be fixed hex, not " + String(call.data) + " (use abi, fn and args for values from the claim)");
-        if(call.abi && call.fn && !new ContractCaller(null, "0x0000000000000000000000000000000000000000", call.abi).hasFunction(call.fn))
-          throw new Error("ethClaimTx call fn '" + call.fn + "' is not in its abi");
+        if(call.abi && call.fn) {
+          let caller = new ContractCaller(null, "0x0000000000000000000000000000000000000000", call.abi);
+          if(!caller.hasFunction(call.fn))
+            throw new Error("ethClaimTx call fn '" + call.fn + "' is not in its abi");
+          // a session's values go into numbers only: an address or bytes argument from the session
+          // would let it choose where a router sends the wallet's call, and what it says there
+          let inputs = (getAbiItem({ abi: caller.abi, name: call.fn }) as any)?.inputs || [];
+          (call.args || []).forEach((arg, idx) => {
+            if(typeof arg === "string" && /\{session\./.test(arg) && !/^(u?int\d*|bool)(\[\])?$/.test(inputs[idx]?.type || ""))
+              throw new Error("ethClaimTx call arg " + idx + " of " + call.fn + " takes " + arg + " for a " + (inputs[idx]?.type || "?") + " parameter: session values may only fill numbers (uint, int, bool)");
+          });
+        }
         break;
     }
   }

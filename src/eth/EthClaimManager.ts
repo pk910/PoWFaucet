@@ -549,7 +549,16 @@ export class EthClaimManager {
       this.lastConfirmedClaimTxIdx = confirmedIdx;
       if(this.batchSizeLimit !== null && claims.length >= this.batchSizeLimit)
         this.batchSizeLimit *= 2; // a batch of the reduced size went through: try bigger
-    }).catch((error) => {
+    }).catch(async (error) => {
+      if(error instanceof TransactionRejectedError) {
+        // refused for good on the re-sends and held by no endpoint: it will never mine. The batch
+        // fails as a whole, its rows at once, the nonce it held is free again
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + targetLabel + " failed: " + error.message);
+        delete this.pendingTxQueue[txHash];
+        claims.forEach((claimTx) => delete this.claimTxDict[claimTx.session]);
+        await this.failClaims(claims, "Transaction Error: " + error.message);
+        return;
+      }
       if(error instanceof TransactionDroppedError) {
         // the nonce is spent and our hash has no receipt. Most likely another transaction took the
         // slot and nobody was paid, but "most likely" does not reopen a payout: the claims end in a

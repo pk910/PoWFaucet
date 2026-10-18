@@ -6,6 +6,6 @@ export * from './EthRpcClient.js';
 export * from './ContractCaller.js';
 export * from './EthSigner.js';
 export * from './redact.js';
-export { encodeAbiParameters, parseAbiParameters, keccak256, recoverMessageAddress, isAddress, getAddress, getCreate2Address } from 'viem';
+export { encodeAbiParameters, parseAbiParameters, keccak256, recoverMessageAddress, isAddress, getAddress, getCreate2Address, getAbiItem } from 'viem';
 export type { Hex, Address } from 'viem';
 export { namehash, normalize } from 'viem/ens';

@@ -252,7 +252,8 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     expect(chain.sent[2].tx.nonce).to.equal(42, "the next transaction takes the reloaded nonce");
   }).timeout(15000);
 
-  it("fails the rows of a refused batch in one statement, never one by one", async () => {
+  it("fails the rows of a refused batch in one statement, never one by one", async function() {
+    this.timeout(15000); // the two-second question to every endpoint comes first
     let chain = fakeChain({ deployerPresent: true, eip7702: true, refuseBatchesOver: 2 });
     let { claims } = await start();
     let list: any[] = [];
@@ -287,6 +288,25 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     let batchSends = chain.attempts.filter((a) => a === chain.sent[2].raw).length;
     expect(batchSends).to.be.greaterThanOrEqual(6, "refused five times, then taken");
     expect(chain.sent.length).to.equal(3, "deploy, delegate, the one batch");
+  });
+
+  it("fails a batch that the pool refused for the moment and then for good, instead of holding the queue", async function() {
+    this.timeout(30000);
+    // two answers "txpool is full", then a definite refusal every time (the wallet drained meanwhile, say)
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, poolFullFor: 2, refuseBatchesOver: 1 });
+    let { wallet, claims } = await start();
+    let c1 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000001", "0x0000000000000000000000000000000000001001", "1000"), {});
+    let c2 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000002", "0x0000000000000000000000000000000000001002", "2000"), {});
+
+    await claims.processQueue(); // the broadcast's own retries end "uncertain": pending, the receipt watch re-sends
+    expect(c1.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
+    await awaitSleepPromise(10000, () => c1.claim.claimStatus !== ClaimTxStatus.PENDING);
+    expect(c1.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "refused on three re-sends in a row, held by nobody: it will never mine");
+    expect(c2.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "the batch as a whole");
+    expect(c1.claim.txError).to.match(/refused on 3 re-sends/);
+    expect(claims.getTransactionQueue().filter((c) => c.claim.claimStatus === ClaimTxStatus.PENDING).length).to.equal(0, "nothing holds the queue");
+    expect(wallet.getWalletState().nonce).to.equal(42, "the nonce was reloaded from the node");
+    expect(chain.sent.length).to.equal(2, "deploy and delegate only");
   });
 
   it("keeps a refused batch pending when an endpoint has it after all, and settles it by that receipt", async function() {
