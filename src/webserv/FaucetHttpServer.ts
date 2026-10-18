@@ -199,7 +199,8 @@ export class FaucetHttpServer {
             if(res && typeof res === "object" && res instanceof FaucetHttpResponse)
               this.sendApiResponse(req, rsp, res.code, res.reason, res.headers, res.body);
             else
-              this.sendApiResponse(req, rsp, 200, "OK", {'Content-Type': 'application/json'}, JSON.stringify(res));
+              // no-store: api answers are the moment's (and the operator's unmasked ones must not sit in a cache)
+              this.sendApiResponse(req, rsp, 200, "OK", {'Content-Type': 'application/json', 'Cache-Control': 'no-store'}, JSON.stringify(res));
           }).catch((err) => {
             if(err && typeof err === "object" && err instanceof FaucetHttpResponse)
               this.sendApiResponse(req, rsp, err.code, err.reason, err.headers, err.body);

@@ -22,6 +22,7 @@ describe("ETH Wallet Manager", () => {
     globalStubs = bindTestStubs({
     });
     fakeProvider = new FakeProvider();
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => ({ hash: payload.params[0] })); // the node knows what it was sent, unless a test says otherwise
     loadDefaultTestConfig();
     faucetConfig.faucetStats = null;
     faucetConfig.ethWalletKey = "feedbeef12340000feedbeef12340000feedbeef12340000feedbeef12340000";
@@ -325,7 +326,7 @@ describe("ETH Wallet Manager", () => {
     };
     let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    await sleepPromise(3000); // wait for timeout from web3js lib
+    await sleepPromise(3000); // wait for the receipt poll to time out
     receiptResponseMode = "receipt"; // now return the receipt
     await awaitSleepPromise(1000, () => claimTx.claim.claimStatus === ClaimTxStatus.CONFIRMED);
     expect(rawTxReq.length).to.equal(1, "unexpected transaction count");
@@ -434,6 +435,7 @@ describe("ETH Wallet Manager", () => {
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
       throw "test error 57572x";
     });
+    fakeProvider.injectResponse("eth_getTransactionByHash", () => null); // a node that refused has nothing
     await ethWalletManager.initialize();
     await ethWalletManager.loadWalletState();
     let testSessionData: FaucetSessionStoreData = {
@@ -447,7 +449,10 @@ describe("ETH Wallet Manager", () => {
     };
     let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    await awaitSleepPromise(5000, () => claimTx.claim.claimStatus === ClaimTxStatus.FAILED);
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.QUEUE, "a refused broadcast queues the claim again");
+    expect(claimTx.claim.txAttempts).to.equal(1);
+    for(let i = 0; i < 3; i++)
+      await ethClaimManager.processQueue(); // refused three more times: that is enough
     expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "unexpected claimTx status");
     expect(claimTx.claim.txError).contains("test error 57572x", "test error not in failReason");
     let walletState = ethWalletManager.getWalletState();

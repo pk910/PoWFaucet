@@ -1,9 +1,11 @@
-import { TypedEmitter } from 'tiny-typed-emitter';
-import { EthExecutionAPI, JsonRpcResponseWithResult, MethodNotImplementedError, Web3APIMethod, Web3APIPayload, Web3APIReturnType, Web3APISpec, Web3BaseProvider, Web3ProviderStatus } from 'web3';
-
-export class FakeProvider<
-API extends Web3APISpec = EthExecutionAPI,
-> extends Web3BaseProvider<API> {
+/**
+ * A JSON-RPC stub in the shape of a web3-era provider: a full envelope in, an envelope out.
+ * EthRpcClient.rawRequest unwraps the envelope, so this plugs in wherever a URL would
+ * (`ethRpcHost`, a module's `rpcHost`). Responses are injected per method, either as a value or
+ * as a function of the request payload; a function may throw to produce a JSON-RPC error, or
+ * return `{ _throw: err }` to make the provider itself fail (a transport error).
+ */
+export class FakeProvider {
 
   private idCounter = 1;
   private responseDict: {
@@ -67,24 +69,15 @@ API extends Web3APISpec = EthExecutionAPI,
     return rspStub;
   }
 
-  /* eslint-disable class-methods-use-this */
-	public getStatus(): Web3ProviderStatus {
-		throw new MethodNotImplementedError();
-	}
+  public getStatus(): string {
+    throw new Error("not implemented");
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public supportsSubscriptions() {
-		return false;
-	}
+  public supportsSubscriptions() {
+    return false;
+  }
 
-	public async request<
-		Method extends Web3APIMethod<API>,
-		ResultType = Web3APIReturnType<API, Method>,
-	>(
-		payload: Web3APIPayload<API, Method>,
-		requestOptions?: RequestInit,
-	): Promise<JsonRpcResponseWithResult<ResultType>> {
-		
+  public async request(payload: any): Promise<any> {
     //console.log("stub.request", payload)
     let response;
     if(Array.isArray(payload))
@@ -92,46 +85,38 @@ API extends Web3APISpec = EthExecutionAPI,
     else
       response = this.getResponse(payload);
 
-		return response as JsonRpcResponseWithResult<ResultType>;
-	}
+    return response;
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public on() {
-		throw new MethodNotImplementedError();
-	}
+  public on() {
+    throw new Error("not implemented");
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public removeListener() {
-		throw new MethodNotImplementedError();
-	}
+  public removeListener() {
+    throw new Error("not implemented");
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public once() {
-		throw new MethodNotImplementedError();
-	}
+  public once() {
+    throw new Error("not implemented");
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public removeAllListeners() {
-		throw new MethodNotImplementedError();
-	}
+  public removeAllListeners() {
+    throw new Error("not implemented");
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public connect() {
-		throw new MethodNotImplementedError();
-	}
+  public connect() {
+    throw new Error("not implemented");
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public disconnect() {
-		throw new MethodNotImplementedError();
-	}
+  public disconnect() {
+    throw new Error("not implemented");
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public reset() {
-		throw new MethodNotImplementedError();
-	}
+  public reset() {
+    throw new Error("not implemented");
+  }
 
-	/* eslint-disable class-methods-use-this */
-	public reconnect() {
-		throw new MethodNotImplementedError();
-	}
+  public reconnect() {
+    throw new Error("not implemented");
+  }
 }

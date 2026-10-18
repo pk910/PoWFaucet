@@ -9,6 +9,7 @@ import { SessionManager } from '../src/session/SessionManager.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
 import { FaucetError } from '../src/common/FaucetError.js';
 import { FaucetSession, FaucetSessionStatus, FaucetSessionStoreData } from '../src/session/FaucetSession.js';
+import { BatchTooExpensiveError } from '../src/eth/claimtx/ClaimTxBuilder.js';
 import { ClaimTxStatus, EthClaimInfo, EthClaimManager } from '../src/eth/EthClaimManager.js';
 import { getNewGuid } from '../src/utils/GuidUtils.js';
 import { EthWalletManager, TransactionResult } from '../src/eth/EthWalletManager.js';
@@ -557,5 +558,185 @@ describe("ETH Claim Manager", () => {
     fakeSocket.emit("close");
     expect(fakeSocket.isReady).to.equal(false, "client still ready");
   });
-  
+
+  describe("Batched claim transactions", () => {
+    const TX_HASH = "0xdb5950d44ceed2a5eb77970104b974b8c4234d7110fd8d0008edb2cfff835f0a";
+
+    function useBatchTemplate(maxClaims: number, maxWaitSeconds: number) {
+      faucetConfig.ethClaimBatch = { maxClaims, maxWaitSeconds };
+      // the delegation setup is the wallet manager's business (its own spec); here it is in place
+      globalStubs["ensureClaimBatching"] = sinon.stub(EthWalletManager.prototype, "ensureClaimBatching").callsFake(function(this: EthWalletManager) {
+        this.getClaimTxBuilder().setBatchActive(true);
+        return Promise.resolve(true);
+      });
+      globalStubs["getWalletState"] = sinon.stub(EthWalletManager.prototype, "getWalletState").returns({
+        ready: true,
+        nonce: 0,
+        balance: 1000000000000000000n,
+        nativeBalance: 1000000000000000000n,
+      });
+      globalStubs["EthWalletManager.sendClaimBatch"] = sinon.stub(EthWalletManager.prototype, "sendClaimBatch");
+    }
+
+    async function queueClaims(claimManager: EthClaimManager, count: number): Promise<EthClaimInfo[]> {
+      let claims: EthClaimInfo[] = [];
+      for(let i = 0; i < count; i++) {
+        let session = await addTestSession(FaucetSessionStatus.CLAIMABLE, null, (100 * (i + 1)).toString());
+        session.targetAddr = "0x000000000000000000000000000000000000100" + i;
+        claims.push(await claimManager.createSessionClaim(session, {}));
+      }
+      return claims;
+    }
+
+    it("groups queued claims into one transaction up to maxClaims", async () => {
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      useBatchTemplate(2, 0);
+      let claims = await queueClaims(claimManager, 3);
+      globalStubs["EthWalletManager.sendClaimBatch"].returns(Promise.resolve({ txHash: TX_HASH, txPromise: new Promise(() => {}), plan: null }));
+      globalStubs["EthWalletManager.sendClaimTx"].returns(Promise.resolve({ txHash: TX_HASH.replace(/a$/, "b"), txPromise: new Promise(() => {}), plan: null }));
+
+      await claimManager.processQueue();
+
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "one batch transaction expected");
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].firstCall.args[0].map((c: EthClaimInfo) => c.session)).to.deep.equal([claims[0].session, claims[1].session]);
+      expect(globalStubs["EthWalletManager.sendClaimTx"].callCount).to.equal(0, "the third claim waits for the batch's receipt: one transaction in flight");
+      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING, ClaimTxStatus.QUEUE]);
+      expect(claimManager.getTransactionQueue().length).to.equal(3, "all claims listed in the queue status");
+      expect(claimManager.getLastProcessedClaimIdx()).to.equal(claims[1].claim.claimIdx);
+    });
+
+    it("keeps one batch transaction in flight while the wallet is delegated, whatever ethMaxPending says", async () => {
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      faucetConfig.ethMaxPending = 12;
+      useBatchTemplate(2, 0);
+      let claims = await queueClaims(claimManager, 5);
+      let settleFirst: (result: any) => void;
+      globalStubs["EthWalletManager.sendClaimBatch"].returns(Promise.resolve({ txHash: TX_HASH, txPromise: new Promise((resolve) => { settleFirst = resolve; }), plan: null }));
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "the pool takes one in-flight transaction from a delegated account");
+      expect(claims.slice(0, 2).map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING]);
+      expect(claims.slice(2).map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE], "the rest waits for the receipt");
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "still one while the first is unmined");
+
+      // the first batch is mined: the next one goes out
+      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns({ executed: true, outcomes: new Map() });
+      settleFirst({ status: true, block: 1, fee: 0n, receipt: { status: true, logs: [] } });
+      await awaitSleepPromise(2000, () => claims[0].claim.claimStatus === ClaimTxStatus.CONFIRMED);
+      globalStubs["EthWalletManager.sendClaimBatch"].returns(Promise.resolve({ txHash: TX_HASH.replace(/a$/, "c"), txPromise: new Promise(() => {}), plan: null }));
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(2, "the second batch follows the first's receipt");
+    });
+
+    it("queues a batch the fee cap refuses in the planning stage again, in the size that fits", async () => {
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      useBatchTemplate(3, 0);
+      let claims = await queueClaims(claimManager, 3);
+      globalStubs["EthWalletManager.sendClaimBatch"].onFirstCall().returns(Promise.reject(new BatchTooExpensiveError(3, 300000, 1)));
+      globalStubs["EthWalletManager.sendClaimTx"].returns(Promise.resolve({ txHash: TX_HASH, txPromise: new Promise(() => {}), plan: null }));
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "the plan of three was refused");
+      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE], "nothing failed, nothing signed");
+      expect(claims.map((c) => c.claim.txAttempts)).to.deep.equal([undefined, undefined, undefined], "not a refused broadcast");
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimTx"].callCount).to.equal(1, "one claim fits: the first goes alone");
+      expect(globalStubs["EthWalletManager.sendClaimTx"].firstCall.args[0].session).to.equal(claims[0].session);
+      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE]);
+    });
+
+    it("waits maxWaitSeconds for a partial batch, then sends it", async () => {
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      useBatchTemplate(3, 10);
+      let claims = await queueClaims(claimManager, 1);
+      globalStubs["EthWalletManager.sendClaimTx"].returns(Promise.resolve({ txHash: TX_HASH, txPromise: new Promise(() => {}), plan: null }));
+
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimTx"].callCount).to.equal(0, "a fresh partial batch waits");
+      expect(claims[0].claim.claimStatus).to.equal(ClaimTxStatus.QUEUE);
+
+      claims[0].claim.claimTime -= 20;
+      await claimManager.processQueue();
+      expect(globalStubs["EthWalletManager.sendClaimTx"].callCount).to.equal(1, "the aged partial batch is sent");
+      expect(claims[0].claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
+    });
+
+    it("settles a batch from its receipt: fee split and per-recipient failure", async () => {
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      useBatchTemplate(2, 0);
+      let claims = await queueClaims(claimManager, 2);
+      let claimFuse = createFuse();
+      globalStubs["EthWalletManager.sendClaimBatch"].returns(Promise.resolve({
+        txHash: TX_HASH,
+        txPromise: fusedSleep(claimFuse, 500).then(() => ({ status: true, block: 77, fee: 101n, receipt: getTestReceipt() })),
+        plan: null,
+      }));
+      // the batcher reported the second claim's only call as unpaid
+      globalStubs["evaluateClaimReceipt"] = sinon.stub(EthWalletManager.prototype, "evaluateClaimReceipt").returns({ executed: true, outcomes: new Map([[0, { failed: 0, total: 1 }], [1, { failed: 1, total: 1 }]]) });
+
+      await claimManager.processQueue();
+      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.PENDING, ClaimTxStatus.PENDING]);
+
+      claimFuse();
+      await awaitSleepPromise(1000, () => claims[0].claim.claimStatus === ClaimTxStatus.CONFIRMED && claims[1].claim.claimStatus === ClaimTxStatus.FAILED);
+      expect(claims[0].claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED, "paid claim should confirm");
+      expect(claims[0].claim.txBlock).to.equal(77);
+      expect(claims[0].claim.txFee).to.equal("51", "first claim carries the fee remainder");
+      expect(claims[1].claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "claim the contract reported as failed should fail");
+      expect(claims[1].claim.txError).to.match(/payout to this address failed/);
+      expect(claims[1].claim.txFee).to.equal("50");
+      expect(claimManager.getTransactionQueue().length).to.equal(2, "both stay listed in the history");
+      expect(claimManager.getTransactionQueue(true).length).to.equal(0, "nothing queued or pending");
+    });
+
+    it("fails every claim of a reverted batch", async () => {
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      useBatchTemplate(2, 0);
+      let claims = await queueClaims(claimManager, 2);
+      let claimFuse = createFuse();
+      globalStubs["EthWalletManager.sendClaimBatch"].returns(Promise.resolve({
+        txHash: TX_HASH,
+        txPromise: fusedSleep(claimFuse, 500).then(() => ({ status: false, block: 77, fee: 100n, receipt: getTestReceipt() })),
+        plan: null,
+      }));
+
+      await claimManager.processQueue();
+      claimFuse();
+      await awaitSleepPromise(1000, () => claims.every((c) => c.claim.claimStatus === ClaimTxStatus.FAILED));
+      expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.FAILED, ClaimTxStatus.FAILED]);
+      expect(claims[0].claim.txError).to.match(/transaction reverted/);
+    });
+
+    it("restores pending claims of one transaction as one batch", async () => {
+      let claimTime = Math.floor(new Date().getTime() / 1000);
+      let ses1 = await addTestSession(FaucetSessionStatus.CLAIMING, { claimIdx: 1, claimStatus: ClaimTxStatus.PENDING, claimTime, txHash: TX_HASH, txNonce: 5 }, "100");
+      let ses2 = await addTestSession(FaucetSessionStatus.CLAIMING, { claimIdx: 2, claimStatus: ClaimTxStatus.PENDING, claimTime, txHash: TX_HASH, txNonce: 5 }, "200");
+      let claimFuse = createFuse();
+      globalStubs["watchClaimTx"] = sinon.stub(EthWalletManager.prototype, "watchClaimTx").returns(
+        fusedSleep(claimFuse, 500).then(() => ({ status: true, block: 78, fee: 90n, receipt: getTestReceipt() }))
+      );
+
+      let claimManager = ServiceManager.GetService(EthClaimManager);
+      await claimManager.initialize();
+      expect(globalStubs["watchClaimTx"].callCount).to.equal(1, "one watcher per transaction hash");
+      expect(claimManager.getTransactionQueue().length).to.equal(2);
+
+      claimFuse();
+      let restored = claimManager.getTransactionQueue();
+      await awaitSleepPromise(1000, () => restored.every((c) => c.claim.claimStatus === ClaimTxStatus.CONFIRMED));
+      expect(restored.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.CONFIRMED, ClaimTxStatus.CONFIRMED]);
+      expect(restored.map((c) => c.claim.txFee).sort()).to.deep.equal(["45", "45"]);
+      expect([ses1.sessionId, ses2.sessionId].sort()).to.deep.equal(restored.map((c) => c.session).sort());
+    });
+  });
+
 });

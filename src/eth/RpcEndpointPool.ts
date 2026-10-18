@@ -1,17 +1,21 @@
-import Web3, { HttpProvider, WebSocketProvider } from 'web3';
-import { ethRpcMethods } from 'web3-rpc-methods';
-import IpcProvider from 'web3-providers-ipc';
+import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, isTransportError, isTxAlreadyKnownError, looksLikeSecret, redactUrl, redactUrlsInText, rpcErrorString } from './rpc/index.js';
 
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { EthRpcHostConfig, IRpcEndpointConfig } from '../config/ConfigSchema.js';
 import { ServiceManager } from '../common/ServiceManager.js';
 import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
 
+/** What a broadcast attempt established, see RpcEndpointPool.broadcastSignedTransaction. */
+export type BroadcastOutcome =
+  | { status: "accepted"; hash: string }
+  | { status: "ambiguous"; error: any }
+  | { status: "rejected"; error: any };
+
 export interface RpcEndpointState {
   config: IRpcEndpointConfig;
   label: string;
-  web3: Web3;
-  provider: any;
+  client: EthRpcClient;
+  provider: IRpcProvider;
   online: boolean;
   blockHeight: number;
   lastCheck: number;
@@ -42,6 +46,8 @@ interface NormalizedEndpoint {
 
 export class RpcEndpointPool {
   private endpoints: RpcEndpointState[] = [];
+  // one client for the lifetime of the pool: every call lands on the endpoint that is active right then
+  private routedClient: RoutedRpcClient = new RoutedRpcClient(() => this.getActiveClient());
   private monitorInterval: NodeJS.Timeout = null;
   private disposed: boolean = false;
 
@@ -105,13 +111,18 @@ export class RpcEndpointPool {
     }));
   }
 
-  // Returns the highest-priority ready Web3, or the first endpoint as a fallback
+  // Returns the highest-priority ready client, or the first endpoint as a fallback
   // (so callers always get a usable instance and surface natural errors on failure).
-  public getActiveWeb3(): Web3 {
+  /** The client to keep: it follows failover, unlike the endpoint clients behind getActiveClient(). */
+  public getClient(): IEthRpcClient {
+    return this.routedClient;
+  }
+
+  public getActiveClient(): EthRpcClient {
     const ready = this.getReadyEndpoints();
     if (ready.length > 0)
-      return ready[0].web3;
-    return this.endpoints[0]?.web3 || null;
+      return ready[0].client;
+    return this.endpoints[0]?.client || null;
   }
 
   public hasReadyEndpoint(): boolean {
@@ -122,6 +133,21 @@ export class RpcEndpointPool {
   // Returns the first successful tx hash. Errors are ignored as long as at least
   // one submission succeeded (other endpoints commonly return "already known").
   public async broadcastSendRawTransaction(rawTxHex: string): Promise<string> {
+    const outcome = await this.broadcastSignedTransaction(rawTxHex);
+    if (outcome.status === 'accepted')
+      return outcome.hash;
+    throw outcome.error;
+  }
+
+  /**
+   * Broadcast to the top-N priority ready endpoints and say what that means:
+   *  - accepted:  an endpoint took it, or already had it ("already known", "nonce too low")
+   *  - rejected:  every endpoint answered, and every answer was a definite no
+   *  - ambiguous: no endpoint confirmed it, and at least one did not answer (a transport error):
+   *               the bytes may be in a mempool, nothing may be concluded from this attempt
+   * A claim is only ever failed on `rejected`; `ambiguous` keeps it pending.
+   */
+  public async broadcastSignedTransaction(rawTxHex: string): Promise<BroadcastOutcome> {
     const broadcastCount = Math.max(1, faucetConfig.ethTxBroadcastCount || 1);
     let targets = this.getReadyEndpoints();
     if (targets.length === 0)
@@ -129,33 +155,55 @@ export class RpcEndpointPool {
 
     targets = targets.slice(0, broadcastCount);
     if (targets.length === 0)
-      throw new Error('no RPC endpoints configured');
+      return { status: 'rejected', error: new Error('no RPC endpoints configured') };
 
     const results = await Promise.allSettled(
-      targets.map((ep) => ethRpcMethods.sendRawTransaction(ep.web3.eth.requestManager, rawTxHex))
+      targets.map((ep) => ep.client.sendRawTransaction(rawTxHex))
     );
 
-    let firstHash: string = null;
-    let firstError: any = null;
+    let hash: string = null;
+    let ambiguous = false;
+    let firstRejection: any = null;
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       const ep = targets[i];
       if (r.status === 'fulfilled') {
-        if (!firstHash)
-          firstHash = r.value as string;
-      } else {
-        if (!firstError)
-          firstError = r.reason;
-        ServiceManager.GetService(FaucetProcess).emitLog(
-          FaucetLogLevel.WARNING,
-          `Tx broadcast to ${ep.label} failed: ${this.errorString(r.reason)}`
-        );
+        if (!hash)
+          hash = r.value as string;
+        continue;
       }
+      if (isTxAlreadyKnownError(r.reason)) {
+        if (!hash)
+          hash = '';
+        continue;
+      }
+      if (isTransportError(r.reason))
+        ambiguous = true;
+      else if (!firstRejection)
+        firstRejection = r.reason;
+      ServiceManager.GetService(FaucetProcess).emitLog(
+        FaucetLogLevel.WARNING,
+        `Tx broadcast to ${ep.label} failed: ${this.errorString(r.reason)}`
+      );
     }
 
-    if (firstHash)
-      return firstHash;
-    throw firstError || new Error('all tx broadcasts failed');
+    if (hash !== null)
+      return { status: 'accepted', hash };
+    if (ambiguous)
+      return { status: 'ambiguous', error: firstRejection || new Error('no RPC endpoint answered the broadcast') };
+    return { status: 'rejected', error: firstRejection || new Error('all tx broadcasts failed') };
+  }
+
+  /** The label of an endpoint that has this transaction (pool or chain), null when none does; endpoints that do not answer count as not having it. */
+  public async endpointKnowingTransaction(txHash: string): Promise<string | null> {
+    const endpoints = this.endpoints.filter((ep) => !!ep.client);
+    const results = await Promise.allSettled(endpoints.map((ep) => ep.client.knowsTransaction(txHash)));
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.status === 'fulfilled' && r.value)
+        return endpoints[i].label;
+    }
+    return null;
   }
 
   private normalizeConfig(raw: EthRpcHostConfig): NormalizedEndpoint[] {
@@ -193,12 +241,12 @@ export class RpcEndpointPool {
   }
 
   private createEndpoint(cfg: NormalizedEndpoint): RpcEndpointState {
-    const provider = this.makeProvider(cfg.url);
+    const provider = this.createProvider(cfg.url);
     const label = cfg.name || (typeof cfg.url === 'string' ? this.sanitizeUrl(cfg.url) : '<provider>');
     const ep: RpcEndpointState = {
       config: { url: cfg.url, name: cfg.name, priority: cfg.priority, metered: cfg.metered },
       label,
-      web3: null,
+      client: null,
       provider,
       online: false,
       blockHeight: 0,
@@ -207,9 +255,14 @@ export class RpcEndpointPool {
       requestCount: 0,
     };
     this.instrumentProvider(ep);
-    ep.web3 = new Web3(ep.provider);
+    ep.client = new EthRpcClient(ep.provider);
     this.attachProviderHandlers(ep);
     return ep;
+  }
+
+  // The seam for tests; the real work is in src/eth/rpc.
+  protected createProvider(url: string | object): IRpcProvider {
+    return createRpcProvider(url);
   }
 
   // Wrap the provider's `request` method so we can count outgoing JSON-RPC calls.
@@ -256,9 +309,9 @@ export class RpcEndpointPool {
     if (this.disposed)
       return;
     try {
-      ep.provider = this.makeProvider(ep.config.url);
+      ep.provider = this.createProvider(ep.config.url);
       this.instrumentProvider(ep);
-      ep.web3 = new Web3(ep.provider);
+      ep.client = new EthRpcClient(ep.provider);
       this.attachProviderHandlers(ep);
     } catch (ex) {
       ServiceManager.GetService(FaucetProcess).emitLog(
@@ -268,67 +321,10 @@ export class RpcEndpointPool {
     }
   }
 
-  private makeProvider(url: any): any {
-    if (typeof url !== 'string')
-      return url; // pre-built provider object
-    if (/^wss?:\/\//.test(url)) {
-      const { cleanUrl, headers } = this.extractAuth(url);
-      const wsOptions = Object.keys(headers).length > 0 ? { headers } : undefined;
-      return new WebSocketProvider(cleanUrl, wsOptions);
-    }
-    if (url.startsWith('/'))
-      return new IpcProvider(url);
-    const { cleanUrl, headers } = this.extractAuth(url);
-    const httpOptions = Object.keys(headers).length > 0 ? { providerOptions: { headers } } : undefined;
-    return new HttpProvider(cleanUrl, httpOptions);
-  }
-
-  private extractAuth(url: string): { cleanUrl: string; headers: Record<string, string> } {
-    try {
-      const u = new URL(url);
-      if (u.username || u.password) {
-        const user = decodeURIComponent(u.username);
-        const pass = decodeURIComponent(u.password);
-        u.username = '';
-        u.password = '';
-        return {
-          cleanUrl: u.toString(),
-          headers: { Authorization: 'Basic ' + Buffer.from(user + ':' + pass).toString('base64') },
-        };
-      }
-    } catch (ex) {
-      // not a parseable URL, return as-is
-    }
-    return { cleanUrl: url, headers: {} };
-  }
-
-  // Returns a display-safe version of the URL: strips userinfo, redacts long path segments
-  // that look like API keys, and redacts known secret-bearing query parameters.
+  // Display-safe URL and error text: the redaction lives in src/eth/rpc/redact.ts, shared with
+  // every other place that logs or shows RPC errors.
   private sanitizeUrl(url: string): string {
-    try {
-      const u = new URL(url);
-      let dirty = false;
-      if (u.username || u.password) {
-        u.username = '';
-        u.password = '';
-        dirty = true;
-      }
-      const sanitizedPath = this.sanitizePath(u.pathname);
-      if (sanitizedPath !== u.pathname) {
-        u.pathname = sanitizedPath;
-        dirty = true;
-      }
-      if (u.search) {
-        const sanitizedSearch = this.sanitizeQuery(u.searchParams);
-        if (sanitizedSearch !== null) {
-          u.search = sanitizedSearch;
-          dirty = true;
-        }
-      }
-      return dirty ? u.toString() : url;
-    } catch (ex) {
-      return url;
-    }
+    return redactUrl(url);
   }
 
   private sanitizePath(pathname: string): string {
@@ -336,38 +332,16 @@ export class RpcEndpointPool {
       return pathname;
     return pathname
       .split('/')
-      .map((seg) => this.looksLikeSecret(seg) ? '<redacted>' : seg)
+      .map((seg) => looksLikeSecret(seg) ? '<redacted>' : seg)
       .join('/');
   }
 
-  private sanitizeQuery(params: URLSearchParams): string | null {
-    const SECRET_KEYS = /^(api[_-]?key|key|token|auth|secret|password|pw|access[_-]?token|x[_-]?api[_-]?key)$/i;
-    let changed = false;
-    const out = new URLSearchParams();
-    for (const [k, v] of params.entries()) {
-      if (SECRET_KEYS.test(k) || this.looksLikeSecret(v)) {
-        out.append(k, '<redacted>');
-        changed = true;
-      } else {
-        out.append(k, v);
-      }
-    }
-    return changed ? '?' + out.toString() : null;
-  }
-
   private looksLikeSecret(value: string): boolean {
-    if (!value || value.length < 16)
-      return false;
-    // long opaque strings: hex / base64url / UUID — typical API key shapes
-    return /^[A-Za-z0-9_\-]{16,}$/.test(value);
+    return looksLikeSecret(value);
   }
 
-  // Strip URLs from arbitrary error text and replace each with its sanitized form,
-  // so things like fetch errors don't leak credentials in lastError fields.
   private sanitizeErrorMessage(message: string): string {
-    if (!message)
-      return message;
-    return message.replace(/https?:\/\/[^\s"'`<>]+/gi, (match) => this.sanitizeUrl(match));
+    return redactUrlsInText(message);
   }
 
   private async runMonitorTick(): Promise<void> {
@@ -393,7 +367,7 @@ export class RpcEndpointPool {
   private async checkEndpoint(ep: RpcEndpointState): Promise<void> {
     ep.lastCheck = Math.floor(Date.now() / 1000);
     try {
-      const blockNumber = Number(await ep.web3.eth.getBlockNumber());
+      const blockNumber = await ep.client.getBlockNumber();
       const wasOffline = !ep.online;
       ep.blockHeight = blockNumber;
       ep.online = true;
@@ -447,7 +421,7 @@ export class RpcEndpointPool {
   private disposeEndpoints(): void {
     for (const ep of this.endpoints) {
       try {
-        (ep.provider as any)?.disconnect?.();
+        ep.client?.dispose();
       } catch (ex) {
         // some providers don't support disconnect
       }
@@ -456,10 +430,7 @@ export class RpcEndpointPool {
   }
 
   private errorString(ex: any): string {
-    if (!ex) return '';
-    let msg: string;
-    if (typeof ex === 'string') msg = ex;
-    else msg = ex.message || ex.toString();
-    return this.sanitizeErrorMessage(msg);
+    // viem's short message plus the node's own words (a fee cap, a gas limit), URLs redacted
+    return rpcErrorString(ex);
   }
 }

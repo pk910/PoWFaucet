@@ -425,11 +425,15 @@ export class FaucetSession {
     this.setSessionData("reward.factors", rewardFactors);
 
     let rewardFactor = 1;
-    //console.log(rewardFactors);
     rewardFactors.forEach((factor) => {
-      if(!factor || typeof factor.factor !== "number")
+      // NaN is a number too: a module that has no number yet must not void the reward
+      // (BigInt(NaN) throws, and the session would fail with an internal error)
+      if(!factor || typeof factor.factor !== "number" || !Number.isFinite(factor.factor)) {
+        if(factor && factor.factor !== undefined)
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Session " + this.sessionId + ": ignoring reward factor " + factor.factor + " from module " + (factor.module || "?"));
         return;
-      rewardFactor *= factor?.factor
+      }
+      rewardFactor *= factor.factor;
     });
 
     let rewardAmount = amount * BigInt(Math.floor(rewardFactor * 100000)) / 100000n;

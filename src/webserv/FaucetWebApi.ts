@@ -89,6 +89,16 @@ export class FaucetWebApi {
     data: any;
   }} = {};
 
+  /**
+   * The operator's key, from `Authorization: Bearer <key>`. It used to travel as a query
+   * parameter, which lands in access logs and browser histories; a header does not.
+   */
+  private operatorKeyFromRequest(req: IncomingMessage): string | undefined {
+    let header = req.headers?.authorization;
+    let match = typeof header === "string" ? /^Bearer\s+(\S+)$/i.exec(header.trim()) : null;
+    return match ? match[1] : undefined;
+  }
+
   public async onApiRequest(req: IncomingMessage, body?: Buffer): Promise<any> {
     let apiUrl = this.parseApiUrl(req.url);
     if (!apiUrl || apiUrl.path.length === 0)
@@ -107,11 +117,11 @@ export class FaucetWebApi {
       case "claimReward".toLowerCase():
         return this.onClaimReward(req, body);
       case "getSessionStatus".toLowerCase():
-        return this.onGetSessionStatus(apiUrl.query['session'] as string, !!apiUrl.query['details'], apiUrl.query['key'] as string);
+        return this.onGetSessionStatus(apiUrl.query['session'] as string, !!apiUrl.query['details'], this.operatorKeyFromRequest(req));
       case "getQueueStatus".toLowerCase():
         return this.onGetQueueStatus();
       case "getFaucetStatus".toLowerCase():
-        return this.onGetFaucetStatus(apiUrl.query['key'] as string);
+        return this.onGetFaucetStatus(this.operatorKeyFromRequest(req));
       default:
         let handler = this.apiEndpoints.get(apiUrl.path[0].toLowerCase());
         if(handler)

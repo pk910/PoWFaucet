@@ -38,11 +38,11 @@ describe("Session details and status visibility", () => {
     return sha256(faucetConfig.faucetSecret + "-unmasked");
   }
 
-  function apiRequest(url: string): IncomingMessage {
+  function apiRequest(url: string, operatorKey?: string): IncomingMessage {
     return {
       url: url,
       method: "GET",
-      headers: {},
+      headers: operatorKey ? { authorization: "Bearer " + operatorKey } : {},
       socket: { remoteAddress: "8.8.8.8" },
     } as any;
   }
@@ -168,7 +168,7 @@ describe("Session details and status visibility", () => {
     it("hands the operator everything, the ip included", async () => {
       let session = await addRichSession();
       let webApi = new FaucetWebApi();
-      let rsp = await webApi.onApiRequest(apiRequest("/api/getSessionStatus?session=" + session.sessionId + "&details=1&key=" + operatorKey()));
+      let rsp = await webApi.onApiRequest(apiRequest("/api/getSessionStatus?session=" + session.sessionId + "&details=1", operatorKey()));
       expect(rsp instanceof FaucetHttpResponse).to.equal(false, "unexpected error response");
       expect(rsp.details.ip).to.equal("198.51.100.7");
       expect(rsp.details.data["captcha.ident"]).to.equal("hc:3f9a-c21d");
@@ -181,9 +181,13 @@ describe("Session details and status visibility", () => {
     it("refuses a wrong key instead of answering with the public set", async () => {
       let session = await addRichSession();
       let webApi = new FaucetWebApi();
-      let rsp = await webApi.onApiRequest(apiRequest("/api/getSessionStatus?session=" + session.sessionId + "&details=1&key=guess"));
+      let rsp = await webApi.onApiRequest(apiRequest("/api/getSessionStatus?session=" + session.sessionId + "&details=1", "guess"));
       expect(rsp instanceof FaucetHttpResponse).to.equal(true, "no error response");
       expect(rsp.code).to.equal(403);
+      // a key in the url is not looked at: the public set, as for anyone
+      let publicRsp = await webApi.onApiRequest(apiRequest("/api/getSessionStatus?session=" + session.sessionId + "&details=1&key=" + operatorKey()));
+      expect(publicRsp instanceof FaucetHttpResponse).to.equal(false, "not refused either");
+      expect(publicRsp.details.ip).to.equal(undefined, "and not unmasked");
     });
 
     it("stays the same without the details flag", async () => {
@@ -213,7 +217,7 @@ describe("Session details and status visibility", () => {
     it("shows everything with the key", async () => {
       let session = await addRichSession();
       let webApi = new FaucetWebApi();
-      let rsp = await webApi.onApiRequest(apiRequest("/api/getFaucetStatus?key=" + operatorKey()));
+      let rsp = await webApi.onApiRequest(apiRequest("/api/getFaucetStatus", operatorKey()));
       let row = rsp.sessions.find((s) => s.id === session.sessionId);
       expect(!!row).to.equal(true, "session row missing");
       expect(row.ip).to.equal(session.remoteIP);

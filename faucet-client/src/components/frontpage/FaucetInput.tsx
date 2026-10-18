@@ -62,7 +62,9 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
         inputTypes.push("ENS name");
     }
 
-    let panels = getPanels("mining").filter((panel) => panel.modes && panel.modes.length > 0);
+    // a panel offers its modes only while its module is enabled on this faucet: the package's client
+    // is loaded whenever the package is installed, the module config says whether it is in use
+    let panels = getPanels("mining").filter((panel) => panel.modes && panel.modes.length > 0 && this.props.faucetConfig.modules[panel.module]);
     let hasMining = !!this.props.faucetConfig.modules.pow;
     let playing = !!this.state.startModule;
 
