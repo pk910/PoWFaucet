@@ -449,6 +449,29 @@ export class FaucetDatabase {
   }
 
   /**
+   * Fails the claims of one transaction in one statement: every row of it that is still claiming
+   * becomes failed, with its claim data, at once. A crash cannot leave rows that still replay the
+   * transaction's bytes beside rows that already count as failed (the bytes pay everyone).
+   */
+  public async failClaimsBulk(updates: { sessionId: string; claimData: EthClaimData }[]): Promise<number> {
+    if(updates.length === 0)
+      return 0;
+    let values: (string | number)[] = [];
+    let cases = updates.map((update) => {
+      values.push(update.sessionId, JSON.stringify(update.claimData));
+      return "WHEN ? THEN ?";
+    }).join(" ");
+    let placeholders = updates.map(() => "?").join(",");
+    updates.forEach((update) => values.push(update.sessionId));
+    let result = await this.db.run(
+      "UPDATE Sessions SET Status = '" + FaucetSessionStatus.FAILED + "', ClaimData = CASE SessionId " + cases + " END" +
+      " WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")",
+      values,
+    );
+    return result.changes;
+  }
+
+  /**
    * Admits exactly one claim for a session: the row goes claimable -> claiming in one conditional
    * update, or, for a session that was never stored, is inserted as claiming, where the primary key
    * lets exactly one of two concurrent inserts through. False when someone else got there first.

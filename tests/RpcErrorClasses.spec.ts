@@ -1,7 +1,7 @@
 import 'mocha';
 import { expect } from 'chai';
 import { HttpRequestError, RpcRequestError, TimeoutError, UnknownRpcError } from 'viem';
-import { isTransportError, isTxAlreadyKnownError } from '../src/eth/rpc/index.js';
+import { isTransientRejection, isTransportError, isTxAlreadyKnownError } from '../src/eth/rpc/index.js';
 
 /**
  * What the faucet makes of an error from the node: a lost request (the transaction may be out)
@@ -23,6 +23,14 @@ describe("RPC error classification", () => {
     expect(isTransportError(rpcError(-32000, "insufficient funds for gas * price + value"))).to.equal(false);
     expect(isTransportError(new UnknownRpcError(rpcError(-32010, "tx fee exceeds the configured cap")))).to.equal(false, "a node's own rejection code is still a rejection");
     expect(isTransportError(new UnknownRpcError(rpcError(3, "execution reverted")))).to.equal(false);
+  });
+
+  it("knows the refusals that are about the moment, not the transaction", () => {
+    expect(isTransientRejection(rpcError(-32000, "txpool is full"))).to.equal(true);
+    expect(isTransientRejection(rpcError(-32000, "in-flight transaction limit reached for delegated accounts"))).to.equal(true);
+    expect(isTransientRejection(rpcError(-32005, "too many requests, rate limit exceeded"))).to.equal(true);
+    expect(isTransientRejection(rpcError(-32000, "tx fee (3.29 ether) exceeds the configured cap (1.00 ether)"))).to.equal(false, "the same bytes would be refused again");
+    expect(isTransientRejection(rpcError(-32000, "insufficient funds for gas * price + value"))).to.equal(false);
   });
 
   it("knows the answers that mean the node has the transaction already", () => {

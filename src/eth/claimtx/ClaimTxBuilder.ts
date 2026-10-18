@@ -64,7 +64,7 @@ export class ClaimTxBuilder {
       if(!Array.isArray(this.config.calls) || this.config.calls.length === 0)
         throw new Error("ethClaimTx.calls must list at least one call");
       for(let call of this.config.calls)
-        ClaimTxBuilder.checkTemplateCall(call);
+        ClaimTxBuilder.checkTemplateCall(call, this.token);
     }
     this.batcher = new ContractCaller(this.client, this.walletAddr, BATCHER_ABI);
   }
@@ -74,9 +74,11 @@ export class ClaimTxBuilder {
    * the amounts are the claim's business, and `{session.<key>}` values are a module's. But the
    * contract the wallet calls, the token it moves and raw calldata are the operator's and fixed at
    * startup: a target taken from the claim would let a claimant pick the code the faucet wallet
-   * runs, and placeholders in raw calldata would let a session write the wallet's calls.
+   * runs, and placeholders in raw calldata would let a session write the wallet's calls. The
+   * faucet's own token is moved with `token` calls only, where its spend is counted: a `call` to
+   * the token contract (a transfer, an approval) would move it past the bound.
    */
-  private static checkTemplateCall(call: IClaimCall): void {
+  private static checkTemplateCall(call: IClaimCall, faucetToken: string | null): void {
     let fixedAddress = (value: unknown, what: string, alsoAllowed: string[] = []) => {
       if(typeof value === "string" && (/^0[xX][0-9a-fA-F]{40}$/.test(value) || alsoAllowed.indexOf(value) !== -1))
         return;
@@ -90,6 +92,8 @@ export class ClaimTxBuilder {
         break;
       case "call":
         fixedAddress(call.to, "to");
+        if(faucetToken && String(call.to).toLowerCase() === faucetToken.toLowerCase())
+          throw new Error("ethClaimTx call to must not be the faucet token contract (use a token call, whose amount is bounded by the claim)");
         if(call.data !== undefined && !/^0[xX]([0-9a-fA-F]{2})*$/.test(String(call.data)))
           throw new Error("ethClaimTx call data must be fixed hex, not " + String(call.data) + " (use abi, fn and args for values from the claim)");
         if(call.abi && call.fn && !new ContractCaller(null, "0x0000000000000000000000000000000000000000", call.abi).hasFunction(call.fn))
@@ -185,7 +189,7 @@ export class ClaimTxBuilder {
         plan = { to: call.to, value: call.amount, nativeSpend: call.amount, data: "0x", gasLimit: 0, claims: [claim] };
         break;
       case "token":
-        plan = { to: call.token, value: 0n, nativeSpend: 0n, tokenSpend: call.token === this.token ? call.amount : 0n, data: new ContractCaller(this.client, call.token, Erc20Abi).encode("transfer", [call.to, call.amount]), gasLimit: 0, claims: [claim] };
+        plan = { to: call.token, value: 0n, nativeSpend: 0n, tokenSpend: this.token && call.token === this.token.toLowerCase() ? call.amount : 0n, data: new ContractCaller(this.client, call.token, Erc20Abi).encode("transfer", [call.to, call.amount]), gasLimit: 0, claims: [claim] };
         break;
       case "call":
         plan = { to: call.to, value: call.amount, nativeSpend: call.amount, data: "0x" + call.data, gasLimit: 0, claims: [claim] };

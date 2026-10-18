@@ -203,6 +203,17 @@ export function isTxAlreadyKnownError(ex: any): boolean {
   return TX_ALREADY_KNOWN_PATTERN.test(rpcErrorString(ex));
 }
 
+const TRANSIENT_REJECTION_PATTERN = /txpool is full|transaction pool is full|pool is full|too many pending|too many requests|rate limit|try again|temporarily|in-flight transaction limit|future transaction tries to replace pending/i;
+
+/**
+ * A definite no about this moment, not about the transaction: the pool is full, the node is
+ * throttling, a delegated account's one in-flight slot is taken. The same bytes are worth
+ * sending again later, so such an answer is treated like an unanswered broadcast.
+ */
+export function isTransientRejection(ex: any): boolean {
+  return TRANSIENT_REJECTION_PATTERN.test(rpcErrorString(ex));
+}
+
 /**
  * The text of an error as the faucet logs or shows it: viem's short message plus the node's own
  * message (`details`), with every URL in it redacted (viem quotes the endpoint URL in transport errors).

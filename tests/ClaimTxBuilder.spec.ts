@@ -113,10 +113,16 @@ describe("Claim transaction builder", () => {
     });
 
     it("counts the faucet token's units a template moves, for the wallet's spend check", async () => {
-      let own = await (() => { let b = new ClaimTxBuilder(fakeClient, WALLET, TOKEN, { calls: [{ type: "token", token: "{token}", to: "{target}", amount: "{amount}" }] }, null); return b.buildPlan([c1]); })();
+      let own = await new ClaimTxBuilder(fakeClient, WALLET, TOKEN, { calls: [{ type: "token", token: "{token}", to: "{target}", amount: "{amount}" }] }, null).buildPlan([c1]);
       expect(own.tokenSpend).to.equal(100n);
+      // the configured address is usually checksummed, the resolved one is lower case
+      let checksummed = "0x00000000000000000000000000000000000000Bb";
+      let viaChecksum = await new ClaimTxBuilder(fakeClient, WALLET, checksummed, { calls: [{ type: "token", token: checksummed, to: "{target}", amount: "{amount}" }] }, null).buildPlan([c1]);
+      expect(viaChecksum.tokenSpend).to.equal(100n, "case does not hide the faucet token");
       let other = await new ClaimTxBuilder(fakeClient, WALLET, TOKEN, { calls: [{ type: "token", token: CONTRACT, to: "{target}", amount: "{session.tokenAmount}" }] }, null).buildPlan([c1]);
       expect(other.tokenSpend).to.equal(0n, "another token is not the faucet's asset");
+      // and the faucet token is not reachable past the count through a raw call
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, checksummed, { calls: [{ type: "call", to: TOKEN, abi: ["function approve(address spender, uint256 amount)"], fn: "approve", args: ["{target}", "{amount}"] }] }, null)).to.throw(/must not be the faucet token contract/);
     });
 
     it("refuses a claim of several calls without batching", async () => {

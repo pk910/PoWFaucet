@@ -1,4 +1,4 @@
-import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, isTransportError, isTxAlreadyKnownError, looksLikeSecret, redactUrl, redactUrlsInText, rpcErrorString } from './rpc/index.js';
+import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, isTransientRejection, isTransportError, isTxAlreadyKnownError, looksLikeSecret, redactUrl, redactUrlsInText, rpcErrorString } from './rpc/index.js';
 
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { EthRpcHostConfig, IRpcEndpointConfig } from '../config/ConfigSchema.js';
@@ -177,8 +177,8 @@ export class RpcEndpointPool {
           hash = '';
         continue;
       }
-      if (isTransportError(r.reason))
-        ambiguous = true;
+      if (isTransportError(r.reason) || isTransientRejection(r.reason))
+        ambiguous = true; // the bytes may be out, or are worth sending again as they are: the receipt watch re-sends them
       else if (!firstRejection)
         firstRejection = r.reason;
       ServiceManager.GetService(FaucetProcess).emitLog(

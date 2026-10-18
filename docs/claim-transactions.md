@@ -57,7 +57,8 @@ What a template may leave to the claim is bounded. The recipient of a `transfer`
 call and the amounts may be placeholders; the contract a `call` targets, the `token` contract
 (a fixed address or `{token}`) and raw `data` are fixed at startup, so a claimant can never pick
 the code the wallet runs and a session can never write the wallet's calldata (values from the
-claim go through `abi`, `fn` and `args`). Before signing, a native faucet's transaction may move
+claim go through `abi`, `fn` and `args`). A `call` may not target the faucet token contract: the
+faucet's own token moves through `token` calls only, where its amount is counted. Before signing, a native faucet's transaction may move
 no more native coin than the claims are worth, and an erc20 faucet's may move no native coin and
 no more of the faucet token than the claims are worth. Other tokens a template moves are bounded
 only by the template and the `{session.<key>}` values modules set: keep user input out of those
@@ -151,9 +152,12 @@ Queue behaviour:
   20 gwei about 550; the faucet logs the limit it applies. Lower `ethTxMaxFee` for bigger batches.
 - A claim is in one transaction, ever. The transaction may be sent again as the same bytes; the
   claim never moves into another one. So a transaction every endpoint refused outright fails its
-  claims as a whole, with one exception: after a moment every endpoint is asked whether it has
-  the transaction after all (a gateway may answer an error after its upstream took the bytes), and
-  if one has, the claims stay pending under it and its receipt decides.
+  claims as a whole, in one statement for all of its rows, with one exception: after a moment
+  every endpoint is asked whether it has the transaction after all (a gateway may answer an error
+  after its upstream took the bytes), and if one has, the claims stay pending under it and its
+  receipt decides. A refusal that is about the moment rather than the transaction (a full pool,
+  a throttling node, a delegated account's in-flight slot) does not fail anything: the claims stay
+  pending and the receipt watch sends the same bytes again until they are taken.
 - A batch that turns out too expensive for `ethTxFeeCap` while it is planned is not signed at
   all (no transaction exists yet); its claims go back and the queue continues in the size that
   fits. The same check fails a single claim whose transaction would be above the cap.

@@ -147,7 +147,7 @@ export class EthClaimManager {
           delete this.pendingTxQueue[txHash];
           if(err instanceof TransactionRejectedError && await this.keepRefusedIfKnown(claims, err.message))
             return;
-          this.failClaims(claims, "Processing Exception: " + rpcErrorString(err));
+          await this.failClaims(claims, "Processing Exception: " + rpcErrorString(err));
         }));
       } else {
         this.awaitTxReceipt(claims, ethWalletManager.watchClaimTx(claims[0]), txHash);
@@ -391,12 +391,18 @@ export class EthClaimManager {
     return claims;
   }
 
-  /** These claims end failed, with the error for the client; their rows are written one by one (each row's status is its own). */
-  private failClaims(claims: EthClaimInfo[], error: string): "failed" {
-    claims.forEach((claimTx) => {
+  /**
+   * These claims end failed, with the error for the client. The rows change in one awaited
+   * statement before memory does: a crash in between leaves either a transaction a restart replays
+   * for every one of its claims, or none, never a replay that pays claims already marked failed.
+   */
+  private async failClaims(claims: EthClaimInfo[], error: string): Promise<"failed"> {
+    let failed = claims.map((claimTx) => ({ sessionId: claimTx.session, claimData: { ...claimTx.claim, claimStatus: ClaimTxStatus.FAILED, txError: error } }));
+    await ServiceManager.GetService(FaucetDatabase).failClaimsBulk(failed);
+    claims.forEach((claimTx, idx) => {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = error;
-      this.updateClaimStatus(claimTx);
+      claimTx.claim = failed[idx].claimData;
     });
     return "failed";
   }
@@ -405,7 +411,7 @@ export class EthClaimManager {
   private async processQueueTxs(claims: EthClaimInfo[]): Promise<"sent" | "failed" | "requeued"> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let walletState = ethWalletManager.getWalletState();
-    let failAll = (error: string): "failed" => this.failClaims(claims, error);
+    let failAll = (error: string): Promise<"failed"> => this.failClaims(claims, error);
     if(!walletState.ready)
       return failAll("Network RPC is currently unreachable.");
     let totalAmount = claims.reduce((sum, claimTx) => sum + BigInt(claimTx.amount), 0n);
