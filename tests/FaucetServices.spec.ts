@@ -41,6 +41,7 @@ describe("Faucet Services", () => {
 
   describe("Stats Log", () => {
     it("Check session stats processing", async () => {
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // a completing session writes its row before it is claimable
       faucetConfig.faucetLogStatsInterval = 1;
       faucetConfig.maxDropAmount = 100000;
       faucetConfig.minDropAmount = 10000;
@@ -406,6 +407,7 @@ describe("Faucet Services", () => {
     });
 
     it("Check status filter: ipinfo.hosting / proxy", async () => {
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // a completing session writes its row before it is claimable
       let statusSvc = ServiceManager.GetService(FaucetStatus);
       statusSvc.initialize();
       let statusEntry1 = statusSvc.setFaucetStatus("test1", "Test status 1", FaucetStatusLevel.ERROR, 10);

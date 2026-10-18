@@ -98,6 +98,27 @@ describe("Claim transaction builder", () => {
       expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ ...templateCall, fn: "nope" }] }, null)).to.throw(/'nope' is not in its abi/);
     });
 
+    it("keeps the contract, the token and raw calldata the operator's: fixed at startup, never from the claim", () => {
+      // the claimant must not pick the code the wallet runs
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ ...templateCall, to: "{target}" }] }, null)).to.throw(/call to must be a fixed address/);
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ ...templateCall, to: "{session.contract}" }] }, null)).to.throw(/call to must be a fixed address/);
+      // nor a session write the wallet's calldata
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, data: "{session.data}", value: "0" }] }, null)).to.throw(/call data must be fixed hex/);
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "call", to: CONTRACT, data: "0xdeadbeef", value: "0" }] }, null)).to.not.throw();
+      // the token is the configured one or a fixed address
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, TOKEN, { calls: [{ type: "token", token: "{target}", to: "{target}", amount: "{amount}" }] }, null)).to.throw(/token token must be a fixed address or \{token\}/);
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, TOKEN, { calls: [{ type: "token", token: "{token}", to: "{target}", amount: "{amount}" }] }, null)).to.not.throw();
+      // the recipient of a transfer is the claim's: that is the payout
+      expect(() => new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "transfer", to: "{target}", amount: "{amount}" }] }, null)).to.not.throw();
+    });
+
+    it("counts the faucet token's units a template moves, for the wallet's spend check", async () => {
+      let own = await (() => { let b = new ClaimTxBuilder(fakeClient, WALLET, TOKEN, { calls: [{ type: "token", token: "{token}", to: "{target}", amount: "{amount}" }] }, null); return b.buildPlan([c1]); })();
+      expect(own.tokenSpend).to.equal(100n);
+      let other = await new ClaimTxBuilder(fakeClient, WALLET, TOKEN, { calls: [{ type: "token", token: CONTRACT, to: "{target}", amount: "{session.tokenAmount}" }] }, null).buildPlan([c1]);
+      expect(other.tokenSpend).to.equal(0n, "another token is not the faucet's asset");
+    });
+
     it("refuses a claim of several calls without batching", async () => {
       let err: any;
       try { await new ClaimTxBuilder(fakeClient, WALLET, null, twoCalls, null).buildPlan([c1]); } catch(ex) { err = ex; }
@@ -146,12 +167,12 @@ describe("Claim transaction builder", () => {
       faucetConfig.ethTxMaxFee = 250000000000; // 250 gwei
       faucetConfig.ethTxFeeCap = 1000000000000000000; // 1 ETH: 4M gas affordable
       let builder = activeBuilder(null, null, { maxClaims: 1000, maxWaitSeconds: 0 });
-      // (4M - the batch base) / (65k stipend + 15k + 16 * 33 bytes) per plain transfer
-      expect(builder.feeCapBatchSize()).to.equal(60);
-      expect(builder.getBatchSize()).to.equal(60, "the cap, not maxClaims");
-      expect(activeBuilder(null, null, { maxClaims: 50, maxWaitSeconds: 0 }).getBatchSize()).to.equal(50, "maxClaims when it is the smaller one");
+      // (4M - the batch base) / (50k stipend + 40k around the call + 16 * 33 bytes) per plain transfer
+      expect(builder.feeCapBatchSize()).to.equal(43);
+      expect(builder.getBatchSize()).to.equal(43, "the cap, not maxClaims");
+      expect(activeBuilder(null, null, { maxClaims: 40, maxWaitSeconds: 0 }).getBatchSize()).to.equal(40, "maxClaims when it is the smaller one");
       faucetConfig.ethTxMaxFee = 20000000000; // 20 gwei: 50M gas affordable
-      expect(builder.feeCapBatchSize()).to.equal(762);
+      expect(builder.feeCapBatchSize()).to.equal(551);
       faucetConfig.ethTxFeeCap = 0;
       expect(builder.getBatchSize()).to.equal(1000, "no cap, maxClaims");
       // a token transfer reserves more gas per claim
@@ -174,9 +195,16 @@ describe("Claim transaction builder", () => {
       expect(err).to.be.instanceOf(BatchTooExpensiveError);
       expect(err.gasLimit).to.equal(1200000, "the node's estimate plus 20 %");
       expect(err.fit).to.equal(2, "(1M - the batch base) / the per-claim share of the limit");
-      // a single claim is never refused here: the node has the last word on it
-      let plan = await builder.buildPlan([c1]);
-      expect(plan.gasLimit).to.equal(1200000);
+      // a single claim above the cap cannot be made smaller: it fails, with the reason
+      err = null;
+      try { await builder.buildPlan([c1]); } catch(ex) { err = ex; }
+      expect(err).to.not.be.instanceOf(BatchTooExpensiveError);
+      expect(err?.message).to.match(/above ethTxFeeCap .* a node would refuse it/);
+      // the same for a plain transaction
+      estimateResult = 1000000n;
+      err = null;
+      try { await new ClaimTxBuilder(fakeClient, WALLET, null, { calls: [{ type: "transfer", to: "{target}", amount: "{amount}" }], gasLimit: "estimate" }, null).buildPlan([c1]); } catch(ex) { err = ex; }
+      expect(err?.message).to.match(/above ethTxFeeCap/);
       // and no cap, no refusal
       faucetConfig.ethTxFeeCap = 0;
       expect((await builder.buildPlan([c1, c2, c3])).gasLimit).to.equal(1200000);

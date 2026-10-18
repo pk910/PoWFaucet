@@ -643,7 +643,6 @@ describe("ETH Claim Manager", () => {
       await claimManager.processQueue();
       expect(globalStubs["EthWalletManager.sendClaimBatch"].callCount).to.equal(1, "the plan of three was refused");
       expect(claims.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE], "nothing failed, nothing signed");
-      expect(claims.map((c) => c.claim.txAttempts)).to.deep.equal([undefined, undefined, undefined], "not a refused broadcast");
 
       await claimManager.processQueue();
       expect(globalStubs["EthWalletManager.sendClaimTx"].callCount).to.equal(1, "one claim fits: the first goes alone");

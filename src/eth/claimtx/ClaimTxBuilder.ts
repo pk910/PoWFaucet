@@ -13,6 +13,8 @@ export interface ClaimTxPlan {
   value: bigint;
   /** native coin leaving the wallet in total: `value`, plus what a batch moves from the wallet balance inside `execute` */
   nativeSpend: bigint;
+  /** units of the faucet's own token leaving the wallet (erc20 faucets); other tokens a template moves are not counted here */
+  tokenSpend?: bigint;
   data: string;
   gasLimit: number;
   claims: EthClaimInfo[];
@@ -61,12 +63,39 @@ export class ClaimTxBuilder {
     if(this.config) {
       if(!Array.isArray(this.config.calls) || this.config.calls.length === 0)
         throw new Error("ethClaimTx.calls must list at least one call");
-      for(let call of this.config.calls) {
-        if(call.type === "call" && call.abi && call.fn && !new ContractCaller(null, "0x0000000000000000000000000000000000000000", call.abi).hasFunction(call.fn))
-          throw new Error("ethClaimTx call fn '" + call.fn + "' is not in its abi");
-      }
+      for(let call of this.config.calls)
+        ClaimTxBuilder.checkTemplateCall(call);
     }
     this.batcher = new ContractCaller(this.client, this.walletAddr, BATCHER_ABI);
+  }
+
+  /**
+   * What a template may leave to the claim and what it may not. The recipient of a transfer and
+   * the amounts are the claim's business, and `{session.<key>}` values are a module's. But the
+   * contract the wallet calls, the token it moves and raw calldata are the operator's and fixed at
+   * startup: a target taken from the claim would let a claimant pick the code the faucet wallet
+   * runs, and placeholders in raw calldata would let a session write the wallet's calls.
+   */
+  private static checkTemplateCall(call: IClaimCall): void {
+    let fixedAddress = (value: unknown, what: string, alsoAllowed: string[] = []) => {
+      if(typeof value === "string" && (/^0[xX][0-9a-fA-F]{40}$/.test(value) || alsoAllowed.indexOf(value) !== -1))
+        return;
+      throw new Error("ethClaimTx " + call.type + " " + what + " must be a fixed address" + (alsoAllowed.length ? " or " + alsoAllowed.join("/") : "") + ", not " + String(value));
+    };
+    switch(call.type) {
+      case "transfer":
+        break;
+      case "token":
+        fixedAddress(call.token, "token", ["{token}"]);
+        break;
+      case "call":
+        fixedAddress(call.to, "to");
+        if(call.data !== undefined && !/^0[xX]([0-9a-fA-F]{2})*$/.test(String(call.data)))
+          throw new Error("ethClaimTx call data must be fixed hex, not " + String(call.data) + " (use abi, fn and args for values from the claim)");
+        if(call.abi && call.fn && !new ContractCaller(null, "0x0000000000000000000000000000000000000000", call.abi).hasFunction(call.fn))
+          throw new Error("ethClaimTx call fn '" + call.fn + "' is not in its abi");
+        break;
+    }
   }
 
   /** The calls one claim consists of. */
@@ -156,32 +185,55 @@ export class ClaimTxBuilder {
         plan = { to: call.to, value: call.amount, nativeSpend: call.amount, data: "0x", gasLimit: 0, claims: [claim] };
         break;
       case "token":
-        plan = { to: call.token, value: 0n, nativeSpend: 0n, data: new ContractCaller(this.client, call.token, Erc20Abi).encode("transfer", [call.to, call.amount]), gasLimit: 0, claims: [claim] };
+        plan = { to: call.token, value: 0n, nativeSpend: 0n, tokenSpend: call.token === this.token ? call.amount : 0n, data: new ContractCaller(this.client, call.token, Erc20Abi).encode("transfer", [call.to, call.amount]), gasLimit: 0, claims: [claim] };
         break;
       case "call":
         plan = { to: call.to, value: call.amount, nativeSpend: call.amount, data: "0x" + call.data, gasLimit: 0, claims: [claim] };
         break;
     }
     plan.gasLimit = await this.resolveGasLimit(this.config?.gasLimit, undefined, 1, plan);
+    this.checkFeeCap(plan.gasLimit, [claim]);
     return plan;
   }
 
   /**
    * The gas a batch needs if every sub-call burns all it may: the transaction base, the calldata,
-   * the batcher's own work per sub-call and each sub-call's stipend. The plan's gas limit is at
-   * least this, whatever the configuration says, so no recipient can make the whole batch run out
-   * of gas by using up its own.
+   * and per sub-call its stipend plus what the caller pays around it. For a call that carries
+   * value that is a cold account (2600), the value transfer (9000) and, for a recipient the chain
+   * has never seen, its creation (25000), plus the batcher's own loop and the failure event: about
+   * 40k on top of the stipend. A token transfer calls a contract without value: 15k. The plan's gas
+   * limit is at least this, whatever the configuration says, so no recipient can make the whole
+   * batch run out of gas by using up its own.
    */
   public static worstCaseBatchGas(calls: ResolvedClaimCall[], dataBytes: number): number {
     let gas = 21000 + 16 * dataBytes + 30000; // base, calldata (worst case, no zero bytes), execute's own frame
     for(let call of calls) {
       switch(call.type) {
-        case "transfer": gas += BATCHER_TRANSFER_GAS + 15000; break;
+        case "transfer": gas += BATCHER_TRANSFER_GAS + 40000; break;
         case "token": gas += BATCHER_TRANSFER_GAS * 2 + 15000; break;
-        case "call": gas += (call.gas ?? DEFAULT_CALL_GAS) + 15000; break;
+        case "call": gas += (call.gas ?? DEFAULT_CALL_GAS) + 40000; break;
       }
     }
     return gas;
+  }
+
+  /**
+   * A node refuses a transaction whose gas limit times max fee is above its fee cap, so a plan
+   * above ethTxFeeCap is refused here, before anything is signed. A batch of several claims says
+   * how many would fit (BatchTooExpensiveError, the queue sends that many); one claim that does not
+   * fit cannot be made smaller and fails.
+   */
+  private checkFeeCap(gasLimit: number, claims: EthClaimInfo[]): void {
+    if(!(faucetConfig.ethTxFeeCap > 0) || !(faucetConfig.ethTxMaxFee > 0))
+      return;
+    if(BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee) <= BigInt(faucetConfig.ethTxFeeCap))
+      return;
+    if(claims.length <= 1)
+      throw new Error("the transaction's gas limit " + gasLimit + " times ethTxMaxFee is above ethTxFeeCap (" + faucetConfig.ethTxFeeCap + " wei); a node would refuse it");
+    let base = ClaimTxBuilder.worstCaseBatchGas([], 4 + 64);
+    let perClaim = (gasLimit - base) / claims.length;
+    let fit = Math.floor((Math.floor(faucetConfig.ethTxFeeCap / faucetConfig.ethTxMaxFee) - base) / perClaim);
+    throw new BatchTooExpensiveError(claims.length, gasLimit, Math.max(1, Math.min(claims.length - 1, fit)));
   }
 
   private async buildBatchPlan(claims: EthClaimInfo[]): Promise<ClaimTxPlan> {
@@ -191,16 +243,10 @@ export class ClaimTxBuilder {
     let data = this.batcher.encode("execute", [stream.calls]);
     let gasLimit = await this.resolveGasLimit(this.batchConfig.gasLimit, this.batchConfig.gasLimitPerClaim, claims.length, { to: this.walletAddr, value: 0n, data });
     gasLimit = Math.max(gasLimit, ClaimTxBuilder.worstCaseBatchGas(stream.resolved, (data.length - 2) / 2));
-    // the exact check behind feeCapBatchSize's estimate: the limit the node sees times the max fee
-    if(claims.length > 1 && faucetConfig.ethTxFeeCap > 0 && faucetConfig.ethTxMaxFee > 0 && BigInt(gasLimit) * BigInt(faucetConfig.ethTxMaxFee) > BigInt(faucetConfig.ethTxFeeCap)) {
-      let base = ClaimTxBuilder.worstCaseBatchGas([], 4 + 64);
-      let perClaim = (gasLimit - base) / claims.length;
-      let fit = Math.floor((Math.floor(faucetConfig.ethTxFeeCap / faucetConfig.ethTxMaxFee) - base) / perClaim);
-      throw new BatchTooExpensiveError(claims.length, gasLimit, Math.max(1, Math.min(claims.length - 1, fit)));
-    }
+    this.checkFeeCap(gasLimit, claims); // the exact check behind feeCapBatchSize's estimate
     let callRanges = claims.map((claim, idx) => ({ offset: idx * stream.callsPerClaim, count: stream.callsPerClaim }));
     // the wallet pays the calls from its own balance inside execute: nothing rides on the transaction
-    return { to: this.walletAddr, value: 0n, nativeSpend: stream.value, data, gasLimit, claims, callRanges };
+    return { to: this.walletAddr, value: 0n, nativeSpend: stream.value, tokenSpend: stream.tokenValue, data, gasLimit, claims, callRanges };
   }
 
   /**

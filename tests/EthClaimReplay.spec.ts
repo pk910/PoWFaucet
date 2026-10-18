@@ -244,6 +244,27 @@ describe("ETH Claim Replay", () => {
     expect(receiptCalls).to.be.greaterThanOrEqual(4);
   });
 
+  it("admits a claim exactly once for a session the database has never seen", async () => {
+    fakeProvider.injectResponse("eth_sendRawTransaction", TX_HASH_RSP);
+    await startWallet();
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+    // no row for this session: two requests race for the first write of it
+    let session = sessionData("0d9f0c2e-6a1b-4f58-9d3e-7b2c1a5e8f40");
+    let results = await Promise.allSettled([
+      claimManager.createSessionClaim({ ...session }, {}),
+      claimManager.createSessionClaim({ ...session, claim: null }, {}),
+    ]);
+    let admitted = results.filter((r) => r.status === "fulfilled");
+    let refused = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+    expect(admitted.length).to.equal(1, "exactly one claim for the session");
+    expect(refused.length).to.equal(1);
+    expect(refused[0].reason?.getCode?.()).to.equal("RACE_CLAIMING");
+    expect(claimManager.getTransactionQueue().filter((c) => c.session === session.sessionId).length).to.equal(1, "one entry in the queue");
+    let row = await ServiceManager.GetService(FaucetDatabase).getSession(session.sessionId);
+    expect(row.status).to.equal(FaucetSessionStatus.CLAIMING, "the row was created as claiming");
+  });
+
   it("admits a claim exactly once: the row is the arbiter", async () => {
     fakeProvider.injectResponse("eth_sendRawTransaction", TX_HASH_RSP);
     fakeProvider.injectResponse("eth_getTransactionReceipt", receipt());
@@ -295,7 +316,8 @@ describe("ETH Claim Replay", () => {
     expect(sends).to.equal(1, "no retry for a transaction the node already has");
   });
 
-  it("queues a refused claim again with the nonce freed, and fails it after the third refusal", async () => {
+  it("fails the claim on a definite rejection nobody holds, and frees the nonce", async function() {
+    this.timeout(15000);
     let sends = 0;
     fakeProvider.injectResponse("eth_sendRawTransaction", () => {
       sends++;
@@ -307,18 +329,12 @@ describe("ETH Claim Replay", () => {
     await claimManager.initialize();
 
     let claim = await claimManager.createSessionClaim(sessionData(), {});
-    for(let attempt = 1; attempt <= 3; attempt++) {
-      await claimManager.processQueue();
-      expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.QUEUE, "refusal " + attempt + ": queued again");
-      expect(claim.claim.txAttempts).to.equal(attempt);
-      expect(claim.claim.txHash).to.equal(undefined, "the refused transaction is forgotten");
-      expect(sends).to.equal(attempt, "one broadcast per tick, no retry of a definite no");
-      expect(ServiceManager.GetService(EthWalletManager).getWalletState().nonce).to.equal(42, "nonce reloaded from the node");
-    }
     await claimManager.processQueue();
-    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.FAILED);
+    expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "a claim is in one transaction only: refused means failed, never queued again");
     expect(claim.claim.txError).to.match(/insufficient funds/);
-    expect(sends).to.equal(4);
+    expect(claim.claim.txHash).to.not.equal(undefined, "the claim keeps the transaction it was in");
+    expect(sends).to.equal(1, "a rejection is not retried");
+    expect(ServiceManager.GetService(EthWalletManager).getWalletState().nonce).to.equal(42, "nonce reloaded from the node");
     await awaitSleepPromise(500, () => false);
     let storedSession = await ServiceManager.GetService(FaucetDatabase).getSession(claim.session);
     expect(storedSession.status).to.equal(FaucetSessionStatus.FAILED, "a failed row is not replayed after a restart");

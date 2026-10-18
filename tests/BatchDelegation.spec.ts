@@ -216,37 +216,37 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     expect(chain.code[WALLET.toLowerCase()]).to.equal(foreign, "the foreign delegation is untouched");
   });
 
-  it("queues the claims of a refused batch again and halves the batch size", async () => {
-    let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [executedLog(2)], refuseBatchesOver: 2 });
+  it("fails a refused batch as a whole: its claims never move into another transaction", async () => {
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, refuseBatchesOver: 2, batchLogs: [executedLog(1)] }); // the single claim at the end runs the batcher
     let { wallet, claims } = await start();
     let list: any[] = [];
     for(let i = 1; i <= 4; i++)
       list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
 
-    await claims.processQueue(); // setup, then a batch of 4: refused
+    await claims.processQueue(); // setup, then a batch of 4: refused by every endpoint, known by none
     expect(chain.attempts.length).to.equal(3, "deploy, delegate, the refused batch");
     expect(chain.sent.length).to.equal(2, "the refused batch is not on the chain");
-    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE, ClaimTxStatus.QUEUE], "queued again, not failed");
-    expect(list.map((c) => c.claim.txAttempts)).to.deep.equal([1, 1, 1, 1]);
-    expect(list[0].claim.txHash).to.equal(undefined, "the refused transaction is forgotten");
-    let row = await ServiceManager.GetService(FaucetDatabase).getSession(list[0].session);
-    expect(row.status).to.equal(FaucetSessionStatus.CLAIMING, "still ours to pay");
-    expect(row.claim.txHex).to.equal(undefined, "nothing to replay after a restart");
-
-    // half the size goes through, batch by batch
-    for(let i = 0; i < 6 && list.some((c) => c.claim.claimStatus !== ClaimTxStatus.CONFIRMED); i++) {
-      await claims.processQueue();
-      await awaitSleepPromise(1500, () => list.filter((c) => c.claim.claimStatus === ClaimTxStatus.CONFIRMED).length >= 2 * (i + 1));
+    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.FAILED), "the batch failed as one");
+    expect(list[0].claim.txError).to.match(/tx fee .* exceeds/);
+    expect(new Set(list.map((c) => c.claim.txHash)).size).to.equal(1, "every claim keeps the one transaction it was in");
+    let database = ServiceManager.GetService(FaucetDatabase);
+    for(let c of list) {
+      let row = await database.getSession(c.session);
+      expect(row.status).to.equal(FaucetSessionStatus.FAILED, "a failed row is not replayed and not claimed again");
     }
-    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal([ClaimTxStatus.CONFIRMED, ClaimTxStatus.CONFIRMED, ClaimTxStatus.CONFIRMED, ClaimTxStatus.CONFIRMED]);
-    let batches = chain.sent.slice(2).map((s) => (decodeFunctionData({ abi: BATCHER_ABI, data: s.tx.data }).args[0] as string).length / 2 / 33);
-    expect(batches.map(Math.floor)).to.deep.equal([2, 2], "two batches of two");
-    expect(list[0].claim.txHash).to.equal(list[1].claim.txHash);
-    expect(list[2].claim.txHash).to.equal(list[3].claim.txHash);
-    expect(list[0].claim.txHash).to.not.equal(list[2].claim.txHash);
-  });
+    expect(claims.getTransactionQueue().filter((c) => c.claim.claimStatus === ClaimTxStatus.QUEUE).length).to.equal(0, "nothing queued again");
+    expect(wallet.getWalletState().nonce).to.equal(42, "the nonce was reloaded from the node (the fake chain never advances its count)");
 
-  it("keeps a refused batch pending when an endpoint has it after all, and settles it by that receipt", async () => {
+    // the queue goes on with new claims as before
+    let c5 = await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-000000000005", "0x0000000000000000000000000000000000001005", "1000"), {});
+    await claims.processQueue();
+    await awaitSleepPromise(3000, () => c5.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    expect(c5.claim.claimStatus).to.equal(ClaimTxStatus.CONFIRMED);
+    expect(chain.sent[2].tx.nonce).to.equal(42, "the next transaction takes the reloaded nonce");
+  }).timeout(15000);
+
+  it("keeps a refused batch pending when an endpoint has it after all, and settles it by that receipt", async function() {
+    this.timeout(15000);
     let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [executedLog(4)], refuseBatchesOver: 2, refusedStillKnown: true });
     let { claims } = await start();
     let list: any[] = [];
@@ -254,34 +254,12 @@ describe("ETH Claim Batching (EIP-7702)", () => {
       list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
 
     await claims.processQueue();
-    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.PENDING), "refused by the answer, known by the node: pending, not queued again");
-    expect(list.map((c) => c.claim.txAttempts)).to.deep.equal([undefined, undefined, undefined, undefined]);
+    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.PENDING), "refused by the answer, known by the node: pending, not failed");
     expect(list[0].claim.txHash).to.not.equal(undefined, "the transaction is kept");
-    await awaitSleepPromise(3000, () => list.every((c) => c.claim.claimStatus === ClaimTxStatus.CONFIRMED));
+    await awaitSleepPromise(6000, () => list.every((c) => c.claim.claimStatus === ClaimTxStatus.CONFIRMED));
     expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.CONFIRMED));
     expect(new Set(list.map((c) => c.claim.txHash)).size).to.equal(1, "paid by the one transaction the node had");
     expect(chain.attempts.length).to.equal(3, "deploy, delegate, the batch: nothing else was sent");
-  });
-
-  it("fails a refused batch whose rows do not all give up the transaction, instead of queueing part of it", async () => {
-    let chain = fakeChain({ deployerPresent: true, eip7702: true, refuseBatchesOver: 2 });
-    let { claims } = await start();
-    let list: any[] = [];
-    for(let i = 1; i <= 4; i++)
-      list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
-    // the rows take the signed transaction (first bulk write), but not the requeue (second): one row changed hands meanwhile
-    let realBulk = FaucetDatabase.prototype.updateClaimDataBulk;
-    let bulk = sinon.stub(FaucetDatabase.prototype, "updateClaimDataBulk").callsFake(function(this: FaucetDatabase, updates) {
-      return bulk.callCount === 1 ? realBulk.call(this, updates) : Promise.resolve(3);
-    });
-    globalStubs["updateClaimDataBulk"] = bulk;
-
-    await claims.processQueue();
-    expect(bulk.callCount).to.equal(2, "persist, then the all-or-nothing requeue");
-    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.FAILED), "no half-requeued batch");
-    expect(list[0].claim.txError).to.match(/tx fee .* exceeds/);
-    expect(claims.getTransactionQueue().filter((c) => c.claim.claimStatus === ClaimTxStatus.QUEUE).length).to.equal(0, "nothing queued");
-    expect(chain.sent.length).to.equal(2, "deploy and delegate only");
   });
 
   it("deploys the batcher, delegates the wallet, then pays a batch through execute on itself", async () => {

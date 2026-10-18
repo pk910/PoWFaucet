@@ -310,7 +310,8 @@ export class FaucetSession {
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
     this.manager.notifySessionUpdate(this);
     this.setSessionData("close.time", Math.floor((new Date()).getTime() / 1000));
-    this.saveSession();
+    // the row is written before the session is reported claimable: the claim admission goes through the row
+    await this.saveSession();
     this.isDisposed = true;
   }
 

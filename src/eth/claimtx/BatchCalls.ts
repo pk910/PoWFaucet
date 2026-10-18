@@ -43,6 +43,8 @@ export interface EncodedBatchCalls {
   resolved: ResolvedClaimCall[];
   /** native coin the stream moves out of the wallet, in wei */
   value: bigint;
+  /** units of the faucet's own token (`ctx.token`) the stream moves out of the wallet */
+  tokenValue: bigint;
   /** calls per claim: the position of a failed sub-call divided by this is the claim's position */
   callsPerClaim: number;
 }
@@ -131,6 +133,7 @@ export function encodeBatchCalls(templates: IClaimCall[], claims: EthClaimInfo[]
     throw new Error("ethClaimTx.calls is empty");
   let hex = "";
   let value = 0n;
+  let tokenValue = 0n;
   let resolved: ResolvedClaimCall[] = [];
   for(let claim of claims) {
     for(let template of templates) {
@@ -139,7 +142,9 @@ export function encodeBatchCalls(templates: IClaimCall[], claims: EthClaimInfo[]
       hex += packClaimCall(call);
       if(call.type !== "token")
         value += call.amount;
+      else if(ctx.token && call.token === ctx.token.toLowerCase())
+        tokenValue += call.amount;
     }
   }
-  return { calls: "0x" + hex, value, resolved, callsPerClaim: templates.length };
+  return { calls: "0x" + hex, value, tokenValue, resolved, callsPerClaim: templates.length };
 }

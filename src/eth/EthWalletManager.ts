@@ -501,8 +501,13 @@ export class EthWalletManager {
    */
   private checkPlanFunds(plan: ClaimTxPlan, claims: EthClaimInfo[]) {
     let totalAmount = claims.reduce((sum, claim) => sum + BigInt(claim.amount), 0n);
+    // the faucet's own asset is bounded by what the claims are worth; an erc20 faucet moves no native coin at all
     if(!this.tokenState && plan.nativeSpend > totalAmount)
       throw new Error("transaction sends " + plan.nativeSpend.toString() + " wei, more than the claims' " + totalAmount.toString());
+    if(this.tokenState && plan.nativeSpend > 0n)
+      throw new Error("transaction sends " + plan.nativeSpend.toString() + " wei of native coin from an erc20 faucet");
+    if(this.tokenState && (plan.tokenSpend ?? 0n) > totalAmount)
+      throw new Error("transaction sends " + (plan.tokenSpend ?? 0n).toString() + " token units, more than the claims' " + totalAmount.toString());
     if(!this.walletState.ready)
       return;
     let gasReserve = BigInt(plan.gasLimit) * BigInt(faucetConfig.ethTxMaxFee);

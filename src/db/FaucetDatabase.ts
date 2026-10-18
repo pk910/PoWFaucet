@@ -449,21 +449,39 @@ export class FaucetDatabase {
   }
 
   /**
-   * claimable -> claiming for exactly this session: the compare-and-swap that admits a claim.
-   * "conflict" when the row exists but is not claimable any more (claimed already, by this process
-   * or another); "missing" when there is no row yet (a session handed in without being stored,
-   * the caller writes it whole).
+   * Admits exactly one claim for a session: the row goes claimable -> claiming in one conditional
+   * update, or, for a session that was never stored, is inserted as claiming, where the primary key
+   * lets exactly one of two concurrent inserts through. False when someone else got there first.
+   * `session` is the row as it should read afterwards (status claiming, the claim data set).
    */
-  public async startClaim(sessionId: string, dropAmount: string, claimData: EthClaimData): Promise<"claimed" | "conflict" | "missing"> {
+  public async startClaim(session: FaucetSessionStoreData): Promise<boolean> {
+    let claimData = JSON.stringify(session.claim);
     let result = await this.db.run("UPDATE Sessions SET Status = 'claiming', DropAmount = ?, ClaimData = ? WHERE SessionId = ? AND Status = 'claimable'", [
-      dropAmount,
-      JSON.stringify(claimData),
-      sessionId,
+      session.dropAmount,
+      claimData,
+      session.sessionId,
     ]);
     if(result.changes === 1)
-      return "claimed";
-    let row = await this.db.get("SELECT Status FROM Sessions WHERE SessionId = ?", [sessionId]);
-    return row ? "conflict" : "missing";
+      return true;
+    try {
+      await this.db.run("INSERT INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData) VALUES (?,?,?,?,?,?,?,?,?)", [
+        session.sessionId,
+        FaucetSessionStatus.CLAIMING,
+        session.startTime,
+        session.targetAddr,
+        session.dropAmount,
+        session.remoteIP,
+        JSON.stringify(session.tasks),
+        JSON.stringify(session.data),
+        claimData,
+      ]);
+      return true;
+    } catch(ex) {
+      // the row exists (and is not claimable, or the update above would have taken it): a duplicate key
+      if(/UNIQUE constraint failed|SQLITE_CONSTRAINT|Duplicate entry|ER_DUP_ENTRY/i.test(String(ex)))
+        return false;
+      throw ex;
+    }
   }
 
   public async getClaimableAmount(): Promise<bigint> {

@@ -53,6 +53,16 @@ template applies to.
 `gasLimit` is a number, `"estimate"` (the node's estimate plus 20 %, falling back to
 `ethTxGasLimit` when estimation fails), or omitted for `ethTxGasLimit`.
 
+What a template may leave to the claim is bounded. The recipient of a `transfer` or `token`
+call and the amounts may be placeholders; the contract a `call` targets, the `token` contract
+(a fixed address or `{token}`) and raw `data` are fixed at startup, so a claimant can never pick
+the code the wallet runs and a session can never write the wallet's calldata (values from the
+claim go through `abi`, `fn` and `args`). Before signing, a native faucet's transaction may move
+no more native coin than the claims are worth, and an erc20 faucet's may move no native coin and
+no more of the faucet token than the claims are worth. Other tokens a template moves are bounded
+only by the template and the `{session.<key>}` values modules set: keep user input out of those
+keys, they are what the wallet signs.
+
 A claim with one call is a plain transaction. A claim with several calls (ETH plus a token, say)
 needs `ethClaimBatch`: the wallet's own code executes the calls, see below.
 
@@ -137,16 +147,16 @@ Queue behaviour:
   usually makes the next block.
 - A batch is sized to stay under `ethTxFeeCap` (1 ETH by default, geth's own default): nodes
   refuse a transaction whose gas limit times max fee is above their cap, and a batch's gas limit is
-  its worst case. With `ethTxMaxFee` at 250 gwei that is about 60 plain transfers per batch, with
-  20 gwei about 760; the faucet logs the limit it applies. Lower `ethTxMaxFee` for bigger batches.
-- A batch the network refuses outright (every endpoint answered no, nothing is in a pool) is not
-  failed: its claims are queued again and the next batches are half the size, growing back with
-  every confirmed one. A claim refused three times fails. Before the claims go back, every
-  endpoint is asked whether it has the transaction after all (then it stays pending and its
-  receipt decides), and all rows of the batch give up the signed bytes in one all-or-nothing
-  statement, so a crash cannot leave rows that replay the old batch beside rows that ride a new
-  one. A batch that turns out too expensive for `ethTxFeeCap` while it is planned is not signed at
-  all; it goes back in the size that fits.
+  its worst case. With `ethTxMaxFee` at 250 gwei that is about 43 plain transfers per batch, with
+  20 gwei about 550; the faucet logs the limit it applies. Lower `ethTxMaxFee` for bigger batches.
+- A claim is in one transaction, ever. The transaction may be sent again as the same bytes; the
+  claim never moves into another one. So a transaction every endpoint refused outright fails its
+  claims as a whole, with one exception: after a moment every endpoint is asked whether it has
+  the transaction after all (a gateway may answer an error after its upstream took the bytes), and
+  if one has, the claims stay pending under it and its receipt decides.
+- A batch that turns out too expensive for `ethTxFeeCap` while it is planned is not signed at
+  all (no transaction exists yet); its claims go back and the queue continues in the size that
+  fits. The same check fails a single claim whose transaction would be above the cap.
 - All claims of a batch share the transaction hash, nonce and block. The fee is split evenly
   (remainder on the first claim). The signed transaction hex is kept on the first claim only.
 - A single queued claim is paid through `fn` when the template has one, otherwise through the
@@ -220,8 +230,9 @@ so the faucet fails all its claims rather than confirming them.
   claiming, otherwise it changes nothing, and the bytes only leave the faucet when every row took
   them.
 - A batch transaction's gas limit is at least the worst case, every sub-call burning its whole
-  stipend, whatever `gasLimit` and `gasLimitPerClaim` say. A recipient can waste its own gas,
-  never the batch's.
+  stipend plus what the caller pays around a call that carries value (a cold account, the value
+  transfer, the creation of a recipient the chain has never seen), whatever `gasLimit` and
+  `gasLimitPerClaim` say. A recipient can waste its own gas, never the batch's.
 - One faucet process per wallet. Nonces are allocated in the process; two faucets on one key
   would race for them.
 
