@@ -203,6 +203,17 @@ export function isTxAlreadyKnownError(ex: any): boolean {
   return TX_ALREADY_KNOWN_PATTERN.test(rpcErrorString(ex));
 }
 
+const DEFINITE_REJECTION_PATTERN = /insufficient funds|intrinsic gas too low|exceeds block gas limit|gas limit reached|exceeds the configured cap|invalid sender|invalid signature|invalid transaction|typed transaction too short|rlp:|oversized data|transaction type not supported|only replay-protected|max priority fee per gas higher than max fee per gas/i;
+
+/**
+ * A validation error: the node looked at the bytes and will never admit them, so they are
+ * nowhere. Only such an answer may fail a claim; any other refusal of bytes that were handed to
+ * a node leaves the claim's outcome unknown.
+ */
+export function isDefiniteRejection(ex: any): boolean {
+  return DEFINITE_REJECTION_PATTERN.test(rpcErrorString(ex));
+}
+
 const TRANSIENT_REJECTION_PATTERN = /txpool is full|transaction pool is full|pool is full|too many pending|too many requests|rate limit|try again|temporarily|in-flight transaction limit|future transaction tries to replace pending/i;
 
 /**

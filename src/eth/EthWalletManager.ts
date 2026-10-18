@@ -646,10 +646,18 @@ export class EthWalletManager {
         return "accepted";
       let errorText = rpcErrorString(outcome.error);
       if(outcome.status === "rejected" && !hadAmbiguous) {
-        // every endpoint said no, and nothing before this could have taken it: the bytes are nowhere
-        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txHash + " was rejected: " + errorText);
+        // every endpoint said no, and nothing before this could have taken it. A validation error
+        // means the bytes were never admitted and are nowhere: the claims may fail. Any other no (an
+        // internal error, a gateway that forwarded the bytes before answering) proves nothing about
+        // where the bytes are: the claims end unknown, consumed. Either way the nonce is reloaded,
+        // here on the queue's own path.
         await this.loadWalletState();
-        throw new TransactionRejectedError(errorText);
+        if(outcome.definite) {
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txHash + " was rejected: " + errorText);
+          throw new TransactionRejectedError(errorText);
+        }
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "TX " + txHash + " was refused with an answer that is no validation error, giving it up as unknown: " + errorText);
+        throw new TransactionDroppedError("transaction " + txHash + " was refused with an answer that is no validation error: " + errorText);
       }
       // ambiguous (or rejected after an ambiguous attempt): the bytes may sit in a mempool
       hadAmbiguous = true;

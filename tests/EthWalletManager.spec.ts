@@ -450,7 +450,7 @@ describe("ETH Wallet Manager", () => {
     };
     let claimTx = await ethClaimManager.createSessionClaim(testSessionData, {});
     await ethClaimManager.processQueue();
-    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.FAILED, "unexpected claimTx status");
+    expect(claimTx.claim.claimStatus).to.equal(ClaimTxStatus.UNKNOWN, "an error that is no validation error leaves the outcome unknown, the claim consumed");
     expect(claimTx.claim.txError).contains("test error 57572x", "test error not in failReason");
     let walletState = ethWalletManager.getWalletState();
     expect(!!walletState).equal(true, "no wallet state");

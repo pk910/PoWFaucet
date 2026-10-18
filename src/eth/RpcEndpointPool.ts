@@ -1,4 +1,4 @@
-import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, isTransientRejection, isTransportError, isTxAlreadyKnownError, looksLikeSecret, redactUrl, redactUrlsInText, rpcErrorString } from './rpc/index.js';
+import { EthRpcClient, IEthRpcClient, IRpcProvider, RoutedRpcClient, createRpcProvider, isDefiniteRejection, isTransientRejection, isTransportError, isTxAlreadyKnownError, looksLikeSecret, redactUrl, redactUrlsInText, rpcErrorString } from './rpc/index.js';
 
 import { faucetConfig } from '../config/FaucetConfig.js';
 import { EthRpcHostConfig, IRpcEndpointConfig } from '../config/ConfigSchema.js';
@@ -9,7 +9,8 @@ import { FaucetLogLevel, FaucetProcess } from '../common/FaucetProcess.js';
 export type BroadcastOutcome =
   | { status: "accepted"; hash: string }
   | { status: "ambiguous"; error: any }
-  | { status: "rejected"; error: any };
+  /** `definite`: every refusal was a validation error, so the bytes were never admitted anywhere; false for any other kind of no */
+  | { status: "rejected"; error: any; definite: boolean };
 
 export interface RpcEndpointState {
   config: IRpcEndpointConfig;
@@ -155,7 +156,7 @@ export class RpcEndpointPool {
 
     targets = targets.slice(0, broadcastCount);
     if (targets.length === 0)
-      return { status: 'rejected', error: new Error('no RPC endpoints configured') };
+      return { status: 'rejected', error: new Error('no RPC endpoints configured'), definite: true };
 
     const results = await Promise.allSettled(
       targets.map((ep) => ep.client.sendRawTransaction(rawTxHex))
@@ -164,6 +165,7 @@ export class RpcEndpointPool {
     let hash: string = null;
     let ambiguous = false;
     let firstRejection: any = null;
+    let definite = true;
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       const ep = targets[i];
@@ -179,8 +181,12 @@ export class RpcEndpointPool {
       }
       if (isTransportError(r.reason) || isTransientRejection(r.reason))
         ambiguous = true; // the bytes may be out, or are worth sending again as they are: the receipt watch re-sends them
-      else if (!firstRejection)
-        firstRejection = r.reason;
+      else {
+        if (!firstRejection)
+          firstRejection = r.reason;
+        if (!isDefiniteRejection(r.reason))
+          definite = false;
+      }
       ServiceManager.GetService(FaucetProcess).emitLog(
         FaucetLogLevel.WARNING,
         `Tx broadcast to ${ep.label} failed: ${this.errorString(r.reason)}`
@@ -191,7 +197,7 @@ export class RpcEndpointPool {
       return { status: 'accepted', hash };
     if (ambiguous)
       return { status: 'ambiguous', error: firstRejection || new Error('no RPC endpoint answered the broadcast') };
-    return { status: 'rejected', error: firstRejection || new Error('all tx broadcasts failed') };
+    return { status: 'rejected', error: firstRejection || new Error('all tx broadcasts failed'), definite };
   }
 
   /** The label of an endpoint that has this transaction (pool or chain), null when none does; endpoints that do not answer count as not having it. */

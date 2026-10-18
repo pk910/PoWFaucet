@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
-import { EthWalletManager, PreparedClaimTx, TransactionDroppedError, TransactionRejectedError, WalletState } from "./EthWalletManager.js";
+import { EthWalletManager, PreparedClaimTx, TransactionDroppedError, WalletState } from "./EthWalletManager.js";
 import { BatchTooExpensiveError } from "./claimtx/ClaimTxBuilder.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
@@ -64,8 +64,6 @@ export interface EthClaimData {
   txError?: string;
 }
 
-/** seconds between a refused broadcast and the question to every endpoint whether it has the transaction after all */
-const REFUSAL_RECHECK_DELAY = 2;
 
 export class EthClaimManager {
   private initialized: boolean;
@@ -143,11 +141,12 @@ export class EthClaimManager {
         rebroadcasts.push(rebroadcast.then((res) => {
           this.awaitTxReceipt(claims, res.txPromise, txHash);
         }, async (err) => {
-          // refused by every endpoint: the batch fails as a whole, unless an endpoint has it after all
+          // refused by every endpoint: a validation error fails the batch as a whole, anything else leaves it unknown
           delete this.pendingTxQueue[txHash];
-          if(err instanceof TransactionRejectedError && await this.keepRefusedIfKnown(claims, err.message))
-            return;
-          await this.failClaims(claims, "Processing Exception: " + rpcErrorString(err));
+          if(err instanceof TransactionDroppedError)
+            await this.giveUpClaims(claims, err.message);
+          else
+            await this.failClaims(claims, "Processing Exception: " + rpcErrorString(err));
         }));
       } else {
         this.awaitTxReceipt(claims, ethWalletManager.watchClaimTx(claims[0]), txHash);
@@ -394,19 +393,32 @@ export class EthClaimManager {
   }
 
   /**
-   * These claims end failed, with the error for the client. The rows change in one awaited
-   * statement before memory does: a crash in between leaves either a transaction a restart replays
-   * for every one of its claims, or none, never a replay that pays claims already marked failed.
+   * A claim is in one transaction, ever: the transaction may be sent again as the same bytes, the
+   * claim never moves into another one. When the transaction is not going to be watched any further,
+   * its claims end together, in one awaited statement before memory changes: a crash in between
+   * leaves either a transaction a restart replays for every one of its claims, or none, never a
+   * replay that pays claims already settled. Failed (a validation error: the bytes were never
+   * admitted, the session may claim again) or unknown (anything else: consumed, the operator
+   * reconciles against the chain).
    */
-  private async failClaims(claims: EthClaimInfo[], error: string): Promise<"failed"> {
-    let failed = claims.map((claimTx) => ({ sessionId: claimTx.session, claimData: { ...claimTx.claim, claimStatus: ClaimTxStatus.FAILED, txError: error } }));
-    await ServiceManager.GetService(FaucetDatabase).failClaimsBulk(failed);
+  private async settleClaims(claims: EthClaimInfo[], status: ClaimTxStatus.FAILED | ClaimTxStatus.UNKNOWN, error: string): Promise<"failed"> {
+    let settled = claims.map((claimTx) => ({ sessionId: claimTx.session, claimData: { ...claimTx.claim, claimStatus: status, txError: error } }));
+    await ServiceManager.GetService(FaucetDatabase).settleClaimsBulk(settled, status === ClaimTxStatus.FAILED ? FaucetSessionStatus.FAILED : FaucetSessionStatus.FINISHED);
     claims.forEach((claimTx, idx) => {
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = error;
-      claimTx.claim = failed[idx].claimData;
+      claimTx.claim = settled[idx].claimData;
+      if(status === ClaimTxStatus.UNKNOWN)
+        delete this.claimTxDict[claimTx.session];
     });
     return "failed";
+  }
+
+  private failClaims(claims: EthClaimInfo[], error: string): Promise<"failed"> {
+    return this.settleClaims(claims, ClaimTxStatus.FAILED, error);
+  }
+
+  private giveUpClaims(claims: EthClaimInfo[], reason: string): Promise<"failed"> {
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Transaction for " + claims.length + " claim(s) has an unknown outcome, reconcile by hand: " + reason);
+    return this.settleClaims(claims, ClaimTxStatus.UNKNOWN, "Transaction outcome unknown: " + reason);
   }
 
   /** Pays these claims with one transaction: sent (awaiting its receipt), failed, or queued again after a refused broadcast. */
@@ -461,37 +473,10 @@ export class EthClaimManager {
         this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
         return "requeued";
       }
-      if(ex instanceof TransactionRejectedError && await this.keepRefusedIfKnown(claims, ex.message))
-        return "sent";
+      if(ex instanceof TransactionDroppedError)
+        return this.giveUpClaims(claims, ex.message);
       return failAll("Processing Exception: " + rpcErrorString(ex));
     }
-  }
-
-  /**
-   * A claim is in one transaction, ever: the transaction may be sent again as the same bytes, the
-   * claim never moves into another one. So a transaction every endpoint refused outright fails
-   * its claims as a whole; the one exception is a refusal that was not one. A gateway may answer
-   * an error after its upstream took the bytes, so after a moment every endpoint is asked whether
-   * it has the transaction after all: if one has, the claims stay pending under it and its
-   * receipt decides. True then; false when nobody has it, and the caller fails the claims.
-   */
-  private async keepRefusedIfKnown(claims: EthClaimInfo[], reason: string): Promise<boolean> {
-    let txHash = claims[0].claim.txHash;
-    if(!txHash)
-      return false;
-    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    await new Promise((resolve) => setTimeout(resolve, REFUSAL_RECHECK_DELAY * 1000));
-    let knownBy = await ethWalletManager.endpointKnowingTransaction(txHash);
-    if(!knownBy)
-      return false;
-    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Broadcast of TX " + txHash + " was refused, but " + knownBy + " has it: watching its receipt (" + reason + ")");
-    this.pendingTxQueue[txHash] = claims;
-    claims.forEach((claimTx) => {
-      claimTx.claim.claimStatus = ClaimTxStatus.PENDING;
-      this.updateClaimStatus(claimTx);
-    });
-    this.awaitTxReceipt(claims, ethWalletManager.watchClaimTx(claims[0]), txHash);
-    return true;
   }
 
   /**

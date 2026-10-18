@@ -159,11 +159,14 @@ Queue behaviour:
   its worst case. With `ethTxMaxFee` at 250 gwei that is about 43 plain transfers per batch, with
   20 gwei about 550; the faucet logs the limit it applies. Lower `ethTxMaxFee` for bigger batches.
 - A claim is in one transaction, ever. The transaction may be sent again as the same bytes; the
-  claim never moves into another one. So a transaction every endpoint refused outright fails its
-  claims as a whole, in one statement for all of its rows, with one exception: after a moment
-  every endpoint is asked whether it has the transaction after all (a gateway may answer an error
-  after its upstream took the bytes), and if one has, the claims stay pending under it and its
-  receipt decides. A refusal that is about the moment rather than the transaction (a full pool,
+  claim never moves into another one. A transaction every endpoint refused outright settles its
+  claims as a whole, in one statement for all of its rows, and the kind of answer decides how: a
+  validation error (insufficient funds, intrinsic gas, the node's fee cap, the block gas limit, an
+  invalid sender) means the node looked at the bytes and will never admit them, so they are nowhere
+  and the claims *fail*, the sessions may claim again. Any other no, an internal error, a gateway
+  that forwarded the bytes before answering, proves nothing about where the bytes are: the claims
+  end *unknown*, consumed, and the operator reconciles against the chain. Negative lookups never
+  turn a transaction into a failure. A refusal that is about the moment rather than the transaction (a full pool,
   a throttling node, a delegated account's in-flight slot) does not fail anything: the claims stay
   pending and the receipt watch sends the same bytes again until they are taken. When those
   re-sends get a definite no three times in a row and no endpoint has the bytes, the transaction

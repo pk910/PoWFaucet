@@ -1,7 +1,7 @@
 import 'mocha';
 import { expect } from 'chai';
 import { HttpRequestError, RpcRequestError, TimeoutError, UnknownRpcError } from 'viem';
-import { isTransientRejection, isTransportError, isTxAlreadyKnownError } from '../src/eth/rpc/index.js';
+import { isDefiniteRejection, isTransientRejection, isTransportError, isTxAlreadyKnownError } from '../src/eth/rpc/index.js';
 
 /**
  * What the faucet makes of an error from the node: a lost request (the transaction may be out)
@@ -31,6 +31,17 @@ describe("RPC error classification", () => {
     expect(isTransientRejection(rpcError(-32005, "too many requests, rate limit exceeded"))).to.equal(true);
     expect(isTransientRejection(rpcError(-32000, "tx fee (3.29 ether) exceeds the configured cap (1.00 ether)"))).to.equal(false, "the same bytes would be refused again");
     expect(isTransientRejection(rpcError(-32000, "insufficient funds for gas * price + value"))).to.equal(false);
+  });
+
+  it("knows the validation errors after which the bytes are nowhere, and takes nothing else for one", () => {
+    expect(isDefiniteRejection(rpcError(-32000, "insufficient funds for gas * price + value"))).to.equal(true);
+    expect(isDefiniteRejection(rpcError(-32000, "intrinsic gas too low"))).to.equal(true);
+    expect(isDefiniteRejection(rpcError(-32000, "exceeds block gas limit"))).to.equal(true);
+    expect(isDefiniteRejection(rpcError(-32602, "tx fee (3.29 ether) exceeds the configured cap (1.00 ether)"))).to.equal(true);
+    expect(isDefiniteRejection(rpcError(-32000, "invalid sender"))).to.equal(true);
+    expect(isDefiniteRejection(rpcError(-32603, "internal error"))).to.equal(false, "an internal error says nothing about the bytes");
+    expect(isDefiniteRejection(rpcError(-32000, "txpool is full"))).to.equal(false);
+    expect(isDefiniteRejection(rpcError(-32000, "test error 57572x"))).to.equal(false);
   });
 
   it("knows the answers that mean the node has the transaction already", () => {

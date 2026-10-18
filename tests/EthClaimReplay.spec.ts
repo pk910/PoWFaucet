@@ -316,14 +316,12 @@ describe("ETH Claim Replay", () => {
     expect(sends).to.equal(1, "no retry for a transaction the node already has");
   });
 
-  it("fails the claim on a definite rejection nobody holds, and frees the nonce", async function() {
-    this.timeout(15000);
+  it("fails the claim on a validation error, and frees the nonce", async () => {
     let sends = 0;
     fakeProvider.injectResponse("eth_sendRawTransaction", () => {
       sends++;
-      throw "insufficient funds for gas * price + value";
+      throw "insufficient funds for gas * price + value"; // the node looked at the bytes: they are nowhere
     });
-    fakeProvider.injectResponse("eth_getTransactionByHash", () => null); // a node that refused has nothing
     await startWallet();
     let claimManager = ServiceManager.GetService(EthClaimManager);
     await claimManager.initialize();

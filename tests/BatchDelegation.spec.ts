@@ -79,15 +79,13 @@ describe("ETH Claim Batching (EIP-7702)", () => {
   }
 
   /** a chain: code per address, mined raw transactions, receipts by hash; `batchLogs` are emitted by a batch transaction */
-  function fakeChain(opts: { deployerPresent: boolean; eip7702: boolean; batchLogs?: any[]; failFirstSend?: boolean; refuseBatchesOver?: number; refusedStillKnown?: boolean; poolFullFor?: number }) {
+  function fakeChain(opts: { deployerPresent: boolean; eip7702: boolean; batchLogs?: any[]; failFirstSend?: boolean; refuseBatchesOver?: number; refuseMessage?: string; poolFullFor?: number }) {
     let code: {[addr: string]: string} = {};
     if(opts.deployerPresent)
       code[DETERMINISTIC_DEPLOYER.toLowerCase()] = "0x7fdeadbeef";
     let sent: { raw: string; hash: string; tx: any }[] = [];
     let logsByHash: {[hash: string]: any[]} = {};
-    let refused: string[] = [];
-    // a node that answered an error and kept the bytes anyway (refusedStillKnown): it knows the hash, and mines it
-    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => (sent.some((s) => s.hash === payload.params[0]) || (opts.refusedStillKnown && refused.includes(payload.params[0]))) ? { hash: payload.params[0] } : null);
+    fakeProvider.injectResponse("eth_getTransactionByHash", (payload) => sent.some((s) => s.hash === payload.params[0]) ? { hash: payload.params[0] } : null);
     fakeProvider.injectResponse("eth_getCode", (payload) => code[payload.params[0].toLowerCase()] || "0x");
     let attempts: string[] = [];
     fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
@@ -102,12 +100,8 @@ describe("ETH Claim Batching (EIP-7702)", () => {
       if(opts.refuseBatchesOver && tx.type !== "eip7702" && tx.to?.toLowerCase() === WALLET.toLowerCase()) {
         // the node's own limit on a batch (its fee cap, say): a definite no, not a transport error
         let stream = decodeFunctionData({ abi: BATCHER_ABI, data: tx.data }).args[0] as string;
-        if((stream.length - 2) / 2 / 33 > opts.refuseBatchesOver) {
-          refused.push(hash);
-          if(opts.refusedStillKnown && opts.batchLogs)
-            logsByHash[hash] = opts.batchLogs;
-          throw new Error("tx fee (3.29 ether) exceeds the configured cap (1.00 ether)");
-        }
+        if((stream.length - 2) / 2 / 33 > opts.refuseBatchesOver)
+          throw new Error(opts.refuseMessage || "tx fee (3.29 ether) exceeds the configured cap (1.00 ether)");
       }
       sent.push({ raw, hash, tx });
       if(tx.type !== "eip7702" && tx.to?.toLowerCase() === WALLET.toLowerCase() && opts.batchLogs)
@@ -132,7 +126,7 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     // a receipt only for what the chain took (a refused transaction has none, unless a node kept it after all)
     fakeProvider.injectResponse("eth_getTransactionReceipt", (payload) => {
       let hash = payload.params[0];
-      let mined = sent.some((s) => s.hash === hash) || (opts.refusedStillKnown && refused.includes(hash));
+      let mined = sent.some((s) => s.hash === hash);
       return mined ? receipt(hash, logsByHash[hash] || []) : null;
     });
     return { code, sent, logsByHash, attempts };
@@ -252,6 +246,23 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     expect(chain.sent[2].tx.nonce).to.equal(42, "the next transaction takes the reloaded nonce");
   }).timeout(15000);
 
+  it("gives up a batch refused with an answer that is no validation error as unknown, consumed", async () => {
+    let chain = fakeChain({ deployerPresent: true, eip7702: true, refuseBatchesOver: 2, refuseMessage: "internal error 0x1337" });
+    let { wallet, claims } = await start();
+    let list: any[] = [];
+    for(let i = 1; i <= 4; i++)
+      list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
+
+    await claims.processQueue();
+    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.UNKNOWN), "no validation error: the bytes may be anywhere, nothing may be claimed again");
+    expect(list[0].claim.txError).to.match(/outcome unknown.*internal error 0x1337/);
+    let database = ServiceManager.GetService(FaucetDatabase);
+    for(let c of list)
+      expect((await database.getSession(c.session)).status).to.equal(FaucetSessionStatus.FINISHED, "consumed");
+    expect(wallet.getWalletState().nonce).to.equal(42, "the nonce was reloaded on the queue's path");
+    expect(chain.sent.length).to.equal(2, "deploy and delegate only");
+  });
+
   it("fails the rows of a refused batch in one statement, never one by one", async function() {
     this.timeout(15000); // the two-second question to every endpoint comes first
     let chain = fakeChain({ deployerPresent: true, eip7702: true, refuseBatchesOver: 2 });
@@ -260,9 +271,9 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     for(let i = 1; i <= 4; i++)
       list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
     let perRow = sinon.spy(FaucetDatabase.prototype, "updateClaimData");
-    let bulk = sinon.spy(FaucetDatabase.prototype, "failClaimsBulk");
+    let bulk = sinon.spy(FaucetDatabase.prototype, "settleClaimsBulk");
     globalStubs["updateClaimData"] = perRow;
-    globalStubs["failClaimsBulk"] = bulk;
+    globalStubs["settleClaimsBulk"] = bulk;
 
     await claims.processQueue();
     expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.FAILED));
@@ -312,23 +323,6 @@ describe("ETH Claim Batching (EIP-7702)", () => {
     await claims.processQueue();
     expect(wallet.getWalletState().nonce).to.equal(42, "the queue tick reloaded it before allocating anything");
     expect(chain.sent.length).to.equal(2, "deploy and delegate only");
-  });
-
-  it("keeps a refused batch pending when an endpoint has it after all, and settles it by that receipt", async function() {
-    this.timeout(15000);
-    let chain = fakeChain({ deployerPresent: true, eip7702: true, batchLogs: [executedLog(4)], refuseBatchesOver: 2, refusedStillKnown: true });
-    let { claims } = await start();
-    let list: any[] = [];
-    for(let i = 1; i <= 4; i++)
-      list.push(await claims.createSessionClaim(sessionData("00000000-0000-0000-0000-00000000000" + i, "0x000000000000000000000000000000000000100" + i, "1000"), {}));
-
-    await claims.processQueue();
-    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.PENDING), "refused by the answer, known by the node: pending, not failed");
-    expect(list[0].claim.txHash).to.not.equal(undefined, "the transaction is kept");
-    await awaitSleepPromise(6000, () => list.every((c) => c.claim.claimStatus === ClaimTxStatus.CONFIRMED));
-    expect(list.map((c) => c.claim.claimStatus)).to.deep.equal(Array(4).fill(ClaimTxStatus.CONFIRMED));
-    expect(new Set(list.map((c) => c.claim.txHash)).size).to.equal(1, "paid by the one transaction the node had");
-    expect(chain.attempts.length).to.equal(3, "deploy, delegate, the batch: nothing else was sent");
   });
 
   it("deploys the batcher, delegates the wallet, then pays a batch through execute on itself", async () => {
