@@ -11,6 +11,7 @@ import { SlotOutlet } from '../../sdk/SlotOutlet';
 import { emitHook, emitHookSafe } from '../../sdk/hooks';
 import { Spinner, Tooltip } from 'react-bootstrap';
 import { ClaimNotificationClient, IClaimNotificationUpdateData } from './ClaimNotificationClient';
+import { FaucetApiError } from '../../common/FaucetApi';
 
 import './ClaimPage.css'
 import { FaucetOverlay } from '../shared/FaucetOverlay';
@@ -63,7 +64,12 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   private isTimedOut: boolean;
   private notificationClient: ClaimNotificationClient;
   private notificationClientActive: boolean;
-  private lastStatusPoll: number;
+  /** when the last status request was started; the fallback poll measures from here */
+  private lastStatusPoll: number = 0;
+  /** the last status request failed: the next one comes sooner than the fallback */
+  private lastPollFailed = false;
+  /** the server said the claim is settled and the page has not seen a final status yet */
+  private claimSettled = false;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private initialRetries = 0;
   private unmounted = false;
@@ -86,6 +92,13 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       this.setState({
         claimNotification: message.data,
       });
+      if(message.data?.settled)
+        this.onClaimSettled();
+    });
+    this.notificationClient.on("error", (message) => {
+      // the server ends the socket once the session is no longer claiming: the final status is there to fetch
+      if(/claim settled|session not claiming/.test(message.data?.reason || ""))
+        this.onClaimSettled();
     });
     this.notificationClient.on("open", () => {
       this.setState({
@@ -120,6 +133,29 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   public componentDidUpdate(prevProps: IClaimPageProps, prevState: IClaimPageState) {
     if(prevState.sessionStatus !== this.state.sessionStatus || prevState.isTimedOut !== this.state.isTimedOut)
       this.updateHeader();
+    if(prevState.sessionStatus !== this.state.sessionStatus)
+      this.updateNotificationClient();
+  }
+
+  /** the notification socket is open while the claim is in the queue and closed otherwise */
+  private updateNotificationClient() {
+    let claiming = this.state.sessionStatus?.status === "claiming";
+    if(claiming && !this.notificationClientActive) {
+      this.notificationClientActive = true;
+      this.notificationClient.start();
+    }
+    else if(!claiming && this.notificationClientActive) {
+      this.notificationClientActive = false;
+      this.notificationClient.stop();
+    }
+  }
+
+  /** the claim left the queue: ask for its final status now; the timer asks again should the answer not be final yet */
+  private onClaimSettled() {
+    if(this.claimSettled)
+      return;
+    this.claimSettled = true;
+    this.refreshSessionStatus();
   }
 
   public componentWillUnmount() {
@@ -148,6 +184,9 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
 
     try {
       let sessionStatus = await this.props.pageContext.faucetApi.getSessionStatus(this.props.sessionId, !this.state.sessionDetails);
+      this.lastPollFailed = false;
+      if(sessionStatus.status !== "claiming")
+        this.claimSettled = false;
       if(sessionStatus.details) {
         this.setState({
           sessionDetails: sessionStatus.details,
@@ -162,18 +201,43 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       });
     }
     catch(err) {
-      this.setState({
-        loadingStatus: false,
-        loadingError: err.error?.toString() || err.toString() || true,
-      });
-      if(!this.unmounted && !this.state.sessionStatus && this.initialRetries < 5) {
-        this.retryTimer = setTimeout(() => {
-          this.retryTimer = undefined;
-          this.refreshSessionStatus();
-        }, 2000 * 2 ** this.initialRetries++);
+      this.lastPollFailed = true;
+      if(this.state.sessionStatus) {
+        // the page keeps the status it has; the timer asks again
+        console.warn("[ClaimPage] session status request failed", err);
+        this.setState({
+          loadingStatus: false,
+        });
+      }
+      else {
+        this.setState({
+          loadingStatus: false,
+          loadingError: err.error?.toString() || err.toString() || true,
+        });
+        let transient = !(err instanceof FaucetApiError) || err.isTransient();
+        if(transient && !this.unmounted && this.initialRetries < 5) {
+          this.retryTimer = setTimeout(() => {
+            this.retryTimer = undefined;
+            this.refreshSessionStatus();
+          }, 2000 * 2 ** this.initialRetries++);
+        }
       }
     }
     this.loadingStatus = false;
+  }
+
+  /**
+   * While the claim is in the queue the notification socket says when it is settled and the page
+   * asks for the status once. This timer is the fallback for a socket that is down: every 30 s,
+   * and every 5 s after a failed request or while a settled claim's status is not final yet.
+   * Never from render: a request answered with "claiming" must not start the next one.
+   */
+  private pollClaimStatus() {
+    if(this.state.sessionStatus?.status !== "claiming")
+      return;
+    let interval = (this.lastPollFailed || this.claimSettled) ? 5 * 1000 : 30 * 1000;
+    if((new Date()).getTime() - this.lastStatusPoll >= interval)
+      this.refreshSessionStatus();
   }
 
   private setUpdateTimer() {
@@ -189,12 +253,12 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       this.setState({
         refreshIndex: this.state.refreshIndex + 1,
       });
+      this.pollClaimStatus();
       this.setUpdateTimer();
     }, timeLeft);
   }
 
 	public render(): React.ReactElement<IClaimPageProps> {
-    let exactNow = (new Date()).getTime();
     let now = this.props.pageContext.faucetApi.getFaucetTime().getSyncedTime();
 
     if(this.state.sessionStatus) {
@@ -219,23 +283,6 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
             this.refreshSessionStatus();
           }
         });
-      }
-
-      if(this.state.sessionStatus.status === "claiming") {
-        if(!this.notificationClientActive) {
-          this.notificationClientActive = true;
-          this.notificationClient.start();
-        }
-
-        let pollInterval = this.state.sessionStatus.claimIdx <= (this.state.claimNotification?.confirmedIdx || 0) ? 1000 : 30 * 1000;
-        if(!(exactNow - this.lastStatusPoll < pollInterval))
-          this.refreshSessionStatus();
-      }
-      else {
-        if(this.notificationClientActive) {
-          this.notificationClientActive = false;
-          this.notificationClient.stop();
-        }
       }
     }
 

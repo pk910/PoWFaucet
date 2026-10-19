@@ -9,8 +9,12 @@ export interface IClaimNotificationClientOptions {
 }
 
 export interface IClaimNotificationUpdateData {
+  /** the queue has been processed up to this claim index */
   processedIdx: number;
+  /** every claim up to this index is settled; a later claim's receipt does not move it */
   confirmedIdx: number;
+  /** this session's claim is settled, confirmed or failed, and its final status can be fetched */
+  settled?: boolean;
 }
 
 interface ClaimNotificationClientEvents {
@@ -117,7 +121,7 @@ export class ClaimNotificationClient extends TypedEmitter<ClaimNotificationClien
     }
 
     if(message.action === "error") {
-      // the server ends the socket with an error message once the claim is confirmed; nobody has
+      // the server ends the socket with an error message once the claim is settled; nobody has
       // to listen for that, and an EventEmitter throws on an "error" nobody listens to
       console.log("[ClaimNotificationClient] server error", message.data);
       if(this.listenerCount("error") > 0)
