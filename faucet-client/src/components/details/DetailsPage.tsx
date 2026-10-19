@@ -102,6 +102,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
         delete sessionStatus.details;
       this.setState({
         loadingStatus: false,
+        loadingError: false,
         sessionStatus: sessionStatus,
         sessionDetails: statusDetails,
         unmasked: !!key && !!statusDetails && statusDetails.ip !== undefined,

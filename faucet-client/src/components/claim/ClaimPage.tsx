@@ -64,6 +64,9 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   private notificationClient: ClaimNotificationClient;
   private notificationClientActive: boolean;
   private lastStatusPoll: number;
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private initialRetries = 0;
+  private unmounted = false;
 
   constructor(props: IClaimPageProps) {
     super(props);
@@ -109,6 +112,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   }
 
   public componentDidMount() {
+    this.unmounted = false;
     this.updateHeader();
     this.refreshSessionStatus();
   }
@@ -119,7 +123,9 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
   }
 
   public componentWillUnmount() {
+    this.unmounted = true;
     this.props.pageContext.setPageHeader(null);
+    clearTimeout(this.retryTimer);
     if(this.updateTimer) {
       clearTimeout(this.updateTimer);
       this.updateTimer = null;
@@ -135,6 +141,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       return;
     
     this.loadingStatus = true;
+    this.lastStatusPoll = (new Date()).getTime();
     this.setState({
       loadingStatus: true,
     });
@@ -148,6 +155,7 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
       }
       this.setState({
         loadingStatus: false,
+        loadingError: false,
         sessionStatus: sessionStatus,
       }, () => {
         this.setUpdateTimer();
@@ -158,6 +166,12 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
         loadingStatus: false,
         loadingError: err.error?.toString() || err.toString() || true,
       });
+      if(!this.unmounted && !this.state.sessionStatus && this.initialRetries < 5) {
+        this.retryTimer = setTimeout(() => {
+          this.retryTimer = undefined;
+          this.refreshSessionStatus();
+        }, 2000 * 2 ** this.initialRetries++);
+      }
     }
     this.loadingStatus = false;
   }
@@ -213,10 +227,9 @@ export class ClaimPage extends React.PureComponent<IClaimPageProps, IClaimPageSt
           this.notificationClient.start();
         }
 
-        if(exactNow - this.lastStatusPoll > 30 * 1000 || this.state.sessionStatus.claimIdx <= (this.state.claimNotification?.confirmedIdx || 0)) {
-          this.lastStatusPoll = exactNow;
+        let pollInterval = this.state.sessionStatus.claimIdx <= (this.state.claimNotification?.confirmedIdx || 0) ? 1000 : 30 * 1000;
+        if(!(exactNow - this.lastStatusPoll < pollInterval))
           this.refreshSessionStatus();
-        }
       }
       else {
         if(this.notificationClientActive) {
