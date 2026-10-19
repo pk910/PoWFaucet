@@ -206,7 +206,8 @@ describe("ETH Claim Replay", () => {
     let claim = await claimManager.createSessionClaim(sessionData(), {});
     await claimManager.processQueue();
     expect(claim.claim.claimStatus).to.equal(ClaimTxStatus.PENDING);
-    expect(sends).to.equal(1, "accepted at once");
+    // the tick returns once the claim rows are written; the receipt watch may have polled (and re-sent) by then
+    expect(sends).to.be.greaterThanOrEqual(1, "accepted at once");
 
     // the pool lost it (evicted, restarted, never gossiped): every poll puts the same bytes back
     await awaitSleepPromise(2000, () => sends >= 3);
