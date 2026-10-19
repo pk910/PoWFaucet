@@ -102,6 +102,7 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
         delete sessionStatus.details;
       this.setState({
         loadingStatus: false,
+        loadingError: false,
         sessionStatus: sessionStatus,
         sessionDetails: statusDetails,
         unmasked: !!key && !!statusDetails && statusDetails.ip !== undefined,
@@ -110,10 +111,19 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
       });
     }
     catch(err) {
-      this.setState({
-        loadingStatus: false,
-        loadingError: err.error?.toString() || err.toString() || true,
-      });
+      if(this.state.sessionStatus) {
+        // the page keeps the status it has; the timer asks again
+        console.warn("[DetailsPage] session status request failed", err);
+        this.setState({
+          loadingStatus: false,
+        });
+      }
+      else {
+        this.setState({
+          loadingStatus: false,
+          loadingError: err.error?.toString() || err.toString() || true,
+        });
+      }
     }
     this.loadingStatus = false;
   }
