@@ -2,9 +2,21 @@ import { WebSocket } from 'ws';
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
 
+/** the queue's progress, the same for every socket */
 export interface IEthClaimNotificationData {
+  /** the queue has been processed up to this claim index: every claim up to here was sent, or failed before sending */
   processedIdx: number;
+  /**
+   * every claim up to this index is settled: confirmed or failed, with its session's status
+   * written. Receipts are observed in any order, so the claim confirmed last may lie far beyond
+   * it while an earlier transaction is still pending; `settled` is the word for one socket's claim.
+   */
   confirmedIdx: number;
+}
+
+/** what one socket gets: the queue's progress, and whether its own claim is settled */
+export interface IEthClaimNotificationMessage extends IEthClaimNotificationData {
+  settled: boolean;
 }
 
 export class EthClaimNotificationClient {
@@ -29,10 +41,12 @@ export class EthClaimNotificationClient {
   private pingTimer: NodeJS.Timeout = null;
   private lastPingPong: Date;
   private claimIdx: number;
+  private isSettled: () => boolean;
 
-  public constructor(socket: WebSocket, claimIdx: number) {
+  public constructor(socket: WebSocket, claimIdx: number, isSettled: () => boolean) {
     this.socket = socket;
     this.claimIdx = claimIdx;
+    this.isSettled = isSettled;
     this.lastPingPong = new Date();
 
     this.socket.on("ping", (data) => {
@@ -103,10 +117,15 @@ export class EthClaimNotificationClient {
     }));
   }
 
+  /** the queue's progress with this socket's own verdict; a settled claim ends the socket, its page asks for the final status once */
   private sendClaimNotification(data: IEthClaimNotificationData) {
-    this.sendMessage("update", data);
-    if(data.confirmedIdx >= this.claimIdx) {
-      this.killClient("claim confirmed");
+    let message: IEthClaimNotificationMessage = {
+      ...data,
+      settled: data.confirmedIdx >= this.claimIdx || this.isSettled(),
+    };
+    this.sendMessage("update", message);
+    if(message.settled) {
+      this.killClient("claim settled");
     }
   }
 

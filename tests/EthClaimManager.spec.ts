@@ -518,6 +518,111 @@ describe("ETH Claim Manager", () => {
     expect(errorMsg.length).to.equal(1, "no error message sent after confirmation");
   });
 
+  it("Notification Websocket: a later claim's receipt does not settle an earlier pending claim", async () => {
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+    let testSession1 = await addTestSession(FaucetSessionStatus.CLAIMABLE, null);
+    let claim1 = await claimManager.createSessionClaim(testSession1, {});
+    let testSession2 = await addTestSession(FaucetSessionStatus.CLAIMABLE, null);
+    let claim2 = await claimManager.createSessionClaim(testSession2, {});
+
+    globalStubs["getWalletState"] = sinon.stub(EthWalletManager.prototype, "getWalletState").returns({
+      ready: true,
+      nonce: 0,
+      balance: 1000000000000000000n,
+      nativeBalance: 1000000000000000000n,
+    });
+    let claimFuses: (() => void)[] = [];
+    globalStubs["EthWalletManager.sendClaimTx"].callsFake(() => {
+      let claimFuse = createFuse();
+      claimFuses.push(claimFuse);
+      return Promise.resolve({
+        txHash: "0xdb5950d44ceed2a5eb77970104b974b8c4234d7110fd8d0008edb2cfff835f0" + claimFuses.length,
+        txPromise: fusedSleep(claimFuse, 500).then(() => ({
+          status: true,
+          block: 1,
+          fee: 100n,
+          receipt: getTestReceipt(),
+        })),
+      } as TransactionResult);
+    });
+
+    await claimManager.processQueue();
+    expect(claim1.claim.claimStatus).to.equal(ClaimTxStatus.PENDING, "unexpected claim1 status after processQueue");
+    expect(claim2.claim.claimStatus).to.equal(ClaimTxStatus.PENDING, "unexpected claim2 status after processQueue");
+    let fakeWs1 = await injectFakeWebSocket("/ws/claim?session=" + testSession1.sessionId, "8.8.8.8");
+    let fakeWs2 = await injectFakeWebSocket("/ws/claim?session=" + testSession2.sessionId, "8.8.8.8");
+    expect(fakeWs1.getSentMessage("update")[0].data.settled).to.equal(false, "claim1 reported settled while pending");
+    expect(fakeWs2.getSentMessage("update")[0].data.settled).to.equal(false, "claim2 reported settled while pending");
+
+    // the second claim's receipt is observed first
+    claimFuses[1]();
+    await awaitSleepPromise(1000, () => claim2.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    await claimManager.processQueue();
+
+    let updateMsg = fakeWs2.getSentMessage("update");
+    expect(updateMsg.length).to.equal(2, "no update message sent to claim2 on its confirmation");
+    expect(updateMsg[1].data.settled).to.equal(true, "claim2 not reported settled");
+    expect(updateMsg[1].data.confirmedIdx).to.equal(0, "settled index moved past the pending claim1");
+    expect(fakeWs2.isReady).to.equal(false, "websocket2 still open after its claim settled");
+
+    updateMsg = fakeWs1.getSentMessage("update");
+    expect(updateMsg.length).to.equal(2, "no update message sent to claim1 on claim2's confirmation");
+    expect(updateMsg[1].data.settled).to.equal(false, "claim1 reported settled while its transaction is pending");
+    expect(fakeWs1.isReady).to.equal(true, "websocket1 closed while its claim is pending");
+
+    claimFuses[0]();
+    await awaitSleepPromise(1000, () => claim1.claim.claimStatus === ClaimTxStatus.CONFIRMED);
+    await claimManager.processQueue();
+
+    updateMsg = fakeWs1.getSentMessage("update");
+    expect(updateMsg.length).to.equal(3, "no update message sent to claim1 on its confirmation");
+    expect(updateMsg[2].data.settled).to.equal(true, "claim1 not reported settled");
+    expect(updateMsg[2].data.confirmedIdx).to.equal(2, "unexpected settled index after both confirmations");
+    expect(fakeWs1.isReady).to.equal(false, "websocket1 still open after its claim settled");
+  });
+
+  it("Notification Websocket: a failed claim is settled once its row is written", async () => {
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+    let testSession = await addTestSession(FaucetSessionStatus.CLAIMABLE, null);
+    let claim = await claimManager.createSessionClaim(testSession, {});
+
+    globalStubs["getWalletState"] = sinon.stub(EthWalletManager.prototype, "getWalletState").returns({
+      ready: true,
+      nonce: 0,
+      balance: 1000000000000000000n,
+      nativeBalance: 1000000000000000000n,
+    });
+    let claimFuse = createFuse();
+    globalStubs["EthWalletManager.sendClaimTx"].returns(Promise.resolve({
+      txHash: "0xdb5950d44ceed2a5eb77970104b974b8c4234d7110fd8d0008edb2cfff835f01",
+      txPromise: fusedSleep(claimFuse, 500).then(() => { throw "transaction dropped"; }),
+    } as TransactionResult));
+    // a slow database: the notification has to wait for the row
+    let updateClaimData = FaucetDatabase.prototype.updateClaimData;
+    globalStubs["FaucetDatabase.updateClaimData"] = sinon.stub(FaucetDatabase.prototype, "updateClaimData").callsFake(async function(this: FaucetDatabase, sessionId: string, claimData: any) {
+      await sleepPromise(300);
+      return updateClaimData.call(this, sessionId, claimData);
+    });
+
+    await claimManager.processQueue();
+    let fakeWs = await injectFakeWebSocket("/ws/claim?session=" + testSession.sessionId, "8.8.8.8");
+    expect(fakeWs.getSentMessage("update")[0].data.settled).to.equal(false, "claim reported settled while pending");
+
+    claimFuse();
+    await awaitSleepPromise(1000, () => claim.claim.claimStatus === ClaimTxStatus.FAILED);
+    await claimManager.processQueue();
+
+    let updateMsg = fakeWs.getSentMessage("update");
+    expect(updateMsg.length).to.equal(2, "no update message sent on the failure");
+    expect(updateMsg[1].data.settled).to.equal(true, "failed claim not reported settled");
+    expect(updateMsg[1].data.confirmedIdx).to.equal(1, "settled index does not cover the failed claim");
+    expect(fakeWs.isReady).to.equal(false, "websocket still open after the claim failed");
+    let storedSession = await ServiceManager.GetService(FaucetDatabase).getSession(testSession.sessionId);
+    expect(storedSession.status).to.equal(FaucetSessionStatus.FAILED, "session row not final when the settlement was announced");
+  });
+
   it("Notification Websocket: Check ping timeout handling", async () => {
     EthClaimNotificationClient.cfgPingInterval = 1;
     EthClaimNotificationClient.cfgPingTimeout = 2;

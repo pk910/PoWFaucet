@@ -67,7 +67,11 @@ export class EthClaimManager {
   private queueProcessing: boolean = false;
   private lastClaimTxIdx: number = 1;
   private lastProcessedClaimTxIdx: number = 0;
-  private lastConfirmedClaimTxIdx: number = 0;
+  /** how many claims have settled; a settlement that does not move the settled index still gets announced */
+  private settledClaimCount: number = 0;
+  private notifiedSettledClaimCount: number = 0;
+  /** the claim-data writes still on their way to the database, by session: a settlement is announced once its row is written */
+  private claimWrites: Map<Promise<void>, string> = new Map();
   private lastClaimNotification: IEthClaimNotificationData;
 
   public async initialize(): Promise<void> {
@@ -139,7 +143,7 @@ export class EthClaimManager {
       if(sessionInfo.status !== FaucetSessionStatus.CLAIMING)
         throw "session not claiming";
 
-      new EthClaimNotificationClient(ws, sessionInfo.claim.claimIdx);
+      new EthClaimNotificationClient(ws, sessionInfo.claim.claimIdx, () => this.isClaimSettled(sessionId));
     } catch(ex) {
       ws.send(JSON.stringify({
         action: "error",
@@ -174,6 +178,39 @@ export class EthClaimManager {
     return this.lastProcessedClaimTxIdx;
   }
 
+  /**
+   * The claim index up to which every claim has left the queue, confirmed or failed. The claims
+   * still queued or in flight are the live ones, and the lowest of them is the first that is not
+   * settled. Receipts are observed in any order, so the index of the claim confirmed last says
+   * nothing about the claims before it.
+   */
+  private getSettledClaimIdx(): number {
+    let settledIdx = this.lastClaimTxIdx - 1;
+    for(let claimInfo of Object.values(this.claimTxDict)) {
+      if(claimInfo.claim.claimIdx <= settledIdx)
+        settledIdx = claimInfo.claim.claimIdx - 1;
+    }
+    return settledIdx;
+  }
+
+  /** a session's claim is settled once it is neither queued nor in flight and its row is written */
+  public isClaimSettled(sessionId: string): boolean {
+    if(this.claimTxDict[sessionId])
+      return false;
+    for(let session of this.claimWrites.values()) {
+      if(session === sessionId)
+        return false;
+    }
+    return true;
+  }
+
+  /** a claim leaves the live set: the next notification announces it, after its row is written */
+  private settleClaim(claimTx: EthClaimInfo) {
+    delete this.claimTxDict[claimTx.session];
+    this.settledClaimCount++;
+    this.updateClaimStatus(claimTx);
+  }
+
   private updateClaimStatus(claimInfo: EthClaimInfo) {
     if(claimInfo.claim.claimStatus === ClaimTxStatus.CONFIRMED) {
       let moduleManager = ServiceManager.GetService(ModuleManager);
@@ -181,7 +218,12 @@ export class EthClaimManager {
       moduleManager.getModule<FaucetOutflowModule>("faucet-outflow")?.updateState(null, BigInt(claimInfo.claim.txFee));
       ServiceManager.GetService(FaucetStatsLog).addClaimStats(claimInfo);
     }
-    ServiceManager.GetService(FaucetDatabase).updateClaimData(claimInfo.session, claimInfo.claim);
+    let write: Promise<void> = ServiceManager.GetService(FaucetDatabase).updateClaimData(claimInfo.session, claimInfo.claim).catch((ex) => {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Could not store the claim data of session " + claimInfo.session + ": " + ex.toString());
+    }).then(() => {
+      this.claimWrites.delete(write);
+    });
+    this.claimWrites.set(write, claimInfo.session);
   }
 
   public async createSessionClaim(sessionData: FaucetSessionStoreData, userInput: any): Promise<EthClaimInfo> {
@@ -261,11 +303,18 @@ export class EthClaimManager {
       if(faucetConfig.ethRefillContract && walletState.ready)
         await ServiceManager.GetService(EthWalletRefill).processWalletRefill();
 
-      if(!this.lastClaimNotification || this.lastClaimNotification.processedIdx !== this.lastProcessedClaimTxIdx || this.lastClaimNotification.confirmedIdx !== this.lastConfirmedClaimTxIdx) {
+      // the settled index and count are taken before the writes are awaited: a claim that settles
+      // meanwhile is announced with the next tick, once its own row is written too
+      let settledIdx = this.getSettledClaimIdx();
+      let settledCount = this.settledClaimCount;
+      if(this.claimWrites.size > 0)
+        await Promise.all(this.claimWrites.keys());
+      if(!this.lastClaimNotification || this.lastClaimNotification.processedIdx !== this.lastProcessedClaimTxIdx || this.lastClaimNotification.confirmedIdx !== settledIdx || this.notifiedSettledClaimCount !== settledCount) {
         this.lastClaimNotification = {
           processedIdx: this.lastProcessedClaimTxIdx,
-          confirmedIdx: this.lastConfirmedClaimTxIdx,
+          confirmedIdx: settledIdx,
         };
+        this.notifiedSettledClaimCount = settledCount;
         EthClaimNotificationClient.broadcastClaimNotification(this.lastClaimNotification);
       }
     } catch(ex) {
@@ -286,7 +335,7 @@ export class EthClaimManager {
     if(!walletState.ready) {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Network RPC is currently unreachable.";
-      this.updateClaimStatus(claimTx);
+      this.settleClaim(claimTx);
       return;
     }
     if(
@@ -295,7 +344,7 @@ export class EthClaimManager {
     ) {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Faucet wallet is out of funds.";
-      this.updateClaimStatus(claimTx);
+      this.settleClaim(claimTx);
       return;
     }
 
@@ -314,7 +363,7 @@ export class EthClaimManager {
     } catch(ex) {
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Processing Exception: " + ex.toString();
-      this.updateClaimStatus(claimTx);
+      this.settleClaim(claimTx);
     }
   }
 
@@ -332,20 +381,15 @@ export class EthClaimManager {
       }
 
       delete this.pendingTxQueue[claimTx.claim.txHash];
-      delete this.claimTxDict[claimTx.session];
       claimTx.claim.txBlock = txData.block;
-
-      this.lastConfirmedClaimTxIdx = claimTx.claim.claimIdx;
-
       claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
-      this.updateClaimStatus(claimTx);
+      this.settleClaim(claimTx);
     }).catch((error) => {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
       delete this.pendingTxQueue[claimTx.claim.txHash];
-      delete this.claimTxDict[claimTx.session];
       claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
       claimTx.claim.txError = "Transaction Error: " + error.toString();
-      this.updateClaimStatus(claimTx);
+      this.settleClaim(claimTx);
     }).then(() => {
       this.historyTxDict[claimTx.claim.txNonce] = claimTx;
       setTimeout(() => {
