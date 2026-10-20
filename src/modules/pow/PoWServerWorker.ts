@@ -149,6 +149,7 @@ export class PoWServerWorker {
         session.activeClient.killClient(failed ? "session failed" : "session closed");
         session.activeClient = null;
       }
+      this.clearSessionIdleTimer(session);
 
       delete this.sessions[sessionId];
     }
@@ -252,6 +253,7 @@ export class PoWServerWorker {
         session.activeClient.killClient("server shutdown");
         session.activeClient = null;
       }
+      this.clearSessionIdleTimer(session);
     }
 
     if (this.loadTracker) {
@@ -316,22 +318,29 @@ export class PoWServerWorker {
     return this.sessions[sessionId];
   }
 
-  private resetSessionIdleTimer(session: PoWSession) {
+  public resetSessionIdleTimer(session: PoWSession) {
     let hasActiveClient = !!session.activeClient;
-    let idleTimer = session.idleTimer;
 
-    if(hasActiveClient && idleTimer) {
-      clearTimeout(idleTimer);
-      session.idleTimer = null;
+    if(hasActiveClient) {
+      this.clearSessionIdleTimer(session);
     }
-    else if(!hasActiveClient && !idleTimer && session.idleTime && this.moduleConfig.powIdleTimeout) {
+    else if(!session.idleTimer && session.idleTime && this.moduleConfig.powIdleTimeout) {
       let now = Math.floor(new Date().getTime() / 1000);
       let timeout = session.idleTime + this.moduleConfig.powIdleTimeout - now;
       if(timeout < 0)
         timeout = 0;
       session.idleTimer = setTimeout(() => {
+        session.idleTimer = null;
         session.closeSession("timeout");
       }, timeout * 1000);
+    }
+  }
+
+  private clearSessionIdleTimer(session: PoWSession) {
+    let idleTimer = session.idleTimer;
+    if(idleTimer) {
+      clearTimeout(idleTimer);
+      session.idleTimer = null;
     }
   }
 }

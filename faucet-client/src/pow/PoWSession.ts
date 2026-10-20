@@ -34,6 +34,9 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
   private preImage: string;
   private lastNonce: number;
   private shareCount: number;
+  /** seconds a mining connection was open as far as this page saw it; the server keeps its own count */
+  private connectTime: number = 0;
+  private connectStart: number | null = null;
   private balance: bigint;
   private shareQueue: IPoWMinerShare[];
   private shareQueueProcessing: boolean;
@@ -54,12 +57,22 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
     this.preImage = sessionState.preImage;
     this.lastNonce = sessionState.lastNonce + 1;
     this.shareCount = sessionState.shareCount;
+    this.connectTime = sessionState.connectTime || 0;
+    this.connectStart = this.options.client.isReady() ? this.options.time.getSyncedTime() : null;
     this.balance = this.options.session.getDropAmount();
 
     this.options.client.on("open", () => {
+      if(this.connectStart === null)
+        this.connectStart = this.options.time.getSyncedTime();
       this.processShareQueue();
       this.processVerifyQueue();
-    })
+    });
+    this.options.client.on("close", () => {
+      if(this.connectStart !== null) {
+        this.connectTime += this.options.time.getSyncedTime() - this.connectStart;
+        this.connectStart = null;
+      }
+    });
     this.options.client.on("verify", (message) => this.processVerification(message.data));
     this.options.client.on("updateBalance", (message) => this.updateBalance(message.data));
     this.options.client.on("error", (message) => {
@@ -191,6 +204,13 @@ export class PoWSession extends TypedEmitter<PoWSessionEvents> {
 
   public getStartTime(): number {
     return this.options.session.getStartTime();
+  }
+
+  public getConnectedTime(): number {
+    let time = this.connectTime;
+    if(this.connectStart !== null)
+      time += this.options.time.getSyncedTime() - this.connectStart;
+    return time;
   }
 
 }

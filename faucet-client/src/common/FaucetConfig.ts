@@ -117,6 +117,7 @@ export interface IPoWModuleConfig {
   powParams: PoWParams;
   powDifficulty: number;
   powHashrateLimit: number;
+  powHashrateLimitConnectedOnly: boolean;
 }
 
 export type PoWParams = {

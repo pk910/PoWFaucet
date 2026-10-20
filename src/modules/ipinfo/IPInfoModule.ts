@@ -25,6 +25,15 @@ export interface IIPInfoRestriction {
   proxyBased: boolean;
 }
 
+/** what the session's first ip looked like, the reference for the ip change rules */
+interface IIPInfoRef {
+  ip: string;
+  countryCode: string;
+  as: string;
+}
+
+type IPChangeKind = "ip" | "asn" | "country";
+
 export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
   private ipInfoDb: IPInfoDB;
@@ -42,7 +51,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     );
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionIpChange, 6, "IP Info check", 
-      (session: FaucetSession) => this.processSessionStart(session)
+      (session: FaucetSession) => this.processSessionIpChange(session)
     );
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionRewardFactor, 6, "IP restrictions", 
@@ -64,6 +73,42 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   private async processSessionStart(session: FaucetSession): Promise<void> {
     if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
       return;
+    let ipInfo = await this.resolveSessionIpInfo(session);
+    if(!session.getSessionData("ipinfo.first"))
+      session.setSessionData("ipinfo.first", this.getIpInfoRef(session.getRemoteIP(), ipInfo));
+    this.checkSessionRestriction(session);
+  }
+
+  /**
+   * A mining client reconnected from another ip. The ip change rules compare the new ip with the one
+   * the session started from and decide the session's fate (kill, close, or a reward factor the session
+   * keeps); the ordinary rules then decide whether the new ip may connect at all.
+   */
+  private async processSessionIpChange(session: FaucetSession): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
+    let firstInfo = session.getSessionData<IIPInfoRef>("ipinfo.first");
+    if(!firstInfo) {
+      // the session started before its first ip was recorded; the previous lookup is the best reference left
+      firstInfo = this.getIpInfoRef(null, session.getSessionData("ipinfo.data"));
+      session.setSessionData("ipinfo.first", firstInfo);
+    }
+    let ipInfo = await this.resolveSessionIpInfo(session);
+    this.trackIpChange(session, firstInfo, ipInfo);
+
+    let changeRestriction = this.getIpChangeRestriction(session);
+    if(changeRestriction.blocked) {
+      let blockReason = "IP Blocked: " + changeRestriction.messages.map((msg) => msg.text).join(", ");
+      if(changeRestriction.blocked === "kill")
+        await session.setSessionFailed("IPINFO_RESTRICTION", blockReason);
+      else
+        await session.completeSession();
+      throw new FaucetError("IPINFO_RESTRICTION", blockReason);
+    }
+    this.checkSessionRestriction(session);
+  }
+
+  private async resolveSessionIpInfo(session: FaucetSession): Promise<IIPInfo> {
     let remoteIp = session.getRemoteIP();
     let ipInfo: IIPInfo;
     try {
@@ -87,7 +132,10 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     }
 
     session.setSessionData("ipinfo.data", ipInfo);
+    return ipInfo;
+  }
 
+  private checkSessionRestriction(session: FaucetSession) {
     let sessionRestriction = this.getSessionRestriction(session);
     if(sessionRestriction.blocked) {
       let err = new FaucetError("IPINFO_RESTRICTION", "IP Blocked: " + sessionRestriction.messages.map((msg) => msg.text).join(", "));
@@ -101,6 +149,34 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     }
     session.setSessionModuleRef("ipinfo.restriction.time", Math.floor((new Date()).getTime() / 1000));
     session.setSessionModuleRef("ipinfo.restriction.data", sessionRestriction);
+  }
+
+  private getIpInfoRef(ip: string, ipInfo: IIPInfo): IIPInfoRef {
+    return {
+      ip: ip,
+      countryCode: ipInfo?.countryCode || null,
+      as: ipInfo?.as || null,
+    };
+  }
+
+  private getAsNumber(as: string): string {
+    // ip-api style "AS15169 Google LLC"
+    return as ? as.split(" ")[0] : null;
+  }
+
+  private trackIpChange(session: FaucetSession, firstInfo: IIPInfoRef, ipInfo: IIPInfo) {
+    let changed = session.getSessionData<IPChangeKind[]>("ipinfo.changed", []).slice();
+    let markChanged = (kind: IPChangeKind) => {
+      if(changed.indexOf(kind) === -1)
+        changed.push(kind);
+    };
+    markChanged("ip");
+    if(firstInfo.countryCode && ipInfo?.countryCode && ipInfo.countryCode !== firstInfo.countryCode)
+      markChanged("country");
+    if(firstInfo.as && ipInfo?.as && this.getAsNumber(ipInfo.as) !== this.getAsNumber(firstInfo.as))
+      markChanged("asn");
+    session.setSessionData("ipinfo.changed", changed);
+    session.setSessionData("ipinfo.changes", session.getSessionData<number>("ipinfo.changes", 0) + 1);
   }
 
   private async processSessionRewardFactor(session: FaucetSession, rewardFactors: ISessionRewardFactor[]) {
@@ -139,6 +215,9 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
       "ETH: " + session.getTargetAddr(),
       "IP: " + session.getRemoteIP(),
       "Ident: " + (session.getSessionData("captcha.ident") || ""),
+      "IpChanges: " + session.getSessionData<number>("ipinfo.changes", 0),
+      "IpChanged: " + session.getSessionData<IPChangeKind[]>("ipinfo.changed", []).join(" "),
+      "FirstCountry: " + (session.getSessionData<IIPInfoRef>("ipinfo.first")?.countryCode || ""),
     ];
     if(ipinfo) {
       infoStr.push(
@@ -210,7 +289,8 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
     return restriction;
   }
 
-  private getSessionRestriction(session: FaucetSession): IIPInfoRestriction {
+  /** an empty restriction and the function that merges further restrictions into it (lowest reward, strongest block, messages once per key) */
+  private createRestrictionCollector(): {restriction: IIPInfoRestriction, apply: (restr: number | IIPInfoRestrictionConfig) => void} {
     let restriction: IIPInfoRestriction = {
       reward: 100,
       messages: [],
@@ -219,9 +299,8 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
       proxyBased: false,
     };
     let msgKeyDict = {};
-    let sessionIpInfo: IIPInfo = session.getSessionData("ipinfo.data");
 
-    let applyRestriction = (restr: number | IIPInfoRestrictionConfig) => {
+    let apply = (restr: number | IIPInfoRestrictionConfig) => {
       restr = this.wrapFactorRestriction(restr);
       if(restr.reward < restriction.reward)
         restriction.reward = restr.reward;
@@ -243,6 +322,32 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
         });
       }
     };
+
+    return {restriction, apply};
+  }
+
+  /** the restrictions configured for the kinds of ip change the session has seen so far */
+  private applyIpChangeRestrictions(session: FaucetSession, applyRestriction: (restr: number | IIPInfoRestrictionConfig) => void) {
+    let changeRestrictions = this.moduleConfig.ipChangeRestrictions;
+    if(!changeRestrictions)
+      return;
+    session.getSessionData<IPChangeKind[]>("ipinfo.changed", []).forEach((kind) => {
+      if(typeof changeRestrictions[kind] !== "undefined" && changeRestrictions[kind] !== null)
+        applyRestriction(changeRestrictions[kind]);
+    });
+  }
+
+  private getIpChangeRestriction(session: FaucetSession): IIPInfoRestriction {
+    let collector = this.createRestrictionCollector();
+    this.applyIpChangeRestrictions(session, collector.apply);
+    return collector.restriction;
+  }
+
+  private getSessionRestriction(session: FaucetSession): IIPInfoRestriction {
+    let collector = this.createRestrictionCollector();
+    let restriction = collector.restriction;
+    let applyRestriction = collector.apply;
+    let sessionIpInfo: IIPInfo = session.getSessionData("ipinfo.data");
 
     if(sessionIpInfo && this.moduleConfig.restrictions) {
       if(sessionIpInfo.hosting && this.moduleConfig.restrictions.hosting) {
@@ -267,6 +372,8 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
       });
     }
     
+    this.applyIpChangeRestrictions(session, applyRestriction);
+
     return restriction;
   }
 

@@ -55,8 +55,11 @@ export class PoWClient {
       return;
     this.socket = null;
 
-    if(this.session && this.session.activeClient === this)
+    if(this.session && this.session.activeClient === this) {
       this.session.activeClient = null;
+      // the session idles from now on; it gets closed when no client returns within the idle timeout
+      this.server.resetSessionIdleTimer(this.session);
+    }
 
     if(this.pingTimer) {
       clearInterval(this.pingTimer);
@@ -182,10 +185,10 @@ export class PoWClient {
     this.session.missedVerifications = 0;
     
     if(moduleConfig.powHashrateHardLimit > 0) {
-      let sessionAge = Math.floor((new Date()).getTime() / 1000) - this.session.startTime;
-      let nonceLimit = (sessionAge + 30) * moduleConfig.powHashrateHardLimit;
+      let miningTime = this.session.getMiningTime();
+      let nonceLimit = (miningTime + 30) * moduleConfig.powHashrateHardLimit;
       if(lastNonce > nonceLimit)
-        return this.sendErrorResponse("HASHRATE_LIMIT", "Nonce too high (did you evade the hashrate limit?) " + sessionAge + "/" + nonceLimit, message);
+        return this.sendErrorResponse("HASHRATE_LIMIT", "Nonce too high (did you evade the hashrate limit?) " + miningTime + "/" + nonceLimit, message);
     }
 
     let shareVerification = new PoWShareVerification(this.server, this.session, shareData.nonce, shareData.data);

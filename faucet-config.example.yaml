@@ -246,6 +246,16 @@ modules:
       # percentage of drop amount if IP is from given country code (DE/US/...), 0 to block entirely
       #US: 100
 
+    # restrictions for sessions whose mining client reconnects from another ip than the session started from
+    # (percentage of drop amount, or a restriction object; a session that matched a kind once keeps that restriction)
+    #ipChangeRestrictions:
+    #  ip: 100       # any other ip
+    #  asn: 50       # ip from another AS (mobile network switch, proxy rotation)
+    #  country:      # ip from another country (proxy rotation): kill the session without reward
+    #    reward: 0
+    #    blocked: kill
+    #    message: "mining client reconnected from another country"
+
     # ip info pattern based restrictions
     restrictionsPattern:
       "^.*Tencent Cloud.*$": 10
@@ -469,6 +479,10 @@ modules:
     # maximum allowed mining hashrate (will be throttled to this rate when faster)
     powHashrateSoftLimit: 1000 # soft limit (enforced client side)
     powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
+
+    # count only the time with a connected mining client towards the hashrate limits
+    # (default false: the whole session age counts, so a client that mines while disconnected keeps its nonce budget)
+    #powHashrateLimitConnectedOnly: true
 
     # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
     powDifficulty: 11

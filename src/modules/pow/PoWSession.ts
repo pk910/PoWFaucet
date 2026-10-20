@@ -13,6 +13,9 @@ export class PoWSession {
   private worker: PoWServerWorker;
   private sessionData: {[key: string]: IPoWSessionPropValue} = {};
   private currentActiveClient: PoWClient;
+  private currentIdleTimer: NodeJS.Timeout = null;
+  /** start of the current client connection (unix seconds), null while no client is connected */
+  private connectStart: number = null;
   private verifyStats: {missed: number, pending: number} = {missed: 0, pending: 0};
   private balance: bigint = BigInt(0);
   private rewardCounter = 0;
@@ -97,23 +100,48 @@ export class PoWSession {
   }
 
   public set activeClient(value: PoWClient) {
+    let now = Math.floor(new Date().getTime() / 1000);
     this.currentActiveClient = value;
-    if(value)
+    if(value) {
       this.setSessionProp("pow.idleTime", null);
-    else
-      this.setSessionProp("pow.idleTime", Math.floor(new Date().getTime() / 1000));
+      if(this.connectStart === null)
+        this.connectStart = now;
+    }
+    else {
+      this.setSessionProp("pow.idleTime", now);
+      if(this.connectStart !== null) {
+        this.setSessionProp("pow.connectTime", this.getConnectedTime());
+        this.connectStart = null;
+      }
+    }
   }
 
   public get idleTime(): number {
     return this.getSessionProp("pow.idleTime");
   }
 
+  // the timer belongs to the worker; as a session prop it would travel to the main process with the next reward
   public get idleTimer(): NodeJS.Timeout {
-    return this.getSessionProp("pow.idleTimer");
+    return this.currentIdleTimer;
   }
 
   public set idleTimer(value: NodeJS.Timeout) {
-    this.setSessionProp("pow.idleTimer", value);
+    this.currentIdleTimer = value;
+  }
+
+  /** seconds a mining client has been connected to this session so far, including the current connection */
+  public getConnectedTime(): number {
+    let time: number = this.getSessionProp("pow.connectTime") || 0;
+    if(this.connectStart !== null)
+      time += Math.floor(new Date().getTime() / 1000) - this.connectStart;
+    return time;
+  }
+
+  /** the time the hashrate limits are based on: the session age, or only the connected time when configured so */
+  public getMiningTime(): number {
+    if(this.worker.getModuleConfig().powHashrateLimitConnectedOnly)
+      return this.getConnectedTime();
+    return Math.floor(new Date().getTime() / 1000) - this.startTime;
   }
 
   public get lastNonce(): number {

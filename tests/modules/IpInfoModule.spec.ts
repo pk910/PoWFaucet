@@ -298,6 +298,114 @@ describe("Faucet module: ipinfo", () => {
     expect(testSession.getDropAmount()).to.equal(50n, "unexpected drop amount");
   });
 
+  function ipChangeFetchStub(secondResponse: any) {
+    // the session starts from 8.8.8.8, every other ip gets the second response
+    globalStubs["fetch"].callsFake((url: string) => returnDelayedPromise(true, {
+      json: () => Promise.resolve(url.indexOf("8.8.8.8") !== -1 ? testIPInfoResponse : secondResponse)
+    }));
+  }
+
+  function keepSessionsRunning() {
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession) => {
+      session.addBlockingTask("test", "mining", 0);
+    });
+  }
+
+  it("check ip change restriction (kill on reconnect from another country)", async () => {
+    faucetConfig.modules["ipinfo"] = {
+      enabled: true,
+      apiUrl: "http://test-api-info-check.com/{ip}",
+      cacheTime: 86400,
+      required: false,
+      restrictions: null,
+      restrictionsPattern: {},
+      restrictionsFile: null,
+      ipChangeRestrictions: {
+        country: { reward: 0, blocked: "kill", message: "reconnected from another country" },
+      },
+    } as IIPInfoConfig;
+    ipChangeFetchStub({ ...testIPInfoResponse, country: "Germany", countryCode: "DE", as: "AS3320 Deutsche Telekom AG" });
+    await ServiceManager.GetService(ModuleManager).initialize();
+    keepSessionsRunning();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+    expect(testSession.getSessionData("ipinfo.first")?.countryCode).to.equal("US", "first ip not recorded");
+    let error: FaucetError | null = null;
+    try {
+      await testSession.updateRemoteIP("1.1.1.1");
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error?.getCode()).to.equal("IPINFO_RESTRICTION", "ip change not rejected");
+    expect(testSession.getSessionStatus()).to.equal("failed", "session not killed");
+    expect(testSession.getSessionData("failed.code")).to.equal("IPINFO_RESTRICTION", "unexpected failure code");
+    expect(testSession.getSessionData("ipinfo.changed")).to.include("country", "country change not tracked");
+    expect(testSession.getSessionData("ipinfo.changes")).to.equal(1, "unexpected ip change count");
+  });
+
+  it("check ip change restriction (reward factor on reconnect from another AS)", async () => {
+    faucetConfig.modules["ipinfo"] = {
+      enabled: true,
+      apiUrl: "http://test-api-info-check.com/{ip}",
+      cacheTime: 86400,
+      required: false,
+      restrictions: null,
+      restrictionsPattern: {},
+      restrictionsFile: null,
+      ipChangeRestrictions: {
+        asn: 50,
+        country: { reward: 0, blocked: "kill" },
+      },
+    } as IIPInfoConfig;
+    ipChangeFetchStub({ ...testIPInfoResponse, isp: "Cloudflare", as: "AS13335 Cloudflare, Inc." });
+    await ServiceManager.GetService(ModuleManager).initialize();
+    keepSessionsRunning();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+    await testSession.updateRemoteIP("1.1.1.1");
+    expect(testSession.getSessionStatus()).to.equal("running", "session not running after the ip change");
+    expect(testSession.getSessionData("ipinfo.changed")).to.deep.equal(["ip", "asn"], "unexpected change kinds");
+    testSession.resolveBlockingTask("test", "mining");
+    await testSession.tryProceedSession();
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after completion");
+    expect(testSession.getDropAmount()).to.equal(50n, "AS change restriction not applied");
+  });
+
+  it("check ip change restriction (same AS and country stays unrestricted)", async () => {
+    faucetConfig.modules["ipinfo"] = {
+      enabled: true,
+      apiUrl: "http://test-api-info-check.com/{ip}",
+      cacheTime: 86400,
+      required: false,
+      restrictions: null,
+      restrictionsPattern: {},
+      restrictionsFile: null,
+      ipChangeRestrictions: {
+        asn: 50,
+        country: { reward: 0, blocked: "kill" },
+      },
+    } as IIPInfoConfig;
+    ipChangeFetchStub(testIPInfoResponse);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    keepSessionsRunning();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    await testSession.updateRemoteIP("8.8.4.4");
+    expect(testSession.getSessionData("ipinfo.changed")).to.deep.equal(["ip"], "unexpected change kinds");
+    testSession.resolveBlockingTask("test", "mining");
+    await testSession.tryProceedSession();
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status after completion");
+    expect(testSession.getDropAmount()).to.equal(100n, "unexpected restriction applied");
+  });
+
   it("check ipinfo-pattern based restriction (50% restriction)", async () => {
     faucetConfig.modules["ipinfo"] = {
       enabled: true,

@@ -123,6 +123,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       powParams: powParams,
       powDifficulty: this.moduleConfig.powDifficulty,
       powHashrateLimit: this.moduleConfig.powHashrateSoftLimit,
+      powHashrateLimitConnectedOnly: this.moduleConfig.powHashrateLimitConnectedOnly,
     };
   }
 
@@ -136,6 +137,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       lastNonce: session.getSessionData("pow.lastNonce", 0),
       preImage: session.getSessionData("pow.preimage"),
       shareCount: session.getSessionData("pow.shareCount", 0),
+      connectTime: session.getSessionData("pow.connectTime", 0),
     }
   }
 

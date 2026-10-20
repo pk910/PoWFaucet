@@ -170,6 +170,7 @@ export class MiningPage extends React.PureComponent<IMiningPageProps, IMiningPag
       time: this.props.pageContext.faucetApi.getFaucetTime(),
       session: this.powSession,
       hashrateLimit: this.props.faucetConfig.modules.pow.powHashrateLimit,
+      hashrateLimitConnectedOnly: this.props.faucetConfig.modules.pow.powHashrateLimitConnectedOnly,
       powParams: this.props.faucetConfig.modules.pow.powParams,
       difficulty: this.props.faucetConfig.modules.pow.powDifficulty,
       workerSrc: this.props.pageContext.faucetUrls.minerSrc,

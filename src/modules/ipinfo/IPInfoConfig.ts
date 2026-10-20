@@ -17,6 +17,11 @@ export interface IIPInfoConfig extends IBaseModuleConfig {
     yaml?: string|string[]; // path to yaml file (for more actions/kill messages/etc.)
     refresh: number; // refresh interval
   };
+  ipChangeRestrictions?: null | { // restrictions for sessions whose mining client reconnects from another ip than the session started from
+    ip?: number | IIPInfoRestrictionConfig; // any other ip
+    asn?: number | IIPInfoRestrictionConfig; // ip from another AS
+    country?: number | IIPInfoRestrictionConfig; // ip from another country
+  };
 }
 
 export interface IIPInfoRestrictionConfig {
@@ -35,4 +40,5 @@ export const defaultConfig: IIPInfoConfig = {
   restrictions: null,
   restrictionsPattern: {},
   restrictionsFile: null,
+  ipChangeRestrictions: null,
 }

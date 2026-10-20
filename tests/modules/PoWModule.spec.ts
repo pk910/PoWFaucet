@@ -11,6 +11,7 @@ import { IPoWConfig, PoWHashAlgo } from '../../src/modules/pow/PoWConfig.js';
 import { FaucetWebApi } from '../../src/webserv/FaucetWebApi.js';
 import { disposeFakeWebSockets, FakeWebSocket, injectFakeWebSocket } from '../stubs/FakeWebSocket.js';
 import { PoWModule } from '../../src/modules/pow/PoWModule.js';
+import { sleepPromise } from '../../src/utils/PromiseUtils.js';
 
 
 describe("Faucet module: pow", () => {
@@ -196,6 +197,27 @@ describe("Faucet module: pow", () => {
     expect(errorMsg.length).to.equal(1, "no error message sent");
     expect(errorMsg[0].data.code).to.equal("CLIENT_KILLED", "unexpected error code");
   });
+
+  it("Close an idle session after the mining client disconnected", async () => {
+    faucetConfig.modules["pow"] = {
+      enabled: true,
+      powIdleTimeout: 1,
+    } as IPoWConfig;
+    let moduleManager = ServiceManager.GetService(ModuleManager);
+    await moduleManager.initialize();
+    let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+    let fakeWs = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+    expect(fakeWs.isReady).to.equal(true, "websocket was closed");
+    await awaitSleepPromise(1500, () => testSession.getSessionStatus() !== "running");
+    expect(testSession.getSessionStatus()).to.equal("running", "session closed while the client was connected");
+    fakeWs.emit("close");
+    await awaitSleepPromise(4000, () => testSession.getSessionStatus() !== "running");
+    expect(testSession.getSessionStatus()).to.not.equal("running", "session not closed after the idle timeout");
+    expect(typeof testSession.getSessionData("pow.idleTime")).to.equal("number", "idle time not recorded");
+  }).timeout(10000);
 
   describe("Mining websocket protocol", () => {
 
@@ -401,6 +423,92 @@ describe("Faucet module: pow", () => {
       expect(errorMsg[0].data.code).to.equal("HASHRATE_LIMIT", "unexpected error code");
       expect(errorMsg[0].data.message).to.matches(/Nonce too high/i, "unexpected error message");
     });
+
+    it("check action 'foundShare': nonce limit counts the session age by default", async () => {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powHashAlgo: PoWHashAlgo.SCRYPT,
+        powScryptParams: {
+          cpuAndMemory: 4096,
+          blockSize: 8,
+          parallelization: 1,
+          keyLength: 16,
+        },
+        powDifficulty: 11,
+        powHashrateHardLimit: 1000,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+      // three seconds without a client: the session age grants 33000 nonces, a connected-time count only 30000
+      await sleepPromise(3000);
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket.emit("message", JSON.stringify({
+        id: 42,
+        action: "foundShare",
+        data: {
+          nonce: 31500,
+          params: "scrypt|4096|8|1|16|11",
+          hashrate: 12,
+        }
+      }));
+      let errorMsg = fakeSocket.getSentMessage("error").filter((msg) => msg.data.code === "HASHRATE_LIMIT");
+      expect(errorMsg.length).to.equal(0, "share rejected by the hashrate limit");
+    }).timeout(10000);
+
+    it("check action 'foundShare': nonce limit counts only the connected time", async () => {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powHashAlgo: PoWHashAlgo.SCRYPT,
+        powScryptParams: {
+          cpuAndMemory: 4096,
+          blockSize: 8,
+          parallelization: 1,
+          keyLength: 16,
+        },
+        powDifficulty: 11,
+        powHashrateHardLimit: 1000,
+        powHashrateLimitConnectedOnly: true,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+      await sleepPromise(3000);
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket.emit("message", JSON.stringify({
+        id: 42,
+        action: "foundShare",
+        data: {
+          nonce: 31500,
+          params: "scrypt|4096|8|1|16|11",
+          hashrate: 12,
+        }
+      }));
+      let errorMsg = fakeSocket.getSentMessage("error");
+      expect(errorMsg.length).to.equal(1, "no error message sent");
+      expect(errorMsg[0].rsp).to.equal(42, "invalid response id");
+      expect(errorMsg[0].data.code).to.equal("HASHRATE_LIMIT", "unexpected error code");
+
+      // the time a client was connected adds up across connections
+      await sleepPromise(2500);
+      fakeSocket.emit("close");
+      let fakeSocket2 = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket2.emit("message", JSON.stringify({
+        id: 43,
+        action: "foundShare",
+        data: {
+          nonce: 31500,
+          params: "scrypt|4096|8|1|16|11",
+          hashrate: 12,
+        }
+      }));
+      let errorMsg2 = fakeSocket2.getSentMessage("error").filter((msg) => msg.data.code === "HASHRATE_LIMIT");
+      expect(errorMsg2.length).to.equal(0, "share rejected although the connected time covers the nonce");
+    }).timeout(15000);
 
     it("check action 'foundShare': valid share, local verification, scrypt", async () => {
       faucetConfig.modules["pow"] = {

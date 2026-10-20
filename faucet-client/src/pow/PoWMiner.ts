@@ -13,6 +13,7 @@ export interface IPoWMinerOptions {
   powParams: PoWParams;
   difficulty: number;
   hashrateLimit: number;
+  hashrateLimitConnectedOnly?: boolean;
 }
 
 interface IPoWMinerSettings {
@@ -422,13 +423,19 @@ export class PoWMiner extends TypedEmitter<PoWMinerEvents> {
     if(this.options.hashrateLimit <= 0)
       return requestedRefill;
 
-    let sessionAge = this.options.time.getSyncedTime() - this.options.session.getStartTime();
-    if(sessionAge <= 1)
+    // the nonce budget grows with the session age, or with the connected time only when the faucet
+    // counts just that: then a disconnected miner runs out of nonces until the connection is back
+    let miningTime: number;
+    if(this.options.hashrateLimitConnectedOnly)
+      miningTime = this.options.session.getConnectedTime();
+    else
+      miningTime = this.options.time.getSyncedTime() - this.options.session.getStartTime();
+    if(miningTime <= 1)
       return requestedRefill;
 
-    sessionAge += 4; // add 4 seconds as this limits the number of nonces that will be processed in the next 4 sec
+    miningTime += 4; // add 4 seconds as this limits the number of nonces that will be processed in the next 4 sec
     
-    let nonceLimit =  sessionAge * this.options.hashrateLimit;
+    let nonceLimit =  miningTime * this.options.hashrateLimit;
     let nonceCount = nonceLimit - this.options.session.getLastNonce();
     if(nonceCount <= 0)
       requestedRefill = requestedRefill > 0 ? 1 : 0;
