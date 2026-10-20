@@ -1,7 +1,7 @@
 import 'mocha';
 import { expect } from 'chai';
 import type { Browser, BrowserContext, Page } from 'playwright';
-import { bootFaucet, IFaucetFixture, launchBrowser, openFaucet, TEST_TARGET_ADDR } from './harness.js';
+import { bootFaucet, IFaucetFixture, launchBrowser, startMiningSession } from './harness.js';
 
 /** The mining picture: the inlined svg by default, the png when motion is unwanted or switched off. */
 describe("browser: progress animation", function() {
@@ -26,11 +26,7 @@ describe("browser: progress animation", function() {
   });
 
   async function startMining(p: Page) {
-    await openFaucet(p, fixture);
-    await p.getByPlaceholder(/ETH address/).fill(TEST_TARGET_ADDR);
-    await p.getByRole("button", { name: "Start Mining" }).click();
-    await p.waitForURL(/#\/mine\//, { timeout: 30000 });
-    await p.getByText("Your mining reward").waitFor({ timeout: 30000 });
+    await startMiningSession(p, fixture);
   }
 
   async function picture(p: Page) {
