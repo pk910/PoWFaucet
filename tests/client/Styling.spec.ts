@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { expect } from 'chai';
 import type { Browser, Page } from 'playwright';
-import { bootFaucet, IFaucetFixture, launchBrowser, openFaucet, REPO_ROOT } from './harness.js';
+import { bootFaucet, IFaucetFixture, launchBrowser, openFaucet, REPO_ROOT, startMiningSession } from './harness.js';
 
 /**
  * What the stylesheet promises: the faucet looks the way it should, and a page that embeds it
@@ -243,11 +243,8 @@ describe("browser: styling and embedding", function() {
     if(skipReason) return this.skip();
     fixture = await bootFaucet();
     page = await browser.newPage();
-    await openFaucet(page, fixture);
-    await page.getByPlaceholder(/ETH address/).fill("0x0000000000000000000000000000000000001337");
-    await page.getByRole("button", { name: "Start Mining" }).click();
-    await page.waitForURL(/#\/mine\//, { timeout: 30000 });
-    await page.getByText("Your mining reward").waitFor({ timeout: 30000 });
+    // the pill reads "Reconnecting" until the socket is open; the helper waits for that
+    await startMiningSession(page, fixture);
 
     let layout = await page.evaluate(() => {
       let tiles = Array.from(document.querySelectorAll(".faucet-page .pf-stat"));

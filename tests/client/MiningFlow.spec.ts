@@ -1,7 +1,7 @@
 import 'mocha';
 import { expect } from 'chai';
 import type { Browser, Page } from 'playwright';
-import { bootFaucet, IFaucetFixture, launchBrowser, openFaucet, sessionIdFromUrl, TEST_TARGET_ADDR } from './harness.js';
+import { bootFaucet, IFaucetFixture, launchBrowser, openFaucet, startMiningSession, waitForShare, TEST_TARGET_ADDR } from './harness.js';
 import { ServiceManager } from '../../src/common/ServiceManager.js';
 import { SessionManager } from '../../src/session/SessionManager.js';
 
@@ -35,17 +35,12 @@ describe("browser: mining flow", function() {
     page = await browser.newPage();
     let pageErrors: string[] = [];
     page.on("pageerror", (err) => pageErrors.push(err.stack || ("" + err)));
-    await openFaucet(page, fixture);
 
-    // start
-    await page.getByPlaceholder(/ETH address/).fill(TEST_TARGET_ADDR);
-    await page.getByRole("button", { name: "Start Mining" }).click();
-    await page.waitForURL(/#\/mine\//, { timeout: 30000 });
-    let sessionId = sessionIdFromUrl(page.url());
+    // start; the mining page is up and connected when this returns
+    let sessionId = await startMiningSession(page, fixture);
     expect(sessionId, "no session id in the mining url").to.be.a("string");
 
     // mining page: the status block and the stop button
-    await page.getByText("Your mining reward").waitFor({ timeout: 30000 });
     expect(await page.getByText(TEST_TARGET_ADDR).count()).to.be.greaterThan(0, "target address not shown");
     let stopButton = page.getByRole("button", { name: /^Stop Mining/ });
     await stopButton.waitFor();
@@ -56,13 +51,7 @@ describe("browser: mining flow", function() {
       let hashrate = Array.from(document.querySelectorAll("*")).map((el) => el.textContent || "").find((t) => /\d+(\.\d+)? H\/s/.test(t) && !/^0 H\/s/.test(t.trim()));
       return !!hashrate;
     }, null, { timeout: 60000 });
-    let balanceDeadline = Date.now() + 60000;
-    while(Date.now() < balanceDeadline) {
-      let session = sessionManager.getSession(sessionId);
-      if(session && session.getDropAmount() > 0n)
-        break;
-      await new Promise((r) => setTimeout(r, 500));
-    }
+    await waitForShare(sessionId);
     expect(sessionManager.getSession(sessionId).getDropAmount() > 0n).to.equal(true, "no share rewarded within a minute");
 
     // the stop button learned about the balance

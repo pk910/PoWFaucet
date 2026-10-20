@@ -15,8 +15,10 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { IncomingMessage } from 'node:http';
+import type { Socket } from 'node:net';
 import sinon from 'sinon';
-import type { Browser, Page } from 'playwright';
+import type { Browser, Locator, Page } from 'playwright';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig } from '../common.js';
 import { ServiceManager } from '../../src/common/ServiceManager.js';
 import { faucetConfig } from '../../src/config/FaucetConfig.js';
@@ -191,6 +193,11 @@ export async function bootFaucet(options?: IFaucetFixtureOptions): Promise<IFauc
   let server = ServiceManager.GetService(FaucetHttpServer);
   server.initialize();
   let port = server.getListenPort();
+  upgradedSockets = new Set();
+  (server as any).httpServer.on("upgrade", (req: IncomingMessage, socket: Socket) => {
+    upgradedSockets.add(socket);
+    socket.on("close", () => upgradedSockets.delete(socket));
+  });
 
   return {
     baseUrl: "http://127.0.0.1:" + port,
@@ -227,6 +234,64 @@ export async function openFaucet(page: Page, fixture: IFaucetFixture, route?: st
   let url = fixture.baseUrl + "/" + (route ? "#" + route : "");
   await page.goto(url, { waitUntil: "load" });
   await page.waitForSelector(".faucet-page", { timeout: 30000 });
+}
+
+/**
+ * Starts a mining session from the front page and returns once the mining page is up and its
+ * websocket is connected: the stat tiles render as soon as the session exists, the header pill
+ * turns from "Reconnecting" to "Mining" only when the socket reports open. A test that reads the
+ * page right after the tiles appear races that gap.
+ */
+export async function startMiningSession(page: Page, fixture: IFaucetFixture, targetAddr?: string): Promise<string> {
+  await openFaucet(page, fixture);
+  await page.getByPlaceholder(/ETH address/).fill(targetAddr || TEST_TARGET_ADDR);
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  await page.waitForURL(/#\/mine\//, { timeout: 30000 });
+  await page.getByText("Your mining reward").waitFor({ timeout: 30000 });
+  await miningPill(page, "Mining").waitFor({ timeout: 30000 });
+  return sessionIdFromUrl(page.url());
+}
+
+/** Clicks the "Close" button in a dialog's footer; the header's x carries the same accessible name. */
+export async function closeDialog(dialog: Locator): Promise<void> {
+  await dialog.getByRole("button", { name: "Close" }).filter({ hasText: "Close" }).click();
+  await dialog.waitFor({ state: "hidden", timeout: 10000 });
+}
+
+/** The header pill of the mining page with the given text ("Mining" while connected, "Reconnecting" otherwise). */
+export function miningPill(page: Page, text: string) {
+  return page.locator(".faucet-page .pf-pill", { hasText: text });
+}
+
+/**
+ * Waits until the server rewarded the session a share. The hashers are real wasm workers, so this
+ * is the one step of a mining test whose length depends on the machine.
+ */
+export async function waitForShare(sessionId: string, timeoutMs?: number): Promise<void> {
+  let sessionManager = ServiceManager.GetService(SessionManager);
+  let deadline = Date.now() + (timeoutMs || 60000);
+  while(Date.now() < deadline) {
+    let session = sessionManager.getSession(sessionId);
+    if(session && session.getDropAmount() > 0n)
+      return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error("no share rewarded for session " + sessionId + " within " + Math.round((timeoutMs || 60000) / 1000) + " s");
+}
+
+/**
+ * The tcp sockets behind the faucet's open websockets. The pow module hands its sockets to its
+ * worker, so the http server's own websocket server does not track them; the harness watches the
+ * upgrade requests instead.
+ */
+let upgradedSockets: Set<Socket> = new Set();
+
+/** Drops every websocket the faucet holds open, the way a network outage does; the clients reconnect on their own. */
+export function dropWebsockets(): number {
+  let count = upgradedSockets.size;
+  upgradedSockets.forEach((socket) => socket.destroy());
+  upgradedSockets.clear();
+  return count;
 }
 
 /** The session id the mining or claim page is on, read from the hash route. */
