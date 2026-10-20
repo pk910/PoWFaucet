@@ -67,6 +67,29 @@ describe("Session Management with MySQL DB Driver", () => {
     expect(testSession.getDropAmount()).to.equal(BigInt(faucetConfig.maxDropAmount), "unexpected drop amount");
   });
 
+  it("stores the target address in lower case and lower-cases stored ones on the schema upgrade", async () => {
+    let faucetDb = ServiceManager.GetService(FaucetDatabase);
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x00000000000000000000000000000000000ABCDE" });
+    expect(testSession.getTargetAddr()).to.equal("0x00000000000000000000000000000000000abcde", "unexpected targetAddr");
+    let now = Math.floor(new Date().getTime() / 1000);
+    await faucetDb.updateSession({
+      sessionId: "4e63566e-e482-46f3-bb91-da11f511aae7",
+      status: FaucetSessionStatus.FINISHED,
+      startTime: now,
+      targetAddr: "0x00000000000000000000000000000000000ABCDE",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [],
+      data: {},
+      claim: null,
+    });
+    await faucetDb.getDatabase().run("UPDATE SchemaVersion SET Version = 1 WHERE Module IS NULL");
+    await (faucetDb as any).upgradeSchema();
+    let storedSession = await faucetDb.getSession("4e63566e-e482-46f3-bb91-da11f511aae7");
+    expect(storedSession.targetAddr).to.equal("0x00000000000000000000000000000000000abcde", "stored targetAddr not lower-cased");
+  });
+
   it("Create invalid session (missing addr)", async () => {
     let sessionManager = ServiceManager.GetService(SessionManager);
     let error: FaucetError | null = null;
