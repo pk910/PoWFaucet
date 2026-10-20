@@ -246,6 +246,16 @@ modules:
       # percentage of drop amount if IP is from given country code (DE/US/...), 0 to block entirely
       #US: 100
 
+    # restrictions for sessions whose mining client reconnects from another ip than the session started from
+    # (percentage of drop amount, or a restriction object; a session that matched a kind once keeps that restriction)
+    #ipChangeRestrictions:
+    #  ip: 100       # any other ip
+    #  asn: 50       # ip from another AS (mobile network switch, proxy rotation)
+    #  country:      # ip from another country (proxy rotation): kill the session without reward
+    #    reward: 0
+    #    blocked: kill
+    #    message: "mining client reconnected from another country"
+
     # ip info pattern based restrictions
     restrictionsPattern:
       "^.*Tencent Cloud.*$": 10
