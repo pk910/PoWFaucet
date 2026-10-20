@@ -3,6 +3,8 @@ import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
 import { EthClaimManager } from "./EthClaimManager.js";
 import { EthWalletManager, TransactionResult } from "./EthWalletManager.js";
+import { ContractCaller } from "./rpc/index.js";
+import { resolveCallArgs } from "./CallArgs.js";
 import { SessionManager } from "../session/SessionManager.js";
 
 export class EthWalletRefill {
@@ -71,28 +73,19 @@ export class EthWalletRefill {
     }
   }
 
-  private resolveCallArgs(args: string[], amount: string): string[] {
+  /** {walletAddr}, {amount} and {token} as the claim transaction templates resolve them (src/eth/CallArgs.ts) */
+  private resolveCallArgs(args: string[], amount: string): unknown[] {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    return args.map((arg) => {
-      switch(arg) {
-        case "{walletAddr}":
-          arg = ethWalletManager.getFaucetAddress();
-          break;
-        case "{amount}":
-          arg = amount;
-          break;
-        case "{token}":
-          arg = ethWalletManager.getTokenAddress();
-          break;
-      }
-      return arg;
-    })
+    return resolveCallArgs(args, {
+      walletAddr: ethWalletManager.getFaucetAddress(),
+      token: ethWalletManager.getTokenAddress(),
+      amount: amount,
+    });
   }
 
   private async refillWallet(): Promise<TransactionResult> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    let refillContractAbi = JSON.parse(faucetConfig.ethRefillContract.abi);
-    let refillContract = ethWalletManager.getContractInterface(faucetConfig.ethRefillContract.contract, refillContractAbi);
+    let refillContract: ContractCaller = ethWalletManager.getContract(faucetConfig.ethRefillContract.contract, faucetConfig.ethRefillContract.abi);
     let refillAmount = BigInt(faucetConfig.ethRefillContract.requestAmount) || 0n;
     let refillAllowance: bigint = null;
 
@@ -101,7 +94,7 @@ export class EthWalletRefill {
     if(faucetConfig.ethRefillContract.allowanceFn) {
       // check allowance
       let callArgs = getCallArgs(faucetConfig.ethRefillContract.allowanceFnArgs || ["{walletAddr}"]);
-      refillAllowance = BigInt(await refillContract.methods[faucetConfig.ethRefillContract.allowanceFn].apply(this, callArgs).call());
+      refillAllowance = BigInt(await refillContract.call(faucetConfig.ethRefillContract.allowanceFn, callArgs) as bigint);
       if(refillAllowance == 0n)
         throw "no withdrawable funds from refill contract";
       if(refillAmount > refillAllowance)
@@ -122,15 +115,14 @@ export class EthWalletRefill {
     return await ethWalletManager.sendCustomTx(
       faucetConfig.ethRefillContract.contract,
       0n,
-      refillContract.methods[faucetConfig.ethRefillContract.withdrawFn].apply(this, callArgs).encodeABI(),
+      refillContract.encode(faucetConfig.ethRefillContract.withdrawFn, callArgs),
       faucetConfig.ethRefillContract.withdrawGasLimit
     );
   }
 
   private async overflowWallet(amount: bigint): Promise<TransactionResult> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
-    let refillContractAbi = JSON.parse(faucetConfig.ethRefillContract.abi);
-    let refillContract = ethWalletManager.getContractInterface(faucetConfig.ethRefillContract.contract, refillContractAbi);
+    let refillContract: ContractCaller = ethWalletManager.getContract(faucetConfig.ethRefillContract.contract, faucetConfig.ethRefillContract.abi);
 
     let getCallArgs = (args) => this.resolveCallArgs(args, amount.toString());
 
@@ -138,7 +130,7 @@ export class EthWalletRefill {
     return await ethWalletManager.sendCustomTx(
       faucetConfig.ethRefillContract.contract,
       amount,
-      faucetConfig.ethRefillContract.depositFn ? refillContract.methods[faucetConfig.ethRefillContract.depositFn].apply(this, callArgs).encodeABI() : undefined,
+      faucetConfig.ethRefillContract.depositFn ? refillContract.encode(faucetConfig.ethRefillContract.depositFn, callArgs) : undefined,
       faucetConfig.ethRefillContract.withdrawGasLimit
     );
   }

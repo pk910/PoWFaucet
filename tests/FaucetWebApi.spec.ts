@@ -595,8 +595,9 @@ describe("Faucet Web API", () => {
 
     let webApi = new FaucetWebApi();
     let apiResponse = await webApi.onApiRequest(encodeApiRequest({
-      url: "/api/getFaucetStatus?key=" + sha256(faucetConfig.faucetSecret + "-unmasked"),
-      remoteAddr: "8.8.8.8"
+      url: "/api/getFaucetStatus",
+      remoteAddr: "8.8.8.8",
+      headers: { authorization: "Bearer " + sha256(faucetConfig.faucetSecret + "-unmasked") },
     }));
     expect(!!apiResponse).equal(true, "no api response");
     expect(apiResponse.status.unclaimedBalance).equal("100", "value mismatch: unclaimedBalance");
@@ -616,12 +617,21 @@ describe("Faucet Web API", () => {
 
     let webApi = new FaucetWebApi();
     let apiResponse = await webApi.onApiRequest(encodeApiRequest({
-      url: "/api/getFaucetStatus?key=invalid",
-      remoteAddr: "8.8.8.8"
+      url: "/api/getFaucetStatus",
+      remoteAddr: "8.8.8.8",
+      headers: { authorization: "Bearer invalid" },
     }));
     expect(!!apiResponse).equal(true, "no api response");
     expect(apiResponse.code).equal(403, "invalid response code");
     expect(apiResponse.reason).equal("Access denied", "invalid response reason");
+
+    // the key in the url is not a key: the public answer, as for anyone (urls land in logs)
+    let publicResponse = await webApi.onApiRequest(encodeApiRequest({
+      url: "/api/getFaucetStatus?key=" + sha256(faucetConfig.faucetSecret + "-unmasked"),
+      remoteAddr: "8.8.8.8"
+    }));
+    expect(publicResponse instanceof FaucetHttpResponse).equal(false, "a query parameter key is ignored, not refused");
+    expect(publicResponse.status).to.not.equal(undefined, "the public status");
   });
 
   it("check /api/getQueueStatus", async () => {

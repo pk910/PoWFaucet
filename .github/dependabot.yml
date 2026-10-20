@@ -9,6 +9,10 @@ updates:
       "Server dependencies":
         patterns:
           - "*"
+    ignore:
+      # viem 3 is in pre-release; the move is a deliberate migration of src/eth/rpc, not a bump
+      - dependency-name: "viem"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "npm"
     directory: "/faucet-client"
     schedule:

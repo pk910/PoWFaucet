@@ -136,6 +136,7 @@ export async function bootFaucet(options?: IFaucetFixtureOptions): Promise<IFauc
       return {
         txHash: txHash,
         txPromise: Promise.resolve(confirmedTx(txHash)),
+        plan: null, // the plan is only read by the real sender
       };
     }),
     "EthWalletManager.watchClaimTx": sinon.stub(EthWalletManager.prototype, "watchClaimTx").callsFake(async (claimTx: any) => {

@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import YAML from 'yaml';
 import { bindTestStubs, unbindTestStubs, loadDefaultTestConfig, awaitSleepPromise } from './common.js';
 import { ServiceManager } from '../src/common/ServiceManager.js';
+import { FaucetDatabase } from '../src/db/FaucetDatabase.js';
 import { ModuleHookAction, ModuleManager } from '../src/modules/ModuleManager.js';
 import { SessionManager } from '../src/session/SessionManager.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
@@ -40,6 +41,7 @@ describe("Faucet Services", () => {
 
   describe("Stats Log", () => {
     it("Check session stats processing", async () => {
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // a completing session writes its row before it is claimable
       faucetConfig.faucetLogStatsInterval = 1;
       faucetConfig.maxDropAmount = 100000;
       faucetConfig.minDropAmount = 10000;
@@ -103,6 +105,7 @@ describe("Faucet Services", () => {
       };
       let statsLog = ServiceManager.GetService(FaucetStatsLog);
       statsLog.initialize();
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // admitting a claim is a row update now
       await ServiceManager.GetService(ModuleManager).initialize();
       let testSession = await ServiceManager.GetService(SessionManager).createSession("8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
       expect(testSession.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");
@@ -404,6 +407,7 @@ describe("Faucet Services", () => {
     });
 
     it("Check status filter: ipinfo.hosting / proxy", async () => {
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // a completing session writes its row before it is claimable
       let statusSvc = ServiceManager.GetService(FaucetStatus);
       statusSvc.initialize();
       let statusEntry1 = statusSvc.setFaucetStatus("test1", "Test status 1", FaucetStatusLevel.ERROR, 10);

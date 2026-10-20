@@ -5,6 +5,7 @@ import { ServiceManager } from '../src/common/ServiceManager.js';
 import { FaucetProcess } from '../src/common/FaucetProcess.js';
 import { faucetConfig } from '../src/config/FaucetConfig.js';
 import { FakeProvider } from './stubs/FakeProvider.js';
+import { extractAuth, rpcErrorString } from '../src/eth/rpc/index.js';
 import { RpcEndpointPool, RpcEndpointState, IRpcEndpointStatus } from '../src/eth/RpcEndpointPool.js';
 
 // Internal access shim — these tests intentionally exercise private methods to
@@ -172,7 +173,7 @@ describe("RPC Endpoint Pool", () => {
   describe("auth header extraction", () => {
     it("returns clean URL and Basic auth header for user:pass URL", () => {
       const pool = new RpcEndpointPool() as AnyPool;
-      const { cleanUrl, headers } = pool.extractAuth("https://alice:hunter2@rpc.example.com/p");
+      const { cleanUrl, headers } = extractAuth("https://alice:hunter2@rpc.example.com/p");
       expect(cleanUrl).to.not.contain("alice");
       expect(cleanUrl).to.contain("rpc.example.com/p");
       expect(headers.Authorization).to.equal("Basic " + Buffer.from("alice:hunter2").toString("base64"));
@@ -180,20 +181,20 @@ describe("RPC Endpoint Pool", () => {
 
     it("returns no headers for URL without auth", () => {
       const pool = new RpcEndpointPool() as AnyPool;
-      const { headers } = pool.extractAuth("https://rpc.example.com/");
+      const { headers } = extractAuth("https://rpc.example.com/");
       expect(headers).to.deep.equal({});
     });
 
     it("returns the original URL when not parseable", () => {
       const pool = new RpcEndpointPool() as AnyPool;
-      const { cleanUrl, headers } = pool.extractAuth("not a url");
+      const { cleanUrl, headers } = extractAuth("not a url");
       expect(cleanUrl).to.equal("not a url");
       expect(headers).to.deep.equal({});
     });
 
     it("decodes percent-encoded auth values", () => {
       const pool = new RpcEndpointPool() as AnyPool;
-      const { headers } = pool.extractAuth("https://alice:p%40ss@rpc.example.com/");
+      const { headers } = extractAuth("https://alice:p%40ss@rpc.example.com/");
       expect(headers.Authorization).to.equal("Basic " + Buffer.from("alice:p@ss").toString("base64"));
     });
   });
@@ -202,26 +203,47 @@ describe("RPC Endpoint Pool", () => {
     it("returns the input untouched when given a pre-built provider", () => {
       const pool = new RpcEndpointPool() as AnyPool;
       const fp = new FakeProvider();
-      expect(pool.makeProvider(fp)).to.equal(fp);
+      expect(pool.createProvider(fp)).to.equal(fp);
     });
 
     it("creates an HttpProvider for http(s) URLs", () => {
       const pool = new RpcEndpointPool() as AnyPool;
-      const provider = pool.makeProvider("http://localhost:8545");
+      const provider = pool.createProvider("http://localhost:8545");
       expect(provider.constructor.name).to.equal("HttpProvider");
     });
 
     it("attaches Authorization headers when URL has userinfo", () => {
       const pool = new RpcEndpointPool() as AnyPool;
-      const provider = pool.makeProvider("http://u:p@localhost:8545");
-      // HttpProvider stores options privately, but we can grab them via field name
-      const opts = (provider as any).httpProviderOptions;
-      expect(opts?.providerOptions?.headers?.Authorization).to.contain("Basic");
+      const provider = pool.createProvider("http://u:p@localhost:8545");
+      expect((provider as any).headers?.Authorization).to.contain("Basic");
+      expect((provider as any).url).to.equal("http://localhost:8545/");
+    });
+
+    it("rejects ws:// URLs that carry credentials, without echoing them", () => {
+      const pool = new RpcEndpointPool() as AnyPool;
+      let err: any;
+      try { pool.createProvider("ws://alice:hunter2@localhost:8546/"); } catch (ex) { err = ex; }
+      expect(err?.message).to.match(/cannot carry credentials/);
+      expect(err?.message).to.not.contain("alice");
+      expect(err?.message).to.not.contain("hunter2");
+    });
+
+    it("rpcErrorString redacts URLs in plain strings and ws URLs too", () => {
+      expect(rpcErrorString("failed: wss://alice:hunter2@rpc.example.com/ws")).to.not.contain("hunter2");
+      expect(rpcErrorString("failed: wss://alice:hunter2@rpc.example.com/ws")).to.contain("rpc.example.com");
+    });
+
+    it("rpcErrorString redacts URLs quoted in error text", () => {
+      const text = rpcErrorString(new Error("HTTP request failed.\n\nURL: https://alice:hunter2@rpc.example.com/v3/SomeApiKey1234567890\nRequest body: {}"));
+      expect(text).to.not.contain("alice");
+      expect(text).to.not.contain("hunter2");
+      expect(text).to.not.contain("SomeApiKey1234567890");
+      expect(text).to.contain("rpc.example.com");
     });
 
     it("creates a WebSocketProvider for ws:// URLs", () => {
       const pool = new RpcEndpointPool() as AnyPool;
-      const provider = pool.makeProvider("ws://localhost:8546");
+      const provider = pool.createProvider("ws://localhost:8546");
       expect(provider.constructor.name).to.match(/WebSocketProvider|WebsocketProvider/);
       // close immediately so the WS reconnect timer doesn't keep the test alive
       try { provider.disconnect?.(); } catch (_) { /* ignore */ }
@@ -229,14 +251,10 @@ describe("RPC Endpoint Pool", () => {
 
     it("routes absolute path URLs to the IPC provider class", () => {
       const pool = new RpcEndpointPool() as AnyPool;
-      // IpcProvider validates its URL on construction. A bogus absolute path
-      // should reach the IPC code path (the error mentions "Client URL" + "invalid"),
-      // not the HTTP/WS code paths (which would 404 / handshake instead).
-      let err: any;
-      try { pool.makeProvider("/definitely/not/a/socket"); }
-      catch (ex) { err = ex; }
-      expect(err).to.exist;
-      expect(err.toString().toLowerCase()).to.match(/client url|invalid/);
+      // the IPC transport connects lazily, so a bogus path only fails on the first request
+      const provider = pool.createProvider("/definitely/not/a/socket");
+      expect(provider.constructor.name).to.equal("IpcProvider");
+      try { provider.disconnect?.(); } catch (_) { /* ignore */ }
     });
   });
 
@@ -248,9 +266,9 @@ describe("RPC Endpoint Pool", () => {
       pool.endpoints = [pool.createEndpoint({ url: fp, priority: 1, metered: false })];
       const ep = pool.endpoints[0];
       expect(ep.requestCount).to.equal(0);
-      await ep.web3.eth.getBlockNumber();
+      await ep.client.getBlockNumber();
       expect(ep.requestCount).to.equal(1);
-      await ep.web3.eth.getBlockNumber();
+      await ep.client.getBlockNumber();
       expect(ep.requestCount).to.equal(2);
     });
 
@@ -373,7 +391,7 @@ describe("RPC Endpoint Pool", () => {
     });
   });
 
-  describe("getReadyEndpoints / getActiveWeb3 / getStatusList", () => {
+  describe("getReadyEndpoints / getActiveClient / getStatusList", () => {
     function makePool(): { pool: AnyPool, eps: RpcEndpointState[], providers: FakeProvider[] } {
       const pool = new RpcEndpointPool() as AnyPool;
       const providers = [new FakeProvider(), new FakeProvider(), new FakeProvider()];
@@ -394,17 +412,40 @@ describe("RPC Endpoint Pool", () => {
       expect(ready.map((ep) => ep.label)).to.deep.equal(["high", "low"]);
     });
 
-    it("getActiveWeb3 falls back to the first endpoint if none are ready", () => {
+    it("getActiveClient falls back to the first endpoint if none are ready", () => {
       const { pool, eps } = makePool();
       // none online
-      const active = pool.getActiveWeb3();
-      expect(active).to.equal(eps[0].web3);
+      const active = pool.getActiveClient();
+      expect(active).to.equal(eps[0].client);
     });
 
-    it("getActiveWeb3 returns null when there are no endpoints", () => {
+    it("getActiveClient returns null when there are no endpoints", () => {
       const pool = new RpcEndpointPool() as AnyPool;
       pool.endpoints = [];
-      expect(pool.getActiveWeb3()).to.equal(null);
+      expect(pool.getActiveClient()).to.equal(null);
+    });
+
+    it("getClient() follows failover: each call lands on the endpoint active at that moment", async () => {
+      const { pool, eps } = makePool();
+      eps.forEach((ep) => { ep.online = true; });
+      const client = pool.getClient();
+      await client.getBlockNumber();
+      expect(eps.map((ep) => ep.requestCount)).to.deep.equal([0, 1, 0], "first call should hit 'high'");
+      eps[1].online = false; // 'high' dies
+      await client.getBlockNumber();
+      expect(eps.map((ep) => ep.requestCount)).to.deep.equal([0, 1, 1], "second call should hit 'mid'");
+      eps[2].blockLagOffline = true; // 'mid' lags
+      await client.getBlockNumber();
+      expect(eps.map((ep) => ep.requestCount)).to.deep.equal([1, 1, 1], "third call should hit 'low'");
+      expect(pool.getClient()).to.equal(client, "the routing client is the same object for the pool's lifetime");
+    });
+
+    it("getClient() fails with a clear error when the pool has no endpoints", async () => {
+      const pool = new RpcEndpointPool() as AnyPool;
+      pool.endpoints = [];
+      let err: any;
+      try { await pool.getClient().getBlockNumber(); } catch (ex) { err = ex; }
+      expect(err?.message).to.equal("no RPC endpoint available");
     });
 
     it("hasReadyEndpoint reflects readiness", () => {
@@ -637,7 +678,7 @@ describe("RPC Endpoint Pool", () => {
       pool.endpoints = [pool.createEndpoint({ url: fp, priority: 1, metered: false })];
       const ep = pool.endpoints[0];
       // Make makeProvider throw to exercise the catch branch.
-      pool.makeProvider = () => { throw new Error("nope"); };
+      pool.createProvider = () => { throw new Error("nope"); };
       expect(() => pool.recreateProvider(ep)).to.not.throw();
     });
 

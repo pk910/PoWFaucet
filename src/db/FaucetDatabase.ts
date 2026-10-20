@@ -402,6 +402,7 @@ export class FaucetDatabase {
     let status: FaucetSessionStatus;
     switch(claimData.claimStatus) {
       case ClaimTxStatus.CONFIRMED:
+      case ClaimTxStatus.UNKNOWN: // may have paid: consumed, like a confirmed claim
         status = FaucetSessionStatus.FINISHED;
         break;
       case ClaimTxStatus.FAILED:
@@ -416,6 +417,95 @@ export class FaucetDatabase {
       JSON.stringify(claimData),
       sessionId
     ]);
+  }
+
+  /**
+   * The claim data of several claiming sessions in one statement, all or nothing: the update only
+   * applies when every one of the sessions is claiming, otherwise it changes no row at all. So a
+   * crash can never leave a signed transaction known to some of a batch's rows and not to others,
+   * and a short batch leaves nothing behind to clean up. The sessions stay "claiming".
+   * Returns the number of rows changed: all of them, or zero.
+   */
+  public async updateClaimDataBulk(updates: { sessionId: string; claimData: EthClaimData }[]): Promise<number> {
+    if(updates.length === 0)
+      return 0;
+    let values: (string | number)[] = [];
+    let cases = updates.map((update) => {
+      values.push(update.sessionId, JSON.stringify(update.claimData));
+      return "WHEN ? THEN ?";
+    }).join(" ");
+    let placeholders = updates.map(() => "?").join(",");
+    updates.forEach((update) => values.push(update.sessionId));
+    updates.forEach((update) => values.push(update.sessionId));
+    values.push(updates.length);
+    // the derived table keeps MySQL from refusing a subquery on the table being updated
+    let result = await this.db.run(
+      "UPDATE Sessions SET ClaimData = CASE SessionId " + cases + " END" +
+      " WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")" +
+      " AND (SELECT COUNT(*) FROM (SELECT SessionId FROM Sessions WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")) AS batch) = ?",
+      values,
+    );
+    return result.changes;
+  }
+
+  /**
+   * Settles the claims of one transaction in one statement: every row of it that is still claiming
+   * takes the status (failed, or finished for an unknown outcome) and its claim data at once. A
+   * crash cannot leave rows that still replay the transaction's bytes beside rows that already
+   * count as settled (the bytes pay everyone).
+   */
+  public async settleClaimsBulk(updates: { sessionId: string; claimData: EthClaimData }[], status: FaucetSessionStatus.FAILED | FaucetSessionStatus.FINISHED): Promise<number> {
+    if(updates.length === 0)
+      return 0;
+    let values: (string | number)[] = [];
+    let cases = updates.map((update) => {
+      values.push(update.sessionId, JSON.stringify(update.claimData));
+      return "WHEN ? THEN ?";
+    }).join(" ");
+    let placeholders = updates.map(() => "?").join(",");
+    updates.forEach((update) => values.push(update.sessionId));
+    let result = await this.db.run(
+      "UPDATE Sessions SET Status = '" + status + "', ClaimData = CASE SessionId " + cases + " END" +
+      " WHERE Status = 'claiming' AND SessionId IN (" + placeholders + ")",
+      values,
+    );
+    return result.changes;
+  }
+
+  /**
+   * Admits exactly one claim for a session: the row goes claimable -> claiming in one conditional
+   * update, or, for a session that was never stored, is inserted as claiming, where the primary key
+   * lets exactly one of two concurrent inserts through. False when someone else got there first.
+   * `session` is the row as it should read afterwards (status claiming, the claim data set).
+   */
+  public async startClaim(session: FaucetSessionStoreData): Promise<boolean> {
+    let claimData = JSON.stringify(session.claim);
+    let result = await this.db.run("UPDATE Sessions SET Status = 'claiming', DropAmount = ?, ClaimData = ? WHERE SessionId = ? AND Status = 'claimable'", [
+      session.dropAmount,
+      claimData,
+      session.sessionId,
+    ]);
+    if(result.changes === 1)
+      return true;
+    try {
+      await this.db.run("INSERT INTO Sessions (SessionId,Status,StartTime,TargetAddr,DropAmount,RemoteIP,Tasks,Data,ClaimData) VALUES (?,?,?,?,?,?,?,?,?)", [
+        session.sessionId,
+        FaucetSessionStatus.CLAIMING,
+        session.startTime,
+        session.targetAddr,
+        session.dropAmount,
+        session.remoteIP,
+        JSON.stringify(session.tasks),
+        JSON.stringify(session.data),
+        claimData,
+      ]);
+      return true;
+    } catch(ex) {
+      // the row exists (and is not claimable, or the update above would have taken it): a duplicate key
+      if(/UNIQUE constraint failed|SQLITE_CONSTRAINT|Duplicate entry|ER_DUP_ENTRY/i.test(String(ex)))
+        return false;
+      throw ex;
+    }
   }
 
   public async getClaimableAmount(): Promise<bigint> {

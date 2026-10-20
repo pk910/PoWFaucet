@@ -11,8 +11,9 @@ import { SessionManager } from "../../session/SessionManager.js";
 
 export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
-  private balanceRestriction: number;
+  private balanceRestriction: number = 100; // percent, until the first refresh
   private balanceRestrictionRefresh = 0;
+  private balanceRefreshPromise: Promise<void> | null = null;
 
   protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(
@@ -44,18 +45,27 @@ export class FaucetBalanceModule extends BaseModule<IFaucetBalanceConfig> {
   }
 
   private async refreshBalanceRestriction(): Promise<void> {
+    // sessions arriving together share one refresh and wait for it: the refresh time used to be set
+    // before the first await, so every session behind the first one read a restriction that was not
+    // there yet (undefined / 100 = NaN, and the session failed with an internal error)
+    if(this.balanceRefreshPromise)
+      return this.balanceRefreshPromise;
     let now = Math.floor((new Date()).getTime() / 1000);
     if(this.balanceRestrictionRefresh > now - 30)
       return;
-      
+    this.balanceRefreshPromise = this.computeBalanceRestriction(now).finally(() => { this.balanceRefreshPromise = null; });
+    return this.balanceRefreshPromise;
+  }
+
+  private async computeBalanceRestriction(now: number): Promise<void> {
     let faucetBalance = ServiceManager.GetService(EthWalletManager).getFaucetBalance();
-    if(faucetBalance === null)
+    if(faucetBalance === null || faucetBalance === undefined)
       return;
-    
+
     this.balanceRestrictionRefresh = now;
     faucetBalance -= await ServiceManager.GetService(SessionManager).getUnclaimedBalance(); // subtract balance from active & claimable sessions
     faucetBalance -= ServiceManager.GetService(EthClaimManager).getQueuedAmount(); // subtract pending transaction amounts
-    
+
     this.balanceRestriction = Math.min(
       this.getStaticBalanceRestriction(faucetBalance),
       this.getDynamicBalanceRestriction(faucetBalance)

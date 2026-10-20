@@ -15,6 +15,52 @@ export interface IRpcEndpointConfig {
 
 export type EthRpcHostConfig = string | object | IRpcEndpointConfig | (string | object | IRpcEndpointConfig)[];
 
+/**
+ * How a claim is paid when not by a plain transfer: a call on a contract. Arguments are literals
+ * or placeholders (see src/eth/CallArgs.ts): {target} {amount} {token} {walletAddr} {sessionId}
+ * {sessionHash} {session.<key>}; in the batch block the list forms {targets[]} {amounts[]}
+ * {sessionIds[]} {sessionHashes[]} {session.<key>[]} and {sum}.
+ */
+/**
+ * One call a claim consists of. Fields take literals or the single-claim placeholders
+ * (src/eth/CallArgs.ts): {target} {amount} {token} {walletAddr} {sessionId} {sessionHash} {session.<key>}.
+ */
+export interface IClaimCall {
+  type: "transfer" | "token" | "call"; // native coin to `to`; the faucet's tokens to `to`; a contract call
+  to?: string;
+  amount?: string; // transfer / token: wei or token base units
+  token?: string; // token: the ERC20 contract
+  value?: string; // call: native coin sent along (default 0)
+  gas?: number; // call: gas the call may use (default 200000); a recipient burning it fails its own call, not the batch
+  data?: string; // call: calldata, 0x hex ...
+  abi?: string | string[]; // ... or the calldata built from an abi (JSON string or human-readable signatures), a function and its arguments
+  fn?: string;
+  args?: string[];
+}
+
+/**
+ * What paying one claim means. Without it a claim is the faucet coin's plain transfer. One call is
+ * sent as a plain transaction; several calls per claim need `ethClaimBatch`, which executes them
+ * through the wallet's own code.
+ */
+export interface IClaimTxConfig {
+  calls: IClaimCall[];
+  gasLimit?: number | "estimate"; // gas limit of a single-claim transaction; "estimate" asks the node (+20 %); default ethTxGasLimit
+}
+
+/**
+ * Several claims per transaction, transparent to what a claim is. The faucet wallet delegates its
+ * code to the batcher (EIP-7702) and calls `execute` on itself with every claim's calls; the faucet
+ * sets that up by itself (deploys the batcher through the deterministic deployment proxy when the
+ * chain lacks it, then sends the delegation). Single transactions keep working as before.
+ */
+export interface IClaimBatchConfig {
+  maxClaims: number; // claims per transaction (1 or less disables batching)
+  maxWaitSeconds: number; // a partial batch is sent once its oldest claim waited this long (0: on the next queue tick)
+  gasLimit?: number | "estimate"; // gas limit of a batch transaction (base); "estimate" asks the node (+20 %)
+  gasLimitPerClaim?: number; // added per claim on top of gasLimit
+}
+
 export interface IConfigSchema {
   version?: 2;
 
@@ -77,6 +123,7 @@ export interface IConfigSchema {
   ethLegacyTx: boolean; // use legacy (non-eip1559) transaction type
   ethTxMaxFee: number; // max transaction gas fee
   ethTxPrioFee: number; // max transaction priority fee
+  ethTxFeeCap: number; // the most a transaction may cost (gas limit * ethTxMaxFee, wei): nodes refuse transactions above their own cap (geth: 1 ETH), so batches are sized to stay below this; 0 for no limit
   ethMaxPending: number; // max number of unconfirmed transactions to create simultaneously
   ethQueueNoFunds: boolean; // queue transactions when faucet is out of funds
   ethTxExplorerLink: string; // link to eth transaction explorer with {txid} as placeholder for transaction id or null for no link
@@ -100,6 +147,10 @@ export interface IConfigSchema {
   denyNewSessions: string | boolean; // prevent creation of new sessions (used for maintenance)
 
   corsAllowOrigin: string[]; // Access-Control-Allow-Origin header, empty to disable cors
+
+  ethClaimTx: IClaimTxConfig | null; // what a claim pays (one or more calls), or null for the faucet coin's plain transfer
+  ethClaimBatch: IClaimBatchConfig | null; // several claims per transaction via EIP-7702 self-delegation, or null for one transaction per claim
+  ethIgnoreDelegate: boolean; // leave the wallet's EIP-7702 delegation as it is: never set one for batching, never clear one left behind when batching is off
 
   ethRefillContract: null | { // refill from vault contract or null to disable automatic refilling
     contract: string; // vault contract address

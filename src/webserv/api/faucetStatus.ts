@@ -16,7 +16,12 @@ import { sha256 } from "../../utils/CryptoUtils.js";
 
 /** The operator's key: unmasks the status list and the session details. */
 export function isOperatorKey(key: string | undefined): boolean {
-  return !!key && key === sha256(faucetConfig.faucetSecret + "-unmasked");
+  return !!key && key === getOperatorKey();
+}
+
+/** The operator's key, derived from the faucet secret (a hash of it: knowing the key reveals nothing of the secret). Printed to the log at startup. */
+export function getOperatorKey(): string {
+  return sha256(faucetConfig.faucetSecret + "-unmasked");
 }
 
 /**

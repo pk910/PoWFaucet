@@ -323,6 +323,8 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
         return (<span className="pf-pill pf-pill-live">Confirmed</span>);
       case "failed":
         return (<span className="pf-pill pf-pill-crit">Failed</span>);
+      case "unknown":
+        return (<span className="pf-pill pf-pill-warn">Outcome unknown</span>);
       default:
         return (<span className="pf-pill">{this.state.sessionStatus.claimStatus}</span>);
     }

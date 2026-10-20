@@ -129,6 +129,9 @@ export function loadDefaultTestConfig() {
   loadFaucetConfig(true);
   faucetConfig.faucetSecret = "test";
   faucetConfig.faucetStats = null;
+  // the default points at faucet-status.{json,yaml} in the working directory: an operator's (or
+  // developer's) local status file must not leak into test assertions
+  faucetConfig.faucetStatus = { json: null, yaml: null };
   faucetConfig.database = {
     driver: FaucetDbDriver.SQLITE,
     file: ":memory:",

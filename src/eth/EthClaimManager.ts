@@ -2,7 +2,8 @@ import { WebSocket } from 'ws';
 import { faucetConfig } from "../config/FaucetConfig.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
-import { EthWalletManager } from "./EthWalletManager.js";
+import { EthWalletManager, PreparedClaimTx, TransactionDroppedError, WalletState } from "./EthWalletManager.js";
+import { BatchTooExpensiveError } from "./claimtx/ClaimTxBuilder.js";
 import { FaucetStatsLog } from "../services/FaucetStatsLog.js";
 import { FaucetDatabase } from "../db/FaucetDatabase.js";
 import { EthWalletRefill } from "./EthWalletRefill.js";
@@ -14,7 +15,7 @@ import { IncomingMessage } from 'http';
 import { EthClaimNotificationClient, IEthClaimNotificationData } from './EthClaimNotificationClient.js';
 import { FaucetOutflowModule } from '../modules/faucet-outflow/FaucetOutflowModule.js';
 import { clearInterval } from 'timers';
-import { TransactionReceipt } from 'web3';
+import { EthTxReceipt, rpcErrorString } from "./rpc/index.js";
 
 export enum ClaimTxStatus {
   QUEUE = "queue",
@@ -22,6 +23,8 @@ export enum ClaimTxStatus {
   PENDING = "pending",
   CONFIRMED = "confirmed",
   FAILED = "failed",
+  /** the nonce was spent and no receipt for our hash was found: paid or not is not known. Terminal, counts as consumed, to be reconciled by hand. */
+  UNKNOWN = "unknown",
 }
 
 export interface ClaimTxEvents {
@@ -43,6 +46,8 @@ export interface EthClaimInfo {
   target: string;
   amount: string;
   claim: EthClaimData;
+  /** the session's data at claim time, for {session.<key>} placeholders in a transaction template */
+  data?: {[key: string]: any};
 }
 
 export interface EthClaimData {
@@ -52,19 +57,26 @@ export interface EthClaimData {
   txHash?: string;
   txHex?: string;
   txNonce?: number;
+  /** this claim's sub-calls in a batch transaction's stream (offset and count), so its receipt can be read from the row alone */
+  txCalls?: { offset: number; count: number };
   txBlock?: number;
   txFee?: string;
   txError?: string;
 }
+
 
 export class EthClaimManager {
   private initialized: boolean;
   private queueInterval: NodeJS.Timeout;
   private claimTxDict: {[session: string]: EthClaimInfo} = {};
   private claimTxQueue: EthClaimInfo[] = [];
-  private pendingTxQueue: {[hash: string]: EthClaimInfo} = {};
-  private historyTxDict: {[nonce: number]: EthClaimInfo} = {};
+  // one transaction pays one claim, or a batch of them (ethClaimTx.batch): both maps hold the claims per transaction
+  private pendingTxQueue: {[hash: string]: EthClaimInfo[]} = {};
+  private historyTxDict: {[nonce: number]: EthClaimInfo[]} = {};
   private queueProcessing: boolean = false;
+  private delegationClearPending: boolean = false; // the startup attempt to clear a stale wallet delegation failed; the queue retries
+  private batchSizeLimit: number | null = null; // what fits under the fee cap when a plan turned out too expensive; doubled after each confirmed batch until it reaches the configured size again
+  private feeCapNoted: boolean = false;
   private lastClaimTxIdx: number = 1;
   private lastProcessedClaimTxIdx: number = 0;
   /** how many claims have settled; a settlement that does not move the settled index still gets announced */
@@ -81,7 +93,8 @@ export class EthClaimManager {
 
     // restore saved claimTx queue
     let maxQueueIdx = 0;
-    let storedSession = await  ServiceManager.GetService(FaucetDatabase).getSessions([
+    let database = ServiceManager.GetService(FaucetDatabase);
+    let storedSession = await database.getSessions([
       FaucetSessionStatus.CLAIMING,
     ]);
     storedSession.forEach((sessionData) => {
@@ -90,7 +103,13 @@ export class EthClaimManager {
         target: sessionData.targetAddr,
         amount: sessionData.dropAmount,
         claim: sessionData.claim,
+        data: sessionData.data,
       };
+      // a "processing" row with the signed transaction in it was written right before the
+      // broadcast; the process died in between and the bytes may or may not be out: treat it as
+      // pending and send the same bytes again, never a new transaction
+      if(claimInfo.claim.claimStatus === ClaimTxStatus.PROCESSING && claimInfo.claim.txHex && claimInfo.claim.txHash)
+        claimInfo.claim.claimStatus = ClaimTxStatus.PENDING;
       switch(claimInfo.claim.claimStatus) {
         case ClaimTxStatus.QUEUE:
         case ClaimTxStatus.PROCESSING:
@@ -98,9 +117,11 @@ export class EthClaimManager {
           this.claimTxDict[claimInfo.session] = claimInfo;
           break;
         case ClaimTxStatus.PENDING:
-          this.pendingTxQueue[claimInfo.claim.txHash] = claimInfo;
+          // claims of one batch share the hash: watched once, below
+          if(!this.pendingTxQueue[claimInfo.claim.txHash])
+            this.pendingTxQueue[claimInfo.claim.txHash] = [];
+          this.pendingTxQueue[claimInfo.claim.txHash].push(claimInfo);
           this.claimTxDict[claimInfo.session] = claimInfo;
-          this.awaitTxReceipt(claimInfo, ServiceManager.GetService(EthWalletManager).watchClaimTx(claimInfo));
           break;
         default:
           ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Cannot restore claimTx: unexpected claim status '" + claimInfo.claim.claimStatus + "'");
@@ -110,8 +131,43 @@ export class EthClaimManager {
         maxQueueIdx = claimInfo.claim.claimIdx;
     });
 
+    // pending transactions: the ones with their signed bytes stored go out again (the network
+    // ignores bytes it has seen; a transaction the crash kept from being sent gets sent), the
+    // others (from before the bytes were kept) are watched by hash
+    let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+    let rebroadcasts: Promise<unknown>[] = [];
+    Object.keys(this.pendingTxQueue).forEach((txHash) => {
+      let claims = this.pendingTxQueue[txHash];
+      let signed = claims.find((claimInfo) => !!claimInfo.claim.txHex);
+      if(signed) {
+        claims.forEach((claimInfo) => this.updateClaimStatus(claimInfo)); // "processing" rows become "pending"
+        let rebroadcast = ethWalletManager.rebroadcastClaimTx({ txHash: txHash, txNonce: signed.claim.txNonce, txHex: signed.claim.txHex }, claims);
+        rebroadcasts.push(rebroadcast.then((res) => {
+          this.awaitTxReceipt(claims, res.txPromise, txHash);
+        }, async (err) => {
+          // refused by every endpoint: a validation error fails the batch as a whole, anything else leaves it unknown
+          delete this.pendingTxQueue[txHash];
+          if(err instanceof TransactionDroppedError)
+            await this.giveUpClaims(claims, err.message);
+          else
+            await this.failClaims(claims, "Processing Exception: " + rpcErrorString(err));
+        }));
+      } else {
+        this.awaitTxReceipt(claims, ethWalletManager.watchClaimTx(claims[0]), txHash);
+      }
+    });
+    if(rebroadcasts.length > 0) {
+      // the queue must not hand out a nonce a replayed transaction just took
+      await Promise.all(rebroadcasts);
+      await ethWalletManager.loadWalletState();
+    }
+
     this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
     this.lastClaimTxIdx = maxQueueIdx + 1;
+
+    // a delegation an earlier batching setup left on the wallet is cleared before the queue runs
+    // (after the replays: its transaction takes the next free nonces)
+    this.delegationClearPending = !(await ethWalletManager.ensureNoDelegation());
 
     // register claim ws endpoint
     ServiceManager.GetService(FaucetHttpServer).addWssEndpoint("claim", /^\/ws\/claim($|\?)/, (req, ws, ip) => this.processClaimNotificationWebSocket(req, ws, ip));
@@ -160,8 +216,8 @@ export class EthClaimManager {
     let txlist: EthClaimInfo[] = [];
     Array.prototype.push.apply(txlist, this.claimTxQueue);
     if(!queueOnly) {
-      Array.prototype.push.apply(txlist, Object.values(this.pendingTxQueue));
-      Array.prototype.push.apply(txlist, Object.values(this.historyTxDict));
+      Object.values(this.pendingTxQueue).forEach((claims) => Array.prototype.push.apply(txlist, claims));
+      Object.values(this.historyTxDict).forEach((claims) => Array.prototype.push.apply(txlist, claims));
     }
     return txlist;
   }
@@ -243,6 +299,7 @@ export class EthClaimManager {
       target: sessionData.targetAddr,
       amount: sessionData.dropAmount,
       claim: sessionData.claim,
+      data: sessionData.data,
     };
     
     try {
@@ -263,10 +320,15 @@ export class EthClaimManager {
       claimStatus: ClaimTxStatus.QUEUE,
       claimTime: Math.floor(new Date().getTime() / 1000),
     };
+    // the row is the arbiter: claimable -> claiming for exactly this session (or the row is created
+    // as claiming, for a session that was never stored), or someone else (another request, another
+    // process) got there first
+    let claiming: FaucetSessionStoreData = { ...sessionData, status: FaucetSessionStatus.CLAIMING, dropAmount: claimInfo.amount, claim: claimInfo.claim };
+    if(!await ServiceManager.GetService(FaucetDatabase).startClaim(claiming))
+      throw new FaucetError("RACE_CLAIMING", "cannot claim session: not claimable anymore");
     sessionData.status = FaucetSessionStatus.CLAIMING;
     sessionData.dropAmount = claimInfo.amount;
     sessionData.claim = claimInfo.claim;
-    ServiceManager.GetService(FaucetDatabase).updateSession(sessionData);
 
     this.claimTxQueue.push(claimInfo);
     this.claimTxDict[claimInfo.session] = claimInfo;
@@ -279,22 +341,54 @@ export class EthClaimManager {
     this.queueProcessing = true;
 
     try {
-      let walletState = ServiceManager.GetService(EthWalletManager).getWalletState();
-      while(Object.keys(this.pendingTxQueue).length < faucetConfig.ethMaxPending && this.claimTxQueue.length > 0) {
+      let ethWalletManager = ServiceManager.GetService(EthWalletManager);
+      if(ethWalletManager.takeWalletStateReloadRequest())
+        await ethWalletManager.loadWalletState(); // a given-up transaction's nonce, reloaded here and nowhere else
+      let walletState = ethWalletManager.getWalletState();
+      let now = Math.floor(new Date().getTime() / 1000);
+      let batchSize = 1;
+      let batchMaxWait = 0;
+      let maxPending = faucetConfig.ethMaxPending;
+      if(faucetConfig.ethClaimBatch && this.claimTxQueue.length > 0 && await ethWalletManager.ensureClaimBatching()) {
+        let builder = ethWalletManager.getClaimTxBuilder();
+        batchSize = builder.getBatchSize();
+        batchMaxWait = builder.getBatchMaxWait();
+        if(batchSize < faucetConfig.ethClaimBatch.maxClaims && !this.feeCapNoted) {
+          this.feeCapNoted = true;
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "ethTxFeeCap limits claim batches to " + batchSize + " claims (worst-case gas * ethTxMaxFee); ethClaimBatch.maxClaims is " + faucetConfig.ethClaimBatch.maxClaims);
+        }
+        // Transaction pools allow a delegated account one in-flight transaction (geth and reth since
+        // EIP-7702; a second one is refused or trickles in a block at a time). So one batch transaction
+        // is in flight at a time, and `maxClaims` is the throughput lever, not `ethMaxPending`.
+        if(builder.isBatchActive())
+          maxPending = 1;
+      }
+      else if(this.delegationClearPending)
+        this.delegationClearPending = !(await ethWalletManager.ensureNoDelegation());
+      while(Object.keys(this.pendingTxQueue).length < maxPending && this.claimTxQueue.length > 0) {
         if(faucetConfig.ethQueueNoFunds && (
-          !walletState.ready || 
+          !walletState.ready ||
           walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(this.claimTxQueue[0].amount) ||
           walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
         )) {
           break; // skip processing (out of funds)
         }
+        let size = batchSize;
+        if(this.batchSizeLimit !== null) {
+          if(this.batchSizeLimit >= batchSize)
+            this.batchSizeLimit = null; // back at the configured size
+          else
+            size = this.batchSizeLimit;
+        }
+        if(size > 1 && this.claimTxQueue.length < size && now - this.claimTxQueue[0].claim.claimTime < batchMaxWait)
+          break; // a partial batch: give it until maxWaitSeconds to fill up
 
-        let claimTx = this.claimTxQueue.splice(0, 1)[0];
-        this.lastProcessedClaimTxIdx = claimTx.claim.claimIdx;
-        await this.processQueueTx(claimTx);
+        let claims = this.collectBatch(size, walletState);
+        this.lastProcessedClaimTxIdx = Math.max(...claims.map((claimTx) => claimTx.claim.claimIdx));
+        if(await this.processQueueTxs(claims) === "requeued")
+          break; // the next tick continues with the smaller batches
       }
 
-      let now = Math.floor(new Date().getTime() / 1000);
       let walletRefreshTime = walletState.ready ? 600 : 10;
       if(Object.keys(this.pendingTxQueue).length === 0 && now - ServiceManager.GetService(EthWalletManager).getLastWalletRefresh() > walletRefreshTime) {
         await ServiceManager.GetService(EthWalletManager).loadWalletState();
@@ -329,71 +423,189 @@ export class EthClaimManager {
     this.queueProcessing = false;
   }
 
-  private async processQueueTx(claimTx: EthClaimInfo) {
+  /**
+   * The claims for the next transaction: the first queued one, then more up to `batchSize` as long as
+   * the wallet can cover their sum. What does not fit waits for the next transaction.
+   */
+  private collectBatch(batchSize: number, walletState: WalletState): EthClaimInfo[] {
+    let claims: EthClaimInfo[] = [this.claimTxQueue.shift()];
+    let total = BigInt(claims[0].amount);
+    while(claims.length < batchSize && this.claimTxQueue.length > 0) {
+      let next = this.claimTxQueue[0];
+      let nextTotal = total + BigInt(next.amount);
+      if(walletState.ready && walletState.balance - BigInt(faucetConfig.spareFundsAmount) < nextTotal)
+        break;
+      claims.push(this.claimTxQueue.shift());
+      total = nextTotal;
+    }
+    return claims;
+  }
+
+  /**
+   * A claim is in one transaction, ever: the transaction may be sent again as the same bytes, the
+   * claim never moves into another one. When the transaction is not going to be watched any further,
+   * its claims end together, in one awaited statement before memory changes: a crash in between
+   * leaves either a transaction a restart replays for every one of its claims, or none, never a
+   * replay that pays claims already settled. Failed (a validation error: the bytes were never
+   * admitted, the session may claim again) or unknown (anything else: consumed, the operator
+   * reconciles against the chain).
+   */
+  private async settleClaims(claims: EthClaimInfo[], status: ClaimTxStatus.FAILED | ClaimTxStatus.UNKNOWN, error: string): Promise<"failed"> {
+    let settled = claims.map((claimTx) => ({ sessionId: claimTx.session, claimData: { ...claimTx.claim, claimStatus: status, txError: error } }));
+    await ServiceManager.GetService(FaucetDatabase).settleClaimsBulk(settled, status === ClaimTxStatus.FAILED ? FaucetSessionStatus.FAILED : FaucetSessionStatus.FINISHED);
+    claims.forEach((claimTx, idx) => {
+      claimTx.claim = settled[idx].claimData;
+      delete this.claimTxDict[claimTx.session];
+      this.settledClaimCount++;
+    });
+    return "failed";
+  }
+
+  private failClaims(claims: EthClaimInfo[], error: string): Promise<"failed"> {
+    return this.settleClaims(claims, ClaimTxStatus.FAILED, error);
+  }
+
+  private giveUpClaims(claims: EthClaimInfo[], reason: string): Promise<"failed"> {
+    ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Transaction for " + claims.length + " claim(s) has an unknown outcome, reconcile by hand: " + reason);
+    return this.settleClaims(claims, ClaimTxStatus.UNKNOWN, "Transaction outcome unknown: " + reason);
+  }
+
+  /** Pays these claims with one transaction: sent (awaiting its receipt), failed, or queued again after a refused broadcast. */
+  private async processQueueTxs(claims: EthClaimInfo[]): Promise<"sent" | "failed" | "requeued"> {
     let ethWalletManager = ServiceManager.GetService(EthWalletManager);
     let walletState = ethWalletManager.getWalletState();
-    if(!walletState.ready) {
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Network RPC is currently unreachable.";
-      this.settleClaim(claimTx);
-      return;
-    }
+    let failAll = (error: string): Promise<"failed"> => this.failClaims(claims, error);
+    if(!walletState.ready)
+      return failAll("Network RPC is currently unreachable.");
+    let totalAmount = claims.reduce((sum, claimTx) => sum + BigInt(claimTx.amount), 0n);
     if(
-      walletState.balance - BigInt(faucetConfig.spareFundsAmount) < BigInt(claimTx.amount) ||
+      walletState.balance - BigInt(faucetConfig.spareFundsAmount) < totalAmount ||
       walletState.nativeBalance <= BigInt(faucetConfig.ethTxGasLimit) * BigInt(faucetConfig.ethTxMaxFee)
-    ) {
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Faucet wallet is out of funds.";
-      this.settleClaim(claimTx);
-      return;
-    }
+    )
+      return failAll("Faucet wallet is out of funds.");
+
+    // between signing and broadcasting: the signed transaction goes into every claim's session row
+    // first (still "processing"), so a crash in between replays these bytes on restart instead of
+    // building a new transaction for the same claims
+    let database = ServiceManager.GetService(FaucetDatabase);
+    let persistBeforeBroadcast = async (prepared: PreparedClaimTx) => {
+      // one statement for the whole batch: all rows learn the transaction, or none does; and every
+      // row must have, or the bytes do not leave (a row that is not "claiming" any more is not ours to pay)
+      let written = await database.updateClaimDataBulk(claims.map((claimTx) => ({ sessionId: claimTx.session, claimData: claimTx.claim })));
+      if(written !== claims.length)
+        throw new Error("only " + written + " of " + claims.length + " claim rows accepted the signed transaction");
+    };
 
     try {
-      claimTx.claim.claimStatus = ClaimTxStatus.PROCESSING;
+      claims.forEach((claimTx) => claimTx.claim.claimStatus = ClaimTxStatus.PROCESSING);
 
       // send transaction
-      let { txPromise } = await ethWalletManager.sendClaimTx(claimTx);
-      this.pendingTxQueue[claimTx.claim.txHash] = claimTx;
-      
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount)) + "] to: " + claimTx.target + ": " + claimTx.claim.txHash);
-      claimTx.claim.claimStatus = ClaimTxStatus.PENDING;
-      this.updateClaimStatus(claimTx);
+      let txResult = claims.length === 1 ? await ethWalletManager.sendClaimTx(claims[0], persistBeforeBroadcast) : await ethWalletManager.sendClaimBatch(claims, persistBeforeBroadcast);
+      let txHash = txResult.txHash || claims[0].claim.txHash;
+      this.pendingTxQueue[txHash] = claims;
 
-      this.awaitTxReceipt(claimTx, txPromise);
+      claims.forEach((claimTx) => {
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Submitted claim transaction " + claimTx.session + " [" + ethWalletManager.readableAmount(BigInt(claimTx.amount)) + "] to: " + claimTx.target + ": " + txHash + (claims.length > 1 ? " (batch of " + claims.length + ")" : ""));
+        claimTx.claim.claimStatus = ClaimTxStatus.PENDING;
+        this.updateClaimStatus(claimTx);
+      });
+
+      this.awaitTxReceipt(claims, txResult.txPromise, txHash);
+      return "sent";
     } catch(ex) {
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Processing Exception: " + ex.toString();
-      this.settleClaim(claimTx);
+      if(ex instanceof BatchTooExpensiveError) {
+        // nothing was signed or stored: the batch goes back as it is, the next ones are the size that fits
+        this.batchSizeLimit = ex.fit;
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "A batch of " + claims.length + " claims would cost more than ethTxFeeCap, " + ex.fit + " fit: queued again in smaller batches");
+        claims.forEach((claimTx) => claimTx.claim.claimStatus = ClaimTxStatus.QUEUE);
+        this.claimTxQueue.unshift(...claims);
+        this.claimTxQueue.sort((a, b) => a.claim.claimIdx - b.claim.claimIdx);
+        return "requeued";
+      }
+      if(ex instanceof TransactionDroppedError)
+        return this.giveUpClaims(claims, ex.message);
+      return failAll("Processing Exception: " + rpcErrorString(ex));
     }
   }
 
-  private awaitTxReceipt(claimTx: EthClaimInfo, txPromise: Promise<{
+  /**
+   * Settle the claims of one transaction from its receipt. A reverted transaction fails all of
+   * them; a mined one confirms them, except recipients the contract reported as failed
+   * (ethClaimTx.batch.failedEvent). The fee is split evenly, the remainder goes to the first claim.
+   */
+  private awaitTxReceipt(claims: EthClaimInfo[], txPromise: Promise<{
     status: boolean;
     block: number;
     fee: bigint;
-    receipt: TransactionReceipt;
-  }>) {
-    // await transaction receipt
+    receipt: EthTxReceipt;
+  }>, txHash: string) {
+    let targetLabel = claims.length === 1 ? claims[0].target : claims.length + " claims";
     txPromise.then((txData) => {
-      claimTx.claim.txFee = txData.fee.toString();
+      let count = BigInt(claims.length);
+      let feeShare = txData.fee / count;
+      let feeRemainder = txData.fee - feeShare * count;
+      claims.forEach((claimTx, idx) => {
+        claimTx.claim.txFee = (feeShare + (idx === 0 ? feeRemainder : 0n)).toString();
+      });
       if(!txData.status) {
         throw "transaction reverted";
       }
 
-      delete this.pendingTxQueue[claimTx.claim.txHash];
-      claimTx.claim.txBlock = txData.block;
-      claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
-      this.settleClaim(claimTx);
+      // per claim: how many of its sub-calls the batcher could not make (read from the receipt and
+      // the row's own call range, independent of the current configuration)
+      let evaluation = ServiceManager.GetService(EthWalletManager).evaluateClaimReceipt(txData.receipt, claims);
+      if(evaluation.executed === false)
+        throw "the batch transaction mined without running the payout code (the wallet's code was not the batcher)";
+      let outcomes = evaluation.outcomes;
+      delete this.pendingTxQueue[txHash];
+      claims.forEach((claimTx, claimPos) => {
+        let outcome = outcomes.get(claimPos);
+        if(outcome && outcome.failed > 0 && outcome.failed >= outcome.total) {
+          // nothing reached the recipient: the claim failed, the session may try again
+          ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction " + txHash + " could not pay " + claimTx.target + " (position " + claimPos + "): the batcher reported the payout as failed");
+          claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
+          claimTx.claim.txError = "Transaction Error: the payout to this address failed";
+        } else {
+          // paid, in full or in part. A partial payout is still a payout: the claim is consumed and
+          // counts towards every limit, otherwise a recipient that refuses one of its calls could
+          // collect the others again and again
+          if(outcome && outcome.failed > 0) {
+            ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction " + txHash + " paid " + claimTx.target + " (position " + claimPos + ") only in part: " + outcome.failed + " of " + outcome.total + " calls failed");
+            claimTx.claim.txError = "Partial payout: " + outcome.failed + " of " + outcome.total + " calls failed";
+          }
+          claimTx.claim.txBlock = txData.block;
+          claimTx.claim.claimStatus = ClaimTxStatus.CONFIRMED;
+        }
+        this.settleClaim(claimTx);
+      });
+      if(this.batchSizeLimit !== null && claims.length >= this.batchSizeLimit)
+        this.batchSizeLimit *= 2; // a batch of the reduced size went through: try bigger
     }).catch((error) => {
-      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + claimTx.target + " failed: " + error.toString());
-      delete this.pendingTxQueue[claimTx.claim.txHash];
-      claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
-      claimTx.claim.txError = "Transaction Error: " + error.toString();
-      this.settleClaim(claimTx);
+      if(error instanceof TransactionDroppedError) {
+        // the nonce is spent and our hash has no receipt. Most likely another transaction took the
+        // slot and nobody was paid, but "most likely" does not reopen a payout: the claims end in a
+        // terminal state that counts as consumed, for an operator to reconcile against the chain
+        ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Transaction for " + targetLabel + " has an unknown outcome, reconcile by hand: " + error.message);
+        delete this.pendingTxQueue[txHash];
+        claims.forEach((claimTx) => {
+          claimTx.claim.claimStatus = ClaimTxStatus.UNKNOWN;
+          claimTx.claim.txError = "Transaction outcome unknown: " + error.message;
+          this.settleClaim(claimTx);
+        });
+        return;
+      }
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Transaction for " + targetLabel + " failed: " + rpcErrorString(error));
+      delete this.pendingTxQueue[txHash];
+      claims.forEach((claimTx) => {
+        claimTx.claim.claimStatus = ClaimTxStatus.FAILED;
+        claimTx.claim.txError = "Transaction Error: " + rpcErrorString(error);
+        this.settleClaim(claimTx);
+      });
     }).then(() => {
-      this.historyTxDict[claimTx.claim.txNonce] = claimTx;
+      let txNonce = claims[0].claim.txNonce;
+      this.historyTxDict[txNonce] = claims;
       setTimeout(() => {
-        delete this.historyTxDict[claimTx.claim.txNonce];
+        delete this.historyTxDict[txNonce];
       }, 30 * 60 * 1000);
     });
   }
