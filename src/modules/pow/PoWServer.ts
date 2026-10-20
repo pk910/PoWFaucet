@@ -198,6 +198,7 @@ export class PoWServer {
         "_startTime": session.getStartTime(),
         "_balance": session.getDropAmount().toString(),
         "pow.idleTime": session.getSessionData("pow.idleTime"),
+        "pow.connectTime": session.getSessionData("pow.connectTime"),
         "pow.lastNonce": session.getSessionData("pow.lastNonce"),
         "pow.shareCount": session.getSessionData("pow.shareCount"),
         "pow.hashrates": session.getSessionData("pow.hashrates"),

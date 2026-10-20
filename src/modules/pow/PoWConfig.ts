@@ -15,6 +15,7 @@ export interface IPoWConfig extends IBaseModuleConfig {
   powDifficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
   powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
   powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceed the limit)
+  powHashrateLimitConnectedOnly: boolean; // count only the time with a connected mining client towards the hashrate limits (default: the whole session age counts)
 
   powSessionsPerServer: number; // maximum number of sessions per server sub-process (0 = unlimited)
 
@@ -121,6 +122,7 @@ export const defaultConfig: IPoWConfig = {
   powDifficulty: 11,
   powHashrateSoftLimit: 0,
   powHashrateHardLimit: 0,
+  powHashrateLimitConnectedOnly: false,
   powSessionsPerServer: 0,
   verifyLocalPercent: 10,
   verifyLocalMaxQueue: 100,

@@ -470,6 +470,10 @@ modules:
     powHashrateSoftLimit: 1000 # soft limit (enforced client side)
     powHashrateHardLimit: 1100 # hard limit (reject shares with too high nonces)
 
+    # count only the time with a connected mining client towards the hashrate limits
+    # (default false: the whole session age counts, so a client that mines while disconnected keeps its nonce budget)
+    #powHashrateLimitConnectedOnly: true
+
     # number of 0-bits the scrypt hash needs to start with to be eligible for a reward
     powDifficulty: 11
 
