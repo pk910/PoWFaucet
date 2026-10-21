@@ -145,6 +145,65 @@ describe("Faucet Session Management", () => {
     expect(error?.getCode()).to.equal("INVALID_ADDR", "unexpected error code");
   });
 
+  it("stores the target address in lower case, whatever its spelling", async () => {
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("8.8.8.8", { addr: "0x00000000000000000000000000000000000ABCDE" });
+    expect(testSession.getTargetAddr()).to.equal("0x00000000000000000000000000000000000abcde", "unexpected targetAddr");
+    let storedSession = await ServiceManager.GetService(FaucetDatabase).getSession(testSession.getSessionId());
+    expect(storedSession.targetAddr).to.equal("0x00000000000000000000000000000000000abcde", "unexpected stored targetAddr");
+    // the same account spelled differently is not a change of the target address
+    testSession.setTargetAddr("0x00000000000000000000000000000000000AbCdE");
+    expect(testSession.getTargetAddr()).to.equal("0x00000000000000000000000000000000000abcde", "targetAddr changed by another spelling");
+    let error: FaucetError | null = null;
+    try {
+      testSession.setTargetAddr("0x00000000000000000000000000000000000abcdf");
+    } catch(ex) { error = ex; }
+    expect(error?.getCode()).to.equal("INVALID_STATE", "another address was accepted on a session that has one");
+  });
+
+  it("restores a stored mixed-case target address in lower case", async () => {
+    faucetConfig.sessionTimeout = 10;
+    let now = Math.floor(new Date().getTime() / 1000);
+    await ServiceManager.GetService(FaucetDatabase).updateSession({
+      sessionId: "4e63566e-e482-46f3-bb91-da11f511aae6",
+      status: FaucetSessionStatus.RUNNING,
+      startTime: now,
+      targetAddr: "0x00000000000000000000000000000000000ABCDE",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [],
+      data: {},
+      claim: null,
+    });
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    await sessionManager.initialize();
+    let testSession = sessionManager.getSession("4e63566e-e482-46f3-bb91-da11f511aae6", [FaucetSessionStatus.RUNNING]);
+    expect(testSession).to.not.equal(undefined, "getSession failed");
+    expect(testSession.getTargetAddr()).to.equal("0x00000000000000000000000000000000000abcde", "unexpected targetAddr");
+  });
+
+  it("lower-cases the stored target addresses when upgrading the schema", async () => {
+    let faucetDb = ServiceManager.GetService(FaucetDatabase);
+    let now = Math.floor(new Date().getTime() / 1000);
+    await faucetDb.updateSession({
+      sessionId: "4e63566e-e482-46f3-bb91-da11f511aae7",
+      status: FaucetSessionStatus.FINISHED,
+      startTime: now,
+      targetAddr: "0x00000000000000000000000000000000000ABCDE",
+      dropAmount: "1337",
+      remoteIP: "8.8.8.8",
+      tasks: [],
+      data: {},
+      claim: null,
+    });
+    await faucetDb.getDatabase().run("UPDATE SchemaVersion SET Version = 1 WHERE Module IS NULL");
+    await (faucetDb as any).upgradeSchema();
+    let storedSession = await faucetDb.getSession("4e63566e-e482-46f3-bb91-da11f511aae7");
+    expect(storedSession.targetAddr).to.equal("0x00000000000000000000000000000000000abcde", "stored targetAddr not lower-cased");
+    let versionRow = await faucetDb.getDatabase().get("SELECT Version FROM SchemaVersion WHERE Module IS NULL") as {Version: number};
+    expect(versionRow.Version).to.equal(2, "unexpected schema version");
+  });
+
   it("Create session with blocking task", async () => {
     faucetConfig.minDropAmount = 1000;
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {

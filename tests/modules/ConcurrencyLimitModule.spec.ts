@@ -91,6 +91,32 @@ describe("Faucet module: concurrency-limit", () => {
     expect(error?.message).to.matches(/test-error-message/, "unexpected error message");
   });
 
+  it("Exceed limit by addr spelled differently", async () => {
+    faucetConfig.maxDropAmount = 100;
+    faucetConfig.minDropAmount = 10;
+    faucetConfig.modules["concurrency-limit"] = {
+      enabled: true,
+      concurrencyLimit: 1,
+      byAddrOnly: true,
+      messageByAddr: "test-error-message",
+    } as IConcurrencyLimitConfig;
+    let moduleManager = ServiceManager.GetService(ModuleManager);
+    await moduleManager.initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test1", 1);
+    });
+    await runTestSession("8.8.8.8", "0x00000000000000000000000000000000000abcde", "running");
+    let error: FaucetError | null = null;
+    try {
+      await runTestSession("8.8.4.4", "0x00000000000000000000000000000000000ABCDE");
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error).to.not.equal(null, "no exception thrown");
+    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
+    expect(error?.getCode()).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
+  });
+
   it("Exceed limit by addr or ip", async () => {
     faucetConfig.maxDropAmount = 100;
     faucetConfig.minDropAmount = 10;

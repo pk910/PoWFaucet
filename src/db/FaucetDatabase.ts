@@ -197,13 +197,9 @@ export class FaucetDatabase {
           [FaucetDbDriver.SQLITE]: `CREATE INDEX SessionsRemoteIPIdx ON Sessions (RemoteIP	ASC, StartTime	ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE Sessions ADD INDEX SessionsRemoteIPIdx (RemoteIP, StartTime);`,
           }));
-      /*
-      case 1: // upgrade to version 2
+      case 1: // upgrade to version 2: target addresses in lower case, the spelling new sessions store
         schemaVersion = 2;
-        this.db.exec(`
-          
-        `);
-      */
+        await this.db.run("UPDATE Sessions SET TargetAddr = LOWER(TargetAddr)");
     }
     if(schemaVersion !== oldVersion) {
       ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Upgraded FaucetStore schema from version " + oldVersion + " to version " + schemaVersion);

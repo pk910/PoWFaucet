@@ -176,7 +176,7 @@ describe("Faucet module: passport", () => {
     });
     expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
     expect(globalStubs["fetch"].callCount).to.equal(2, "unexpected fetch call count");
-    expect(globalStubs["fetch"].firstCall.args[0]).to.match(/^https:\/\/api\.passport\.xyz\/v2\/stamps\/0x332E43696A505EF45b9319973785F837ce5267b9\?/, "unexpected api url");
+    expect(globalStubs["fetch"].firstCall.args[0]).to.match(/^https:\/\/api\.passport\.xyz\/v2\/stamps\/0x332e43696a505ef45b9319973785f837ce5267b9\?/, "unexpected api url: the session address is looked up in its stored lower-case spelling");
     expect(globalStubs["fetch"].firstCall.args[1]?.headers?.["X-API-KEY"]).to.equal("test-api-key", "api key not sent");
     expect(globalStubs["fetch"].secondCall.args[0]).to.match(/^https:\/\/api\.passport\.xyz\/registry\/stamps\/.*token=test-token/, "pagination link not followed");
     let passportData = testSession.getSessionData("passport.data");

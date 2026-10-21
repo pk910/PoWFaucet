@@ -182,7 +182,7 @@ export class FaucetSession {
     this.sessionId = sessionData.sessionId;
     this.status = sessionData.status;
     this.startTime = sessionData.startTime;
-    this.targetAddr = sessionData.targetAddr;
+    this.targetAddr = sessionData.targetAddr.toLowerCase();
     this.dropAmount = BigInt(sessionData.dropAmount);
     this.remoteIP = sessionData.remoteIP;
     this.blockingTasks = sessionData.tasks;
@@ -352,7 +352,12 @@ export class FaucetSession {
     return this.targetAddr;
   }
 
+  /**
+   * Sets the session's target address, kept in lower case: every spelling of an address pays the same account,
+   * so the concurrency and recurring limits that key on the address must see one value for it.
+   */
   public setTargetAddr(addr: string) {
+    addr = addr.toLowerCase();
     if(this.targetAddr && this.targetAddr !== addr)
       throw new FaucetError("INVALID_STATE", "cannot change target address: already set.");
     this.targetAddr = addr;
