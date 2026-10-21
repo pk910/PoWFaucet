@@ -50,4 +50,5 @@ USER nginx
 WORKDIR /data
 
 EXPOSE 8080
+STOPSIGNAL SIGTERM
 ENTRYPOINT [ "/entrypoint.sh" ]
