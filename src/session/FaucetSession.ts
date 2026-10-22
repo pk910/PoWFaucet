@@ -241,13 +241,15 @@ export class FaucetSession {
     this.setSessionData("failed.reason", reason);
     this.setSessionData("failed.stack", stack);
     this.status = FaucetSessionStatus.FAILED;
-    this.manager.notifySessionUpdate(this);
     this.resetSessionTimer();
     ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.INFO, "Session " + this.sessionId + " failed: [" + code + "] " + reason);
     if(oldStatus === FaucetSessionStatus.RUNNING)
       ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
     if(this.isSaved)
       await this.saveSession();
+    // the manager drops the session from its list only once the row carries the failure: a status
+    // request in between would read the row and report the session as still running
+    this.manager.notifySessionUpdate(this);
     this.isDisposed = true;
   }
 
@@ -308,10 +310,11 @@ export class FaucetSession {
     this.status = FaucetSessionStatus.CLAIMABLE;
     await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionComplete, [this]);
     ServiceManager.GetService(FaucetStatsLog).addSessionStats(this);
-    this.manager.notifySessionUpdate(this);
     this.setSessionData("close.time", Math.floor((new Date()).getTime() / 1000));
     // the row is written before the session is reported claimable: the claim admission goes through the row
     await this.saveSession();
+    // and the manager keeps answering for the session until then, so no status request reads a row that still says running
+    this.manager.notifySessionUpdate(this);
     this.isDisposed = true;
   }
 

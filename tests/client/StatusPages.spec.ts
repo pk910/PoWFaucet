@@ -146,7 +146,7 @@ describe("browser: status and details pages", function() {
     fixture = await bootFaucet();
     let session = await addRichSession();
     page = await browser.newPage();
-    await page.addInitScript((key) => { sessionStorage.setItem("powfaucet.operatorKey", key); }, operatorKey());
+    await page.addInitScript((key) => { localStorage.setItem("powfaucet.operatorKey", key); }, operatorKey());
     await openFaucet(page, fixture, "/details/" + session.sessionId);
 
     await page.getByRole("heading", { name: "Operator data" }).waitFor();
@@ -171,7 +171,9 @@ describe("browser: status and details pages", function() {
     fixture = await bootFaucet();
     let session = await addRichSession();
 
-    page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    // an own context: the key must come back in a second tab of the same browser profile
+    let context = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+    page = await context.newPage();
     await openFaucet(page, fixture, "/status");
     await page.getByText("Active mining sessions").waitFor();
     let publicBody = await page.locator("body").textContent();
@@ -194,6 +196,14 @@ describe("browser: status and details pages", function() {
     await page.getByRole("link", { name: session.sessionId }).click();
     await page.waitForURL(new RegExp("#/details/" + session.sessionId));
     await page.getByRole("heading", { name: "Operator data" }).waitFor();
+
+    // the key is kept by the browser, not the tab: after this tab is gone, a fresh one opens the
+    // list unmasked without typing it again (sessionStorage would start that tab empty)
+    await page.close();
+    page = await context.newPage();
+    await openFaucet(page, fixture, "/status");
+    await page.getByText("Unmasked").waitFor();
+    expect(await page.getByLabel("Operator key").inputValue()).to.equal(operatorKey(), "the key field is empty in the new tab");
   });
 
   it("status page forgets a key the faucet refuses", async function() {
@@ -208,7 +218,7 @@ describe("browser: status and details pages", function() {
     await page.getByRole("button", { name: "Refresh" }).click();
     await page.getByText("The faucet did not accept that key.").waitFor();
     expect(await page.locator("body").textContent()).to.contain("Masked");
-    expect(await page.evaluate(() => sessionStorage.getItem("powfaucet.operatorKey"))).to.equal(null, "the refused key was kept");
+    expect(await page.evaluate(() => localStorage.getItem("powfaucet.operatorKey"))).to.equal(null, "the refused key was kept");
     expect(await page.getByLabel("Operator key").inputValue()).to.equal("");
   });
 });

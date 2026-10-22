@@ -1,15 +1,16 @@
 /**
- * The operator's key, typed once on the status page and kept for the tab.
+ * The operator's key, typed once on the status page and kept in the browser.
  *
  * The faucet's API unmasks the status list and the session details for a request that carries
- * it. sessionStorage: it is gone when the tab closes, it is not shared with other tabs, and it
- * never leaves the browser except in the query of the two requests that take it.
+ * it. localStorage: it stays across tabs, restarts and crashes of the browser until the faucet
+ * refuses it or the field is cleared, and it never leaves the browser except in the header of
+ * the two requests that take it.
  */
 const STORAGE_KEY = "powfaucet.operatorKey";
 
 export function getOperatorKey(): string | null {
   try {
-    return sessionStorage.getItem(STORAGE_KEY) || null;
+    return localStorage.getItem(STORAGE_KEY) || null;
   } catch(ex) {
     return null;
   }
@@ -18,9 +19,9 @@ export function getOperatorKey(): string | null {
 export function setOperatorKey(key: string | null): void {
   try {
     if(key)
-      sessionStorage.setItem(STORAGE_KEY, key);
+      localStorage.setItem(STORAGE_KEY, key);
     else
-      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
   } catch(ex) {
     // storage blocked: the key lives for this page only
   }
