@@ -193,7 +193,7 @@ export class EthWalletManager {
       case FaucetCoinType.ERC20:
         let tokenAddr = faucetConfig.faucetCoinContract;
         // over the pool's routing client, so failover is transparent
-        let tokenContract = new ContractCaller(this.client, tokenAddr, Erc20Abi);
+        let tokenContract = new ContractCaller(this.client, tokenAddr, Erc20Abi, this.walletAddr);
         this.tokenState = {
           address: tokenAddr,
           decimals: 0,
@@ -344,9 +344,12 @@ export class EthWalletManager {
       return this.walletState?.balance;
   }
 
-  /** A contract on the active endpoint, addressed by function name (config-driven calls like the refill contract). */
+  /**
+   * A contract on the active endpoint, addressed by function name (config-driven calls like the
+   * refill contract). Its calls are sent as the faucet wallet, as a transaction from it would be.
+   */
   public getContract(addr: string, abi: ContractAbiInput): ContractCaller {
-    return new ContractCaller(this.client, addr, abi);
+    return new ContractCaller(this.client, addr, abi, this.walletAddr);
   }
 
   /** How claims become transactions: the plain transfer, or the operator's ethClaimTx template. */

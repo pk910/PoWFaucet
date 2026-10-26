@@ -107,6 +107,72 @@ describe("ETH Wallet Refill", () => {
     expect(rawTxReq[0].params[0]).to.equal("0x02f8928205392a847735940085174876e800830493e094a5058fbcd09425e922e3e9e78d569ab84edb88eb80a42e1a7d4d0000000000000000000000000000000000000000000000056bc75e2d63100000c001a0bbeaf993f51b3b3a3f3bb8db15ca7a502953f08d5b4a1eed9fa7de6eb95ba059a030d699df2ab4831f2032a347a112e0bb4a90dc411f10781c980982f38fb0e018", "unexpected refill transaction hex");
   });
 
+  it("Refill allowance check is called as the faucet wallet", async () => {
+    // a vault that answers by msg.sender (getClaimableBalance() without arguments): the eth_call
+    // must carry the faucet wallet as `from`, or the vault sees the zero address and reverts
+    faucetConfig.ethRefillContract.abi = '[{"inputs":[],"name":"getClaimableBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]';
+    faucetConfig.ethRefillContract.allowanceFn = "getClaimableBalance";
+    faucetConfig.ethRefillContract.allowanceFnArgs = [];
+    fakeProvider.injectResponse("eth_chainId", 1337);
+    let balances = {
+      "0xca9456991e0aa5d5321e88bba44d405aab401193": "900000000000000000000",
+      "0xa5058fbcd09425e922e3e9e78d569ab84edb88eb": "2000000000000000000000",
+    };
+    fakeProvider.injectResponse("eth_getBalance", (payload) => balances[payload.params[0].toLowerCase()]); // 900 ETH
+    fakeProvider.injectResponse("eth_getTransactionCount", 42);
+    fakeProvider.injectResponse("eth_blockNumber", "0x1000");
+    let allowanceCallers: string[] = [];
+    fakeProvider.injectResponse("eth_call", (payload) => {
+      switch(payload.params[0].data.substring(0, 10)) {
+        case "0x": // test call
+          return "0x";
+        case "0xe0bd3015": // getClaimableBalance()
+          allowanceCallers.push(payload.params[0].from || null);
+          if((payload.params[0].from || "").toLowerCase() !== "0xca9456991e0aa5d5321e88bba44d405aab401193")
+            throw new Error("execution reverted: ERC721: address zero is not a valid owner");
+          return "0x00000000000000000000000000000000000000000000003635c9adc5dea00000"; // 1000 ETH
+        default:
+          console.log("unknown call: ", payload);
+      }
+    });
+    let rawTxReq: any[] = [];
+    fakeProvider.injectResponse("eth_sendRawTransaction", (payload) => {
+      rawTxReq.push(payload);
+      return "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337";
+    });
+    fakeProvider.injectResponse("eth_getTransactionReceipt", (payload) => {
+      return {
+        "blockHash": "0xfce202c4104864d81d8bd78b7202a77e5dca634914a3fd6636f2765d65fa9a07",
+        "blockNumber": "0x8aa5ae",
+        "contractAddress": null,
+        "cumulativeGasUsed": "0x1752665",
+        "effectiveGasPrice": "0x3b9aca00", // 1 gwei
+        "from": "0xca9456991e0aa5d5321e88bba44d405aab401193",
+        "gasUsed": "0x5208", // 21000
+        "logs": [],
+        "logsBloom": "0x" + "00".repeat(256),
+        "status": "0x1",
+        "to": "0xa5058fbcd09425e922e3e9e78d569ab84edb88eb",
+        "transactionHash": "0x1337b2933e4d908d44948ae7f8ec3184be10bbd67ba3c4b165be654281337337",
+        "transactionIndex": "0x3d",
+        "type": "0x2"
+      };
+    });
+
+    await ServiceManager.GetService(EthWalletManager).initialize();
+    let claimManager = ServiceManager.GetService(EthClaimManager);
+    await claimManager.initialize();
+
+    await claimManager.processQueue();
+    await awaitSleepPromise(500, () => rawTxReq.length > 0);
+
+    expect(allowanceCallers.length).to.equal(1, "unexpected number of allowance calls");
+    expect((allowanceCallers[0] || "").toLowerCase()).to.equal("0xca9456991e0aa5d5321e88bba44d405aab401193", "allowance call is not sent as the faucet wallet");
+    expect(rawTxReq.length).to.equal(1, "unexpected number of refill transactions");
+    // withdraw(100 ETH): the same transaction as with an argument-taking allowance function
+    expect(rawTxReq[0].params[0]).to.equal("0x02f8928205392a847735940085174876e800830493e094a5058fbcd09425e922e3e9e78d569ab84edb88eb80a42e1a7d4d0000000000000000000000000000000000000000000000056bc75e2d63100000c001a0bbeaf993f51b3b3a3f3bb8db15ca7a502953f08d5b4a1eed9fa7de6eb95ba059a030d699df2ab4831f2032a347a112e0bb4a90dc411f10781c980982f38fb0e018", "unexpected refill transaction hex");
+  });
+
   it("Forward funds when exceeding overflow balance", async () => {
     fakeProvider.injectResponse("eth_chainId", 1337);
     let balances = {
