@@ -206,7 +206,7 @@ describe("browser: status and details pages", function() {
     expect(await page.getByLabel("Operator key").inputValue()).to.equal(operatorKey(), "the key field is empty in the new tab");
   });
 
-  it("status page forgets a key the faucet refuses", async function() {
+  it("status page keeps a key the faucet refuses, and shows the public list", async function() {
     if(skipReason) return this.skip();
     fixture = await bootFaucet();
     await addRichSession();
@@ -218,7 +218,43 @@ describe("browser: status and details pages", function() {
     await page.getByRole("button", { name: "Refresh" }).click();
     await page.getByText("The faucet did not accept that key.").waitFor();
     expect(await page.locator("body").textContent()).to.contain("Masked");
-    expect(await page.evaluate(() => localStorage.getItem("powfaucet.operatorKey"))).to.equal(null, "the refused key was kept");
-    expect(await page.getByLabel("Operator key").inputValue()).to.equal("");
+    expect(await page.evaluate(() => localStorage.getItem("powfaucet.operatorKey"))).to.equal("not-the-key", "only an emptied field removes the key");
+    expect(await page.getByLabel("Operator key").inputValue()).to.equal("not-the-key", "the field keeps what was typed, to be corrected");
+  });
+
+  it("status page keeps the key through a failed request", async function() {
+    if(skipReason) return this.skip();
+    fixture = await bootFaucet();
+    await addRichSession();
+    page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    await page.addInitScript((key) => { localStorage.setItem("powfaucet.operatorKey", key); }, operatorKey());
+    await openFaucet(page, fixture, "/status");
+    await page.getByText("Unmasked").waitFor();
+
+    // the faucet restarts, a proxy answers for it: the status request fails without a verdict on the key
+    await page.route("**/api/getFaucetStatus", (route) => route.fulfill({ status: 502, contentType: "text/html", body: "<html>Bad Gateway</html>" }));
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await page.getByText("The unmasked status could not be loaded").waitFor();
+    expect(await page.evaluate(() => localStorage.getItem("powfaucet.operatorKey"))).to.equal(operatorKey(), "a failed request is no verdict on the key");
+    expect(await page.getByLabel("Operator key").inputValue()).to.equal(operatorKey());
+
+    // the faucet is back: the next refresh is unmasked again, nothing to type
+    await page.unroute("**/api/getFaucetStatus");
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await page.getByText("Unmasked").waitFor();
+  });
+
+  it("status page removes the key only when the field is emptied", async function() {
+    if(skipReason) return this.skip();
+    fixture = await bootFaucet();
+    page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    await page.addInitScript((key) => { localStorage.setItem("powfaucet.operatorKey", key); }, operatorKey());
+    await openFaucet(page, fixture, "/status");
+    await page.getByText("Unmasked").waitFor();
+
+    await page.getByLabel("Operator key").fill("");
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await page.getByText("Masked").waitFor();
+    expect(await page.evaluate(() => localStorage.getItem("powfaucet.operatorKey"))).to.equal(null);
   });
 });

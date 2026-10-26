@@ -7,7 +7,8 @@ import { useParams, useNavigate, NavigateFunction } from "react-router";
 import { IFaucetContext } from '../../common/FaucetContext';
 import { IFaucetSessionStatus } from '../../common/FaucetSession';
 import { ISessionRewardFactor } from '../../types/FaucetStatus';
-import { getOperatorKey, setOperatorKey } from '../../common/OperatorKey';
+import { getOperatorKey } from '../../common/OperatorKey';
+import { FaucetApiError } from '../../common/FaucetApi';
 import { toReadableAmount } from '../../utils/ConvertHelpers';
 import { renderDate, renderTimespan } from '../../utils/DateUtils';
 
@@ -89,10 +90,11 @@ export class DetailsPage extends React.PureComponent<IDetailsPageProps, IDetails
       try {
         sessionStatus = await this.props.pageContext.faucetApi.getSessionStatus(this.props.sessionId, true, key || undefined);
       } catch(err) {
-        // a refused key answers with a plain 403, which is no json: forget it and load the public page
-        if(!key)
+        // a refused key answers with a plain 403, which is no json: this page loads masked, the
+        // key stays in the browser (the status page is where it is entered and cleared). Any
+        // other failure is handled below like one without a key
+        if(!key || !(err instanceof FaucetApiError && err.status === 403))
           throw err;
-        setOperatorKey(null);
         key = null;
         sessionStatus = await this.props.pageContext.faucetApi.getSessionStatus(this.props.sessionId, true);
       }
