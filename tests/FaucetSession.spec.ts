@@ -395,6 +395,34 @@ describe("Faucet Session Management", () => {
     expect(sessionManager.getActiveSessions().length).to.equal(1, "unexpected getActiveSessions result count");
   });
 
+  it("reports a session as failed while its row is still being written", async () => {
+    faucetConfig.minDropAmount = 1000;
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test1", 1);
+    });
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", { addr: "0x0000000000000000000000000000000000001337" });
+    expect(testSession).to.not.equal(null, "createSession failed");
+
+    // a slow database: the failure takes a while to reach the row, and the status is asked for in the meantime
+    let faucetDb = ServiceManager.GetService(FaucetDatabase);
+    let updateSession = faucetDb.updateSession.bind(faucetDb);
+    let updateStub = sinon.stub(faucetDb, "updateSession").callsFake(async (sessionData) => {
+      await awaitSleepPromise(200, () => false);
+      return updateSession(sessionData);
+    });
+    let failPromise = testSession.setSessionFailed("TEST_KILL", "killed by the test");
+    let statusData = await sessionManager.getSessionData(testSession.getSessionId());
+    expect(statusData.status).to.equal(FaucetSessionStatus.FAILED, "the status answered while the row was being written");
+    expect(statusData.data["failed.code"]).to.equal("TEST_KILL", "the failure code answered while the row was being written");
+    await failPromise;
+    updateStub.restore();
+
+    expect(sessionManager.getActiveSessions().length).to.equal(0, "the failed session is still listed as active");
+    expect(sessionManager.getSession(testSession.getSessionId())).to.equal(undefined, "the failed session is still held by the manager");
+    expect((await faucetDb.getSession(testSession.getSessionId())).status).to.equal(FaucetSessionStatus.FAILED, "the row does not carry the failure");
+  });
+
   it("Check SessionManager: getUnclaimedBalance", async () => {
     faucetConfig.minDropAmount = 1000;
     ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
