@@ -10,6 +10,7 @@ import { Tooltip } from 'react-bootstrap';
 import { IFaucetContext } from '../../common/FaucetContext';
 import { IClientClaimStatus, IClientSessionStatus, IFaucetRpcEndpointStatus, IFaucetStatusGeneralStatus, IFaucetStatusOutflowStatus, IFaucetStatusRefillStatus } from '../../types/FaucetStatus';
 import { getOperatorKey, setOperatorKey } from '../../common/OperatorKey';
+import { FaucetApiError } from '../../common/FaucetApi';
 
 import "./FaucetStatus.css";
 import { FaucetOverlay } from '../shared/FaucetOverlay';
@@ -93,12 +94,14 @@ export class FaucetStatusPage extends React.PureComponent<IFaucetStatusPageProps
       keyError: null,
     });
     this.props.pageContext.faucetApi.getFaucetStatus(key || undefined).catch((err) => {
-      // a refused key answers with a plain 403, which is no json: forget the key and show the
-      // public list instead of a page that never loads
+      // the key stays in the browser whatever the answer; only an emptied field removes it. A
+      // refused key (a plain 403, no json) is reported and the public list shown instead of a
+      // page that never loads; a failed request of any other kind (a restart, a proxy, the
+      // network) says nothing about the key and is reported as what it is
       if(!key)
         throw err;
-      setOperatorKey(null);
-      this.setState({ keyInput: "", keyError: "The faucet did not accept that key." });
+      let refused = err instanceof FaucetApiError && err.status === 403;
+      this.setState({ keyError: refused ? "The faucet did not accept that key." : "The unmasked status could not be loaded (" + (err?.message || err) + "), showing the public list." });
       key = null;
       return this.props.pageContext.faucetApi.getFaucetStatus();
     }).then((faucetStatus) => {
