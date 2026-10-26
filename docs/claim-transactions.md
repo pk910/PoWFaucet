@@ -260,3 +260,5 @@ so the faucet fails all its claims rather than confirming them.
 
 `ethRefillContract` uses the same placeholder syntax for `allowanceFnArgs`, `withdrawFnArgs` and
 `depositFnArgs`, with `{walletAddr}`, `{amount}` (the requested amount) and `{token}`.
+The allowance call is an `eth_call` sent from the faucet wallet, so a vault that answers by
+`msg.sender` needs no address argument.

@@ -251,7 +251,7 @@ export interface IEthRpcClient {
   getTransactionCount(address: string, blockTag?: EthBlockTag): Promise<number>;
   getGasPrice(): Promise<bigint>;
   getCode(address: string): Promise<string>;
-  call(to: string, data: string): Promise<string>;
+  call(to: string, data: string, from?: string): Promise<string>;
   estimateGas(tx: { from?: string; to: string; data?: string; value?: bigint }): Promise<bigint>;
   sendRawTransaction(signedTx: string): Promise<string>;
   getTransactionReceipt(txHash: string): Promise<EthTxReceipt | null>;
@@ -281,7 +281,7 @@ export class RoutedRpcClient implements IEthRpcClient {
   public getTransactionCount(address: string, blockTag?: EthBlockTag): Promise<number> { return this.target().getTransactionCount(address, blockTag); }
   public getGasPrice(): Promise<bigint> { return this.target().getGasPrice(); }
   public getCode(address: string): Promise<string> { return this.target().getCode(address); }
-  public call(to: string, data: string): Promise<string> { return this.target().call(to, data); }
+  public call(to: string, data: string, from?: string): Promise<string> { return this.target().call(to, data, from); }
   public estimateGas(tx: { from?: string; to: string; data?: string; value?: bigint }): Promise<bigint> { return this.target().estimateGas(tx); }
   public sendRawTransaction(signedTx: string): Promise<string> { return this.target().sendRawTransaction(signedTx); }
   public getTransactionReceipt(txHash: string): Promise<EthTxReceipt | null> { return this.target().getTransactionReceipt(txHash); }
@@ -353,9 +353,9 @@ export class EthRpcClient implements IEthRpcClient {
     return (await this.client.getCode({ address: address as Address })) || "0x";
   }
 
-  /** eth_call against `latest`; the raw return data. */
-  public async call(to: string, data: string): Promise<string> {
-    const res = await this.client.call({ to: to as Address, data: data as Hex });
+  /** eth_call against `latest`; the raw return data. `from` is the call's sender, msg.sender to the contract. */
+  public async call(to: string, data: string, from?: string): Promise<string> {
+    const res = await this.client.call({ account: from as Address | undefined, to: to as Address, data: data as Hex });
     return res.data || "0x";
   }
 

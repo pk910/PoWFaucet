@@ -41,16 +41,21 @@ export function coerceAbiValue(type: string, value: unknown): unknown {
 /**
  * Encode and call functions of one contract by name, the way the refill config and the ERC20
  * handling address them. Replaces web3's Contract for the faucet's needs.
+ *
+ * `from` is the sender of every eth_call: a contract that answers by msg.sender (a vault's
+ * "what may the caller withdraw") sees that account instead of the zero address.
  */
 export class ContractCaller {
   public readonly address: string;
   public readonly abi: Abi;
+  public readonly from: string | null;
   private client: IEthRpcClient;
 
-  public constructor(client: IEthRpcClient, address: string, abi: ContractAbiInput) {
+  public constructor(client: IEthRpcClient, address: string, abi: ContractAbiInput, from?: string) {
     this.client = client;
     this.address = address;
     this.abi = parseContractAbi(abi);
+    this.from = from || null;
   }
 
   public hasFunction(name: string): boolean {
@@ -95,10 +100,10 @@ export class ContractCaller {
     return decoded;
   }
 
-  /** eth_call `fn(args)` and decode: the single output value, or an array for several outputs. */
+  /** eth_call `fn(args)` as `from` and decode: the single output value, or an array for several outputs. */
   public async call(fnName: string, args: unknown[] = []): Promise<unknown> {
     const fn = this.getFunction(fnName, args.length);
-    const data = await this.client.call(this.address, this.encode(fnName, args));
+    const data = await this.client.call(this.address, this.encode(fnName, args), this.from || undefined);
     if (!data || data === "0x") {
       if (fn.outputs.length === 0)
         return undefined;
