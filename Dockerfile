@@ -22,7 +22,7 @@ COPY ./faucet-client faucet-client
 RUN cd faucet-client && node ./build-client.js
 
 # final stage
-FROM nginxinc/nginx-unprivileged:1.30
+FROM nginxinc/nginx-unprivileged:1.31
 
 USER root
 
