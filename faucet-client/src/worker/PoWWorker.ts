@@ -246,7 +246,7 @@ export class PoWWorker {
       // the hash libs report failures as "!<reason>", which would sort below any difficulty mask
       if(!this.hashErrorLogged) {
         this.hashErrorLogged = true;
-        console.error("PoW hashing failed (" + this.powParams.params.a + "):", hashHex);
+        console.error("PoW hashing failed (%s): %s", String(this.powParams.params.a), String(hashHex));
       }
       return null;
     } else {
