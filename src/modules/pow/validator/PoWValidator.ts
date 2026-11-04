@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { isMainThread, parentPort, Worker } from 'worker_threads';
 import { FaucetWorkers } from '../../../common/FaucetWorker.js';
 import { ServiceManager } from '../../../common/ServiceManager.js';
+import { FaucetLogLevel, FaucetProcess } from '../../../common/FaucetProcess.js';
 import { PromiseDfd } from '../../../utils/PromiseDfd.js';
 import { PoWHashAlgo } from '../PoWConfig.js';
 import { PoWModule } from '../PoWModule.js';
@@ -51,6 +52,8 @@ export class PoWValidator {
             return config.powArgon2Params;
           case PoWHashAlgo.NICKMINER: 
             return config.powNickMinerParams;
+          case PoWHashAlgo.YESPOWER:
+            return config.powYespowerParams;
         }
       })(),
       difficulty: config.powDifficulty,
@@ -84,6 +87,9 @@ export class PoWValidator {
     
     let resDfd = this.validateQueue[msg.shareId];
     delete this.validateQueue[msg.shareId];
+
+    if(msg.error)
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "PoW share validation failed: " + msg.error);
 
     resDfd.resolve(msg.isValid);
   }

@@ -7,11 +7,12 @@ export interface IPoWConfig extends IBaseModuleConfig {
   powIdleTimeout: number; // maximum number of seconds a session can idle until it gets closed
   powPingInterval: number; // websocket ping interval
   powPingTimeout: number; // kill websocket if no ping/pong for that number of seconds
-  powHashAlgo: PoWHashAlgo; // hash algorithm to use ("sc" = SCrypt, "cn" = CryptoNight), defaults to SCrypt
+  powHashAlgo: PoWHashAlgo; // hash algorithm to use (scrypt / cryptonight / argon2 / nickminer / yespower), defaults to argon2
   powScryptParams: IPoWSCryptParams; // scrypt parameters
   powCryptoNightParams: IPoWCryptoNightParams; // cryptonight parameters
   powArgon2Params: IPoWArgon2Params; // argon2 parameters
   powNickMinerParams: IPoWNickMinerParams; // nickminer parameters
+  powYespowerParams: IPoWYespowerParams; // yespower parameters
   powDifficulty: number; // number of 0-bits the scrypt hash needs to start with to be egliable for a reward
   powHashrateSoftLimit: number; // maximum allowed mining hashrate (will be throttled to this rate when faster)
   powHashrateHardLimit: number; // maximum allowed mining hashrate (reject shares with nonces that exceed the limit)
@@ -44,6 +45,7 @@ export enum PoWHashAlgo {
   CRYPTONIGHT = "cryptonight",
   ARGON2      = "argon2",
   NICKMINER   = "nickminer",
+  YESPOWER    = "yespower",
 }
 
 export interface IPoWSCryptParams {
@@ -80,7 +82,13 @@ export interface IPoWNickMinerParams {
   relevantFile: string; // filename to store relevant data
 }
 
-export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params | IPoWNickMinerParams;
+export interface IPoWYespowerParams {
+  N: number; // memory/CPU cost, power of 2 (1024 - 16384); memory per hash is 128 * N * r bytes
+  r: number; // block size (8 - 32); upstream recommends 32 and growing N for more memory
+  pers: string; // personalization string (printable ASCII, max 64 chars, no "|"); "" for none
+}
+
+export type PoWCryptoParams = IPoWSCryptParams | IPoWCryptoNightParams | IPoWArgon2Params | IPoWNickMinerParams | IPoWYespowerParams;
 
 export const defaultConfig: IPoWConfig = {
   enabled: false,
@@ -119,6 +127,11 @@ export const defaultConfig: IPoWConfig = {
     relevantDifficulty: 0,
     relevantFile: null,
   },
+  powYespowerParams: {
+    N: 2048,
+    r: 32,
+    pers: "PoWFaucet",
+  },
   powDifficulty: 11,
   powHashrateSoftLimit: 0,
   powHashrateHardLimit: 0,
@@ -135,4 +148,22 @@ export const defaultConfig: IPoWConfig = {
   verifyMinerTimeout: 30,
   verifyMinerRewardPerc: 15,
   verifyMinerMissPenaltyPerc: 10,
+}
+
+const YESPOWER_MAX_MEMORY = 64 * 1024 * 1024;
+
+// returns a description of the first problem with the given yespower parameters, or null if they are usable
+export function validateYespowerParams(params: IPoWYespowerParams): string | null {
+  if(!params || typeof params !== "object")
+    return "powYespowerParams must be an object";
+  let { N, r, pers } = params;
+  if(!Number.isInteger(N) || N < 1024 || N > 16384 || (N & (N - 1)) !== 0)
+    return "powYespowerParams.N must be a power of 2 between 1024 and 16384 (got " + N + ")";
+  if(!Number.isInteger(r) || r < 8 || r > 32)
+    return "powYespowerParams.r must be an integer between 8 and 32 (got " + r + ")";
+  if(128 * N * r > YESPOWER_MAX_MEMORY)
+    return "powYespowerParams N * r needs " + (128 * N * r / 1048576) + " MiB per hash, the limit is " + (YESPOWER_MAX_MEMORY / 1048576) + " MiB";
+  if(typeof pers !== "string" || !/^[\x20-\x7b\x7d\x7e]{0,64}$/.test(pers))
+    return "powYespowerParams.pers must be printable ASCII without \"|\", at most 64 characters";
+  return null;
 }

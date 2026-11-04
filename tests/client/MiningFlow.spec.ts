@@ -4,6 +4,7 @@ import type { Browser, Page } from 'playwright';
 import { bootFaucet, IFaucetFixture, launchBrowser, openFaucet, startMiningSession, waitForShare, TEST_TARGET_ADDR } from './harness.js';
 import { ServiceManager } from '../../src/common/ServiceManager.js';
 import { SessionManager } from '../../src/session/SessionManager.js';
+import { ModuleManager } from '../../src/modules/ModuleManager.js';
 
 /**
  * The whole user journey in one browser: start a session, mine until a share came in, stop, claim,
@@ -72,6 +73,39 @@ describe("browser: mining flow", function() {
     expect(await explorerLink.innerText()).to.equal("0x" + "ab".repeat(32), "the link text is the tx hash");
 
     expect(pageErrors, "javascript errors on the page: " + pageErrors.join("; ")).to.have.length(0);
+  });
+
+  it("mines a share with the yespower worker", async function() {
+    if(skipReason) return this.skip();
+    fixture = await bootFaucet({
+      configure: (config) => {
+        Object.assign(config.modules["pow"], {
+          powHashAlgo: "yespower",
+          powYespowerParams: { N: 1024, r: 8, pers: "PoWFaucet" },
+        });
+      },
+    });
+    page = await browser.newPage();
+    let pageErrors: string[] = [];
+    let consoleErrors: string[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err.stack || ("" + err)));
+    page.on("console", (msg) => { if(msg.type() === "error") consoleErrors.push(msg.text()); });
+    let workerScripts: string[] = [];
+    page.on("request", (req) => { if(/powfaucet-worker-/.test(req.url())) workerScripts.push(req.url()); });
+
+    let sessionId = await startMiningSession(page, fixture);
+    expect(sessionId, "no session id in the mining url").to.be.a("string");
+
+    // the share is validated server side with the same yespower params, so a reward proves both ends agree
+    await waitForShare(sessionId);
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    expect(sessionManager.getSession(sessionId).getDropAmount() > 0n).to.equal(true, "no yespower share rewarded");
+    expect(ServiceManager.GetService(ModuleManager).getModule("pow").getModuleConfig()["powHashAlgo"]).to.equal("yespower", "faucet not running yespower");
+    expect(workerScripts.length).to.be.greaterThan(0, "no miner worker loaded");
+    expect(workerScripts.every((url) => /powfaucet-worker-yp\.js/.test(url)), "unexpected worker scripts: " + workerScripts.join(", ")).to.equal(true);
+
+    expect(pageErrors, "javascript errors on the page: " + pageErrors.join("; ")).to.have.length(0);
+    expect(consoleErrors.filter((msg) => /hashing failed/.test(msg)), "worker reported hashing failures").to.have.length(0);
   });
 
   it("refuses an invalid address with a dialog and stays on the front page", async function() {

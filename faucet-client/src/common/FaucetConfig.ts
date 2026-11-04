@@ -147,6 +147,11 @@ export type PoWParams = {
   c: number; // count
   s: string; // suffix
   p: string; // prefix
+} | {
+  a: PoWHashAlgo.YESPOWER;
+  n: number; // N (memory/CPU cost)
+  r: number; // r (block size)
+  s: string; // personalization string
 }
 
 export interface IPassportModuleConfig {

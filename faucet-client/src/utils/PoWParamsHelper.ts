@@ -11,5 +11,7 @@ export function getPoWParamsStr(params: PoWParams, difficulty: number): string {
       return params.a+"|"+params.t + "|" + params.v + "|" + params.i + "|" + params.m + "|" + params.p + "|" + params.l + "|" + difficulty;
     case PoWHashAlgo.NICKMINER:
       return params.a+"|"+params.i + "|" + params.r + "|" + params.v + "|" + params.c + "|" + params.s + "|" + params.p + "|" + difficulty;
+    case PoWHashAlgo.YESPOWER:
+      return params.a+"|"+params.n + "|" + params.r + "|" + params.s + "|" + difficulty;
   }
 }

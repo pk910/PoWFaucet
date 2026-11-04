@@ -12,6 +12,7 @@ import { FaucetWebApi } from '../../src/webserv/FaucetWebApi.js';
 import { disposeFakeWebSockets, FakeWebSocket, injectFakeWebSocket } from '../stubs/FakeWebSocket.js';
 import { PoWModule } from '../../src/modules/pow/PoWModule.js';
 import { sleepPromise } from '../../src/utils/PromiseUtils.js';
+import { FaucetLogLevel, FaucetProcess } from '../../src/common/FaucetProcess.js';
 
 
 describe("Faucet module: pow", () => {
@@ -117,6 +118,87 @@ describe("Faucet module: pow", () => {
     expect(clientConfig.modules['pow'].powParams.l).to.equal(16, "client config mismatch: powParams.l");
     expect(clientConfig.modules['pow'].powDifficulty).to.equal(11, "client config mismatch: powDifficulty");
     expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(1337, "client config mismatch: powHashrateLimit");
+  });
+
+  it("Check client config exports (yespower)", async () => {
+    faucetConfig.modules["pow"] = {
+      enabled: true,
+      powShareReward: 10,
+      powSessionTimeout: 60,
+      powHashAlgo: PoWHashAlgo.YESPOWER,
+      powYespowerParams: {
+        N: 4096,
+      },
+      powDifficulty: 14,
+      powHashrateSoftLimit: 6000,
+    } as any;
+    let moduleManager = ServiceManager.GetService(ModuleManager);
+    await moduleManager.initialize();
+    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
+    expect(!!clientConfig.modules['pow']).to.equal(true, "no pow config exported");
+    expect(clientConfig.modules['pow'].powParams.a).to.equal(PoWHashAlgo.YESPOWER, "client config mismatch: powParams.a");
+    expect(clientConfig.modules['pow'].powParams.n).to.equal(4096, "client config mismatch: powParams.n");
+    expect(clientConfig.modules['pow'].powParams.r).to.equal(32, "client config mismatch: powParams.r (default not merged)");
+    expect(clientConfig.modules['pow'].powParams.s).to.equal("PoWFaucet", "client config mismatch: powParams.s (default not merged)");
+    expect(clientConfig.modules['pow'].powDifficulty).to.equal(14, "client config mismatch: powDifficulty");
+    expect(clientConfig.modules['pow'].powHashrateLimit).to.equal(6000, "client config mismatch: powHashrateLimit");
+  });
+
+  it("Refuse to start with invalid yespower params", async () => {
+    for(let params of [
+      { N: 1000, r: 32, pers: "" },
+      { N: 512, r: 32, pers: "" },
+      { N: 32768, r: 32, pers: "" },
+      { N: 2048, r: 7, pers: "" },
+      { N: 2048, r: 33, pers: "" },
+      { N: 2048, r: 32, pers: "a|b" },
+      { N: 2048, r: 32, pers: "x".repeat(65) },
+      { N: 2048, r: 32, pers: "caf\u00e9" },
+    ]) {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powHashAlgo: PoWHashAlgo.YESPOWER,
+        powYespowerParams: params,
+      } as IPoWConfig;
+      let error: any = null;
+      let moduleManager = new ModuleManager();
+      await moduleManager.initialize().catch((err) => { error = err; });
+      expect(String(error)).to.match(/cannot enable module 'pow': powYespowerParams/, "invalid params accepted: " + JSON.stringify(params));
+      expect(!!moduleManager.getModule("pow").isEnabled()).to.equal(false, "module left enabled after a rejected start: " + JSON.stringify(params));
+    }
+  });
+
+  it("Keep the running config on a reload with invalid yespower params", async () => {
+    faucetConfig.modules["pow"] = {
+      enabled: true,
+      powHashAlgo: PoWHashAlgo.YESPOWER,
+      powDifficulty: 14,
+    } as IPoWConfig;
+    let moduleManager = ServiceManager.GetService(ModuleManager);
+    await moduleManager.initialize();
+    let powModule = moduleManager.getModule<PoWModule>("pow");
+    let runningConfig = powModule.getModuleConfig();
+    let emitLog = sinon.stub(FaucetProcess.prototype, "emitLog");
+    try {
+      powModule.setModuleConfig({
+        enabled: true,
+        powHashAlgo: PoWHashAlgo.YESPOWER,
+        powYespowerParams: { N: 2048, r: 64 },
+        powDifficulty: 20,
+      } as any);
+      expect(powModule.getModuleConfig()).to.equal(runningConfig, "invalid reload replaced the running config");
+      expect(emitLog.calledWith(FaucetLogLevel.ERROR, sinon.match(/Invalid pow config.*powYespowerParams\.r/))).to.equal(true, "invalid reload not logged");
+    } finally {
+      emitLog.restore();
+    }
+    powModule.setModuleConfig({
+      enabled: true,
+      powHashAlgo: PoWHashAlgo.YESPOWER,
+      powYespowerParams: { N: 4096 },
+      powDifficulty: 15,
+    } as any);
+    expect(powModule.getModuleConfig().powYespowerParams).to.deep.equal({ N: 4096, r: 32, pers: "PoWFaucet" }, "valid reload not applied");
+    expect(powModule.getModuleConfig().powDifficulty).to.equal(15, "valid reload not applied");
   });
 
   it("Start mining session and check session params", async () => {
@@ -776,6 +858,140 @@ describe("Faucet module: pow", () => {
       expect(errorMsg[0].data.message).to.matches(/verification failed/i, "unexpected error1 message");
       expect(errorMsg[1].data.code).to.equal("CLIENT_KILLED", "unexpected error2 code");
       expect(errorMsg[1].data.message).to.matches(/session failed/i, "unexpected error2 message");
+      expect(testSession.getDropAmount()).to.equal(0n, "unexpected drop amount");
+    });
+
+    it("check action 'foundShare': valid share, local verification, yespower", async () => {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powShareReward: 10,
+        powHashAlgo: PoWHashAlgo.YESPOWER,
+        powYespowerParams: {
+          N: 2048,
+          r: 32,
+          pers: "PoWFaucet",
+        },
+        powDifficulty: 11,
+        powHashrateHardLimit: 100,
+        verifyLocalLowPeerPercent: 100,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "2TobvsN38W8=",
+      });
+      expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket.emit("message", JSON.stringify({
+        id: 42,
+        action: "foundShare",
+        data: {
+          nonce: 2506,
+          params: "yespower|2048|32|PoWFaucet|11",
+          hashrate: 12,
+        }
+      }))
+      expect(fakeSocket.isReady).to.equal(true, "client is not ready");
+      await awaitSleepPromise(1000, () => fakeSocket.getSentMessage("ok").length > 0);
+      let okMsg = fakeSocket.getSentMessage("ok");
+      expect(okMsg.length).to.equal(1, "no ok message sent");
+      expect(okMsg[0].rsp).to.equal(42, "invalid response id");
+      await awaitSleepPromise(100, () => fakeSocket.getSentMessage("updateBalance").length > 0);
+      let balanceMsg = fakeSocket.getSentMessage("updateBalance");
+      expect(balanceMsg.length).to.equal(1, "no updateBalance message sent");
+      expect(balanceMsg[0].data.balance).to.equal("10", "invalid updateBalance message: unexpected balance");
+      expect(balanceMsg[0].data.reason).to.matches(/valid share/, "invalid updateBalance message: unexpected reason");
+    });
+
+    it("check action 'foundShare': invalid share, local verification, yespower", async () => {
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powHashAlgo: PoWHashAlgo.YESPOWER,
+        powYespowerParams: {
+          N: 2048,
+          r: 32,
+          pers: "PoWFaucet",
+        },
+        powDifficulty: 11,
+        powHashrateHardLimit: 100,
+        verifyLocalLowPeerPercent: 100,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "2TobvsN38W8=",
+      });
+      expect(testSession.getSessionStatus()).to.equal("running", "unexpected session status");
+      let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+      fakeSocket.emit("message", JSON.stringify({
+        id: 42,
+        action: "foundShare",
+        data: {
+          nonce: 1,
+          params: "yespower|2048|32|PoWFaucet|11",
+          hashrate: 12,
+        }
+      }))
+      expect(fakeSocket.isReady).to.equal(true, "client is not ready");
+      await awaitSleepPromise(1000, () => !fakeSocket.isReady);
+      let errorMsg = fakeSocket.getSentMessage("error");
+      expect(errorMsg.length).to.equal(2, "unexpected number of error messages sent");
+      expect(errorMsg[0].rsp).to.equal(42, "invalid response id");
+      expect(errorMsg[0].data.code).to.equal("WRONG_SHARE", "unexpected error1 code");
+      expect(errorMsg[1].data.code).to.equal("CLIENT_KILLED", "unexpected error2 code");
+      expect(testSession.getDropAmount()).to.equal(0n, "unexpected drop amount");
+    });
+
+    it("check action 'foundShare': a failed hash is no valid share (argon2 over its memory limit)", async () => {
+      // the argon2 wasm cannot allocate 64 MiB: every hash fails with "!Memory allocation error",
+      // which used to sort below the difficulty mask and pass as a share
+      faucetConfig.modules["pow"] = {
+        enabled: true,
+        powShareReward: 10,
+        powHashAlgo: PoWHashAlgo.ARGON2,
+        powArgon2Params: {
+          type: 0,
+          version: 13,
+          timeCost: 1,
+          memoryCost: 65536,
+          parallelization: 1,
+          keyLength: 16,
+        },
+        powDifficulty: 11,
+        powHashrateHardLimit: 100,
+        verifyLocalLowPeerPercent: 100,
+      } as IPoWConfig;
+      let moduleManager = ServiceManager.GetService(ModuleManager);
+      await moduleManager.initialize();
+      let testSession = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      }, {
+        "pow.preimage": "2TobvsN38W8=",
+      });
+      let emitLog = sinon.stub(FaucetProcess.prototype, "emitLog");
+      try {
+        let fakeSocket = await injectFakeWebSocket("/ws/pow?session=" + testSession.getSessionId(), "8.8.8.8");
+        fakeSocket.emit("message", JSON.stringify({
+          id: 42,
+          action: "foundShare",
+          data: {
+            nonce: 1,
+            params: "argon2|0|13|1|65536|1|16|11",
+            hashrate: 12,
+          }
+        }))
+        await awaitSleepPromise(1000, () => !fakeSocket.isReady);
+        expect(fakeSocket.getSentMessage("ok").length).to.equal(0, "a failed hash was accepted as share");
+        let errorMsg = fakeSocket.getSentMessage("error");
+        expect(errorMsg.length > 0 && errorMsg[0].data.code).to.equal("WRONG_SHARE", "unexpected error code");
+        expect(emitLog.calledWith(FaucetLogLevel.ERROR, sinon.match(/argon2 hashing failed: Memory allocation error/))).to.equal(true, "hash failure not logged");
+      } finally {
+        emitLog.restore();
+      }
       expect(testSession.getDropAmount()).to.equal(0n, "unexpected drop amount");
     });
 

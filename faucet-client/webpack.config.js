@@ -82,6 +82,13 @@ var webpackModuleConfigs = [
       filename: 'powfaucet-worker-nm.js',
     },
   },
+  {
+    entry: './src/worker/worker-yespower',
+    output: {
+      path: path.join(import.meta.dirname, '/dist'),
+      filename: 'powfaucet-worker-yp.js',
+    },
+  },
 ];
 
 var webpackBaseConfig = {

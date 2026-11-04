@@ -33,6 +33,7 @@ export class PoWWorker {
   private nonceRanges: IPoWWorkerNonceRange[];
   private statsCount: number;
   private statsPoll: number;
+  private hashErrorLogged = false;
 
   public constructor(options: IPoWWorkerOptions) {
     this.options = options;
@@ -234,13 +235,20 @@ export class PoWWorker {
     let hashHex = this.options.hashFn(nonceHex, preimg, this.powParams.params);
 
     if (this.powParams.params.a === PoWHashAlgo.NICKMINER) {
-      if(hashHex.substring(0, 2) != "0x") {
+      if(typeof hashHex !== "string" || hashHex.substring(0, 2) != "0x") {
         console.error("NickMiner error:", hashHex);
         return null;
       }
 
       let difficulty = parseInt(hashHex.substring(2, 4), 16);
       return (difficulty >= this.powParams.difficulty) ? hashHex : null;
+    } else if(typeof hashHex !== "string" || hashHex.length < this.powParams.dmask.length || !/^[0-9a-f]+$/.test(hashHex)) {
+      // the hash libs report failures as "!<reason>", which would sort below any difficulty mask
+      if(!this.hashErrorLogged) {
+        this.hashErrorLogged = true;
+        console.error("PoW hashing failed (" + this.powParams.params.a + "):", hashHex);
+      }
+      return null;
     } else {
       let startOfHash = hashHex.substring(0, this.powParams.dmask.length);
       return (startOfHash <= this.powParams.dmask) ? hashHex : null;
