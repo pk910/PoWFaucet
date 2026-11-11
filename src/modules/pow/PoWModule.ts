@@ -4,7 +4,7 @@ import { ServiceManager } from "../../common/ServiceManager.js";
 import { FaucetSession, FaucetSessionStatus } from "../../session/FaucetSession.js";
 import { BaseModule } from "../BaseModule.js";
 import { ModuleHookAction } from "../ModuleManager.js";
-import { defaultConfig, IPoWConfig, PoWHashAlgo } from './PoWConfig.js';
+import { defaultConfig, IPoWConfig, PoWHashAlgo, validateYespowerParams } from './PoWConfig.js';
 import { FaucetHttpServer } from "../../webserv/FaucetHttpServer.js";
 import { IncomingMessage } from "http";
 import { WebSocket } from 'ws';
@@ -23,6 +23,37 @@ export class PoWModule extends BaseModule<IPoWConfig> {
   protected readonly moduleDefaultConfig = defaultConfig;
  
   private powServers: {[serverId: string]: PoWServer} = {};
+
+  public override setModuleConfig(config: IPoWConfig): void {
+    // the params blocks are merged with their defaults, so a config can override single values
+    config = Object.assign({}, config, {
+      powYespowerParams: Object.assign({}, defaultConfig.powYespowerParams, config?.powYespowerParams),
+    });
+
+    let configError = this.isEnabled() ? PoWModule.getConfigError(config) : null;
+    if(configError) {
+      // a broken reload must not take a running faucet down or change its PoW: keep what is running
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.ERROR, "Invalid pow config, keeping the previous config: " + configError);
+      return;
+    }
+    super.setModuleConfig(config);
+  }
+
+  public override enableModule(): Promise<void> {
+    let configError = PoWModule.getConfigError(this.moduleConfig);
+    if(configError)
+      return Promise.reject("cannot enable module '" + this.moduleName + "': " + configError);
+    return super.enableModule();
+  }
+
+  private static getConfigError(config: IPoWConfig): string | null {
+    switch(config.powHashAlgo) {
+      case PoWHashAlgo.YESPOWER:
+        return validateYespowerParams(config.powYespowerParams);
+      default:
+        return null;
+    }
+  }
 
   protected override startModule(): Promise<void> {
     // register websocket endpoint (/pow)
@@ -113,6 +144,14 @@ export class PoWModule extends BaseModule<IPoWConfig> {
           c: this.moduleConfig.powNickMinerParams.count,
           s: this.moduleConfig.powNickMinerParams.suffix,
           p: this.moduleConfig.powNickMinerParams.prefix,
+        };
+        break;
+      case PoWHashAlgo.YESPOWER:
+        powParams = {
+          a: PoWHashAlgo.YESPOWER,
+          n: this.moduleConfig.powYespowerParams.N,
+          r: this.moduleConfig.powYespowerParams.r,
+          s: this.moduleConfig.powYespowerParams.pers,
         };
         break;
     }

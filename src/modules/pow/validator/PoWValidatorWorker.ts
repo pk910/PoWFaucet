@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { MessagePort } from "worker_threads";
 import { base64ToHex } from "../../../utils/ConvertHelpers.js";
 import { IPoWValidatorValidateRequest } from "./IPoWValidator.js";
-import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWNickMinerParams, IPoWSCryptParams, PoWCryptoParams, PoWHashAlgo } from '../PoWConfig.js';
+import { IPoWArgon2Params, IPoWCryptoNightParams, IPoWNickMinerParams, IPoWSCryptParams, IPoWYespowerParams, PoWCryptoParams, PoWHashAlgo } from '../PoWConfig.js';
 
 export type PoWHashFn = (nonceHex: string, preimgHex: string, params: PoWCryptoParams) => string;
 
@@ -69,6 +69,16 @@ export class PoWValidatorWorker {
           };
         })();
         break;
+      case PoWHashAlgo.YESPOWER:
+        hashFn = await (async () => {
+          let module = await import("../../../../libs/yespower_wasm.cjs");
+          await module.default.getYespowerReadyPromise();
+          let yespower = module.default.getYespower();
+          return (nonce, preimg, params: IPoWYespowerParams) => {
+            return yespower(preimg + nonce, params.N, params.r, params.pers);
+          };
+        })();
+        break;
     }
     return hashFn;
   }
@@ -107,6 +117,7 @@ export class PoWValidatorWorker {
       dmask = this.difficultyMasks[req.difficulty] = this.getDifficultyMask(req.difficulty);
 
     let isValid = true;
+    let error: string = null;
     let nonceHex = req.nonce?.toString(16) || "";
     if(nonceHex.length < 16) {
       nonceHex = "0000000000000000".substring(0, 16 - nonceHex.length) + nonceHex;
@@ -122,6 +133,10 @@ export class PoWValidatorWorker {
       if(hashHex.substring(0, 2) != "0x" || parseInt(hashHex.substring(2, 4), 16) < req.difficulty || hashHex != req.data) {
         isValid = false;
       }
+    } else if(typeof hashHex !== "string" || hashHex.length < dmask.length || !/^[0-9a-f]+$/.test(hashHex)) {
+      // the hash libs report failures as "!<reason>", which would sort below any difficulty mask
+      isValid = false;
+      error = req.algo + " hashing failed: " + (typeof hashHex === "string" ? hashHex.replace(/^!/, "") : "no result");
     } else {
       let startOfHash = hashHex.substring(0, dmask.length);
       if(!(startOfHash <= dmask)) {
@@ -133,7 +148,8 @@ export class PoWValidatorWorker {
       action: "validated", 
       data: {
         shareId: req.shareId,
-        isValid: isValid
+        isValid: isValid,
+        error: error,
       }
     });
   }

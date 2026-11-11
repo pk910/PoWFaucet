@@ -300,6 +300,12 @@ export class PoWServerWorker {
         "|" + this.moduleConfig.powNickMinerParams.suffix +
         "|" + this.moduleConfig.powNickMinerParams.prefix +
         "|" + this.moduleConfig.powDifficulty;
+      case PoWHashAlgo.YESPOWER:
+        return PoWHashAlgo.YESPOWER.toString() +
+        "|" + this.moduleConfig.powYespowerParams.N +
+        "|" + this.moduleConfig.powYespowerParams.r +
+        "|" + this.moduleConfig.powYespowerParams.pers +
+        "|" + this.moduleConfig.powDifficulty;
     }
   }
 

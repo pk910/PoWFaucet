@@ -77,6 +77,9 @@ function checkFileExists(filename, dstpath) {
   copyIfFound("powfaucet-worker-nm.js", path.join(staticPath, "js"));
   copyIfFoundOrRemove("powfaucet-worker-nm.js.map", path.join(staticPath, "js"));
 
+  copyIfFound("powfaucet-worker-yp.js", path.join(staticPath, "js"));
+  copyIfFoundOrRemove("powfaucet-worker-yp.js.map", path.join(staticPath, "js"));
+
   console.log("finished");
 }).then(() => {
   let staticPath = path.join(import.meta.dirname, "..", "static");
@@ -86,6 +89,7 @@ function checkFileExists(filename, dstpath) {
   checkFileExists("powfaucet-worker-cn.js", path.join(staticPath, "js"));
   checkFileExists("powfaucet-worker-a2.js", path.join(staticPath, "js"));
   checkFileExists("powfaucet-worker-nm.js", path.join(staticPath, "js"));
+  checkFileExists("powfaucet-worker-yp.js", path.join(staticPath, "js"));
 }).catch((err) => {
   console.log("build failed: ", err);
   process.exit(1);
