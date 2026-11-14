@@ -607,8 +607,6 @@ describe("Faucet module: authenticatoor (module)", () => {
     ["+faucet:all", "+faucet:all"],
     ["+all:all", "+all:all"],
     ["wildcard +faucet:drop*", "+faucet:drop*"],
-    ["absent claim", undefined],
-    ["empty claim", ""],
   ];
   featureHeld.forEach(([name, services]) => {
     it("Feature grant applied: " + name, async () => {
@@ -621,7 +619,12 @@ describe("Faucet module: authenticatoor (module)", () => {
     });
   });
 
-  const featureNotHeld: [string, string][] = [
+  // A token without a services claim has basic access to every service and
+  // nothing more: it gets the baseline grant, not the feature grant.
+  const featureNotHeld: [string, string | undefined][] = [
+    ["absent claim", undefined],
+    ["empty claim", ""],
+    ["+all", "+all"],
     ["bare +faucet", "+faucet"],
     ["-all,+faucet", "-all,+faucet"],
     ["+faucet:all:-drop_100eth", "+faucet:all:-drop_100eth"],

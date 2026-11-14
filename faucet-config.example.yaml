@@ -342,7 +342,8 @@ modules:
     # session goes on without it and gets no grant (with requireLogin it is
     # rejected, AUTHENTICATOOR_SERVICE). Grants with a `feature` are evaluated
     # against it. Tokens without a services claim (older authenticatoor
-    # versions, or an authenticatoor without grants) are not restricted.
+    # versions, or an authenticatoor without grants) pass this service check,
+    # but hold no feature grant.
     # Leave null to ignore the services claim.
     expectedService: null # e.g. "faucet"
 
@@ -364,9 +365,10 @@ modules:
     # login with plain access to the service (`faucet`) does not hold them.
     # Such a grant is skipped for everyone else, also with `required: true`,
     # and never applies while `expectedService` is null.
-    # NOTE: a token without a services claim is unrestricted and holds every
-    # feature, so use feature grants only with an authenticatoor that has
-    # grants configured (it then always emits the claim).
+    # NOTE: a token without a services claim passes the service check but
+    # holds no feature, so a feature grant never applies to it. Feature
+    # grants need an authenticatoor that has grants configured and hands
+    # the feature out (it then always emits the claim).
     grants:
       # baseline grant for any authenticated user — double reward
       - limitCount: 0

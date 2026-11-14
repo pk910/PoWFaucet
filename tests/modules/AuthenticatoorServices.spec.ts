@@ -46,6 +46,22 @@ function legacyServiceAllowed(directives: string, service: string): boolean {
   return allowed;
 }
 
+// The rule for a token without a services claim, stated independently of
+// the implementation (Go: emptyClaimWant): basic access to every service
+// and nothing more. The service gate ("basic" or an empty feature) is open
+// whatever is asked. Any other feature is allowed under default-allow and
+// denied under default-deny, and refused in both modes when the service or
+// the feature cannot be a query name. Returns [wantDeny, wantAllow].
+function emptyClaimWant(service: string, feature: string): [boolean, boolean] {
+  let isName = (s: string) => s !== "" && !/[:,*]/.test(s) && !s.startsWith("-") && !s.startsWith("+");
+  let f = feature.trim().toLowerCase();
+  if(f === "" || f === "basic")
+    return [true, true];
+  if(!isName(service.trim().toLowerCase()) || !isName(f) || f === "all")
+    return [false, false];
+  return [false, true];
+}
+
 // Small deterministic generator for the generated cases (mulberry32).
 function newRng(seed: number): (n: number) => number {
   let a = seed >>> 0;
@@ -274,7 +290,8 @@ describe("Faucet module: authenticatoor (services claim)", () => {
   });
 
   // The documented table, literally: base access denied / allowed × feature
-  // unset / granted / excluded × both modes, plus the empty-claim row.
+  // unset / granted / excluded × both modes. A token without the claim is
+  // the row "allowed, unset".
   describe("featureAllowed: truth table (Go: TestFeatureAllowed_TruthTable)", () => {
     // name, directives, wantBase, wantDeny, wantAllow
     const cases: [string, string, boolean, boolean, boolean][] = [
@@ -289,7 +306,7 @@ describe("Faucet module: authenticatoor (services claim)", () => {
     ["base allowed, granted by all", "-all,+dora,+dora:all", true, true, true],
     ["base allowed, excluded", "-all,+dora,-dora:roll", true, false, false],
     ["base allowed, excluded inside a grant of all", "+dora:all:-roll", true, false, false],
-    ["empty claim: no constraint", "", true, true, true],
+    ["empty claim: base allowed, unset", "", true, false, true],
     ];
     cases.forEach(([name, directives, wantBase, wantDeny, wantAllow]) => {
       it(name, () => {
@@ -304,13 +321,32 @@ describe("Faucet module: authenticatoor (services claim)", () => {
   describe("featureAllowed: arguments (Go: TestFeatureAllowed_Arguments)", () => {
     // name, directives, service, feature, wantDeny, wantAllow
     const cases: [string, string, string, string, boolean, boolean][] = [
-    // The empty claim allows everything, whatever is asked.
-    ["empty claim", "", "spamoor", "plugins", true, true],
+    // The empty claim is basic access to every service and nothing
+    // more: the service gate is open, a feature reads as under "+all".
+    ["empty claim", "", "spamoor", "plugins", false, true],
     ["empty claim, empty feature", "", "spamoor", "", true, true],
-    ["empty claim, empty service", "", "", "plugins", true, true],
-    ["empty claim, reserved feature name", "", "spamoor", "all", true, true],
+    ["empty claim, blank feature", "", "spamoor", "  ", true, true],
+    ["empty claim, empty service", "", "", "plugins", false, false],
+    ["empty claim, blank service", "", "   ", "plugins", false, false],
+    ["empty claim, empty service, basic", "", "", "basic", true, true],
+    ["empty claim, empty service and feature", "", "", "", true, true],
+    ["empty claim, reserved feature name", "", "spamoor", "all", false, false],
+    ["empty claim, wildcard feature", "", "spamoor", "user*", false, false],
+    ["empty claim, lone * as the feature", "", "spamoor", "*", false, false],
+    ["empty claim, signed feature", "", "spamoor", "-plugins", false, false],
+    ["empty claim, feature with a colon", "", "spamoor", "a:b", false, false],
+    ["empty claim, feature with a comma", "", "spamoor", "a,+all", false, false],
+    ["empty claim, service with a colon", "", "spamoor:plugins", "x", false, false],
+    ["empty claim, wildcard service", "", "spam*", "f1", false, false],
+    ["empty claim, service all", "", "all", "f1", false, true],
+    ["empty claim, case and whitespace", "", " SPAMOOR ", " Plugins ", false, true],
 
-    // Only the empty string is the empty claim.
+    // The same queries under "+all", which the empty claim reads like.
+    ["+all", "+all", "spamoor", "plugins", false, true],
+    ["+all, reserved feature name", "+all", "spamoor", "all", false, false],
+    ["+all, empty service", "+all", "", "plugins", false, false],
+
+    // A whitespace or garbage claim reads the same for a feature.
     ["whitespace claim: base by default, nothing granted", " ", "spamoor", "plugins", false, true],
     ["garbage claim: base by default, nothing granted", "nonsense", "spamoor", "plugins", false, true],
 
@@ -324,6 +360,7 @@ describe("Faucet module: authenticatoor (services claim)", () => {
     ["basic, service denied", "-all,+spamoor", "buildoor", "basic", false, false],
     ["basic, service nothing mentions: allowed by default", "+spamoor,+buildoor", "other", "basic", true, true],
     ["basic under the empty claim", "", "spamoor", "basic", true, true],
+    ["basic under the empty claim, spelled otherwise", "", "spamoor", " Basic ", true, true],
 
     // An empty service is refused, although ServiceAllowed lets it through.
     ["empty service, basic", "+all:all", "", "basic", false, false],
@@ -358,10 +395,49 @@ describe("Faucet module: authenticatoor (services claim)", () => {
       expect(serviceAllowed(undefined as any, "spamoor")).to.equal(true);
       expect(serviceAllowed(null as any, "spamoor")).to.equal(true);
       expect(serviceAllowed("-all", undefined as any)).to.equal(true);
-      checkFeature(undefined as any, "spamoor", "plugins", true, true);
+      checkFeature(undefined as any, "spamoor", "plugins", false, true);
+      checkFeature(null as any, "spamoor", "plugins", false, true);
+      checkFeature(undefined as any, "spamoor", "basic", true, true);
+      checkFeature(undefined as any, "spamoor", undefined as any, true, true);
+      checkFeature(undefined as any, undefined as any, "plugins", false, false);
+      checkFeature(undefined as any, "spamoor", "all", false, false);
       checkFeature("+all:all", undefined as any, "plugins", false, false);
       checkFeature("-all,+spamoor", "spamoor", undefined as any, true, true);
     });
+  });
+
+  // Every combination of a set of services and features — ordinary,
+  // reserved, malformed, in odd case and whitespace — against the empty
+  // directive string, compared with the rule (emptyClaimWant). For every
+  // feature but the service gate the answer is also the one "+all" gives.
+  it("featureAllowed: the empty claim is basic access only (Go: TestFeatureAllowed_EmptyClaimIsBasicAccessOnly)", () => {
+    let services = [
+      "spamoor", "SPAMOOR", " spamoor ", "my-service", "other", "all", "basic", "x",
+      "", "   ", "*", "spam*", "spamoor:plugins", "a,b", "-spamoor", "+spamoor",
+    ];
+    let features = [
+      "plugins", "PLUGINS", " plugins ", "f1", "user-admin", "roll", "basics", "allx", "b",
+      "", "  ", "basic", " Basic ", "BASIC", "all", "ALL", " all ",
+      "*", "user*", "us*er", "a:b", "a,b", "a,+all", "-plugins", "+plugins", "-", "+", ":", ",",
+    ];
+    let plain = 0, refused = 0, gate = 0;
+    for(let service of services) {
+      expect(serviceAllowed("", service)).to.equal(true, "the empty claim allows every service: " + JSON.stringify(service));
+      for(let feature of features) {
+        let [wantDeny, wantAllow] = emptyClaimWant(service, feature);
+        checkFeature("", service, feature, wantDeny, wantAllow);
+
+        if(wantDeny) {
+          gate++;
+          continue; // the service gate; "+all" refuses it for an empty service
+        }
+        if(wantAllow) plain++; else refused++;
+        // The rule, said the other way: exactly as under "+all".
+        checkFeature("+all", service, feature, wantDeny, wantAllow);
+      }
+    }
+    expect(plain > 0 && refused > 0 && gate > 0).to.equal(true,
+      "the cases are one-sided: plain=" + plain + " refused=" + refused + " gate=" + gate);
   });
 
   // The differences to the v0.0.3 evaluator for directive lists with a ":".
@@ -451,6 +527,8 @@ describe("Faucet module: authenticatoor (services claim)", () => {
   // Over generated directive lists in the full grammar: a feature is never
   // allowed without base access in either mode, default-deny never allows
   // what default-allow refuses, and an empty feature is the base question.
+  // The empty claim is one of the lists: it obeys the same formula, and
+  // default-deny allows nothing under it.
   it("featureAllowed: never without base access (Go: TestFeatureAllowed_NeverWithoutBaseAccess)", () => {
     let fragments = [
       "+all", "-all", "+spamoor", "-spamoor", "+buildoor", "-buildoor",
@@ -470,8 +548,6 @@ describe("Faucet module: authenticatoor (services claim)", () => {
       for(let j = 0; j < n; j++)
         parts.push(fragments[rng(fragments.length)]);
       let directives = parts.join(",");
-      if(directives === "")
-        continue;
       for(let service of ["spamoor", "buildoor", "other"]) {
         let base = serviceAllowed(directives, service);
         if(featureAllowed(directives, service, "", false) !== base)
@@ -487,6 +563,10 @@ describe("Faucet module: authenticatoor (services claim)", () => {
             expect.fail(JSON.stringify(directives) + " allows " + service + ":" + feature + " without base access");
           if(deny && !allow)
             expect.fail(JSON.stringify(directives) + ": " + service + ":" + feature + " allowed under default-deny but not under default-allow");
+          // No directive at all — the empty claim, or only separators:
+          // basic access, the feature unset.
+          if(directives.replace(/,/g, "") === "" && (deny || !allow))
+            expect.fail(JSON.stringify(directives) + ": " + service + ":" + feature + " deny=" + deny + " allow=" + allow + ", want basic access and nothing more");
           if(deny) allowedDeny++;
           if(allow) allowedAllow++;
           if(!base) refusedForBase++;

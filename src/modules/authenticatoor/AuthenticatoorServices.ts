@@ -25,8 +25,10 @@
 //
 // Evaluation:
 //
-//   - An empty directive string allows every query, basic or feature:
-//     there is no constraint (tokens of an authenticatoor without grants).
+//   - An empty directive string — a token without the claim, as an
+//     authenticatoor without grants mints it — means basic access to
+//     every service and nothing more. For a feature it reads like "+all":
+//     nothing is said about any feature.
 //   - Directives apply left to right, a later verdict overrides an earlier
 //     one; inside one directive the segments apply left to right too.
 //   - Basic access defaults to ALLOW when no directive matches the
@@ -137,23 +139,32 @@ export function serviceAllowed(directives: string, service: string): boolean {
 //   allowed       unset      no             yes
 //   allowed       granted    yes            yes
 //   allowed       excluded   no             no
-//   (empty directive string) yes            yes
 //
-// NOTE: an EMPTY directive string allows every feature in BOTH modes; it
-// means "no constraint".
+// NOTE: an EMPTY directive string is basic access to every service and
+// nothing more. It passes every service gate, and for a feature it is
+// evaluated exactly like "+all" — the row "allowed, unset": allowed under
+// default-allow, DENIED under default-deny.
 //
 // The feature "basic", like an empty feature, asks for the service itself.
-// An empty service is refused (unless the directive string is empty), and
-// so is a feature that cannot be a feature name: the reserved word "all",
-// or one containing ":", ",", "*" or a leading sign.
+// An empty service is refused (except by the service gate under the empty
+// directive string, which is open whatever is asked), and so is a feature
+// that cannot be a feature name: the reserved word "all", or one
+// containing ":", ",", "*" or a leading sign.
 export function featureAllowed(directives: string, service: string, feature: string, defaultAllow: boolean): boolean {
-  if(!directives)
-    return true;
+  feature = toLower(trimSpace(feature || ""));
+  let basic = !feature || feature === FEATURE_BASIC;
+  if(!directives) {
+    // The service gate of a token without the claim: always open. Any
+    // other feature takes the ordinary walk below, which over no
+    // directives ends at base access with the feature unset.
+    if(basic)
+      return true;
+    directives = "";
+  }
   service = toLower(trimSpace(service || ""));
   if(!service)
     return false;
-  feature = toLower(trimSpace(feature || ""));
-  if(!feature || feature === FEATURE_BASIC)
+  if(basic)
     return serviceAllowed(directives, service);
   if(!isQueryName(service) || !isQueryName(feature) || feature === GRANT_ALL)
     return false;

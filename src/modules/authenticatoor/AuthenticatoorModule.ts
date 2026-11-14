@@ -106,7 +106,9 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
 
     let authInfo: IAuthenticatoorAuthInfo | null = null;
     // The token's "services" claim; empty when the token has none (older
-    // authenticatoor versions, or one without grants), which is no constraint.
+    // authenticatoor versions, or one without grants). Such a token has
+    // basic access to every service and nothing more: it passes the service
+    // check below and holds no feature grant.
     let services = "";
     if(userInput.authToken && this.verifier) {
       try {
