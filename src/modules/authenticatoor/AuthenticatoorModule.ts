@@ -12,6 +12,7 @@ import { ISessionRewardFactor } from "../../session/SessionRewardFactor.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { AuthenticatoorVerifier, IAuthenticatoorClaims } from './AuthenticatoorVerifier.js';
 import { AuthenticatoorDB } from './AuthenticatoorDB.js';
+import { featureAllowed, serviceAllowed } from './AuthenticatoorServices.js';
 
 export interface IAuthenticatoorAuthInfo {
   userId: string;
@@ -33,6 +34,7 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
   protected override async startModule(): Promise<void> {
     this.authDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(AuthenticatoorDB, this);
     this.initVerifier();
+    this.checkGrantFeatures();
 
     this.moduleManager.addActionHook(
       this, ModuleHookAction.ClientConfig, 1, "authenticatoor login config",
@@ -68,6 +70,21 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
 
   protected override onConfigReload(): void {
     this.initVerifier();
+    this.checkGrantFeatures();
+  }
+
+  private getExpectedService(): string | null {
+    let service = this.moduleConfig.expectedService;
+    return (typeof service === "string" && service.trim()) ? service : null;
+  }
+
+  private checkGrantFeatures(): void {
+    if(this.getExpectedService())
+      return;
+    let features = (this.moduleConfig.grants || []).filter((grant) => !!grant.feature).map((grant) => grant.feature);
+    if(features.length > 0) {
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "authenticatoor module: grants with a feature (" + features.join(", ") + ") never apply because expectedService is not configured");
+    }
   }
 
   private initVerifier(): void {
@@ -88,14 +105,30 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
       return;
 
     let authInfo: IAuthenticatoorAuthInfo | null = null;
+    // The token's "services" claim; empty when the token has none (older
+    // authenticatoor versions, or one without grants). Such a token has
+    // basic access to every service and nothing more: it passes the service
+    // check below and holds no feature grant.
+    let services = "";
     if(userInput.authToken && this.verifier) {
       try {
         let claims = await this.verifier.verify(userInput.authToken);
         authInfo = this.claimsToAuthInfo(claims);
+        services = this.claimsToServices(claims);
       } catch(ex) {
         ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Error verifying authenticatoor token: " + ex.toString());
         throw new FaucetError("AUTHENTICATOOR_TOKEN", "Invalid authenticatoor login token.");
       }
+    }
+
+    let expectedService = this.getExpectedService();
+    if(authInfo && expectedService && !serviceAllowed(services, expectedService)) {
+      // A login without access to this faucet is no login here: the session
+      // goes on without it and gets no grant. It only fails where a login is
+      // required.
+      if(this.moduleConfig.requireLogin)
+        throw new FaucetError("AUTHENTICATOOR_SERVICE", "Your login is not permitted to use this faucet.");
+      authInfo = null;
     }
 
     if(this.moduleConfig.requireLogin && !authInfo) {
@@ -107,7 +140,10 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
 
       let perks: AuthenticatoorGrantPerks = {};
       for(let i = 0; i < this.moduleConfig.grants.length; i++) {
-        await this.checkGrant(authInfo, this.moduleConfig.grants[i], perks);
+        let grant = this.moduleConfig.grants[i];
+        if(grant.feature && !(expectedService && featureAllowed(services, expectedService, grant.feature, false)))
+          continue; // not this login's grant
+        await this.checkGrant(authInfo, grant, perks);
       }
 
       session.setSessionData("authenticatoor.data", authInfo);
@@ -156,6 +192,15 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
       email: claims.email || "",
       issuer: (claims.iss as string) || "",
     };
+  }
+
+  private claimsToServices(claims: IAuthenticatoorClaims): string {
+    let services = claims.services;
+    if(typeof services === "undefined" || services === null)
+      return "";
+    if(typeof services !== "string")
+      throw new Error("token has a malformed services claim");
+    return services;
   }
 
   private checkConcurrencyLimit(authInfo: IAuthenticatoorAuthInfo, session: FaucetSession): void {

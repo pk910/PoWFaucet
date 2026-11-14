@@ -11,6 +11,7 @@ import { faucetConfig } from '../../src/config/FaucetConfig.js';
 import { FaucetError } from '../../src/common/FaucetError.js';
 import { FaucetWebApi } from '../../src/webserv/FaucetWebApi.js';
 import { FaucetSession, FaucetSessionStatus } from '../../src/session/FaucetSession.js';
+import { FaucetLogLevel, FaucetProcess } from '../../src/common/FaucetProcess.js';
 import { IAuthenticatoorConfig } from '../../src/modules/authenticatoor/AuthenticatoorConfig.js';
 import { AuthenticatoorVerifier, IAuthenticatoorClaims } from '../../src/modules/authenticatoor/AuthenticatoorVerifier.js';
 import { AuthenticatoorDB } from '../../src/modules/authenticatoor/AuthenticatoorDB.js';
@@ -26,19 +27,25 @@ function tokenFor(email: string): string {
 describe("Faucet module: authenticatoor (module)", () => {
   let globalStubs: any;
   let verifyStub: sinon.SinonStub;
+  // The "services" claim of the tokens the stub hands out; undefined = no claim.
+  let tokenServices: string | undefined;
 
   beforeEach(async () => {
+    tokenServices = undefined;
     verifyStub = sinon.stub(AuthenticatoorVerifier.prototype, "verify").callsFake(async (token: string) => {
       let m = /^stub\.token\.(.+)$/.exec(token);
       if(!m) throw new Error("verifier: bad token");
       let email = m[1];
-      return {
+      let claims: IAuthenticatoorClaims = {
         sub: email,
         email: email,
         iss: AUTH_URL,
         aud: AUDIENCE,
         scope: "*." + AUDIENCE,
-      } as IAuthenticatoorClaims;
+      };
+      if(typeof tokenServices !== "undefined")
+        claims.services = tokenServices;
+      return claims;
     });
 
     globalStubs = bindTestStubs({
@@ -51,6 +58,7 @@ describe("Faucet module: authenticatoor (module)", () => {
       authUrl: AUTH_URL,
       expectedAudience: AUDIENCE,
       expectedHost: null,
+      expectedService: null,
       requireLogin: false,
       concurrencyLimit: 0,
       grants: [],
@@ -468,5 +476,239 @@ describe("Faucet module: authenticatoor (module)", () => {
     });
     expect(testSession.getSessionData("authenticatoor.data")).to.equal(undefined, "no auth data without verifier");
     expect(verifyStub.callCount).to.equal(0, "verifier should not be called without authUrl");
+  });
+
+  // ─── services claim: service check ──────────────────────────────────────
+
+  async function startSession(): Promise<{ session: FaucetSession | null, error: FaucetError | null }> {
+    try {
+      let session = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+        authToken: tokenFor("alice@example.com"),
+      });
+      return { session: session, error: null };
+    } catch(ex) {
+      return { session: null, error: ex };
+    }
+  }
+
+  it("expectedService: token allowing the service is accepted", async () => {
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).expectedService = "faucet";
+    await ServiceManager.GetService(ModuleManager).initialize();
+    for(let services of ["+faucet", "-all,+faucet", "+all", "+spamoor,+buildoor", "-all,+faucet:drop_100eth", " -ALL , +Faucet "]) {
+      tokenServices = services;
+      let res = await startSession();
+      expect(res.error).to.equal(null, "token with services " + JSON.stringify(services) + " rejected");
+      expect(res.session.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");
+      expect(res.session.getSessionData<any>("authenticatoor.data").userId).to.equal("alice@example.com", "no auth data stored");
+    }
+  });
+
+  it("expectedService: token not allowing the service is ignored when login is optional", async () => {
+    let config = faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig;
+    config.expectedService = "faucet";
+    config.requireLogin = false;
+    config.grants.push({ duration: 3600, limitAmount: 0, limitCount: 0, rewardFactor: 2 });
+    await ServiceManager.GetService(ModuleManager).initialize();
+    for(let services of ["-all", "-all,+spamoor", "+all,-faucet", "-faucet", "+faucet:all,-faucet", "-faucet:basic", "-all,+faucet:dr*op"]) {
+      tokenServices = services;
+      let res = await startSession();
+      expect(res.error).to.equal(null, "session with services " + JSON.stringify(services) + " failed");
+      expect(res.session.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");
+      expect(res.session.getSessionData<any>("authenticatoor.data")).to.equal(undefined, "login without the service was kept");
+      expect(res.session.getSessionData<any>("authenticatoor.factor")).to.equal(undefined, "grant applied to a login without the service");
+    }
+  });
+
+  it("expectedService: token not allowing the service is rejected when login is required", async () => {
+    let config = faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig;
+    config.expectedService = "faucet";
+    config.requireLogin = true;
+    await ServiceManager.GetService(ModuleManager).initialize();
+    for(let services of ["-all", "-all,+spamoor", "+all,-faucet"]) {
+      tokenServices = services;
+      let res = await startSession();
+      expect(res.error).to.not.equal(null, "token with services " + JSON.stringify(services) + " accepted");
+      expect(res.error.getCode()).to.equal("AUTHENTICATOOR_SERVICE", "unexpected error code");
+      expect(res.error.message).to.match(/not permitted to use this faucet/, "unexpected error message");
+    }
+  });
+
+  it("expectedService: token without services claim passes", async () => {
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).expectedService = "faucet";
+    await ServiceManager.GetService(ModuleManager).initialize();
+    for(let services of [undefined, ""]) {
+      tokenServices = services;
+      let res = await startSession();
+      expect(res.error).to.equal(null, "token without services claim rejected");
+      expect(res.session.getSessionData<any>("authenticatoor.data").userId).to.equal("alice@example.com", "no auth data stored");
+    }
+  });
+
+  it("expectedService null: services claim is not checked", async () => {
+    await ServiceManager.GetService(ModuleManager).initialize();
+    for(let services of ["-all", "-faucet", "-all,+spamoor"]) {
+      tokenServices = services;
+      let res = await startSession();
+      expect(res.error).to.equal(null, "token with services " + JSON.stringify(services) + " rejected without expectedService");
+      expect(res.session.getSessionStatus()).to.equal(FaucetSessionStatus.CLAIMABLE, "unexpected session status");
+    }
+  });
+
+  it("Token with a non-string services claim is rejected as invalid", async () => {
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).expectedService = "faucet";
+    await ServiceManager.GetService(ModuleManager).initialize();
+    tokenServices = ["+faucet"] as any;
+    let res = await startSession();
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_TOKEN", "unexpected error code");
+  });
+
+  // ─── services claim: feature grants ─────────────────────────────────────
+
+  const DROP_100ETH = 100000000000000000000;
+
+  // The example of faucet-config.example.yaml: a baseline grant for every
+  // login, and one 100 ETH drop per day for logins holding "drop_100eth".
+  function addFeatureGrants(required?: boolean) {
+    let config = faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig;
+    config.expectedService = "faucet";
+    config.grants.push({
+      duration: 86400,
+      limitAmount: 0,
+      limitCount: 0,
+      skipModules: ["baseline-skip"],
+    }, {
+      feature: "drop_100eth",
+      duration: 86400,
+      limitAmount: 0,
+      limitCount: 1,
+      skipModules: ["pow", "recurring-limits", "faucet-outflow"],
+      overrideMaxDrop: DROP_100ETH,
+      required: required,
+    });
+  }
+
+  function expectFeatureGrant(session: FaucetSession, applied: boolean, info: string) {
+    let skipped = session.getSessionData<string[]>("skip.modules", []);
+    if(applied) {
+      expect(session.getSessionData("overrideMaxDropAmount")).to.equal("100000000000000000000", "feature grant not applied: " + info);
+      expect(session.getDropAmount()).to.equal(100000000000000000000n, "drop amount mismatch: " + info);
+      expect(skipped).to.deep.equal(["pow", "recurring-limits", "faucet-outflow"], "skip.modules mismatch: " + info);
+    } else {
+      expect(session.getSessionData("overrideMaxDropAmount")).to.equal(undefined, "feature grant applied: " + info);
+      expect(session.getDropAmount()).to.equal(BigInt(faucetConfig.maxDropAmount), "drop amount mismatch: " + info);
+      expect(skipped).to.deep.equal(["baseline-skip"], "baseline grant not applied: " + info);
+    }
+  }
+
+  const featureHeld: [string, string | undefined][] = [
+    ["explicit feature", "-all,+faucet,+faucet:drop_100eth"],
+    ["explicit feature without the bare directive", "-all,+faucet:drop_100eth"],
+    ["+faucet:all", "+faucet:all"],
+    ["+all:all", "+all:all"],
+    ["wildcard +faucet:drop*", "+faucet:drop*"],
+  ];
+  featureHeld.forEach(([name, services]) => {
+    it("Feature grant applied: " + name, async () => {
+      addFeatureGrants();
+      await ServiceManager.GetService(ModuleManager).initialize();
+      tokenServices = services;
+      let res = await startSession();
+      expect(res.error).to.equal(null, "session rejected");
+      expectFeatureGrant(res.session, true, name);
+    });
+  });
+
+  // A token without a services claim has basic access to every service and
+  // nothing more: it gets the baseline grant, not the feature grant.
+  const featureNotHeld: [string, string | undefined][] = [
+    ["absent claim", undefined],
+    ["empty claim", ""],
+    ["+all", "+all"],
+    ["bare +faucet", "+faucet"],
+    ["-all,+faucet", "-all,+faucet"],
+    ["+faucet:all:-drop_100eth", "+faucet:all:-drop_100eth"],
+    ["another feature", "+faucet:drop_1eth"],
+    ["feature of another service", "+faucet,+spamoor:drop_100eth"],
+    ["wildcard that does not match", "+faucet:drip*"],
+    ["feature excluded later", "+faucet:drop_100eth,-faucet:drop*"],
+    ["claim that names other services only", "+spamoor:all"],
+  ];
+  featureNotHeld.forEach(([name, services]) => {
+    it("Feature grant not applied: " + name, async () => {
+      addFeatureGrants();
+      await ServiceManager.GetService(ModuleManager).initialize();
+      tokenServices = services;
+      let res = await startSession();
+      expect(res.error).to.equal(null, "session rejected");
+      expectFeatureGrant(res.session, false, name);
+    });
+  });
+
+  it("Feature grant: limit applies to the feature holder, then falls back to the baseline", async () => {
+    addFeatureGrants();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    tokenServices = "-all,+faucet,+faucet:drop_100eth";
+    let res1 = await startSession();
+    expectFeatureGrant(res1.session, true, "first session");
+    let res2 = await startSession();
+    expect(res2.error).to.equal(null, "second session rejected");
+    expectFeatureGrant(res2.session, false, "second session");
+  });
+
+  it("Feature grant with required: true does not block a login without the feature", async () => {
+    addFeatureGrants(true);
+    await ServiceManager.GetService(ModuleManager).initialize();
+    tokenServices = "-all,+faucet";
+    // Two sessions: the second would exceed the grant's limitCount if the grant were this login's.
+    for(let i = 0; i < 2; i++) {
+      let res = await startSession();
+      expect(res.error).to.equal(null, "session " + i + " blocked by a required feature grant that is not held");
+      expectFeatureGrant(res.session, false, "session " + i);
+    }
+    // ...while it does block the login that holds it.
+    tokenServices = "-all,+faucet:drop_100eth";
+    let res = await startSession();
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_LIMIT", "required feature grant should limit its holder");
+  });
+
+  // Counts the warnings about feature grants without expectedService.
+  function spyFeatureWarnings(): () => number {
+    let logSpy = globalStubs["FaucetProcess.emitLog"] = sinon.spy(ServiceManager.GetService(FaucetProcess), "emitLog");
+    return () => logSpy.getCalls().filter((call) => {
+      return call.args[0] === FaucetLogLevel.WARNING && /drop_100eth.*expectedService/.test(call.args[1]);
+    }).length;
+  }
+
+  it("Feature grant with expectedService null never applies and logs one warning", async () => {
+    addFeatureGrants();
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).expectedService = null;
+    let featureWarnings = spyFeatureWarnings();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    expect(featureWarnings()).to.equal(1, "expected one warning at start");
+    for(let services of [undefined, "", "+faucet:drop_100eth", "+all:all"]) {
+      tokenServices = services;
+      let res = await startSession();
+      expect(res.error).to.equal(null, "session rejected");
+      expectFeatureGrant(res.session, false, "services " + JSON.stringify(services));
+    }
+    expect(featureWarnings()).to.equal(1, "no warning per session expected");
+    let mod = ServiceManager.GetService(ModuleManager).getModule<any>("authenticatoor");
+    mod.onConfigReload();
+    expect(featureWarnings()).to.equal(2, "expected one warning per config reload");
+  });
+
+  it("No feature warning when expectedService is set or no grant has a feature", async () => {
+    addFeatureGrants();
+    let featureWarnings = spyFeatureWarnings();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    expect(featureWarnings()).to.equal(0, "unexpected warning with expectedService set");
+
+    let config = faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig;
+    config.expectedService = null;
+    config.grants.pop();
+    let mod = ServiceManager.GetService(ModuleManager).getModule<any>("authenticatoor");
+    mod.onConfigReload();
+    expect(featureWarnings()).to.equal(0, "unexpected warning without feature grants");
   });
 });

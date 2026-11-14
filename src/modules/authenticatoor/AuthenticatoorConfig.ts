@@ -4,6 +4,7 @@ export interface IAuthenticatoorConfig extends IBaseModuleConfig {
   authUrl: string;
   expectedAudience: string | null;
   expectedHost: string | null;
+  expectedService: string | null;
   requireLogin: boolean;
   concurrencyLimit: number;
   grants: IAuthenticatoorGrantConfig[];
@@ -14,6 +15,7 @@ export interface IAuthenticatoorConfig extends IBaseModuleConfig {
 }
 
 export interface IAuthenticatoorGrantConfig {
+  feature?: string;
   limitCount: number;
   limitAmount: number;
   duration: number;
@@ -29,6 +31,7 @@ export const defaultConfig: IAuthenticatoorConfig = {
   authUrl: "",
   expectedAudience: null,
   expectedHost: null,
+  expectedService: null,
   requireLogin: false,
   concurrencyLimit: 0,
   grants: [],
