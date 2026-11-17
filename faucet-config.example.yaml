@@ -355,9 +355,30 @@ modules:
     concurrencyLimit: 0
 
     # recurring grants applied on session start. Evaluated in order; later
-    # grants override perks of earlier ones. Use grants without limits as
-    # the always-on baseline for logged-in users, and stricter grants as
-    # tier-specific bonuses.
+    # grants override perks of earlier ones (field by field: rewardFactor,
+    # overrideMaxDrop and skipModules each come from the last grant that sets
+    # them; nothing is added up). Use grants without limits as the always-on
+    # baseline for logged-in users, and stricter grants as tier-specific
+    # bonuses.
+    #
+    # Limits (limitCount / limitAmount within `duration` seconds) count every
+    # session of the user, whatever grant it got; a selectable grant's limits
+    # count only the user's sessions that selected it.
+    #
+    # A grant with `selectable: true` never applies on its own: a logged-in
+    # user picks it on the front page for a session (the page lists the
+    # selectable grants the login holds, used up ones disabled). The selected
+    # grant applies after all other grants, so its perks win. When it pays a
+    # fixed drop (overrideMaxDrop) without a rewardFactor of its own, the
+    # reward factor of the other grants does not apply to the drop. A
+    # selection over its limits is always rejected (`required` has no effect).
+    # Selectable grants need an `id`, and take an optional `name` and
+    # `description` for the page.
+    #
+    # `id`: 1-64 characters of A-Z, a-z, 0-9, "_", "." and "-", unique among
+    # the grants. A session is recorded with the id of the grant selected for
+    # it, so keep an id stable: renaming it resets its limits.
+    # A grant with an invalid or duplicate id is skipped (warning).
     #
     # A grant with a `feature` applies only to logins that hold that feature
     # of `expectedService`. Features are handed out by the authenticatoor's
@@ -390,6 +411,17 @@ modules:
       #  duration: 86400 # 1 day
       #  skipModules: ["pow", "recurring-limits", "faucet-outflow"]
       #  overrideMaxDrop: 100000000000000000000 # 100 ETH
+
+      # selectable grant: a 10 ETH drop without mining, once per week. Only
+      # sessions that selected this grant count against its limit.
+      #- id: "weekly_10eth"
+      #  name: "Weekly 10 ETH drop"
+      #  description: "A fixed drop without mining, once per week"
+      #  selectable: true
+      #  limitCount: 1
+      #  duration: 604800 # 1 week
+      #  skipModules: ["pow", "recurring-limits", "faucet-outflow"]
+      #  overrideMaxDrop: 10000000000000000000 # 10 ETH
 
     # frontend customization
     loginLabel: "Login for additional benefits"

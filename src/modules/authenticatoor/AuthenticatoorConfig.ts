@@ -15,6 +15,15 @@ export interface IAuthenticatoorConfig extends IBaseModuleConfig {
 }
 
 export interface IAuthenticatoorGrantConfig {
+  // stable identifier; needed by selectable grants
+  id?: string;
+  // shown to the user in the grant selection
+  name?: string;
+  description?: string;
+  // applies only when the user selects it, never on its own. Its limits
+  // count the user's sessions that selected it; the limits of the other
+  // grants count every session of the user.
+  selectable?: boolean;
   feature?: string;
   limitCount: number;
   limitAmount: number;

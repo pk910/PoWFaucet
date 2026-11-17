@@ -6,6 +6,9 @@ import { IFaucetContext } from '../../../common/FaucetContext';
 
 import './AuthenticatoorLogin.css';
 import { FaucetOverlay } from '../../shared/FaucetOverlay';
+import { IAuthenticatoorGrantInfo } from '../../../types/AuthenticatoorGrants';
+import { toReadableAmount } from '../../../utils/ConvertHelpers';
+import { renderTimespan } from '../../../utils/DateUtils';
 
 interface IAuthenticatoorTokenInfo {
   authenticated: boolean;
@@ -41,6 +44,11 @@ export interface IAuthenticatoorLoginState {
   scriptLoaded: boolean;
   scriptError: string | null;
   loginInfo: IAuthenticatoorTokenInfo | null;
+  grants: IAuthenticatoorGrantInfo[] | null;
+  grantsLoading: boolean;
+  grantsError: string | null;
+  // id of the selected grant, "" for none
+  selectedGrant: string;
 }
 
 const SCRIPT_LOADERS: { [url: string]: Promise<void> } = {};
@@ -71,6 +79,10 @@ export class AuthenticatoorLogin extends React.PureComponent<IAuthenticatoorLogi
       scriptLoaded: false,
       scriptError: null,
       loginInfo: null,
+      grants: null,
+      grantsLoading: false,
+      grantsError: null,
+      selectedGrant: "",
     };
   }
 
@@ -91,6 +103,8 @@ export class AuthenticatoorLogin extends React.PureComponent<IAuthenticatoorLogi
       }
       client.checkLogin().then((info) => {
         this.setState({ loginInfo: info });
+        if(info?.authenticated)
+          this.loadGrants();
       });
     }).catch((err) => {
       this.setState({
@@ -157,8 +171,113 @@ export class AuthenticatoorLogin extends React.PureComponent<IAuthenticatoorLogi
             Logout
           </a>
         </div>
+        {modCfg.grantSelection ? this.renderGrants() : null}
       </div>
     );
+  }
+
+  private loadGrants() {
+    if(!this.props.faucetConfig.modules.authenticatoor?.grantSelection)
+      return;
+    let token = this.getToken();
+    if(!token)
+      return;
+    this.setState({ grantsLoading: true, grantsError: null });
+    this.props.faucetContext.faucetApi.getAuthenticatoorGrants(token).then((rsp) => {
+      if(rsp.errorCode) {
+        this.setState({ grantsLoading: false, grants: null, grantsError: rsp.errorMessage || rsp.errorCode });
+        return;
+      }
+      let grants = rsp.grants || [];
+      let selected = grants.find((grant) => grant.id === this.state.selectedGrant && grant.available);
+      this.setState({
+        grantsLoading: false,
+        grants: grants,
+        selectedGrant: selected ? selected.id : "",
+      });
+    }, (err) => {
+      this.setState({ grantsLoading: false, grants: null, grantsError: err?.message || String(err) });
+    });
+  }
+
+  private renderGrants(): React.ReactElement {
+    if(this.state.grantsError) {
+      return (
+        <div className='auth-grants'>
+          <div className='auth-grants-error'>Could not load your grants: {this.state.grantsError}</div>
+        </div>
+      );
+    }
+    if(!this.state.grants) {
+      return this.state.grantsLoading ? (
+        <div className='auth-grants'>
+          <div className='auth-grant-details'>Loading your grants…</div>
+        </div>
+      ) : null;
+    }
+    if(this.state.grants.length === 0)
+      return null;
+    return (
+      <div className='auth-grants' role="radiogroup" aria-label="Grant for this session">
+        {this.renderGrantOption("", "Standard", null, ["Default benefits of your login"], true)}
+        {this.state.grants.map((grant) => this.renderGrantOption(
+          grant.id,
+          grant.name,
+          grant.description,
+          this.getGrantDetails(grant),
+          grant.available,
+        ))}
+      </div>
+    );
+  }
+
+  private renderGrantOption(id: string, name: string, description: string | null, details: string[], available: boolean): React.ReactElement {
+    let inputId = "authenticatoor-grant-" + (id || "none");
+    return (
+      <div key={inputId} className={'auth-grant' + (available ? '' : ' auth-grant-unavailable')}>
+        <input
+          className='form-check-input'
+          type='radio'
+          name='authenticatoor-grant'
+          id={inputId}
+          value={id}
+          checked={this.state.selectedGrant === id}
+          disabled={!available}
+          onChange={() => this.setState({ selectedGrant: id })}
+        />
+        <label className='auth-grant-label' htmlFor={inputId}>
+          <span className='auth-grant-name'>{name}</span>
+          {description ? <span className='auth-grant-description'>{description}</span> : null}
+          {details.length > 0 ? <span className='auth-grant-details'>{details.join(" · ")}</span> : null}
+        </label>
+      </div>
+    );
+  }
+
+  private getGrantDetails(grant: IAuthenticatoorGrantInfo): string[] {
+    let config = this.props.faucetConfig;
+    let readable = (amount: string) => toReadableAmount(BigInt(amount), config.faucetCoinDecimals, config.faucetCoinSymbol);
+    let details: string[] = [];
+    if(grant.dropAmount)
+      details.push(readable(grant.dropAmount) + " drop");
+    if(grant.rewardFactor !== null)
+      details.push(grant.rewardFactor + "x reward");
+    if(grant.noMining)
+      details.push("no mining");
+    let period = renderTimespan(grant.duration);
+    if(grant.limitCount > 0)
+      details.push(grant.usedCount + "/" + grant.limitCount + " used per " + period);
+    if(BigInt(grant.limitAmount) > 0n)
+      details.push(readable(grant.usedAmount) + " of " + readable(grant.limitAmount) + " used per " + period);
+    if(!grant.available) {
+      if(grant.nextAvailable) {
+        let wait = Math.max(grant.nextAvailable - this.props.faucetContext.faucetApi.getFaucetTime().getSyncedTime(), 60);
+        details.push("available again in " + renderTimespan(wait));
+      } else {
+        details.push("used up");
+      }
+    }
+    return details;
   }
 
   private renderInfoIcon(): React.ReactElement {
@@ -193,6 +312,14 @@ export class AuthenticatoorLogin extends React.PureComponent<IAuthenticatoorLogi
     return client ? client.getToken() : null;
   }
 
+  // The grant selected for the next session, null for none.
+  public getGrant(): string | null {
+    if(!this.state.loginInfo?.authenticated || !this.state.selectedGrant)
+      return null;
+    let grant = this.state.grants?.find((grant) => grant.id === this.state.selectedGrant);
+    return grant && grant.available ? grant.id : null;
+  }
+
   private onLoginClick() {
     let client = window.ethpandaops?.authenticatoor;
     if(!client)
@@ -206,6 +333,9 @@ export class AuthenticatoorLogin extends React.PureComponent<IAuthenticatoorLogi
       client.logout();
     this.setState({
       loginInfo: { authenticated: false, token: "", exp: 0, user: "" },
+      grants: null,
+      grantsError: null,
+      selectedGrant: "",
     });
   }
 

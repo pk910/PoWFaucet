@@ -246,6 +246,7 @@ export class FaucetInput extends React.PureComponent<IFaucetInputProps, IFaucetI
       }
       if(this.props.faucetConfig.modules.authenticatoor) {
         inputData.authToken = this.authenticatoorLogin.current?.getToken() || undefined;
+        inputData.authGrant = this.authenticatoorLogin.current?.getGrant() || undefined;
       }
       if(this.props.faucetConfig.modules.github) {
         inputData.githubToken = await this.githubLogin.current?.getToken();

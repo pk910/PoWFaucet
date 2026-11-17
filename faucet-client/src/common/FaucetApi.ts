@@ -1,5 +1,6 @@
 import { IClientClaimStatusRsp, IClientFaucetStatusRsp } from "../types/FaucetStatus";
 import { IPassportInfo } from "../types/PassportInfo";
+import { IAuthenticatoorGrantsRsp } from "../types/AuthenticatoorGrants";
 import { IFaucetConfig } from "./FaucetConfig";
 import { IFaucetSessionInfo, IFaucetSessionStatus } from "./FaucetSession";
 import { FaucetTime } from "./FaucetTime";
@@ -179,6 +180,11 @@ export class FaucetApi {
   /** `key` is the operator's: with it the session list carries real ids and ips */
   public getFaucetStatus(key?: string): Promise<IClientFaucetStatusRsp> {
     return this.apiGet("/getFaucetStatus", {}, this.operatorHeaders(key));
+  }
+
+  /** the selectable grants of an authenticatoor login, which goes as a bearer token */
+  public getAuthenticatoorGrants(token: string): Promise<IAuthenticatoorGrantsRsp> {
+    return this.apiGet("/authenticatoorGrants", {}, { "Authorization": "Bearer " + token });
   }
 
   public getPassportInfo(sessionId: string, address: string): Promise<IPassportInfo> {

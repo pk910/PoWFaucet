@@ -711,4 +711,255 @@ describe("Faucet module: authenticatoor (module)", () => {
     mod.onConfigReload();
     expect(featureWarnings()).to.equal(0, "unexpected warning without feature grants");
   });
+  // ─── grant selection and limit scope ────────────────────────────────────
+
+  const ETH = 1000000000000000000;
+
+  async function startWith(input: any): Promise<{ session: FaucetSession | null, error: FaucetError | null }> {
+    try {
+      let session = await ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", Object.assign({
+        addr: "0x0000000000000000000000000000000000001337",
+        authToken: tokenFor("alice@example.com"),
+      }, input));
+      return { session: session, error: null };
+    } catch(ex) {
+      return { session: null, error: ex };
+    }
+  }
+
+  async function requestGrants(token?: string): Promise<any> {
+    return await ServiceManager.GetService(FaucetWebApi).onApiRequest({
+      method: "GET",
+      url: "/api/authenticatoorGrants",
+      headers: token ? { authorization: "Bearer " + token } : {},
+    } as any);
+  }
+
+  // A baseline grant (factor 2), and a selectable 5 ETH drop once per hour.
+  function addSelectableGrants(): void {
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).grants.push({
+      id: "baseline",
+      limitCount: 0,
+      limitAmount: 0,
+      duration: 3600,
+      rewardFactor: 2,
+    }, {
+      id: "drop5",
+      name: "5 ETH drop",
+      description: "once per hour",
+      selectable: true,
+      limitCount: 1,
+      limitAmount: 0,
+      duration: 3600,
+      skipModules: ["pow"],
+      overrideMaxDrop: 5 * ETH,
+    });
+  }
+
+  it("Selectable grant: not applied without selection", async () => {
+    addSelectableGrants();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let res = await startWith({});
+    expect(res.error).to.equal(null, "session rejected");
+    expect(res.session.getSessionData("authenticatoor.factor")).to.equal(2, "baseline factor missing");
+    expect(res.session.getSessionData("overrideMaxDropAmount")).to.equal(undefined, "selectable grant applied without selection");
+    expect(res.session.getSessionData("authenticatoor.grant")).to.equal(undefined, "grant recorded without selection");
+  });
+
+  it("Selectable grant: selected fixed drop is exact, the baseline factor does not apply", async () => {
+    addSelectableGrants();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let res = await startWith({ authGrant: "drop5" });
+    expect(res.error).to.equal(null, "session rejected");
+    expect(res.session.getSessionData("authenticatoor.factor")).to.equal(undefined, "baseline factor kept for a fixed drop");
+    expect(res.session.getDropAmount()).to.equal(BigInt(5 * ETH), "fixed drop mismatch");
+    expect(res.session.getSessionData<string[]>("skip.modules", [])).to.include("pow", "selected skipModules missing");
+    expect(res.session.getSessionData("authenticatoor.grant")).to.equal("drop5", "selected grant not recorded");
+  });
+
+  it("Selectable grant: its own rewardFactor overrides the baseline", async () => {
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).grants.push({
+      limitCount: 0, limitAmount: 0, duration: 3600, rewardFactor: 2,
+    }, {
+      id: "boost", selectable: true, limitCount: 0, limitAmount: 0, duration: 3600, rewardFactor: 3,
+    });
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let res = await startWith({ authGrant: "boost" });
+    expect(res.error).to.equal(null, "session rejected");
+    expect(res.session.getSessionData("authenticatoor.factor")).to.equal(3, "selected factor not applied");
+  });
+
+  it("Selectable grant: unknown, unheld or unauthenticated selection is rejected", async () => {
+    addSelectableGrants();
+    let config = faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig;
+    config.expectedService = "faucet";
+    config.grants.push({
+      id: "vip", feature: "vip", selectable: true, limitCount: 0, limitAmount: 0, duration: 3600, rewardFactor: 10,
+    });
+    await ServiceManager.GetService(ModuleManager).initialize();
+
+    let res = await startWith({ authGrant: "nope" });
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_GRANT", "unknown grant accepted");
+    res = await startWith({ authGrant: "baseline" });
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_GRANT", "non-selectable grant accepted as selection");
+    tokenServices = "+faucet";
+    res = await startWith({ authGrant: "vip" });
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_GRANT", "unheld feature grant accepted");
+    tokenServices = "+faucet:vip";
+    res = await startWith({ authGrant: "vip" });
+    expect(res.error).to.equal(null, "held feature grant rejected");
+    expect(res.session.getSessionData("authenticatoor.factor")).to.equal(10, "feature grant not applied");
+    res = await startWith({ authToken: undefined, authGrant: "drop5" });
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_GRANT", "selection without login accepted");
+    res = await startWith({ authGrant: 42 });
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_GRANT", "non-string selection accepted");
+  });
+
+  it("Selectable grant: used up selection is rejected, other sessions go on", async () => {
+    addSelectableGrants();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let res = await startWith({ authGrant: "drop5" });
+    expect(res.error).to.equal(null, "first selection rejected");
+    res = await startWith({ authGrant: "drop5" });
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_LIMIT", "used up selection accepted");
+    res = await startWith({});
+    expect(res.error).to.equal(null, "session without selection rejected");
+  });
+
+  it("Selectable grant: other sessions of the user do not count", async () => {
+    addSelectableGrants();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let res = await startWith({});
+    expect(res.error).to.equal(null, "baseline session rejected");
+    res = await startWith({ authGrant: "drop5" });
+    expect(res.error).to.equal(null, "selection counted a baseline session");
+  });
+
+  it("Normal grant: sessions with a selected grant count too", async () => {
+    addSelectableGrants();
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).grants.push({
+      limitCount: 1, limitAmount: 0, duration: 3600, rewardFactor: 4,
+    });
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let res = await startWith({ authGrant: "drop5" });
+    expect(res.error).to.equal(null, "selection rejected");
+    res = await startWith({});
+    expect(res.error).to.equal(null, "session rejected");
+    expect(res.session.getSessionData("authenticatoor.factor")).to.equal(2, "normal grant ignored the selected grant's session");
+  });
+
+  it("Selectable grant: a running session holds its grant", async () => {
+    addSelectableGrants();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    // a blocking task keeps the session running
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 50, "test block", async (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "block", 600);
+    });
+    let res = await startWith({ authGrant: "drop5" });
+    expect(res.session?.getSessionStatus()).to.equal(FaucetSessionStatus.RUNNING, "session should be running");
+    res = await startWith({ authGrant: "drop5" });
+    expect(res.error?.getCode()).to.equal("AUTHENTICATOOR_LIMIT", "running session did not hold the grant");
+  });
+
+  it("A failed session releases its grant", async () => {
+    addSelectableGrants();
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).grants.push({
+      id: "always-fails", limitCount: 0, limitAmount: 0, duration: 3600,
+    });
+    await ServiceManager.GetService(ModuleManager).initialize();
+    // a later start hook fails the session after the grant was taken
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 50, "test fail", async (session: FaucetSession, userInput: any) => {
+      if(userInput.failMe)
+        throw new FaucetError("TEST_FAIL", "test failure");
+    });
+    let res = await startWith({ authGrant: "drop5", failMe: true });
+    expect(res.error?.getCode()).to.equal("TEST_FAIL", "session should fail");
+    res = await startWith({ authGrant: "drop5" });
+    expect(res.error).to.equal(null, "grant of the failed session still held");
+  });
+
+  it("Grant config: invalid grants are skipped with a warning", async () => {
+    let logSpy = globalStubs["FaucetProcess.emitLog"] = sinon.spy(ServiceManager.GetService(FaucetProcess), "emitLog");
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).grants.push(
+      { selectable: true, limitCount: 0, limitAmount: 0, duration: 3600, rewardFactor: 5 },
+      { id: "dup", limitCount: 0, limitAmount: 0, duration: 3600, rewardFactor: 1.5 },
+      { id: "dup", limitCount: 0, limitAmount: 0, duration: 3600, rewardFactor: 7 },
+      { id: "bad id!", limitCount: 0, limitAmount: 0, duration: 3600, rewardFactor: 8 },
+    );
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let warnings = logSpy.getCalls().filter((call) => call.args[0] === FaucetLogLevel.WARNING && /is skipped/.test(call.args[1]));
+    expect(warnings.length).to.equal(3, "expected one warning per invalid grant");
+    let res = await startWith({});
+    expect(res.session?.getSessionData("authenticatoor.factor")).to.equal(1.5, "only the first 'dup' grant should apply");
+    let clientConfig = ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig();
+    expect(clientConfig.modules['authenticatoor'].grantSelection).to.equal(false, "invalid selectable grant enabled the selection");
+  });
+
+  it("Grant list endpoint: lists the login's selectable grants with their usage", async () => {
+    addSelectableGrants();
+    let config = faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig;
+    config.expectedService = "faucet";
+    config.grants.push({
+      id: "vip", feature: "vip", selectable: true, limitCount: 0, limitAmount: 0, duration: 3600, rewardFactor: 10,
+    });
+    tokenServices = "+faucet";
+    await ServiceManager.GetService(ModuleManager).initialize();
+    expect(ServiceManager.GetService(FaucetWebApi).onGetFaucetConfig().modules['authenticatoor'].grantSelection).to.equal(true, "grantSelection not exported");
+
+    let rsp = await requestGrants(tokenFor("alice@example.com"));
+    expect(rsp.grants.map((g: any) => g.id)).to.deep.equal(["drop5"], "unexpected grant list");
+    let drop = rsp.grants[0];
+    expect(drop.name).to.equal("5 ETH drop");
+    expect(drop.description).to.equal("once per hour");
+    expect(drop.dropAmount).to.equal(BigInt(5 * ETH).toString());
+    expect(drop.noMining).to.equal(true);
+    expect(drop.available).to.equal(true);
+    expect(drop.usedCount).to.equal(0);
+    expect(drop.nextAvailable).to.equal(null);
+
+    let res = await startWith({ authGrant: "drop5" });
+    expect(res.error).to.equal(null, "selection rejected");
+    rsp = await requestGrants(tokenFor("alice@example.com"));
+    drop = rsp.grants[0];
+    expect(drop.available).to.equal(false, "used up grant listed as available");
+    expect(drop.usedCount).to.equal(1);
+    expect(drop.usedAmount).to.equal(BigInt(5 * ETH).toString());
+    expect(drop.nextAvailable).to.equal(res.session.getStartTime() + 3600, "nextAvailable mismatch");
+
+    tokenServices = "+faucet:vip";
+    rsp = await requestGrants(tokenFor("alice@example.com"));
+    expect(rsp.grants.map((g: any) => g.id)).to.deep.equal(["drop5", "vip"], "feature grant not listed for its holder");
+    rsp = await requestGrants(tokenFor("bob@example.com"));
+    expect(rsp.grants[0].available).to.equal(true, "alice's usage counted for bob");
+  });
+
+  it("Grant list endpoint: rejects missing, invalid and unpermitted logins", async () => {
+    addSelectableGrants();
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).expectedService = "faucet";
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let rsp = await requestGrants();
+    expect(rsp.errorCode).to.equal("AUTHENTICATOOR_TOKEN", "missing token accepted");
+    rsp = await requestGrants("garbage");
+    expect(rsp.errorCode).to.equal("AUTHENTICATOOR_TOKEN", "invalid token accepted");
+    tokenServices = "-faucet";
+    rsp = await requestGrants(tokenFor("alice@example.com"));
+    expect(rsp.errorCode).to.equal("AUTHENTICATOOR_SERVICE", "unpermitted login accepted");
+  });
+
+  it("Database: the selected grant id is stored with the session, NULL without selection", async () => {
+    addSelectableGrants();
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let mod = ServiceManager.GetService(ModuleManager).getModule<any>("authenticatoor");
+    let db: AuthenticatoorDB = mod.authDb;
+    let grantIdOf = async (session: FaucetSession) => (await (db as any).db.all("SELECT GrantId FROM AuthenticatoorSessions WHERE SessionId = ?", [ session.getSessionId() ]))[0].GrantId;
+
+    let selected = await startWith({ authGrant: "drop5" });
+    expect(await grantIdOf(selected.session)).to.equal("drop5", "selected grant id not stored");
+    let plain = await startWith({});
+    expect(await grantIdOf(plain.session)).to.equal(null, "grant id stored without selection");
+
+    expect((await db.getUserGrantSessions("alice@example.com", "drop5", 3600, true)).length).to.equal(1, "drop5 session missing");
+    expect((await db.getUserGrantSessions("alice@example.com", "baseline", 3600, true)).length).to.equal(0, "non-selectable grant recorded");
+    expect((await db.getUserSessions("alice@example.com", 3600, true)).length).to.equal(2, "user scope should count both sessions");
+  });
 });
