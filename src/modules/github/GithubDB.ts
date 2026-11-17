@@ -88,18 +88,15 @@ export class GithubDB extends FaucetModuleDB {
   }
 
   public async setGithubInfo(userId: number, info: IGithubInfo, duration?: number): Promise<void> {
-    let now = this.now();
-    let row = await this.db.get("SELECT Timeout FROM GithubCache WHERE UserId = ?", [userId.toString()]);
-    
-    let timeout = now + (typeof duration === "number" ? duration : 86400);
-    let infoJson = JSON.stringify(info);
-
-    if(row) {
-      await this.db.run("UPDATE GithubCache SET Json = ?, Timeout = ? WHERE UserId = ?", [infoJson, timeout, userId.toString()]);
-    }
-    else {
-      await this.db.run("INSERT INTO GithubCache (UserId, Json, Timeout) VALUES (?, ?, ?)", [userId.toString(), infoJson, timeout]);
-    }
+    let timeout = this.now() + (typeof duration === "number" ? duration : 86400);
+    // one statement: starts of the same user write the entry at the same time
+    await this.db.run(
+      SQL.driverSql({
+        [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO GithubCache (UserId, Json, Timeout) VALUES (?, ?, ?)",
+        [FaucetDbDriver.MYSQL]: "REPLACE INTO GithubCache (UserId, Json, Timeout) VALUES (?, ?, ?)",
+      }),
+      [userId.toString(), JSON.stringify(info), timeout]
+    );
   }
 
   public getGithubSessions(userId: number, duration: number, skipData?: boolean): Promise<FaucetSessionStoreData[]> {
