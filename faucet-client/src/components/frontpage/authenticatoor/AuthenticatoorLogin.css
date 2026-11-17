@@ -23,3 +23,51 @@
 #authenticatoor-tooltip .authenticatoor-info {
   text-align: left;
 }
+
+.faucet-page .faucet-authenticatoor-auth .auth-grants {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--pf-border);
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-grant {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-grant .form-check-input {
+  flex: 0 0 auto;
+  margin: 3px 0 0;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-grant-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-grant-name {
+  color: var(--pf-ink);
+  font-weight: 600;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-grant-description,
+.faucet-page .faucet-authenticatoor-auth .auth-grant-details {
+  color: var(--pf-ink-3);
+  font-size: 13px;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-grant-unavailable .auth-grant-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.faucet-page .faucet-authenticatoor-auth .auth-grants-error {
+  color: var(--pf-crit);
+}

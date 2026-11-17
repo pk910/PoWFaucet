@@ -62,6 +62,7 @@ export interface IAuthenticatoorModuleConfig {
   userLabel: string | null;
   infoHtml: string | null;
   loginLogo: string | null;
+  grantSelection?: boolean;
 }
 
 export interface ICaptchaModuleConfig {

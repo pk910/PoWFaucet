@@ -4,7 +4,7 @@ import { SQL } from '../../db/SQL.js';
 import { FaucetSessionStoreData } from '../../session/FaucetSession.js';
 
 export class AuthenticatoorDB extends FaucetModuleDB {
-  protected override latestSchemaVersion = 1;
+  protected override latestSchemaVersion = 2;
 
   protected override async upgradeSchema(version: number): Promise<number> {
     switch(version) {
@@ -29,6 +29,13 @@ export class AuthenticatoorDB extends FaucetModuleDB {
         await this.db.exec(SQL.driverSql({
           [FaucetDbDriver.SQLITE]: `CREATE INDEX "AuthenticatoorSessionsUserIdx" ON "AuthenticatoorSessions" ("UserId" ASC);`,
           [FaucetDbDriver.MYSQL]: `ALTER TABLE AuthenticatoorSessions ADD INDEX AuthenticatoorSessionsUserIdx (UserId);`,
+        }));
+      case 1:
+        version = 2;
+        // the id of the grant selected for a session, NULL without a selection
+        await this.db.exec(SQL.driverSql({
+          [FaucetDbDriver.SQLITE]: `ALTER TABLE "AuthenticatoorSessions" ADD COLUMN "GrantId" TEXT NULL DEFAULT NULL;`,
+          [FaucetDbDriver.MYSQL]: `ALTER TABLE AuthenticatoorSessions ADD COLUMN GrantId VARCHAR(64) NULL DEFAULT NULL;`,
         }));
     }
     return version;
@@ -64,13 +71,23 @@ export class AuthenticatoorDB extends FaucetModuleDB {
     ].join(" "), [ userId, now - duration ], skipData);
   }
 
-  public async setUserSession(sessionId: string, userId: string, issuer: string): Promise<void> {
+  // The user's sessions that selected the grant and are running, claimable or completed.
+  public getUserGrantSessions(userId: string, grantId: string, duration: number, skipData?: boolean): Promise<FaucetSessionStoreData[]> {
+    let now = this.now();
+    return this.faucetStore.selectSessionsSql([
+      "FROM AuthenticatoorSessions",
+      "INNER JOIN Sessions ON Sessions.SessionId = AuthenticatoorSessions.SessionId",
+      "WHERE AuthenticatoorSessions.UserId = ? AND AuthenticatoorSessions.GrantId = ? AND Sessions.StartTime > ? AND Sessions.Status IN ('running','claimable','claiming','finished')",
+    ].join(" "), [ userId, grantId, now - duration ], skipData);
+  }
+
+  public async setUserSession(sessionId: string, userId: string, issuer: string, grantId?: string | null): Promise<void> {
     await this.db.run(
       SQL.driverSql({
-        [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO AuthenticatoorSessions (SessionId,UserId,Issuer) VALUES (?,?,?)",
-        [FaucetDbDriver.MYSQL]: "REPLACE INTO AuthenticatoorSessions (SessionId,UserId,Issuer) VALUES (?,?,?)",
+        [FaucetDbDriver.SQLITE]: "INSERT OR REPLACE INTO AuthenticatoorSessions (SessionId,UserId,Issuer,GrantId) VALUES (?,?,?,?)",
+        [FaucetDbDriver.MYSQL]: "REPLACE INTO AuthenticatoorSessions (SessionId,UserId,Issuer,GrantId) VALUES (?,?,?,?)",
       }),
-      [ sessionId, userId, issuer ]
+      [ sessionId, userId, issuer, grantId || null ]
     );
   }
 
