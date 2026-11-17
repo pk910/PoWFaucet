@@ -623,4 +623,27 @@ describe("Faucet module: zupass", () => {
     expect(callbackRsp.body).to.matches(/attendeeId/, "attendeeId not in response page");
   });
 
+
+  it("Check zupass grants: count limit holds for parallel starts", async () => {
+    await ServiceManager.GetService(ModuleManager).initialize();
+    (faucetConfig.modules["zupass"] as IZupassConfig).grants.push({
+      duration: 3600,
+      limitAmount: 0,
+      limitCount: 1,
+      required: false,
+      skipModules: ["test"],
+    });
+    let token = generateTestToken("102c8990-9efc-11ee-85f8-de4e23c7523a", "6768a2e0-986f-11ee-abf3-126a2f5f3c5c", "a1c822c4-60bd-11ee-8732-763dbf30819c", "1");
+    let results = await Promise.allSettled(Array.from({length: 5}, () => ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      zupassToken: token,
+    })));
+    // every start applied the grant, the admission lets exactly one of them have it
+    let claimable = results.filter((res) => res.status === "fulfilled" && res.value.getSessionStatus() === "claimable");
+    expect(claimable.length).to.equal(1, "more than one session got the grant");
+    results.filter((res) => res.status === "rejected").forEach((res) => {
+      expect((res as PromiseRejectedResult).reason?.getCode()).to.equal("ZUPASS_LIMIT", "unexpected error code");
+    });
+  });
+
 });

@@ -205,4 +205,29 @@ describe("Faucet module: recurring-limits", () => {
   });
 
 
+
+  it("Limit holds for parallel starts", async () => {
+    faucetConfig.maxDropAmount = 100;
+    faucetConfig.minDropAmount = 10;
+    faucetConfig.modules["recurring-limits"] = {
+      enabled: true,
+      limits: [
+        {
+          duration: 30,
+          limitCount: 1,
+          byAddrOnly: true,
+        }
+      ]
+    } as IRecurringLimitsConfig;
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let results = await Promise.allSettled(Array.from({length: 5}, () => ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    })));
+    let claimable = results.filter((res) => res.status === "fulfilled" && res.value.getSessionStatus() === "claimable");
+    expect(claimable.length).to.equal(1, "more than one session within the limit");
+    results.filter((res) => res.status === "rejected").forEach((res) => {
+      expect((res as PromiseRejectedResult).reason?.getCode()).to.equal("RECURRING_LIMIT", "unexpected error code");
+    });
+  });
+
 });

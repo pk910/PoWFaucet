@@ -146,4 +146,25 @@ describe("Faucet module: concurrency-limit", () => {
     expect(error?.message).to.matches(/test-error-message/, "unexpected error message");
   });
 
+
+  it("Limit holds for parallel starts", async () => {
+    faucetConfig.modules["concurrency-limit"] = {
+      enabled: true,
+      concurrencyLimit: 1,
+      byAddrOnly: true,
+    } as IConcurrencyLimitConfig;
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession, userInput: any) => {
+      session.addBlockingTask("test", "test1", 1);
+    });
+    let results = await Promise.allSettled(Array.from({length: 5}, () => ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    })));
+    let running = results.filter((res) => res.status === "fulfilled" && res.value.getSessionStatus() === "running");
+    expect(running.length).to.equal(1, "more than one running session for one address");
+    results.filter((res) => res.status === "rejected").forEach((res) => {
+      expect((res as PromiseRejectedResult).reason?.getCode()).to.equal("CONCURRENCY_LIMIT", "unexpected error code");
+    });
+  });
+
 });

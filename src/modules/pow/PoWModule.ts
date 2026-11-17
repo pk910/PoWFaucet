@@ -69,7 +69,7 @@ export class PoWModule extends BaseModule<IPoWConfig> {
       async (session: FaucetSession, moduleState: any) => this.processSessionInfo(session, moduleState)
     );
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionStart, 10, "mining session",
+      this, ModuleHookAction.SessionAdmit, 10, "mining session",
       (session: FaucetSession) => this.processSessionStart(session)
     );
     this.moduleManager.addActionHook(

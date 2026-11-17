@@ -54,6 +54,10 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
       (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput)
     );
     this.moduleManager.addActionHook(
+      this, ModuleHookAction.SessionAdmit, 2, "authenticatoor limit check",
+      (session: FaucetSession) => this.processSessionAdmit(session)
+    );
+    this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionComplete, 5, "authenticatoor save session",
       (session: FaucetSession) => this.processSessionComplete(session)
     );
@@ -136,16 +140,19 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
     }
 
     if(authInfo) {
-      this.checkConcurrencyLimit(authInfo, session);
-
+      // decided here, before the hooks the perks skip; the limits of the
+      // applied grants are checked again on admission
       let perks: AuthenticatoorGrantPerks = {};
+      let appliedGrants: IAuthenticatoorGrantConfig[] = [];
       for(let i = 0; i < this.moduleConfig.grants.length; i++) {
         let grant = this.moduleConfig.grants[i];
         if(grant.feature && !(expectedService && featureAllowed(services, expectedService, grant.feature, false)))
           continue; // not this login's grant
-        await this.checkGrant(authInfo, grant, perks);
+        if(await this.checkGrant(authInfo, grant, perks))
+          appliedGrants.push(grant);
       }
 
+      session.setSessionModuleRef("authenticatoor.grants", appliedGrants);
       session.setSessionData("authenticatoor.data", authInfo);
       if(typeof perks.factor === "number")
         session.setSessionData("authenticatoor.factor", perks.factor);
@@ -163,6 +170,20 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
         });
         session.setSessionData("skip.modules", skipModules);
       }
+    }
+  }
+
+  // Runs one session at a time: the sessions admitted before are visible.
+  private async processSessionAdmit(session: FaucetSession): Promise<void> {
+    let authInfo = session.getSessionData<IAuthenticatoorAuthInfo>("authenticatoor.data");
+    if(!authInfo)
+      return;
+    this.checkConcurrencyLimit(authInfo, session);
+    let appliedGrants = session.getSessionModuleRef("authenticatoor.grants") as IAuthenticatoorGrantConfig[] || [];
+    for(let i = 0; i < appliedGrants.length; i++) {
+      let limitMessage = await this.getGrantLimitMessage(authInfo, appliedGrants[i]);
+      if(limitMessage)
+        throw new FaucetError("AUTHENTICATOOR_LIMIT", limitMessage);
     }
   }
 
@@ -221,36 +242,14 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
     }
   }
 
-  private async checkGrant(authInfo: IAuthenticatoorAuthInfo, grant: IAuthenticatoorGrantConfig, perks: AuthenticatoorGrantPerks): Promise<void> {
-    let finishedSessions = await this.authDb.getUserSessions(authInfo.userId, grant.duration, true);
-
-    if(grant.limitCount > 0 && finishedSessions.length >= grant.limitCount) {
+  // Applies the grant's perks when it is within its limits; returns whether it
+  // did. A required grant over its limits fails the session.
+  private async checkGrant(authInfo: IAuthenticatoorAuthInfo, grant: IAuthenticatoorGrantConfig, perks: AuthenticatoorGrantPerks): Promise<boolean> {
+    let limitMessage = await this.getGrantLimitMessage(authInfo, grant);
+    if(limitMessage) {
       if(!grant.required)
-        return;
-      let errMsg = grant.message || [
-        "You have already created ",
-        finishedSessions.length,
-        (finishedSessions.length > 1 ? " sessions" : " session"),
-        " in the last ",
-        renderTimespan(grant.duration),
-      ].join("");
-      throw new FaucetError("AUTHENTICATOOR_LIMIT", errMsg);
-    }
-
-    if(grant.limitAmount > 0) {
-      let totalAmount = 0n;
-      finishedSessions.forEach((sess) => totalAmount += BigInt(sess.dropAmount));
-      if(totalAmount >= BigInt(grant.limitAmount)) {
-        if(!grant.required)
-          return;
-        let errMsg = grant.message || [
-          "You have already requested ",
-          ServiceManager.GetService(EthWalletManager).readableAmount(totalAmount),
-          " in the last ",
-          renderTimespan(grant.duration),
-        ].join("");
-        throw new FaucetError("AUTHENTICATOOR_LIMIT", errMsg);
-      }
+        return false;
+      throw new FaucetError("AUTHENTICATOOR_LIMIT", limitMessage);
     }
 
     if(grant.skipModules)
@@ -259,6 +258,37 @@ export class AuthenticatoorModule extends BaseModule<IAuthenticatoorConfig> {
       perks.factor = grant.rewardFactor;
     if(typeof grant.overrideMaxDrop !== "undefined")
       perks.overrideMaxDrop = grant.overrideMaxDrop;
+    return true;
+  }
+
+  private async getGrantLimitMessage(authInfo: IAuthenticatoorAuthInfo, grant: IAuthenticatoorGrantConfig): Promise<string | null> {
+    if(!(grant.limitCount > 0) && !(grant.limitAmount > 0))
+      return null;
+    let finishedSessions = await this.authDb.getUserSessions(authInfo.userId, grant.duration, true);
+
+    if(grant.limitCount > 0 && finishedSessions.length >= grant.limitCount) {
+      return grant.message || [
+        "You have already created ",
+        finishedSessions.length,
+        (finishedSessions.length > 1 ? " sessions" : " session"),
+        " in the last ",
+        renderTimespan(grant.duration),
+      ].join("");
+    }
+
+    if(grant.limitAmount > 0) {
+      let totalAmount = 0n;
+      finishedSessions.forEach((sess) => totalAmount += BigInt(sess.dropAmount));
+      if(totalAmount >= BigInt(grant.limitAmount)) {
+        return grant.message || [
+          "You have already requested ",
+          ServiceManager.GetService(EthWalletManager).readableAmount(totalAmount),
+          " in the last ",
+          renderTimespan(grant.duration),
+        ].join("");
+      }
+    }
+    return null;
   }
 
 }

@@ -600,4 +600,24 @@ describe("Faucet module: github", () => {
     expect(error?.message).to.matches(/test-message/, "unexpected error message");
   });
 
+
+  it("Check github based recurring restrictions: limit holds for parallel starts", async () => {
+    await ServiceManager.GetService(ModuleManager).initialize();
+    (faucetConfig.modules["github"] as IGithubConfig).restrictions.push({
+      limitCount: 1,
+      limitAmount: 0,
+      duration: 10,
+    });
+    addGithubApiResponses();
+    let results = await Promise.allSettled(Array.from({length: 5}, () => ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      githubToken: generateTestToken("test-github-token", 1337),
+    })));
+    let claimable = results.filter((res) => res.status === "fulfilled" && res.value.getSessionStatus() === "claimable");
+    expect(claimable.length).to.equal(1, "more than one session within the restriction");
+    results.filter((res) => res.status === "rejected").forEach((res) => {
+      expect((res as PromiseRejectedResult).reason?.getCode()).to.equal("GITHUB_LIMIT", "unexpected error code");
+    });
+  });
+
 });

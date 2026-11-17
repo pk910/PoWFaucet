@@ -60,6 +60,10 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
       (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput)
     );
     this.moduleManager.addActionHook(
+      this, ModuleHookAction.SessionAdmit, 2, "Zupass limit check",
+      (session: FaucetSession) => this.processSessionAdmit(session)
+    );
+    this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionComplete, 5, "Zupass save session", 
       (session: FaucetSession) => this.processSessionComplete(session)
     );
@@ -103,13 +107,16 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
     }
 
     if(zupassInfo) {
-      this.checkLimit(zupassInfo, session);
-
+      // decided here, before the hooks the perks skip; the limits of the
+      // applied grants are checked again on admission
       let perks: ZupassGrantPerks = {};
+      let appliedGrants: IZupassGrantConfig[] = [];
       for(let i = 0; i < this.moduleConfig.grants.length; i++) {
-        await this.checkGrant(zupassInfo, this.moduleConfig.grants[i], perks);
+        if(await this.checkGrant(zupassInfo, this.moduleConfig.grants[i], perks))
+          appliedGrants.push(this.moduleConfig.grants[i]);
       }
-      
+
+      session.setSessionModuleRef("zupass.grants", appliedGrants);
       session.setSessionData("zupass.data", zupassInfo);
       if(typeof perks.factor === "number")
         session.setSessionData("zupass.factor", perks.factor);
@@ -125,6 +132,20 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
         });
         session.setSessionData("skip.modules", skipModules);
       }
+    }
+  }
+
+  // Runs one session at a time: the sessions admitted before are visible.
+  private async processSessionAdmit(session: FaucetSession): Promise<void> {
+    let zupassInfo = session.getSessionData<IZupassPDCData>("zupass.data");
+    if(!zupassInfo)
+      return;
+    this.checkLimit(zupassInfo, session);
+    let appliedGrants = session.getSessionModuleRef("zupass.grants") as IZupassGrantConfig[] || [];
+    for(let i = 0; i < appliedGrants.length; i++) {
+      let limitMessage = await this.getGrantLimitMessage(zupassInfo, appliedGrants[i]);
+      if(limitMessage)
+        throw new FaucetError("ZUPASS_LIMIT", limitMessage);
     }
   }
 
@@ -252,44 +273,16 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
     ].join("");
   }
 
-  private async checkGrant(zupassData: IZupassPDCData, grant: IZupassGrantConfig, perks: ZupassGrantPerks): Promise<void> {
-    // per ticket, never per attendee identity: a Zupass account can be recreated at
-    // will and gets the same ticket re-issued under a new semaphore identity
-    let finishedSessions = await this.zupassDb.getZupassSessions(zupassData.ticketId, grant.duration, true);
-
-    if(grant.limitCount > 0 && finishedSessions.length >= grant.limitCount) {
+  // Applies the grant's perks when it is within its limits; returns whether it
+  // did. A required grant over its limits fails the session.
+  private async checkGrant(zupassData: IZupassPDCData, grant: IZupassGrantConfig, perks: ZupassGrantPerks): Promise<boolean> {
+    if(grant.limitAmount > 0 && !grant.required)
+      return false;
+    let limitMessage = await this.getGrantLimitMessage(zupassData, grant);
+    if(limitMessage) {
       if(!grant.required)
-        return;
-      let errMsg = grant.message || [
-        "You have already created ",
-        finishedSessions.length,
-        (finishedSessions.length > 1 ? " sessions" : " session"), 
-        " in the last ",
-        renderTimespan(grant.duration)
-      ].join("");
-      throw new FaucetError(
-        "ZUPASS_LIMIT", 
-        errMsg,
-      );
-    }
-
-    if(grant.limitAmount > 0) {
-      if(!grant.required)
-        return;
-      let totalAmount = 0n;
-      finishedSessions.forEach((session) => totalAmount += BigInt(session.dropAmount));
-      if(totalAmount >= BigInt(grant.limitAmount)) {
-        let errMsg = grant.message || [
-          "You have already requested ",
-          ServiceManager.GetService(EthWalletManager).readableAmount(totalAmount),
-          " in the last ",
-          renderTimespan(grant.duration)
-        ].join("");
-        throw new FaucetError(
-          "ZUPASS_LIMIT", 
-          errMsg,
-        );
-      }
+        return false;
+      throw new FaucetError("ZUPASS_LIMIT", limitMessage);
     }
 
     // apply perks
@@ -302,6 +295,39 @@ export class ZupassModule extends BaseModule<IZupassConfig> {
     if(typeof grant.overrideMaxDrop !== "undefined") {
       perks.overrideMaxDrop = grant.overrideMaxDrop;
     }
+    return true;
+  }
+
+  private async getGrantLimitMessage(zupassData: IZupassPDCData, grant: IZupassGrantConfig): Promise<string | null> {
+    if(!(grant.limitCount > 0) && !(grant.limitAmount > 0))
+      return null;
+    // per ticket, never per attendee identity: a Zupass account can be recreated at
+    // will and gets the same ticket re-issued under a new semaphore identity
+    let finishedSessions = await this.zupassDb.getZupassSessions(zupassData.ticketId, grant.duration, true);
+
+    if(grant.limitCount > 0 && finishedSessions.length >= grant.limitCount) {
+      return grant.message || [
+        "You have already created ",
+        finishedSessions.length,
+        (finishedSessions.length > 1 ? " sessions" : " session"),
+        " in the last ",
+        renderTimespan(grant.duration)
+      ].join("");
+    }
+
+    if(grant.limitAmount > 0) {
+      let totalAmount = 0n;
+      finishedSessions.forEach((session) => totalAmount += BigInt(session.dropAmount));
+      if(totalAmount >= BigInt(grant.limitAmount)) {
+        return grant.message || [
+          "You have already requested ",
+          ServiceManager.GetService(EthWalletManager).readableAmount(totalAmount),
+          " in the last ",
+          renderTimespan(grant.duration)
+        ].join("");
+      }
+    }
+    return null;
   }
 
   private checkLimit(zupassData: IZupassPDCData, session: FaucetSession): void {

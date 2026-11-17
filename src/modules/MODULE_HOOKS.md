@@ -2,13 +2,18 @@
 ClientConfig
     prio 1: authenticatoor, captcha, ensname, github, passport, pow, zupass
 
-SessionStart
+SessionStart (concurrent: resolve the input, external lookups)
     prio 1: captcha, *maintenance_mode_check
-    prio 2: authenticatoor, whitelist, zupass
+    prio 2: authenticatoor, ticket-proof, voucher, whitelist, zupass, *start_module
     prio 3: ensname
     prio 5: *eth_address_check
-    prio 6: passport
-    prio 7: concurrency-limit, ethinfo, ipinfo, mainnet-wallet, recurring-limits
+    prio 6: github, passport
+    prio 7: ethinfo, ipinfo, mainnet-wallet
+
+SessionAdmit (one session at a time: limit checks, then setup; local work only)
+    prio 2: authenticatoor, ticket-proof, zupass
+    prio 6: github
+    prio 7: concurrency-limit, recurring-limits
     prio 10: pow
 
 SessionRestore

@@ -126,6 +126,7 @@ describe("Faucet Services", () => {
     });
 
     it("Check aggregated stats processing", async () => {
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // the start saves the running session's row before it returns
       faucetConfig.faucetLogStatsInterval = 1;
       faucetConfig.faucetStats = {
         logfile: tmpFile("powfaucet-", "-stats.txt"),
@@ -440,6 +441,7 @@ describe("Faucet Services", () => {
     });
 
     it("Check status filter: gt_hashrate", async () => {
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // the start saves the running session's row before it returns
       let statusSvc = ServiceManager.GetService(FaucetStatus);
       statusSvc.initialize();
       let statusEntry1 = statusSvc.setFaucetStatus("test1", "Test status 1", FaucetStatusLevel.ERROR, 10);
@@ -476,6 +478,7 @@ describe("Faucet Services", () => {
     });
 
     it("Check status placeholder: {hashrate} (5 kH/s)", async () => {
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // the start saves the running session's row before it returns
       let statusSvc = ServiceManager.GetService(FaucetStatus);
       statusSvc.initialize();
       statusSvc.setFaucetStatus("test1", "Test hashrate: {hashrate}", FaucetStatusLevel.ERROR, 5);
@@ -504,6 +507,7 @@ describe("Faucet Services", () => {
     });
 
     it("Check dynamic status notifications from ipinfo module", async () => {
+      await ServiceManager.GetService(FaucetDatabase).initialize(); // the start saves the running session's row before it returns
       let statusSvc = ServiceManager.GetService(FaucetStatus);
       statusSvc.initialize();
       

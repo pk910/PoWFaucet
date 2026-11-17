@@ -711,4 +711,42 @@ describe("Faucet module: authenticatoor (module)", () => {
     mod.onConfigReload();
     expect(featureWarnings()).to.equal(0, "unexpected warning without feature grants");
   });
+
+  it("Grant limit holds for parallel starts", async () => {
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).grants.push({
+      duration: 3600,
+      limitAmount: 0,
+      limitCount: 1,
+      overrideMaxDrop: 5000000000000000000,
+    });
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let results = await Promise.allSettled(Array.from({length: 5}, () => ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      authToken: tokenFor("alice@example.com"),
+    })));
+    // every start applied the grant, the admission lets exactly one of them have it
+    let claimable = results.filter((res) => res.status === "fulfilled" && res.value.getSessionStatus() === FaucetSessionStatus.CLAIMABLE);
+    expect(claimable.length).to.equal(1, "more than one session got the grant");
+    results.filter((res) => res.status === "rejected").forEach((res) => {
+      expect((res as PromiseRejectedResult).reason?.getCode()).to.equal("AUTHENTICATOOR_LIMIT", "unexpected error code");
+    });
+  });
+
+  it("Concurrency limit holds for parallel starts", async () => {
+    (faucetConfig.modules["authenticatoor"] as IAuthenticatoorConfig).concurrencyLimit = 1;
+    await ServiceManager.GetService(ModuleManager).initialize();
+    ServiceManager.GetService(ModuleManager).addActionHook(null, ModuleHookAction.SessionStart, 100, "test-task", (session: FaucetSession) => {
+      session.addBlockingTask("test", "test1", 600);
+    });
+    let results = await Promise.allSettled(Array.from({length: 5}, () => ServiceManager.GetService(SessionManager).createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+      authToken: tokenFor("alice@example.com"),
+    })));
+    let running = results.filter((res) => res.status === "fulfilled" && res.value.getSessionStatus() === FaucetSessionStatus.RUNNING);
+    expect(running.length).to.equal(1, "more than one running session for one user");
+    results.filter((res) => res.status === "rejected").forEach((res) => {
+      expect((res as PromiseRejectedResult).reason?.getCode()).to.equal("AUTHENTICATOOR_CONCURRENCY_LIMIT", "unexpected error code");
+    });
+  });
+
 });

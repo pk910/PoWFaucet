@@ -111,23 +111,36 @@ export class FaucetSession {
             this.setTargetAddr(targetAddr);
         }},
       ], ModuleHookAction.SessionStart, [this, userInput]);
+      if(this.status as FaucetSessionStatus === FaucetSessionStatus.FAILED)
+        return;
+      await this.manager.runAdmission(() => this.admitSession(userInput));
     } catch(ex) {
-      if(ex instanceof FaucetError)
-        await this.setSessionFailed(ex.getCode(), ex.message);
-      else
-        await this.setSessionFailed("INTERNAL_ERROR", "sessionStart failed: " + ex.toString());
+      if(this.status as FaucetSessionStatus === FaucetSessionStatus.STARTING) {
+        if(ex instanceof FaucetError)
+          await this.setSessionFailed(ex.getCode(), ex.message);
+        else
+          await this.setSessionFailed("INTERNAL_ERROR", "sessionStart failed: " + ex.toString());
+      }
       throw ex;
     }
+  }
 
+  /**
+   * The second half of the start, run for one session at a time (SessionManager.runAdmission).
+   * Everything a limit check of a later start needs to see is in place when this returns: the
+   * session is listed as running, or completed, and its row is saved.
+   */
+  private async admitSession(userInput: any): Promise<void> {
+    await ServiceManager.GetService(ModuleManager).processActionHooks([], ModuleHookAction.SessionAdmit, [this, userInput]);
     if(this.status as FaucetSessionStatus === FaucetSessionStatus.FAILED)
       return;
-     
+
     this.status = FaucetSessionStatus.RUNNING;
     this.isDirty = true;
     this.manager.notifySessionUpdate(this);
     await this.tryProceedSession();
     if(this.status === FaucetSessionStatus.RUNNING)
-      this.saveSession();
+      await this.saveSession();
   }
 
   /**

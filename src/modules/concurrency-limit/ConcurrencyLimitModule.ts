@@ -11,7 +11,7 @@ export class ConcurrencyLimitModule extends BaseModule<IConcurrencyLimitConfig> 
 
   protected override startModule(): Promise<void> {
     this.moduleManager.addActionHook(
-      this, ModuleHookAction.SessionStart, 7, "Recurring limits check", 
+      this, ModuleHookAction.SessionAdmit, 7, "Concurrency limit check",
       (session: FaucetSession) => this.processSessionStart(session)
     );
     this.moduleManager.addActionHook(

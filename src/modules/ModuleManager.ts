@@ -16,6 +16,10 @@ export enum ModuleHookAction {
   SessionClaim,
   SessionClaimed,
   SessionClose,
+  // The second half of a session start, run for one session at a time (see
+  // SessionManager.runAdmission): limit checks, and the setup only an admitted
+  // session needs. Local work only, no external calls.
+  SessionAdmit,
 }
 
 export interface ModuleHookRegistration {

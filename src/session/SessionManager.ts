@@ -1,3 +1,4 @@
+import { FaucetError } from "../common/FaucetError.js";
 import { FaucetLogLevel, FaucetProcess } from "../common/FaucetProcess.js";
 import { ServiceManager } from "../common/ServiceManager.js";
 import { faucetConfig } from "../config/FaucetConfig.js";
@@ -8,6 +9,10 @@ export class SessionManager {
   private initialized: boolean;
   private faucetSessions: {[sessionId: string]: FaucetSession} = {};
   private cleanupTimer: NodeJS.Timer;
+  // the tail of the admission queue: resolves once the last queued admission is through
+  private admissionQueue: Promise<void> = Promise.resolve();
+  // how long a start waits for its admission turn (ms)
+  public admissionTimeout = 30 * 1000;
 
   public async initialize(): Promise<void> {
     if(this.initialized)
@@ -42,6 +47,45 @@ export class SessionManager {
         if(this.faucetSessions[session.getSessionId()])
           delete this.faucetSessions[session.getSessionId()];
         break;
+    }
+  }
+
+  /**
+   * Runs `admit` for one session at a time, in the order the starts asked.
+   *
+   * A limit check counts the sessions it can see, in memory or in the database, and a session
+   * becomes visible only once its start is through. Two starts checking at the same time would
+   * both miss the other. The admission of a session (its SessionAdmit hooks, the switch to
+   * running and the first save of its row) therefore runs while no other admission does: every
+   * session admitted before is visible to the checks of the next.
+   *
+   * A start that does not get its turn within `admissionTimeout` fails with
+   * SESSION_ADMISSION_TIMEOUT; the queue goes on behind it.
+   */
+  public async runAdmission<T>(admit: () => Promise<T>): Promise<T> {
+    let release: () => void;
+    let turn = new Promise<void>((resolve) => release = resolve);
+    let previous = this.admissionQueue;
+    this.admissionQueue = previous.then(() => turn);
+
+    let timer: NodeJS.Timeout;
+    let timedOut = await Promise.race([
+      previous.then(() => false),
+      new Promise<boolean>((resolve) => timer = setTimeout(() => resolve(true), this.admissionTimeout)),
+    ]);
+    clearTimeout(timer);
+    if(timedOut) {
+      // giving up the turn early lets nobody skip the admission still running: the next one
+      // in the queue waits for that one too
+      release();
+      ServiceManager.GetService(FaucetProcess).emitLog(FaucetLogLevel.WARNING, "Session admission did not get its turn within " + Math.round(this.admissionTimeout / 1000) + "s");
+      throw new FaucetError("SESSION_ADMISSION_TIMEOUT", "The faucet is busy right now, please try again in a moment.");
+    }
+
+    try {
+      return await admit();
+    } finally {
+      release();
     }
   }
 

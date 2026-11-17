@@ -146,6 +146,15 @@ module: the faucet checks that the module is enabled and that `params` is a flat
 strings, stores them under the module's own session-data key, and reads nothing else - the
 module's `SessionStart` hook decides.
 
+A session start runs in two phases. The `SessionStart` hooks of all starts run side by side:
+they resolve the input - tokens, lookups, anything that waits on another service. The
+`SessionAdmit` hooks then run for one session at a time, and the next admission begins only
+once the session before it is listed as running (or completed) and its row is saved. A limit
+check - "how many sessions does this address, user or ticket have" - belongs in
+`SessionAdmit`: there it sees every session admitted before, which a check in `SessionStart`
+does not when two starts arrive together. Admission hooks do local work only (the database,
+memory); a call to another service there holds up every start behind it.
+
 ## Building and testing
 
 `modules/` is git-ignored: a module is its own repository dropped into it, with its own

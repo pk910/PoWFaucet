@@ -40,6 +40,10 @@ export class GithubModule extends BaseModule<IGithubConfig> {
       (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput)
     );
     this.moduleManager.addActionHook(
+      this, ModuleHookAction.SessionAdmit, 6, "Github limit check",
+      (session: FaucetSession) => this.processSessionAdmit(session)
+    );
+    this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionComplete, 5, "Github save session", 
       (session: FaucetSession) => this.processSessionComplete(session)
     );
@@ -132,10 +136,15 @@ export class GithubModule extends BaseModule<IGithubConfig> {
     session.setSessionData("github.user", githubInfo?.user);
     if(rewardFactor !== null)
       session.setSessionData("github.factor", rewardFactor);
+  }
 
-    if(githubInfo) {
-      await Promise.all(this.moduleConfig.restrictions.map((restriction) => this.checkRestriction(githubInfo.uid, restriction)));
-    }
+  private async processSessionAdmit(session: FaucetSession): Promise<void> {
+    if(session.getSessionData<Array<string>>("skip.modules", []).indexOf(this.moduleName) !== -1)
+      return;
+    let githubUserId = session.getSessionData<number>("github.uid");
+    if(!githubUserId)
+      return;
+    await Promise.all(this.moduleConfig.restrictions.map((restriction) => this.checkRestriction(githubUserId, restriction)));
   }
 
   private async processSessionComplete(session: FaucetSession): Promise<void> {

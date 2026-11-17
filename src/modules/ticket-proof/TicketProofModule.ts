@@ -1,7 +1,7 @@
 import { ServiceManager } from "../../common/ServiceManager.js";
 import { faucetConfig } from "../../config/FaucetConfig.js";
 import { EthWalletManager } from "../../eth/EthWalletManager.js";
-import { FaucetSession, FaucetSessionStatus } from "../../session/FaucetSession.js";
+import { FaucetSession } from "../../session/FaucetSession.js";
 import { BaseModule } from "../BaseModule.js";
 import { ModuleHookAction } from "../ModuleManager.js";
 import { defaultConfig, ITicketProofConfig, ITicketProofGrantConfig } from './TicketProofConfig.js';
@@ -47,7 +47,6 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
    * database rows. Failed sessions are forgotten on the next lookup, sessions the
    * database returns are dropped from here.
    */
-  private ticketSessions: {[identifier: string]: FaucetSession[]} = {};
 
   protected override async startModule(): Promise<void> {
     // a module with no signer or partner loads like any other (the module manager
@@ -78,6 +77,10 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
       (session: FaucetSession, userInput: any) => this.processSessionStart(session, userInput)
     );
     this.moduleManager.addActionHook(
+      this, ModuleHookAction.SessionAdmit, 2, "Ticket proof limit check",
+      (session: FaucetSession) => this.processSessionAdmit(session)
+    );
+    this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionComplete, 5, "Ticket proof save session",
       (session: FaucetSession) => this.processSessionComplete(session)
     );
@@ -94,7 +97,6 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
 
   protected override stopModule(): Promise<void> {
     ServiceManager.GetService(FaucetWebApi).removeApiEndpoint("ticketProofLogin");
-    this.ticketSessions = {};
     return Promise.resolve();
   }
 
@@ -140,15 +142,15 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
     }
 
     if(ticketInfo) {
-      // no await between the concurrency check and the registration: a second start
-      // with the same ticket must see this one, whatever it is still waiting on
-      this.checkLimit(ticketInfo, session);
-      this.trackSession(ticketInfo.identifier, session);
-
+      // decided here, before the hooks the perks skip; the concurrency limit and the
+      // limits of the applied grants are checked on admission
       let perks: TicketProofGrantPerks = {};
+      let appliedGrants: ITicketProofGrantConfig[] = [];
       for(let i = 0; i < this.moduleConfig.grants.length; i++) {
-        await this.checkGrant(ticketInfo, this.moduleConfig.grants[i], perks, session);
+        if(await this.checkGrant(ticketInfo, this.moduleConfig.grants[i], perks, session))
+          appliedGrants.push(this.moduleConfig.grants[i]);
       }
+      session.setSessionModuleRef("ticketproof.grants", appliedGrants);
 
       session.setSessionData("ticketproof.data", {
         identifier: ticketInfo.identifier,
@@ -169,6 +171,20 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
         });
         session.setSessionData("skip.modules", skipModules);
       }
+    }
+  }
+
+  // Runs one session at a time: the sessions admitted before are visible.
+  private async processSessionAdmit(session: FaucetSession): Promise<void> {
+    let ticketInfo = session.getSessionData<ITicketProofData>("ticketproof.data");
+    if(!ticketInfo)
+      return;
+    this.checkLimit(ticketInfo, session);
+    let appliedGrants = session.getSessionModuleRef("ticketproof.grants") as ITicketProofGrantConfig[] || [];
+    for(let i = 0; i < appliedGrants.length; i++) {
+      let limitMessage = await this.getGrantLimitMessage(ticketInfo, appliedGrants[i], session);
+      if(limitMessage)
+        throw new FaucetError("TICKETPROOF_LIMIT", limitMessage);
     }
   }
 
@@ -241,78 +257,31 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
     return { data: data };
   }
 
-  private trackSession(identifier: string, session: FaucetSession): void {
-    if(!this.ticketSessions[identifier])
-      this.ticketSessions[identifier] = [];
-    this.ticketSessions[identifier].push(session);
-  }
-
   /**
-   * The sessions of a ticket this process admitted and has not forgotten yet: not
-   * failed, not among `knownIds` (the database has those). The list is pruned to
-   * exactly that, so it never grows beyond the sessions the database lacks.
+   * The running sessions of a ticket that are not among `knownIds` (the database has those).
+   * Running sessions are admitted ones; a session still starting is not admitted yet and is
+   * checked on its own admission.
    */
-  private getTrackedSessions(identifier: string, knownIds?: Set<string>): FaucetSession[] {
-    let sessions = this.ticketSessions[identifier];
-    if(!sessions)
-      return [];
-    sessions = sessions.filter((sess) => {
-      if(sess.getSessionStatus() === FaucetSessionStatus.FAILED)
+  private getRunningSessions(identifier: string, session: FaucetSession, knownIds?: Set<string>): FaucetSession[] {
+    return ServiceManager.GetService(SessionManager).getActiveSessions().filter((sess) => {
+      if(sess === session || (knownIds && knownIds.has(sess.getSessionId())))
         return false;
-      return !knownIds || !knownIds.has(sess.getSessionId());
+      let ticketInfo = sess.getSessionData<ITicketProofData>("ticketproof.data");
+      return !!ticketInfo && ticketInfo.identifier === identifier;
     });
-    if(sessions.length > 0)
-      this.ticketSessions[identifier] = sessions;
-    else
-      delete this.ticketSessions[identifier];
-    return sessions;
   }
 
-  private async checkGrant(ticketData: ITicketProofData, grant: ITicketProofGrantConfig, perks: TicketProofGrantPerks, session: FaucetSession): Promise<void> {
+  // Applies the grant's perks when it is within its limits; returns whether it
+  // did. A required grant over its limits fails the session.
+  private async checkGrant(ticketData: ITicketProofData, grant: ITicketProofGrantConfig, perks: TicketProofGrantPerks, session: FaucetSession): Promise<boolean> {
     if(grant.tiers && grant.tiers.length > 0 && grant.tiers.indexOf(ticketData.tier) === -1)
-      return;
+      return false;
 
-    let finishedSessions = await this.ticketDb.getTicketSessions(ticketData.identifier, grant.duration, true);
-    // sessions in flight or completed but not written yet; the starting one is this session
-    let pendingSessions = this.getTrackedSessions(ticketData.identifier, new Set(finishedSessions.map((sess) => sess.sessionId)))
-      .filter((sess) => sess !== session);
-    let sessionCount = finishedSessions.length + pendingSessions.length;
-
-    if(grant.limitCount > 0 && sessionCount >= grant.limitCount) {
+    let limitMessage = await this.getGrantLimitMessage(ticketData, grant, session);
+    if(limitMessage) {
       if(!grant.required)
-        return;
-      let errMsg = grant.message || [
-        "You have already created ",
-        sessionCount,
-        (sessionCount > 1 ? " sessions" : " session"),
-        " in the last ",
-        renderTimespan(grant.duration)
-      ].join("");
-      throw new FaucetError(
-        "TICKETPROOF_LIMIT",
-        errMsg,
-      );
-    }
-
-    if(grant.limitAmount > 0) {
-      let totalAmount = 0n;
-      finishedSessions.forEach((sess) => totalAmount += BigInt(sess.dropAmount));
-      // a session still starting has no amount yet; assume the most it could get
-      pendingSessions.forEach((sess) => totalAmount += (sess.getDropAmount() > 0n ? sess.getDropAmount() : BigInt(faucetConfig.maxDropAmount)));
-      if(totalAmount >= BigInt(grant.limitAmount)) {
-        if(!grant.required)
-          return;
-        let errMsg = grant.message || [
-          "You have already requested ",
-          ServiceManager.GetService(EthWalletManager).readableAmount(totalAmount),
-          " in the last ",
-          renderTimespan(grant.duration)
-        ].join("");
-        throw new FaucetError(
-          "TICKETPROOF_LIMIT",
-          errMsg,
-        );
-      }
+        return false;
+      throw new FaucetError("TICKETPROOF_LIMIT", limitMessage);
     }
 
     // apply perks
@@ -325,30 +294,48 @@ export class TicketProofModule extends BaseModule<ITicketProofConfig> {
     if(typeof grant.overrideMaxDrop !== "undefined") {
       perks.overrideMaxDrop = grant.overrideMaxDrop;
     }
+    return true;
+  }
+
+  private async getGrantLimitMessage(ticketData: ITicketProofData, grant: ITicketProofGrantConfig, session: FaucetSession): Promise<string | null> {
+    if(!(grant.limitCount > 0) && !(grant.limitAmount > 0))
+      return null;
+    let finishedSessions = await this.ticketDb.getTicketSessions(ticketData.identifier, grant.duration, true);
+    let runningSessions = this.getRunningSessions(ticketData.identifier, session, new Set(finishedSessions.map((sess) => sess.sessionId)));
+    let sessionCount = finishedSessions.length + runningSessions.length;
+
+    if(grant.limitCount > 0 && sessionCount >= grant.limitCount) {
+      return grant.message || [
+        "You have already created ",
+        sessionCount,
+        (sessionCount > 1 ? " sessions" : " session"),
+        " in the last ",
+        renderTimespan(grant.duration)
+      ].join("");
+    }
+
+    if(grant.limitAmount > 0) {
+      let totalAmount = 0n;
+      finishedSessions.forEach((sess) => totalAmount += BigInt(sess.dropAmount));
+      // a running session has no final amount yet; assume the most it could get
+      runningSessions.forEach((sess) => totalAmount += (sess.getDropAmount() > 0n ? sess.getDropAmount() : BigInt(faucetConfig.maxDropAmount)));
+      if(totalAmount >= BigInt(grant.limitAmount)) {
+        return grant.message || [
+          "You have already requested ",
+          ServiceManager.GetService(EthWalletManager).readableAmount(totalAmount),
+          " in the last ",
+          renderTimespan(grant.duration)
+        ].join("");
+      }
+    }
+    return null;
   }
 
   private checkLimit(ticketData: ITicketProofData, session: FaucetSession): void {
     if(this.moduleConfig.concurrencyLimit === 0)
       return;
 
-    // sessions admitted here that are still starting or running, plus running sessions
-    // the manager knows that were not started by this process (restored after a restart)
-    let concurrentSessions = this.getTrackedSessions(ticketData.identifier).filter((sess) => {
-      if(sess === session)
-        return false;
-      let status = sess.getSessionStatus();
-      return status === FaucetSessionStatus.STARTING || status === FaucetSessionStatus.RUNNING;
-    });
-    let activeSessions = ServiceManager.GetService(SessionManager).getActiveSessions();
-    activeSessions.forEach((sess) => {
-      if(sess === session || concurrentSessions.indexOf(sess) !== -1)
-        return;
-      let ticketInfo = sess.getSessionData<ITicketProofData>("ticketproof.data");
-      if(ticketInfo && ticketInfo.identifier === ticketData.identifier)
-        concurrentSessions.push(sess);
-    });
-    let concurrentSessionCount = concurrentSessions.length;
-
+    let concurrentSessionCount = this.getRunningSessions(ticketData.identifier, session).length;
     if(concurrentSessionCount >= this.moduleConfig.concurrencyLimit) {
       throw new FaucetError(
         "TICKETPROOF_CONCURRENCY_LIMIT",
