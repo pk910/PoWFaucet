@@ -229,6 +229,11 @@ modules:
     # ip info lookup api url (default: http://ip-api.com/json/{ip}?fields=21155839)
     apiUrl: "http://ip-api.com/json/{ip}?fields=21155839"
 
+    # response format of the lookup api: "ip-api" (default) or "vpndetection"
+    # for VPNDetection, set apiUrl to "https://api.vpndetection.io/{ip}" (no key needed, see https://vpndetection.io/terms#no-key):
+    # VPN, Tor and privacy relay addresses count as proxy; its answer has no region, city or hosting flag
+    #apiFormat: "ip-api"
+
     # ip info caching time
     cacheTime: 86400 # 1 day
 
