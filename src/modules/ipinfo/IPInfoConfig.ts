@@ -2,6 +2,7 @@ import { IBaseModuleConfig } from "../BaseModule.js";
 
 export interface IIPInfoConfig extends IBaseModuleConfig {
   apiUrl: string; // ip info lookup api url (defaults: http://ip-api.com/json/{ip}?fields=21155839)
+  apiFormat?: "ip-api" | "vpndetection"; // response format of the lookup api (defaults: ip-api)
   cacheTime: number; // ip info caching time
   required: boolean; // require valid ip info for session start / resume / recovery
   restrictions: null | { // ip based restrictions
@@ -35,6 +36,7 @@ export interface IIPInfoRestrictionConfig {
 export const defaultConfig: IIPInfoConfig = {
   enabled: false,
   apiUrl: "http://ip-api.com/json/{ip}?fields=21155839",
+  apiFormat: "ip-api",
   cacheTime: 86400,
   required: false,
   restrictions: null,

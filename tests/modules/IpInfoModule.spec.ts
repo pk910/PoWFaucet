@@ -88,6 +88,95 @@ describe("Faucet module: ipinfo", () => {
     
   });
 
+  const testVpnDetectionResponse = {
+    "ip":"185.159.157.20","is_bogon":false,"is_vpn":true,"is_relay":false,"is_tor":false,"relay":{},"tor":{},
+    "location":{"continent":"EU","continent_name":"Europe","country":"CH","country_name":"Switzerland","timezone":"Europe/Zurich"},
+    "asn":{"asn":209103,"name":"Proton AG","domain":"protonvpn.com","type":"hosting","prefix":"185.159.157.0/24"}
+  };
+
+  function vpnDetectionConfig(restrictions: IIPInfoConfig["restrictions"]): IIPInfoConfig {
+    return {
+      enabled: true,
+      apiUrl: "https://api.vpndetection.io/{ip}",
+      apiFormat: "vpndetection",
+      cacheTime: 86400,
+      required: false,
+      restrictions: restrictions,
+      restrictionsPattern: {},
+      restrictionsFile: null,
+    } as IIPInfoConfig;
+  }
+
+  it("Request IP info from VPNDetection on session start", async () => {
+    faucetConfig.modules["ipinfo"] = vpnDetectionConfig(null);
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve(testVpnDetectionResponse)
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:185.159.157.20", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(globalStubs["fetch"].getCall(0).args[0]).to.equal("https://api.vpndetection.io/185.159.157.20", "unexpected lookup url");
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
+    let ipInfo = testSession.getSessionData("ipinfo.data");
+    expect(ipInfo.status).to.equal("success", "unexpected ipinfo status");
+    expect(ipInfo.countryCode).to.equal("CH", "unexpected country code");
+    expect(ipInfo.country).to.equal("Switzerland", "unexpected country");
+    expect(ipInfo.zone).to.equal("Europe/Zurich", "unexpected zone");
+    expect(ipInfo.as).to.equal("AS209103 Proton AG", "unexpected as");
+    expect(ipInfo.proxy).to.equal(true, "unexpected proxy flag");
+    expect(ipInfo.hosting).to.equal(undefined, "unexpected hosting flag");
+  });
+
+  it("check ipinfo based restriction with VPNDetection (VPN counts as proxy)", async () => {
+    faucetConfig.modules["ipinfo"] = vpnDetectionConfig({ proxy: 50, hosting: 25 });
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve(testVpnDetectionResponse)
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:185.159.157.20", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
+    expect(testSession.getDropAmount()).to.equal(50n, "unexpected drop amount");
+  });
+
+  it("check ipinfo based restriction with VPNDetection (no flag, no restriction)", async () => {
+    faucetConfig.modules["ipinfo"] = vpnDetectionConfig({ proxy: 50, hosting: 25 });
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve(Object.assign({}, testVpnDetectionResponse, { ip: "8.8.8.8", is_vpn: false }))
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let testSession = await sessionManager.createSession("::ffff:8.8.8.8", {
+      addr: "0x0000000000000000000000000000000000001337",
+    });
+    expect(testSession.getSessionStatus()).to.equal("claimable", "unexpected session status");
+    expect(testSession.getDropAmount()).to.equal(100n, "unexpected drop amount");
+  });
+
+  it("Start session with failed IP info request from VPNDetection (error body)", async () => {
+    faucetConfig.modules["ipinfo"] = Object.assign(vpnDetectionConfig(null), { required: true });
+    globalStubs["fetch"].returns(returnDelayedPromise(true, {
+      json: () => Promise.resolve({ "error": "invalid ip address" })
+    }));
+    await ServiceManager.GetService(ModuleManager).initialize();
+    let sessionManager = ServiceManager.GetService(SessionManager);
+    let error: FaucetError | null = null;
+    try {
+      await sessionManager.createSession("::ffff:8.8.8.8", {
+        addr: "0x0000000000000000000000000000000000001337",
+      });
+    } catch(ex) {
+      error = ex;
+    }
+    expect(error).to.not.equal(null, "no exception thrown");
+    expect(error instanceof FaucetError).to.equal(true, "unexpected error type");
+    expect(error?.getCode()).to.equal("INVALID_IPINFO", "unexpected error code");
+  });
+
   it("Start session with failed IP info request (failed status)", async () => {
     faucetConfig.modules["ipinfo"] = {
       enabled: true,

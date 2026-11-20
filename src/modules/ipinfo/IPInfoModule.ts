@@ -44,7 +44,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
 
   protected override async startModule(): Promise<void> {
     this.ipInfoDb = await ServiceManager.GetService(FaucetDatabase).createModuleDb(IPInfoDB, this);
-    this.ipInfoResolver = new IPInfoResolver(this.ipInfoDb, this.moduleConfig.apiUrl);
+    this.ipInfoResolver = new IPInfoResolver(this.ipInfoDb, this.moduleConfig.apiUrl, this.moduleConfig.apiFormat);
     this.moduleManager.addActionHook(
       this, ModuleHookAction.SessionStart, 7, "IP Info check", 
       (session: FaucetSession) => this.processSessionStart(session)
@@ -66,7 +66,7 @@ export class IPInfoModule extends BaseModule<IIPInfoConfig> {
   }
 
   protected override onConfigReload(): void {
-    this.ipInfoResolver.setApi(this.moduleConfig.apiUrl);
+    this.ipInfoResolver.setApi(this.moduleConfig.apiUrl, this.moduleConfig.apiFormat);
     this.ipInfoMatchRestrictionsRefresh = 0;
   }
 

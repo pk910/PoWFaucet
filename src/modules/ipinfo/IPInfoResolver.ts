@@ -20,17 +20,21 @@ export interface IIPInfo {
   hosting?: boolean;
 }
 
+export type IPInfoApiFormat = "ip-api" | "vpndetection";
+
 export class IPInfoResolver {
   private ipInfoDb: IPInfoDB;
   private ipInfoApi: string;
+  private ipInfoApiFormat: IPInfoApiFormat;
   private ipInfoCache: {[ip: string]: [number, Promise<IIPInfo>]} = {};
   private ipInfoCacheCleanupTimer: NodeJS.Timeout;
   private ipInfoCacheCleanupInterval: number = 20 * 1000;
   private ipInfoCacheCleanupTimeout: number = 6 * 60 * 60;
 
-  public constructor(ipInfoDb: IPInfoDB, api: string) {
+  public constructor(ipInfoDb: IPInfoDB, api: string, apiFormat?: IPInfoApiFormat) {
     this.ipInfoDb = ipInfoDb;
     this.ipInfoApi = api;
+    this.ipInfoApiFormat = apiFormat || "ip-api";
     this.ipInfoCacheCleanupTimer = setInterval(() => {
       this.cleanIpInfoCache();
     }, this.ipInfoCacheCleanupInterval);
@@ -40,8 +44,9 @@ export class IPInfoResolver {
     clearInterval(this.ipInfoCacheCleanupTimer);
   }
 
-  public setApi(api: string) {
+  public setApi(api: string, apiFormat?: IPInfoApiFormat) {
     this.ipInfoApi = api;
+    this.ipInfoApiFormat = apiFormat || "ip-api";
   }
 
   public async getIpInfo(ipAddr: string): Promise<IIPInfo> {
@@ -55,6 +60,8 @@ export class IPInfoResolver {
     let promise = FetchUtil.fetchWithTimeout(ipApiUrl, null, 20000)
     .then((rsp) => rsp.json())
     .then((rsp: any) => {
+      if(this.ipInfoApiFormat === "vpndetection")
+        rsp = this.parseVpnDetectionResponse(rsp);
       if(!rsp || !rsp.status)
         throw "invalid ip info response";
       let ipInfo: IIPInfo = {
@@ -90,6 +97,26 @@ export class IPInfoResolver {
       promise,
     ];
     return await promise;
+  }
+
+  // maps a VPNDetection answer (https://docs.vpndetection.io) to the ip-api fields used above
+  private parseVpnDetectionResponse(rsp: any): any {
+    if(!rsp || typeof rsp.ip !== "string")
+      return null;
+    let location = rsp.location || {};
+    let asn = rsp.asn || {};
+    let proxyFlags = ["is_vpn", "is_tor", "is_relay", "is_resproxy", "is_dcproxy", "is_mobproxy", "is_pubproxy"];
+    return {
+      status: "success",
+      country: location.country_name,
+      countryCode: location.country,
+      timezone: location.timezone,
+      isp: asn.name,
+      org: asn.name,
+      as: asn.asn ? "AS" + asn.asn + (asn.name ? " " + asn.name : "") : undefined,
+      proxy: proxyFlags.some((flag) => rsp[flag] === true),
+      hosting: typeof rsp.is_hosting === "boolean" ? rsp.is_hosting : undefined,
+    };
   }
 
   private cleanIpInfoCache() {
